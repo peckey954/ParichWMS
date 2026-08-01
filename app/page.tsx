@@ -1,39 +1,26 @@
 "use client";
 
-import { PackagePlusIcon } from "lucide-react";
-import { Badge } from "@peckey954/ui/components/ui/badge";
+import * as React from "react";
+import { MinusIcon, PlusIcon, TriangleAlertIcon, Trash2Icon } from "lucide-react";
+import { Alert, AlertDescription, AlertTitle } from "@peckey954/ui/components/ui/alert";
+import {
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbList,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+} from "@peckey954/ui/components/ui/breadcrumb";
 import { Button } from "@peckey954/ui/components/ui/button";
+import { Card, CardContent } from "@peckey954/ui/components/ui/card";
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@peckey954/ui/components/ui/card";
-import { Checkbox } from "@peckey954/ui/components/ui/checkbox";
-import {
-  Dialog,
-  DialogClose,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@peckey954/ui/components/ui/dialog";
-import {
-  Field,
-  FieldContent,
-  FieldDescription,
-  FieldLabel,
-  FieldTitle,
-} from "@peckey954/ui/components/ui/field";
+  InputGroup,
+  InputGroupAddon,
+  InputGroupButton,
+  InputGroupInput,
+} from "@peckey954/ui/components/ui/input-group";
 import { Input } from "@peckey954/ui/components/ui/input";
 import { Label } from "@peckey954/ui/components/ui/label";
-import {
-  RadioGroup,
-  RadioGroupItem,
-} from "@peckey954/ui/components/ui/radio-group";
 import {
   Select,
   SelectContent,
@@ -50,219 +37,407 @@ import {
   TableHeader,
   TableRow,
 } from "@peckey954/ui/components/ui/table";
-import { ThemeToggle } from "@/components/theme-toggle";
+import { Textarea } from "@peckey954/ui/components/ui/textarea";
+import { toast } from "sonner";
+import { AddMaterialDialog } from "@/components/production/add-material-dialog";
+import { useNumberField } from "@/components/number-field";
+import { StatusBadge } from "@/components/status-badge";
+import { formatDateTime, formatNumber, formatTon } from "@/lib/format";
+import {
+  SEED_ORDER,
+  stockTon,
+  usedTon,
+  type MaterialLine,
+} from "@/lib/production-order";
 
-const LOTS = [
-  {
-    code: "PD260116/01-04",
-    sku: "A-9M",
-    zone: "โซน A · ชั้น 2",
-    qty: "500 ชิ้น",
-    status: "พร้อมจ่าย",
-  },
-  {
-    code: "PD260116/05-08",
-    sku: "B-4L",
-    zone: "โซน B · ชั้น 1",
-    qty: "180 ชิ้น",
-    status: "รอตรวจ",
-  },
-  {
-    code: "PD260117/01-02",
-    sku: "C-2S",
-    zone: "โซน C · ชั้น 3",
-    qty: "1,240 ชิ้น",
-    status: "พร้อมจ่าย",
-  },
-];
+export default function ProductionOrderPage() {
+  const [order, setOrder] = React.useState(SEED_ORDER);
 
-export default function Home() {
+  const patchMaterial = (id: string, patch: Partial<MaterialLine>) =>
+    setOrder((o) => ({
+      ...o,
+      materials: o.materials.map((m) => (m.id === id ? { ...m, ...patch } : m)),
+    }));
+
+  const removeMaterial = (id: string) =>
+    setOrder((o) => ({
+      ...o,
+      materials: o.materials.filter((m) => m.id !== id),
+    }));
+
+  const addMaterial = (line: MaterialLine) =>
+    setOrder((o) => ({ ...o, materials: [...o.materials, line] }));
+
+  const overStock = order.materials.filter((m) => m.useQty > m.stockQty);
+  const sweepRows = order.materials.filter((m) => m.sweepable);
+
+  function handleSave() {
+    if (overStock.length > 0) {
+      toast.error("บันทึกไม่ได้ — มีรายการที่ใช้เกินจำนวนคงเหลือ");
+      return;
+    }
+    toast.success(`บันทึกใบผลิต ${order.code} แล้ว`, {
+      description: `ปริมาณผลิตได้จริง ${formatTon(order.actualTon)} ตัน`,
+    });
+  }
+
   return (
-    <main className="mx-auto w-full max-w-5xl px-6 py-12">
-      <header className="flex items-start justify-between gap-4">
-        <div className="space-y-2">
-          <Badge>ParichWMS</Badge>
-          <h1 className="text-3xl font-semibold tracking-tight">
-            ระบบจัดการคลังสินค้า
-          </h1>
-          <p className="text-muted-foreground">
-            หน้าตัวอย่าง design system — สีส้ม #F97316 · ฟอนต์ Sarabun
-          </p>
+    <>
+      <main className="mx-auto w-full max-w-6xl px-4 py-6 sm:px-6">
+        <Breadcrumb>
+          <BreadcrumbList>
+            <BreadcrumbItem>
+              <BreadcrumbLink href="/">ระบบ</BreadcrumbLink>
+            </BreadcrumbItem>
+            <BreadcrumbSeparator />
+            <BreadcrumbItem>
+              <BreadcrumbLink href="/">ผลิตแบ่งบรรจุ</BreadcrumbLink>
+            </BreadcrumbItem>
+            <BreadcrumbSeparator />
+            <BreadcrumbItem>
+              <BreadcrumbPage className="text-primary">ใบผลิต</BreadcrumbPage>
+            </BreadcrumbItem>
+          </BreadcrumbList>
+        </Breadcrumb>
+
+        <h1 className="mt-4 text-2xl font-semibold tracking-tight">
+          ใบผลิต {order.code}
+        </h1>
+        <div className="mt-1.5 flex items-center gap-3">
+          <span className="text-sm text-muted-foreground">
+            {formatDateTime(order.createdAt)}
+          </span>
+          <StatusBadge status={order.status} />
         </div>
-        <ThemeToggle />
-      </header>
 
-      <Separator className="my-8" />
-
-      <section className="space-y-4">
-        <h2 className="text-lg font-semibold">ปุ่ม</h2>
-        <div className="flex flex-wrap items-center gap-3">
-          <Button>
-            <PackagePlusIcon />
-            รับสินค้าเข้า
-          </Button>
-          <Button variant="secondary">รอง</Button>
-          <Button variant="outline">ขอบ</Button>
-          <Button variant="ghost">โปร่ง</Button>
-          <Button variant="link">ลิงก์</Button>
-          <Button variant="destructive">ลบรายการ</Button>
-          <Button disabled>ปิดใช้งาน</Button>
-        </div>
-      </section>
-
-      <div className="mt-8 grid gap-6 md:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle>สร้างใบรับสินค้า</CardTitle>
-            <CardDescription>
-              กรอกข้อมูลล็อตที่ต้องการรับเข้าคลัง
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-5">
-            <div className="space-y-2">
-              <Label htmlFor="lot">รหัสล็อต</Label>
-              <Input id="lot" placeholder="PD260116/01-04" />
+        {/* ---------- ข้อมูลสูตร / ยอดสั่งผลิต ---------- */}
+        <Card className="mt-5">
+          <CardContent className="space-y-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="flex flex-wrap items-center gap-3">
+                <span className="font-medium">{order.formula}</span>
+                <Separator orientation="vertical" className="h-4!" />
+                <span className="text-sm">{order.packing}</span>
+                <Separator orientation="vertical" className="h-4!" />
+                <span className="text-sm">{order.bagSize}</span>
+              </div>
+              <div className="flex items-center gap-4 text-sm">
+                <span className="font-medium">{order.line}</span>
+                <span>
+                  <span className="text-muted-foreground">รอบ: </span>
+                  {order.round}
+                </span>
+              </div>
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="zone">โซนจัดเก็บ</Label>
-              <Select>
-                <SelectTrigger id="zone" className="w-full">
-                  <SelectValue placeholder="เลือกโซน" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="a">โซน A — สินค้าหมุนเร็ว</SelectItem>
-                  <SelectItem value="b">โซน B — สินค้าทั่วไป</SelectItem>
-                  <SelectItem value="c">โซน C — ควบคุมอุณหภูมิ</SelectItem>
-                </SelectContent>
-              </Select>
+            <div className="grid gap-4 rounded-lg bg-muted p-4 sm:grid-cols-2">
+              <div>
+                <p className="text-sm text-muted-foreground">สั่งผลิต (ตัน)</p>
+                <p className="mt-1 text-lg font-semibold">
+                  {formatTon(order.orderedTon)}
+                </p>
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">
+                  ปริมาณผลิต (ตัน)
+                </p>
+                <p className="mt-1 text-lg font-semibold">
+                  {formatTon(order.plannedTon)}
+                </p>
+              </div>
             </div>
 
-            <FieldLabel htmlFor="urgent">
-              <Field orientation="horizontal">
-                <Checkbox id="urgent" />
-                <FieldContent>
-                  <FieldTitle>ทำเครื่องหมายเร่งด่วน</FieldTitle>
-                  <FieldDescription>
-                    จะถูกจัดคิวขึ้นก่อนรายการอื่น
-                  </FieldDescription>
-                </FieldContent>
-              </Field>
-            </FieldLabel>
-
-            <div className="space-y-3">
-              <Label>วิธีตรวจนับ</Label>
-              <RadioGroup defaultValue="full" className="gap-3">
-                <FieldLabel htmlFor="count-full">
-                  <Field orientation="horizontal">
-                    <RadioGroupItem id="count-full" value="full" />
-                    <FieldContent>
-                      <FieldTitle>นับทั้งหมด</FieldTitle>
-                      <FieldDescription>ตรวจทุกชิ้นในล็อต</FieldDescription>
-                    </FieldContent>
-                  </Field>
-                </FieldLabel>
-                <FieldLabel htmlFor="count-sample">
-                  <Field orientation="horizontal">
-                    <RadioGroupItem id="count-sample" value="sample" />
-                    <FieldContent>
-                      <FieldTitle>สุ่มตัวอย่าง</FieldTitle>
-                      <FieldDescription>
-                        สุ่ม 10% ของจำนวนทั้งหมด
-                      </FieldDescription>
-                    </FieldContent>
-                  </Field>
-                </FieldLabel>
-              </RadioGroup>
-            </div>
-
-            <Dialog>
-              <DialogTrigger asChild>
-                <Button className="w-full">ยืนยันการรับเข้า</Button>
-              </DialogTrigger>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>ยืนยันการรับสินค้าเข้าคลัง</DialogTitle>
-                  <DialogDescription>
-                    ระบบจะบันทึกล็อตนี้เข้าสต็อกทันที และแก้ไขย้อนหลังไม่ได้
-                  </DialogDescription>
-                </DialogHeader>
-                <DialogFooter>
-                  <DialogClose asChild>
-                    <Button variant="outline">ยกเลิก</Button>
-                  </DialogClose>
-                  <DialogClose asChild>
-                    <Button>ยืนยัน</Button>
-                  </DialogClose>
-                </DialogFooter>
-              </DialogContent>
-            </Dialog>
+            <p className="text-sm">
+              <span className="text-muted-foreground">ผู้สั่งผลิต: </span>
+              <span className="font-medium">{order.requesterName}</span>
+            </p>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>ล็อตในคลัง</CardTitle>
-            <CardDescription>รายการล่าสุด 3 รายการ</CardDescription>
-          </CardHeader>
-          <CardContent>
+        {/* ---------- วัตถุดิบ / สินค้าที่ใช้ ---------- */}
+        <div className="mt-8 flex items-center justify-between gap-3">
+          <h2 className="text-lg font-semibold">วัตถุดิบ/สินค้าที่ใช้ในการผลิต</h2>
+          <AddMaterialDialog
+            existingIds={order.materials.map((m) => m.id)}
+            onAdd={addMaterial}
+          />
+        </div>
+
+        <Card className="mt-4 py-0">
+          <CardContent className="px-0">
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>รหัสล็อต</TableHead>
-                  <TableHead>ตำแหน่ง</TableHead>
-                  <TableHead className="text-right">จำนวน</TableHead>
-                  <TableHead>สถานะ</TableHead>
+                  <TableHead className="pl-4">วัตถุดิบ/สินค้า</TableHead>
+                  <TableHead className="text-right">แนะนำใช้</TableHead>
+                  <TableHead className="min-w-56">Lot</TableHead>
+                  <TableHead className="text-right">
+                    ปริมาณคงเหลือ
+                    <br />
+                    ในคลัง
+                  </TableHead>
+                  <TableHead className="text-right">
+                    จำนวนคงเหลือ
+                    <br />
+                    ในคลัง
+                  </TableHead>
+                  <TableHead className="text-right">ปริมาณที่ใช้</TableHead>
+                  <TableHead className="text-right">จำนวนที่ใช้</TableHead>
+                  <TableHead className="w-12 pr-4" />
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {LOTS.map((lot) => (
-                  <TableRow key={lot.code}>
-                    <TableCell className="font-medium">
-                      {lot.code}
-                      <span className="block text-xs text-muted-foreground">
-                        {lot.sku}
-                      </span>
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {lot.zone}
-                    </TableCell>
-                    <TableCell className="text-right">{lot.qty}</TableCell>
-                    <TableCell>
-                      <Badge
-                        variant={
-                          lot.status === "พร้อมจ่าย" ? "default" : "secondary"
-                        }
-                      >
-                        {lot.status}
-                      </Badge>
-                    </TableCell>
-                  </TableRow>
+                {order.materials.map((m) => (
+                  <MaterialRow
+                    key={m.id}
+                    material={m}
+                    onPatch={(patch) => patchMaterial(m.id, patch)}
+                    onRemove={() => removeMaterial(m.id)}
+                  />
                 ))}
               </TableBody>
             </Table>
           </CardContent>
         </Card>
-      </div>
 
-      <section className="mt-8 space-y-4">
-        <h2 className="text-lg font-semibold">สีของแบรนด์</h2>
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <div className="rounded-lg bg-primary p-4 text-primary-foreground">
-            <p className="text-sm font-medium">primary</p>
-            <p className="text-xs opacity-80">#F97316</p>
-          </div>
-          <div className="rounded-lg bg-secondary p-4 text-secondary-foreground">
-            <p className="text-sm font-medium">secondary</p>
-          </div>
-          <div className="rounded-lg bg-muted p-4 text-muted-foreground">
-            <p className="text-sm font-medium">muted</p>
-          </div>
-          <div className="rounded-lg bg-destructive p-4 text-destructive-foreground">
-            <p className="text-sm font-medium">destructive</p>
-          </div>
+        {overStock.length > 0 && (
+          <Alert variant="destructive" className="mt-4">
+            <TriangleAlertIcon />
+            <AlertTitle>ใช้เกินจำนวนคงเหลือในคลัง</AlertTitle>
+            <AlertDescription>
+              {overStock.map((m) => m.name).join(", ")} —
+              แก้จำนวนที่ใช้ให้ไม่เกินยอดคงเหลือก่อนบันทึก
+            </AlertDescription>
+          </Alert>
+        )}
+
+        {/* ---------- ปุ๋ยกวาดพื้น ---------- */}
+        {sweepRows.length > 0 && (
+          <>
+            <h2 className="mt-8 text-lg font-semibold">ข้อมูลปุ๋ยกวาดพื้น</h2>
+            <Card className="mt-4 py-0">
+              <CardContent className="px-0">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="pl-4">วัตถุดิบ</TableHead>
+                      <TableHead className="w-48 text-right">
+                        ปริมาณกวาดพื้น
+                        <br />
+                        (ตัน)
+                      </TableHead>
+                      <TableHead className="w-40 pr-4 text-right">
+                        ปริมาณสูญเสีย
+                        <br />
+                        (ตัน)
+                      </TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {sweepRows.map((m) => (
+                      <SweepRow
+                        key={m.id}
+                        material={m}
+                        onPatch={(patch) => patchMaterial(m.id, patch)}
+                      />
+                    ))}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+          </>
+        )}
+
+        {/* ---------- การผลิต ---------- */}
+        <h2 className="mt-8 text-lg font-semibold">การผลิต</h2>
+
+        <div className="mt-4 max-w-md space-y-2">
+          <Label htmlFor="actual-ton">ปริมาณผลิตได้จริง (ตัน)</Label>
+          <TonStepper
+            id="actual-ton"
+            value={order.actualTon}
+            onValueChange={(actualTon) => setOrder((o) => ({ ...o, actualTon }))}
+          />
         </div>
-      </section>
-    </main>
+
+        <div className="mt-5 space-y-2">
+          <Label htmlFor="note">
+            หมายเหตุ{" "}
+            <span className="font-normal text-muted-foreground">
+              (ไม่บังคับ)
+            </span>
+          </Label>
+          <Textarea
+            id="note"
+            placeholder="ระบุหมายเหตุ"
+            rows={3}
+            value={order.note}
+            onChange={(e) =>
+              setOrder((o) => ({ ...o, note: e.target.value }))
+            }
+          />
+        </div>
+      </main>
+
+      {/* ---------- แถบปุ่มล่าง ---------- */}
+      <div className="sticky bottom-0 z-30 border-t border-border bg-background">
+        <div className="mx-auto flex w-full max-w-6xl items-center justify-between gap-3 px-4 py-3 sm:px-6">
+          <Button
+            variant="outline"
+            className="border-primary text-primary hover:text-primary"
+          >
+            ย้อนกลับ
+          </Button>
+          <Button onClick={handleSave}>บันทึก</Button>
+        </div>
+      </div>
+    </>
+  );
+}
+
+function MaterialRow({
+  material: m,
+  onPatch,
+  onRemove,
+}: {
+  material: MaterialLine;
+  onPatch: (patch: Partial<MaterialLine>) => void;
+  onRemove: () => void;
+}) {
+  const qtyField = useNumberField(m.useQty, (useQty) => onPatch({ useQty }));
+  const used = usedTon(m);
+  const stock = stockTon(m);
+  const over = m.useQty > m.stockQty;
+
+  return (
+    <TableRow>
+      <TableCell className="pl-4 align-top">
+        <div className="font-medium">{m.name}</div>
+        {m.sub && (
+          <div className="text-xs text-muted-foreground">{m.sub}</div>
+        )}
+      </TableCell>
+      <TableCell className="text-right align-top whitespace-nowrap">
+        {formatNumber(m.suggestQty, m.suggestDigits)} {m.suggestUnit}
+      </TableCell>
+      <TableCell className="align-top">
+        <Select value={m.lot} onValueChange={(lot) => onPatch({ lot })}>
+          <SelectTrigger className="w-full" aria-label={`Lot ของ ${m.name}`}>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {m.lots.map((lot) => (
+              <SelectItem key={lot} value={lot}>
+                {lot}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </TableCell>
+      <TableCell className="text-right align-top whitespace-nowrap">
+        {stock === null ? "-" : `${formatTon(stock)} ตัน`}
+      </TableCell>
+      <TableCell className="text-right align-top whitespace-nowrap">
+        <div>{formatNumber(m.stockQty)}</div>
+        {m.tonPerUnit !== null && (
+          <div className="text-xs text-muted-foreground">
+            {m.tonPerUnit} ตัน/ชิ้น
+          </div>
+        )}
+      </TableCell>
+      <TableCell className="text-right align-top whitespace-nowrap">
+        {used === null ? "-" : `${formatTon(used)} ตัน`}
+      </TableCell>
+      <TableCell className="align-top">
+        <Input
+          {...qtyField}
+          aria-invalid={over}
+          aria-label={`จำนวนที่ใช้ของ ${m.name}`}
+          className="ml-auto w-24 text-right"
+        />
+      </TableCell>
+      <TableCell className="pr-4 align-top">
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          aria-label={`ลบ ${m.name}`}
+          onClick={onRemove}
+        >
+          <Trash2Icon />
+        </Button>
+      </TableCell>
+    </TableRow>
+  );
+}
+
+function SweepRow({
+  material: m,
+  onPatch,
+}: {
+  material: MaterialLine;
+  onPatch: (patch: Partial<MaterialLine>) => void;
+}) {
+  const sweepField = useNumberField(
+    m.sweepTon,
+    (sweepTon) => onPatch({ sweepTon }),
+    2
+  );
+
+  return (
+    <TableRow>
+      <TableCell className="pl-4">
+        <div className="font-medium">{m.name}</div>
+        {m.sub && <div className="text-xs text-muted-foreground">{m.sub}</div>}
+      </TableCell>
+      <TableCell>
+        <Input
+          {...sweepField}
+          aria-label={`ปริมาณกวาดพื้นของ ${m.name}`}
+          className="ml-auto w-32 text-right"
+        />
+      </TableCell>
+      {/* ปุ๋ยที่กวาดพื้นได้ = ส่วนที่หลุดออกจากไลน์ ถือเป็นปริมาณสูญเสียของล็อตนั้น */}
+      <TableCell className="pr-4 text-right whitespace-nowrap">
+        {m.sweepTon > 0 ? formatTon(m.sweepTon) : "-"}
+      </TableCell>
+    </TableRow>
+  );
+}
+
+function TonStepper({
+  id,
+  value,
+  onValueChange,
+}: {
+  id: string;
+  value: number;
+  onValueChange: (next: number) => void;
+}) {
+  const field = useNumberField(value, onValueChange, 2);
+  const step = (delta: number) =>
+    onValueChange(Math.max(0, Number((value + delta).toFixed(2))));
+
+  return (
+    <InputGroup>
+      <InputGroupAddon align="inline-start">
+        <InputGroupButton
+          size="icon-xs"
+          aria-label="ลดปริมาณ"
+          onClick={() => step(-1)}
+        >
+          <MinusIcon />
+        </InputGroupButton>
+      </InputGroupAddon>
+      <InputGroupInput {...field} id={id} className="text-center" />
+      <InputGroupAddon align="inline-end">
+        <InputGroupButton
+          size="icon-xs"
+          aria-label="เพิ่มปริมาณ"
+          onClick={() => step(1)}
+        >
+          <PlusIcon />
+        </InputGroupButton>
+      </InputGroupAddon>
+    </InputGroup>
   );
 }

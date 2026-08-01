@@ -11,3 +11,14 @@
 
 /* ให้ Tailwind สแกนหา class ที่ใช้อยู่ในโค้ดของไลบรารี */
 @source "../node_modules/@peckey954/ui/src";
+
+/* token เพิ่มเติมของแอปนี้ที่ DS ยังไม่มี — ป้ายสถานะเอกสาร
+   ค่าจริงอยู่ใน brand.css ตรงนี้แค่แมปชื่อเข้า Tailwind (bg-warning, text-warning-foreground …) */
+@theme inline {
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-info: var(--info);
+  --color-info-foreground: var(--info-foreground);
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+}

@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import { Sarabun } from "next/font/google";
+import { Toaster } from "@peckey954/ui/components/ui/sonner";
+import { AppShell } from "@/components/app-shell";
 import { ThemeProvider } from "@/components/providers";
 import "./globals.css";
 
@@ -12,8 +14,8 @@ const brandFont = Sarabun({
 });
 
 export const metadata: Metadata = {
-  title: "ParichWMS",
-  description: "ระบบจัดการคลังสินค้า ParichWMS",
+  title: "Parich WMS",
+  description: "ระบบจัดการคลังสินค้า Parich WMS",
 };
 
 export default function RootLayout({
@@ -29,7 +31,10 @@ export default function RootLayout({
       suppressHydrationWarning
     >
       <body className="min-h-screen bg-background text-foreground font-sans antialiased">
-        <ThemeProvider>{children}</ThemeProvider>
+        <ThemeProvider>
+          <AppShell>{children}</AppShell>
+          <Toaster />
+        </ThemeProvider>
       </body>
     </html>
   );
