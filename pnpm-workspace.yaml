@@ -1,0 +1,6 @@
+allowBuilds:
+  sharp: true
+  unrs-resolver: true
+minimumReleaseAgeExclude:
+  - '@peckey954/tokens@0.1.0'
+  - '@peckey954/ui@0.1.0'

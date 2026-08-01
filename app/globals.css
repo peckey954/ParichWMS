@@ -1,0 +1,13 @@
+@import "tailwindcss";
+
+/* utility อนิเมชันที่ shadcn ใช้ (dialog, sheet, popover, tooltip …) */
+@import "tw-animate-css";
+
+/* คำศัพท์กลาง — แมป token เข้ากับ Tailwind (ต้องมาก่อนไฟล์แบรนด์) */
+@import "@peckey954/ui/globals.css";
+
+/* ค่าจริงของแบรนด์ ParichWMS */
+@import "./brand.css";
+
+/* ให้ Tailwind สแกนหา class ที่ใช้อยู่ในโค้ดของไลบรารี */
+@source "../node_modules/@peckey954/ui/src";

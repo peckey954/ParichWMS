@@ -1,0 +1,116 @@
+/* ============================================================
+   Brand: PARICHWMS  (สีส้ม #F97316 + ฟอนต์ Sarabun)
+   scope ด้วย [data-brand="parichwms"]  ·  .dark = โหมดมืด
+   แก้ค่าตรงนี้ = เปลี่ยนทั้งแบรนด์ (component ไม่ต้องแตะ)
+   ============================================================ */
+
+[data-brand="parichwms"] {
+  --background: hsl(0 0% 100%);
+  --foreground: hsl(24 24% 10%);
+
+  --card: hsl(0 0% 100%);
+  --card-foreground: hsl(24 24% 10%);
+
+  --popover: hsl(0 0% 100%);
+  --popover-foreground: hsl(24 24% 10%);
+
+  /* สีหลักของแบรนด์ = #F97316 */
+  --primary: hsl(24.6 95% 53.1%);
+  /* ส้มสว่างมาก ตัวหนังสือขาวบนพื้นนี้ได้แค่ 2.8:1 (ตก AA)
+     จึงใช้น้ำตาลเข้มแทน ได้ 7.4:1 โดยที่ --primary ยังเป็น #F97316 เป๊ะ */
+  --primary-foreground: hsl(24 45% 10%);
+
+  --secondary: hsl(30 45% 96%);
+  --secondary-foreground: hsl(24 24% 10%);
+
+  --muted: hsl(30 45% 96%);
+  --muted-foreground: hsl(25 10% 42%);
+
+  --accent: hsl(30 45% 96%);
+  --accent-foreground: hsl(24 24% 10%);
+
+  --destructive: hsl(0 72% 51%);
+  --destructive-foreground: hsl(0 0% 100%);
+
+  /* สถานะ hover — โหมดสว่างให้ "เข้มขึ้น" (ลดค่า L)
+     อย่าใช้วิธีลด opacity แทน เพราะบนพื้นสว่างมันจะจางลงไม่ใช่เข้มขึ้น */
+  --primary-hover: hsl(24.6 95% 46%);
+  --secondary-hover: hsl(30 45% 92%);
+  --accent-hover: hsl(30 45% 92%);
+  --destructive-hover: hsl(0 72% 46%);
+
+  --border: hsl(28 30% 89%);
+  --input: hsl(28 30% 89%);
+  --ring: hsl(24.6 95% 53.1%);
+
+  --chart-1: hsl(24.6 95% 53.1%);
+  --chart-2: hsl(160 60% 45%);
+  --chart-3: hsl(45 90% 50%);
+  --chart-4: hsl(200 65% 55%);
+  --chart-5: hsl(340 75% 55%);
+
+  --sidebar: hsl(30 40% 98%);
+  --sidebar-foreground: hsl(24 24% 10%);
+  --sidebar-primary: hsl(24.6 95% 53.1%);
+  --sidebar-primary-foreground: hsl(24 45% 10%);
+  --sidebar-accent: hsl(30 45% 96%);
+  --sidebar-accent-foreground: hsl(24 24% 10%);
+  --sidebar-border: hsl(28 30% 89%);
+  --sidebar-ring: hsl(24.6 95% 53.1%);
+
+  --radius: 0.625rem;
+
+  /* ฟอนต์ประจำแบรนด์ (ผูกกับ CSS var ที่ next/font สร้างใน app/layout.tsx) */
+  --font-sans: var(--font-brand), ui-sans-serif, system-ui, sans-serif;
+}
+
+[data-brand="parichwms"].dark {
+  --background: hsl(24 20% 7%);
+  --foreground: hsl(30 25% 96%);
+
+  --card: hsl(24 18% 11%);
+  --card-foreground: hsl(30 25% 96%);
+
+  --popover: hsl(24 18% 11%);
+  --popover-foreground: hsl(30 25% 96%);
+
+  --primary: hsl(27 96% 61%);
+  --primary-foreground: hsl(24 45% 10%);
+
+  --secondary: hsl(24 14% 18%);
+  --secondary-foreground: hsl(30 25% 96%);
+
+  --muted: hsl(24 14% 18%);
+  --muted-foreground: hsl(28 12% 68%);
+
+  --accent: hsl(24 14% 18%);
+  --accent-foreground: hsl(30 25% 96%);
+
+  --destructive: hsl(0 63% 45%);
+  --destructive-foreground: hsl(0 0% 98%);
+
+  /* โหมดมืดกลับด้าน — hover ให้ "สว่างขึ้น" เพื่อให้เด่นขึ้นเหมือนกัน */
+  --primary-hover: hsl(27 96% 68%);
+  --secondary-hover: hsl(24 14% 23%);
+  --accent-hover: hsl(24 14% 23%);
+  --destructive-hover: hsl(0 63% 50%);
+
+  --border: hsl(24 14% 21%);
+  --input: hsl(24 14% 21%);
+  --ring: hsl(27 96% 61%);
+
+  --chart-1: hsl(27 96% 61%);
+  --chart-2: hsl(160 60% 45%);
+  --chart-3: hsl(45 90% 55%);
+  --chart-4: hsl(200 65% 55%);
+  --chart-5: hsl(340 75% 55%);
+
+  --sidebar: hsl(24 18% 11%);
+  --sidebar-foreground: hsl(30 25% 96%);
+  --sidebar-primary: hsl(27 96% 61%);
+  --sidebar-primary-foreground: hsl(24 45% 10%);
+  --sidebar-accent: hsl(24 14% 18%);
+  --sidebar-accent-foreground: hsl(30 25% 96%);
+  --sidebar-border: hsl(24 14% 21%);
+  --sidebar-ring: hsl(27 96% 61%);
+}
