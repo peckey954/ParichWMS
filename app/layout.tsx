@@ -6,10 +6,12 @@ import { ThemeProvider } from "@/components/providers";
 import "./globals.css";
 
 // ต้องมี subset "thai" ไม่งั้นตัวอักษรไทยจะตกไปใช้ฟอนต์สำรอง
-const brandFont = Sarabun({
+// ชื่อ variable ต้องเป็น --font-sarabun เป๊ะ ๆ เพราะ styles.css ของ DS
+// มองหาชื่อนี้ตรง ๆ ที่ html[data-font="sarabun"]
+const sarabun = Sarabun({
   subsets: ["thai", "latin"],
   weight: ["400", "500", "600", "700"],
-  variable: "--font-brand",
+  variable: "--font-sarabun",
   display: "swap",
 });
 
@@ -26,8 +28,10 @@ export default function RootLayout({
   return (
     <html
       lang="th"
-      data-brand="parichwms"
-      className={brandFont.variable}
+      className={sarabun.variable}
+      data-brand="parich"
+      data-tint="pure"
+      data-font="sarabun"
       suppressHydrationWarning
     >
       <body className="min-h-screen bg-background text-foreground font-sans antialiased">

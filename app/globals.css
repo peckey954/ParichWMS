@@ -3,22 +3,18 @@
 /* utility อนิเมชันที่ shadcn ใช้ (dialog, sheet, popover, tooltip …) */
 @import "tw-animate-css";
 
-/* คำศัพท์กลาง — แมป token เข้ากับ Tailwind (ต้องมาก่อนไฟล์แบรนด์) */
+/* คำศัพท์กลาง — แมป token เข้ากับ Tailwind (ต้องมาก่อนไฟล์แบรนด์เสมอ) */
 @import "@peckey954/ui/globals.css";
 
-/* ค่าจริงของแบรนด์ ParichWMS */
-@import "./brand.css";
+/* ค่าสีของแบรนด์ parich — มากับแพ็กเกจ ไม่ต้องสร้างไฟล์สีเอง */
+@import "@peckey954/tokens/parich.css";
 
-/* ให้ Tailwind สแกนหา class ที่ใช้อยู่ในโค้ดของไลบรารี */
+/* โทนสีพื้น pure / blend (ต้องมาหลังไฟล์แบรนด์) */
+@import "@peckey954/tokens/tint.css";
+
+/* ⚠️ ขาดไม่ได้ — ค่าเริ่มต้นของ --radius --font-sans + แกน radius/density/font
+   ถ้าลืม ทุกอย่างจะมุมเหลี่ยมหมดเพราะไม่มี --radius เลย */
+@import "@peckey954/tokens/styles.css";
+
+/* ⚠️ ขาดไม่ได้ — ให้ Tailwind สแกนหา class ที่ไลบรารีใช้ */
 @source "../node_modules/@peckey954/ui/src";
-
-/* token เพิ่มเติมของแอปนี้ที่ DS ยังไม่มี — ป้ายสถานะเอกสาร
-   ค่าจริงอยู่ใน brand.css ตรงนี้แค่แมปชื่อเข้า Tailwind (bg-warning, text-warning-foreground …) */
-@theme inline {
-  --color-warning: var(--warning);
-  --color-warning-foreground: var(--warning-foreground);
-  --color-info: var(--info);
-  --color-info-foreground: var(--info-foreground);
-  --color-success: var(--success);
-  --color-success-foreground: var(--success-foreground);
-}

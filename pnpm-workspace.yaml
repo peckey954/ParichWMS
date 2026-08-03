@@ -1,6 +1,9 @@
 allowBuilds:
   sharp: true
   unrs-resolver: true
+# แพ็กเกจ DS ของเราเอง เพิ่ง publish จึงยังไม่พ้นด่าน minimumReleaseAge ของ pnpm
 minimumReleaseAgeExclude:
   - '@peckey954/tokens@0.1.0'
   - '@peckey954/ui@0.1.0'
+  - '@peckey954/tokens@0.2.0'
+  - '@peckey954/ui@0.2.0'

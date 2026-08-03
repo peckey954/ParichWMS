@@ -9,8 +9,8 @@
     "lint": "eslint"
   },
   "dependencies": {
-    "@peckey954/tokens": "^0.1.0",
-    "@peckey954/ui": "^0.1.0",
+    "@peckey954/tokens": "^0.2.0",
+    "@peckey954/ui": "^0.2.0",
     "lucide-react": "^1.28.0",
     "next": "16.2.12",
     "next-themes": "^0.4.6",
