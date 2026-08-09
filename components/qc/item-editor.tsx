@@ -37,14 +37,19 @@ import {
 } from "@peckey954/ui/components/ui/table";
 import { cn } from "@peckey954/ui/lib/utils";
 import {
-  RECORD_MODE_LABEL,
+  CAPTURE_LABEL,
   RULE_OP_LABEL,
+  VERDICT_LABEL,
+  VERDICT_WORDING_LABEL,
+  describeBehaviour,
   describeRule,
   newColumn,
   newItem,
+  type CaptureMode,
   type QcItem,
-  type RecordMode,
   type RuleOp,
+  type VerdictMode,
+  type VerdictWording,
 } from "@/lib/qc-template";
 
 function moveIn<T>(list: T[], i: number, dir: -1 | 1): T[] {
@@ -74,7 +79,7 @@ export function ItemEditor({
 }) {
   const [open, setOpen] = React.useState(false);
   const isChild = depth > 0;
-  const isMeasure = item.mode === "measure";
+  const isMeasure = item.capture === "number";
 
   const patchColumn = (id: string, p: Partial<QcItem["columns"][number]>) =>
     onPatch({
@@ -136,42 +141,97 @@ export function ItemEditor({
           </div>
         </div>
 
-        {/* ---- วิธีบันทึกผล + สรุปสั้น ๆ ---- */}
-        <div className="flex flex-wrap items-center gap-3 pl-9">
-          <div className="w-56">
+        {/* ---- 2 แกนอิสระ: คีย์ค่าอะไร / ตัดสินยังไง ---- */}
+        <div className="grid gap-3 pl-9 sm:grid-cols-3">
+          <div className="space-y-2">
+            <Label htmlFor={`${item.id}-capture`}>ผู้ตรวจต้องคีย์อะไร</Label>
             <Select
-              value={item.mode}
+              value={item.capture}
               onValueChange={(v) => {
-                const mode = v as RecordMode;
+                const capture = v as CaptureMode;
                 onPatch({
-                  mode,
+                  capture,
                   columns:
-                    mode === "measure" && item.columns.length === 0
+                    capture === "number" && item.columns.length === 0
                       ? [newColumn()]
                       : item.columns,
                 });
               }}
             >
-              <SelectTrigger className="w-full">
+              <SelectTrigger id={`${item.id}-capture`} className="w-full">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {(Object.keys(RECORD_MODE_LABEL) as RecordMode[]).map((m) => (
-                  <SelectItem key={m} value={m}>
-                    {RECORD_MODE_LABEL[m]}
+                {(Object.keys(CAPTURE_LABEL) as CaptureMode[]).map((c) => (
+                  <SelectItem key={c} value={c}>
+                    {CAPTURE_LABEL[c]}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </div>
 
+          <div className="space-y-2">
+            <Label htmlFor={`${item.id}-verdict`}>ตัดสินผ่าน/ไม่ผ่านยังไง</Label>
+            <Select
+              value={item.verdict}
+              onValueChange={(v) => onPatch({ verdict: v as VerdictMode })}
+            >
+              <SelectTrigger id={`${item.id}-verdict`} className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {(Object.keys(VERDICT_LABEL) as VerdictMode[]).map((v) => (
+                  <SelectItem
+                    key={v}
+                    value={v}
+                    disabled={v === "auto" && item.capture !== "number"}
+                  >
+                    {VERDICT_LABEL[v]}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {item.verdict === "manual" && (
+            <div className="space-y-2">
+              <Label htmlFor={`${item.id}-wording`}>คำที่ใช้บนปุ่มติ๊ก</Label>
+              <Select
+                value={item.verdictWording}
+                onValueChange={(v) =>
+                  onPatch({ verdictWording: v as VerdictWording })
+                }
+              >
+                <SelectTrigger id={`${item.id}-wording`} className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {(
+                    Object.keys(VERDICT_WORDING_LABEL) as VerdictWording[]
+                  ).map((w) => (
+                    <SelectItem key={w} value={w}>
+                      {VERDICT_WORDING_LABEL[w]}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+        </div>
+
+        {/* ---- สรุปสั้น ๆ + ปุ่มกางการตั้งค่า ---- */}
+        <div className="flex flex-wrap items-center gap-2 pl-9">
+          <Badge tone="brand" appearance="soft">
+            {describeBehaviour(item)}
+          </Badge>
           {item.repeatable && (
             <Badge tone="neutral" appearance="soft">
               บันทึกได้ {item.maxRounds} ครั้ง
             </Badge>
           )}
           {ruleText && (
-            <Badge tone="brand" appearance="soft">
+            <Badge tone="neutral" appearance="outline">
               {ruleText}
             </Badge>
           )}
@@ -260,10 +320,17 @@ export function ItemEditor({
                   เพิ่มช่องกรอก
                 </Button>
 
-                {/* เกณฑ์ตัดสินอัตโนมัติ */}
+                {/* เกณฑ์ตัวเลข — ใช้ได้ทั้งตัดสินเองและเป็นตัวช่วยตอนผู้ตรวจติ๊ก */}
+                <p className="text-sm text-muted-foreground">
+                  {item.verdict === "auto"
+                    ? "ระบบจะตัดสินผ่าน/ไม่ผ่านจากเกณฑ์นี้ให้เอง"
+                    : item.verdict === "manual"
+                      ? "ผู้ตรวจติ๊กเอง แต่ระบบจะขึ้นผลที่คำนวณจากเกณฑ์นี้ให้ดูเป็นตัวช่วย"
+                      : "ตั้งเกณฑ์ไว้ได้ แต่จะไม่ถูกนำไปตัดสินเพราะเลือกไม่ต้องตัดสิน"}
+                </p>
                 <div className="grid gap-3 sm:grid-cols-3">
                   <div className="space-y-2">
-                    <Label>เกณฑ์ตัดสินอัตโนมัติ</Label>
+                    <Label>เกณฑ์ตัวเลข</Label>
                     <Select
                       value={item.rule.op}
                       onValueChange={(v) =>

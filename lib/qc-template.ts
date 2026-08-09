@@ -27,14 +27,42 @@ export type HeaderField = {
   source?: string;
 };
 
-/** วิธีบันทึกผลของหัวข้อตรวจ */
-export type RecordMode = "measure" | "passfail" | "normalAbnormal" | "text";
+// ---------------------------------------------------------------
+// หัวข้อตรวจแยกเป็น 2 แกนอิสระ เพราะบางข้อต้องทำทั้งสองอย่าง
+//   capture = ผู้ตรวจต้องคีย์ค่าอะไรลงไป
+//   verdict = ตัดสินผ่าน/ไม่ผ่านด้วยวิธีไหน
+// เช่น "น้ำหนักของปุ๋ย" ต้องคีย์ตัวเลข และให้ผู้ตรวจติ๊กยืนยันเองด้วย
+// ---------------------------------------------------------------
 
-export const RECORD_MODE_LABEL: Record<RecordMode, string> = {
-  measure: "วัดค่าเป็นตัวเลข",
-  passfail: "ผ่าน / ไม่ผ่าน",
+/** ผู้ตรวจต้องคีย์ค่าอะไรลงไป */
+export type CaptureMode = "none" | "number" | "text";
+
+export const CAPTURE_LABEL: Record<CaptureMode, string> = {
+  none: "ไม่ต้องคีย์ค่า",
+  number: "คีย์ตัวเลข",
+  text: "คีย์ข้อความ",
+};
+
+/** ตัดสินผ่าน/ไม่ผ่านด้วยวิธีไหน */
+export type VerdictMode = "none" | "auto" | "manual";
+
+export const VERDICT_LABEL: Record<VerdictMode, string> = {
+  none: "ไม่ต้องตัดสิน",
+  auto: "ระบบตัดสินจากเกณฑ์",
+  manual: "ผู้ตรวจติ๊กเอง",
+};
+
+/** คำที่ใช้เรียกสองขั้วของผลตรวจ */
+export type VerdictWording = "passFail" | "normalAbnormal";
+
+export const VERDICT_WORDS: Record<VerdictWording, readonly [string, string]> = {
+  passFail: ["ผ่าน", "ไม่ผ่าน"],
+  normalAbnormal: ["ปกติ", "ผิดปกติ"],
+};
+
+export const VERDICT_WORDING_LABEL: Record<VerdictWording, string> = {
+  passFail: "ผ่าน / ไม่ผ่าน",
   normalAbnormal: "ปกติ / ผิดปกติ",
-  text: "กรอกข้อความ",
 };
 
 /** ช่องตัวเลขหนึ่งช่องของหัวข้อแบบวัดค่า เช่น N (%) หรือ น้ำหนักที่ชั่ง (kg) */
@@ -44,11 +72,11 @@ export type MeasureColumn = {
   unit: string;
 };
 
-/** เกณฑ์ตัดสินผ่าน/ไม่ผ่านแบบอัตโนมัติ สำหรับหัวข้อที่วัดค่า */
+/** เกณฑ์ตัดสินผ่าน/ไม่ผ่านแบบอัตโนมัติ สำหรับหัวข้อที่คีย์ตัวเลข */
 export type RuleOp = "none" | "gte" | "lte" | "between";
 
 export const RULE_OP_LABEL: Record<RuleOp, string> = {
-  none: "ไม่ตัดสินอัตโนมัติ",
+  none: "ไม่มีเกณฑ์ตัวเลข",
   gte: "ไม่น้อยกว่า (≥)",
   lte: "ไม่เกิน (≤)",
   between: "อยู่ระหว่าง",
@@ -64,8 +92,10 @@ export type QcItem = {
   id: string;
   title: string;
   criteria: string;
-  mode: RecordMode;
-  /** ใช้เมื่อ mode = "measure" */
+  capture: CaptureMode;
+  verdict: VerdictMode;
+  verdictWording: VerdictWording;
+  /** ใช้เมื่อ capture = "number" */
   columns: MeasureColumn[];
   rule: Rule;
   /** เปิดให้บันทึกได้หลายครั้ง (ตรวจครั้งที่ 1, 2, 3 …) */
@@ -118,7 +148,9 @@ export function newItem(): QcItem {
     id: uid("item"),
     title: "",
     criteria: "",
-    mode: "passfail",
+    capture: "none",
+    verdict: "manual",
+    verdictWording: "passFail",
     columns: [],
     rule: emptyRule(),
     repeatable: false,
@@ -144,6 +176,21 @@ export function newHeaderField(): HeaderField {
   };
 }
 
+/** มีเกณฑ์ตัวเลขให้ระบบคำนวณได้หรือเปล่า */
+export function hasNumericRule(item: QcItem): boolean {
+  return item.capture === "number" && item.rule.op !== "none";
+}
+
+/** ต้องโชว์ช่องติ๊กให้ผู้ตรวจเลือกเองหรือเปล่า */
+export function showsTick(item: QcItem): boolean {
+  return item.verdict === "manual";
+}
+
+/** โชว์คอลัมน์สถานะที่ระบบคำนวณให้หรือเปล่า */
+export function showsAutoStatus(item: QcItem): boolean {
+  return hasNumericRule(item) && item.verdict !== "none";
+}
+
 /** อธิบายเกณฑ์เป็นภาษาคน ใช้โชว์ในหน้าตัวอย่าง */
 export function describeRule(rule: Rule, unit: string): string {
   const u = unit ? ` ${unit}` : "";
@@ -159,6 +206,18 @@ export function describeRule(rule: Rule, unit: string): string {
     default:
       return "";
   }
+}
+
+/** สรุปสั้น ๆ ว่าหัวข้อนี้ให้ทำอะไรบ้าง ใช้โชว์เป็น badge ในตัวสร้าง */
+export function describeBehaviour(item: QcItem): string {
+  const parts: string[] = [];
+  if (item.capture === "number") parts.push("คีย์ตัวเลข");
+  if (item.capture === "text") parts.push("คีย์ข้อความ");
+  if (item.verdict === "auto") parts.push("ระบบตัดสิน");
+  if (item.verdict === "manual") {
+    parts.push(`ติ๊ก${VERDICT_WORDS[item.verdictWording][0]}/${VERDICT_WORDS[item.verdictWording][1]}`);
+  }
+  return parts.join(" + ") || "ยังไม่ได้ตั้งค่า";
 }
 
 /** ตัดสินค่าที่วัดได้ตามเกณฑ์ — null = ยังตัดสินไม่ได้ */
@@ -223,6 +282,23 @@ export const ROLE_OPTIONS = [
 // เทมเพลตตั้งต้น — ถอดมาจาก FM-QC-02-03 ใบรายงานการตรวจสอบสินค้าสำเร็จรูป
 // ---------------------------------------------------------------
 
+const tick = (title: string, criteria: string): QcItem => ({
+  id: uid("seed"),
+  title,
+  criteria,
+  capture: "none",
+  verdict: "manual",
+  verdictWording: "passFail",
+  columns: [],
+  rule: emptyRule(),
+  repeatable: false,
+  defaultRounds: 1,
+  maxRounds: 1,
+  withTime: false,
+  withNote: true,
+  children: [],
+});
+
 export const SEED_TEMPLATE: QcTemplate = {
   id: "tpl-fm-qc-02-03",
   name: "ใบรายงานการตรวจสอบสินค้าสำเร็จรูป",
@@ -249,10 +325,13 @@ export const SEED_TEMPLATE: QcTemplate = {
 
   items: [
     {
+      // ตัวอย่างข้อที่ต้องทำทั้งสองอย่าง: คีย์น้ำหนัก + ผู้ตรวจติ๊กยืนยันเอง
       id: "it-1",
       title: "น้ำหนักของปุ๋ย",
       criteria: "น้ำหนักต่อกระสอบ ≥ 50.2 kg (บรรจุ 50 kg)",
-      mode: "measure",
+      capture: "number",
+      verdict: "manual",
+      verdictWording: "passFail",
       columns: [{ id: "c-1", label: "น้ำหนักที่ชั่ง", unit: "kg" }],
       rule: { op: "gte", min: 50.2, max: null },
       repeatable: true,
@@ -263,10 +342,13 @@ export const SEED_TEMPLATE: QcTemplate = {
       children: [],
     },
     {
+      // คีย์ตัวเลข 3 ช่อง แล้วให้ระบบตัดสินเองจากเกณฑ์
       id: "it-2",
       title: "สูตรปุ๋ย",
       criteria: "ตัวเลขธาตุอาหารที่วัดได้ต้องตรงกับสูตรที่รับรอง — 15-15-15",
-      mode: "measure",
+      capture: "number",
+      verdict: "auto",
+      verdictWording: "passFail",
       columns: [
         { id: "c-2", label: "N", unit: "%" },
         { id: "c-3", label: "P₂O₅", unit: "%" },
@@ -280,81 +362,19 @@ export const SEED_TEMPLATE: QcTemplate = {
       withNote: true,
       children: [],
     },
+    tick("ตรวจการเย็บกระสอบ", "ระยะห่างฝีเข็มต้องสม่ำเสมอ ต้องเป็นด้ายคู่"),
+    tick("กลิ่นของปุ๋ย", "ไม่มีกลิ่น หรือมีกลิ่นสารเคมีอ่อน ๆ"),
+    tick("การตรวจสอบด้วยการสัมผัส", "สีของเม็ดปุ๋ยต้องไม่ติดมือ"),
+    tick("กระสอบที่ใช้ตรงสูตรใหม่", "ปุ๋ยหน้ากระสอบต้องตรงกับเนื้อปุ๋ยข้างใน"),
+    tick("สติ๊กเกอร์แลกแต้ม", "สติ๊กเกอร์ต้องมีทุกกระสอบ"),
     {
-      id: "it-3",
-      title: "ตรวจการเย็บกระสอบ",
-      criteria: "ระยะห่างฝีเข็มต้องสม่ำเสมอ ต้องเป็นด้ายคู่",
-      mode: "passfail",
-      columns: [],
-      rule: emptyRule(),
-      repeatable: false,
-      defaultRounds: 1,
-      maxRounds: 1,
-      withTime: false,
-      withNote: true,
-      children: [],
-    },
-    {
-      id: "it-4",
-      title: "กลิ่นของปุ๋ย",
-      criteria: "ไม่มีกลิ่น หรือมีกลิ่นสารเคมีอ่อน ๆ",
-      mode: "passfail",
-      columns: [],
-      rule: emptyRule(),
-      repeatable: false,
-      defaultRounds: 1,
-      maxRounds: 1,
-      withTime: false,
-      withNote: true,
-      children: [],
-    },
-    {
-      id: "it-5",
-      title: "การตรวจสอบด้วยการสัมผัส",
-      criteria: "สีของเม็ดปุ๋ยต้องไม่ติดมือ",
-      mode: "passfail",
-      columns: [],
-      rule: emptyRule(),
-      repeatable: false,
-      defaultRounds: 1,
-      maxRounds: 1,
-      withTime: false,
-      withNote: true,
-      children: [],
-    },
-    {
-      id: "it-6",
-      title: "กระสอบที่ใช้ตรงสูตรใหม่",
-      criteria: "ปุ๋ยหน้ากระสอบต้องตรงกับเนื้อปุ๋ยข้างใน",
-      mode: "passfail",
-      columns: [],
-      rule: emptyRule(),
-      repeatable: false,
-      defaultRounds: 1,
-      maxRounds: 1,
-      withTime: false,
-      withNote: true,
-      children: [],
-    },
-    {
-      id: "it-7",
-      title: "สติ๊กเกอร์แลกแต้ม",
-      criteria: "สติ๊กเกอร์ต้องมีทุกกระสอบ",
-      mode: "passfail",
-      columns: [],
-      rule: emptyRule(),
-      repeatable: false,
-      defaultRounds: 1,
-      maxRounds: 1,
-      withTime: false,
-      withNote: true,
-      children: [],
-    },
-    {
+      // คีย์ตัวเลข + ติ๊กเอง โดยระบบขึ้นผลที่คำนวณได้ให้ดูเป็นตัวช่วย
       id: "it-8",
       title: "ความชื้น",
       criteria: "ความชื้นไม่เกิน 80%",
-      mode: "measure",
+      capture: "number",
+      verdict: "manual",
+      verdictWording: "passFail",
       columns: [{ id: "c-5", label: "ค่าความชื้น", unit: "%" }],
       rule: { op: "lte", min: null, max: 80 },
       repeatable: true,
@@ -377,41 +397,53 @@ export const SEED_TEMPLATE: QcTemplate = {
 };
 
 /**
- * จัดหัวข้อที่ติดกันและใช้วิธีบันทึกแบบติ๊กเหมือนกัน ให้อยู่ตารางเดียวกัน
+ * จัดหัวข้อที่ติดกันและเป็นแบบ "ติ๊กอย่างเดียว" เหมือนกัน ให้อยู่ตารางเดียวกัน
  * ตรงกับฟอร์มกระดาษที่ข้อ 3–7 อยู่ในตารางเดียว
+ * ข้อที่ต้องคีย์ค่าด้วยจะแยกออกมาเป็นตารางของตัวเองเสมอ
  */
 export type PreviewBlock =
   | { kind: "single"; item: QcItem; index: number }
-  | { kind: "group"; items: { item: QcItem; index: number }[]; mode: RecordMode };
+  | {
+      kind: "group";
+      items: { item: QcItem; index: number }[];
+      wording: VerdictWording;
+    };
 
 export function buildPreviewBlocks(items: QcItem[]): PreviewBlock[] {
   const blocks: PreviewBlock[] = [];
   let run: { item: QcItem; index: number }[] = [];
-  let runMode: RecordMode | null = null;
+  let runWording: VerdictWording | null = null;
 
   const flush = () => {
     if (run.length === 0) return;
     if (run.length === 1) {
       blocks.push({ kind: "single", item: run[0].item, index: run[0].index });
     } else {
-      blocks.push({ kind: "group", items: run, mode: runMode as RecordMode });
+      blocks.push({
+        kind: "group",
+        items: run,
+        wording: runWording as VerdictWording,
+      });
     }
     run = [];
-    runMode = null;
+    runWording = null;
   };
 
   items.forEach((item, i) => {
-    const tickable = item.mode === "passfail" || item.mode === "normalAbnormal";
-    const groupable = tickable && !item.repeatable && item.children.length === 0;
+    const groupable =
+      item.capture === "none" &&
+      item.verdict === "manual" &&
+      !item.repeatable &&
+      item.children.length === 0;
 
-    if (groupable && (runMode === null || runMode === item.mode)) {
-      runMode = item.mode;
+    if (groupable && (runWording === null || runWording === item.verdictWording)) {
+      runWording = item.verdictWording;
       run.push({ item, index: i });
       return;
     }
     flush();
     if (groupable) {
-      runMode = item.mode;
+      runWording = item.verdictWording;
       run.push({ item, index: i });
     } else {
       blocks.push({ kind: "single", item, index: i });

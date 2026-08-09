@@ -1,6 +1,6 @@
 "use client";
 
-import { PlusIcon } from "lucide-react";
+import { CircleDashedIcon, PlusIcon } from "lucide-react";
 import { Badge } from "@peckey954/ui/components/ui/badge";
 import { Button } from "@peckey954/ui/components/ui/button";
 import { Card, CardContent } from "@peckey954/ui/components/ui/card";
@@ -28,8 +28,11 @@ import {
 } from "@peckey954/ui/components/ui/table";
 import { Textarea } from "@peckey954/ui/components/ui/textarea";
 import {
+  VERDICT_WORDS,
   buildPreviewBlocks,
   describeRule,
+  showsAutoStatus,
+  showsTick,
   type HeaderField,
   type QcItem,
   type QcTemplate,
@@ -37,10 +40,6 @@ import {
 
 export function FormPreview({ template }: { template: QcTemplate }) {
   const blocks = buildPreviewBlocks(template.items);
-  const tickLabels = (mode: QcItem["mode"]) =>
-    mode === "normalAbnormal"
-      ? (["ปกติ", "ผิดปกติ"] as const)
-      : (["ผ่าน", "ไม่ผ่าน"] as const);
 
   return (
     <div className="space-y-6">
@@ -74,7 +73,7 @@ export function FormPreview({ template }: { template: QcTemplate }) {
         if (block.kind === "group") {
           const first = block.items[0].index + 1;
           const last = block.items[block.items.length - 1].index + 1;
-          const [pass, fail] = tickLabels(block.mode);
+          const [pass, fail] = VERDICT_WORDS[block.wording];
           return (
             <section key={`g-${bi}`} className="space-y-3">
               <h3 className="text-base font-semibold">
@@ -203,8 +202,9 @@ export function FormPreview({ template }: { template: QcTemplate }) {
 function ItemPreview({ item, index }: { item: QcItem; index: number }) {
   const rounds = Math.max(1, item.repeatable ? item.defaultRounds : 1);
   const ruleText = describeRule(item.rule, item.columns[0]?.unit ?? "");
-  const [pass, fail] =
-    item.mode === "normalAbnormal" ? ["ปกติ", "ผิดปกติ"] : ["ผ่าน", "ไม่ผ่าน"];
+  const [pass, fail] = VERDICT_WORDS[item.verdictWording];
+  const tick = showsTick(item);
+  const autoStatus = showsAutoStatus(item);
 
   return (
     <section className="space-y-3">
@@ -242,10 +242,7 @@ function ItemPreview({ item, index }: { item: QcItem; index: number }) {
               </TableHeader>
               <TableBody>
                 {item.children.map((c, ci) => {
-                  const [p, f] =
-                    c.mode === "normalAbnormal"
-                      ? ["ปกติ", "ผิดปกติ"]
-                      : ["ผ่าน", "ไม่ผ่าน"];
+                  const [p, f] = VERDICT_WORDS[c.verdictWording];
                   return (
                     <TableRow key={c.id}>
                       <TableCell className="pl-4">
@@ -257,7 +254,13 @@ function ItemPreview({ item, index }: { item: QcItem; index: number }) {
                         {c.criteria || "—"}
                       </TableCell>
                       <TableCell>
-                        <TickChoice id={c.id} pass={p} fail={f} />
+                        {showsTick(c) ? (
+                          <TickChoice id={c.id} pass={p} fail={f} />
+                        ) : (
+                          <span className="text-sm text-muted-foreground">
+                            ระบบตัดสินให้
+                          </span>
+                        )}
                       </TableCell>
                       <TableCell className="pr-4">
                         {c.withNote ? (
@@ -273,68 +276,10 @@ function ItemPreview({ item, index }: { item: QcItem; index: number }) {
             </Table>
           </CardContent>
         </Card>
-      ) : item.mode === "measure" ? (
-        <Card className="py-0">
-          <CardContent className="px-0">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-20 pl-4">ครั้ง</TableHead>
-                  {item.columns.map((c) => (
-                    <TableHead key={c.id} className="min-w-32 text-right">
-                      {c.label || "—"}
-                      {c.unit && (
-                        <span className="block font-normal text-muted-foreground">
-                          ({c.unit})
-                        </span>
-                      )}
-                    </TableHead>
-                  ))}
-                  {item.withTime && (
-                    <TableHead className="w-32 text-right">เวลาที่ตรวจ</TableHead>
-                  )}
-                  {item.withNote && (
-                    <TableHead className="min-w-48 pr-4">
-                      หมายเหตุ
-                      <span className="block font-normal text-muted-foreground">
-                        ไม่บังคับ
-                      </span>
-                    </TableHead>
-                  )}
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {Array.from({ length: rounds }, (_, r) => (
-                  <TableRow key={r}>
-                    <TableCell className="pl-4 tabular-nums">{r + 1}</TableCell>
-                    {item.columns.map((c) => (
-                      <TableCell key={c.id}>
-                        <Input
-                          type="number"
-                          className="text-right tabular-nums"
-                          placeholder="0.00"
-                        />
-                      </TableCell>
-                    ))}
-                    {item.withTime && (
-                      <TableCell>
-                        <Input type="time" className="tabular-nums" />
-                      </TableCell>
-                    )}
-                    {item.withNote && (
-                      <TableCell className="pr-4">
-                        <Input placeholder="—" />
-                      </TableCell>
-                    )}
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
-      ) : item.mode === "text" ? (
+      ) : item.capture === "text" ? (
         <Textarea placeholder="กรอกรายละเอียด" />
       ) : (
+        /* ตารางเดียวรองรับได้ทั้ง คีย์ค่า / ติ๊ก / ทั้งสองอย่าง */
         <Card className="py-0">
           <CardContent className="px-0">
             <Table>
@@ -343,34 +288,120 @@ function ItemPreview({ item, index }: { item: QcItem; index: number }) {
                   {item.repeatable && (
                     <TableHead className="w-20 pl-4">ครั้ง</TableHead>
                   )}
-                  <TableHead className={item.repeatable ? "w-48" : "w-48 pl-4"}>
-                    ผลการตรวจ
-                  </TableHead>
+
+                  {item.capture === "number" &&
+                    item.columns.map((c, ci) => (
+                      <TableHead
+                        key={c.id}
+                        className={cellPad(
+                          "min-w-32 text-right",
+                          !item.repeatable && ci === 0
+                        )}
+                      >
+                        {c.label || "—"}
+                        {c.unit && (
+                          <span className="block font-normal text-muted-foreground">
+                            ({c.unit})
+                          </span>
+                        )}
+                      </TableHead>
+                    ))}
+
                   {item.withTime && (
                     <TableHead className="w-32 text-right">เวลาที่ตรวจ</TableHead>
                   )}
+
+                  {tick && (
+                    <TableHead
+                      className={cellPad(
+                        "w-48",
+                        !item.repeatable && item.capture !== "number"
+                      )}
+                    >
+                      ผลการตรวจ
+                      <span className="block font-normal text-muted-foreground">
+                        ผู้ตรวจติ๊กเอง
+                      </span>
+                    </TableHead>
+                  )}
+
                   {item.withNote && (
-                    <TableHead className="min-w-48 pr-4">หมายเหตุ</TableHead>
+                    <TableHead className="min-w-48">
+                      หมายเหตุ
+                      <span className="block font-normal text-muted-foreground">
+                        ไม่บังคับ
+                      </span>
+                    </TableHead>
+                  )}
+
+                  {autoStatus && (
+                    <TableHead className="w-32 pr-4 text-center">
+                      สถานะ
+                      <span className="block font-normal text-muted-foreground">
+                        ระบบคำนวณ
+                      </span>
+                    </TableHead>
                   )}
                 </TableRow>
               </TableHeader>
+
               <TableBody>
                 {Array.from({ length: rounds }, (_, r) => (
                   <TableRow key={r}>
                     {item.repeatable && (
                       <TableCell className="pl-4 tabular-nums">{r + 1}</TableCell>
                     )}
-                    <TableCell className={item.repeatable ? "" : "pl-4"}>
-                      <TickChoice id={`${item.id}-${r}`} pass={pass} fail={fail} />
-                    </TableCell>
+
+                    {item.capture === "number" &&
+                      item.columns.map((c, ci) => (
+                        <TableCell
+                          key={c.id}
+                          className={cellPad("", !item.repeatable && ci === 0)}
+                        >
+                          <Input
+                            type="number"
+                            className="text-right tabular-nums"
+                            placeholder="0.00"
+                          />
+                        </TableCell>
+                      ))}
+
                     {item.withTime && (
                       <TableCell>
                         <Input type="time" className="tabular-nums" />
                       </TableCell>
                     )}
+
+                    {tick && (
+                      <TableCell
+                        className={cellPad(
+                          "",
+                          !item.repeatable && item.capture !== "number"
+                        )}
+                      >
+                        <TickChoice
+                          id={`${item.id}-${r}`}
+                          pass={pass}
+                          fail={fail}
+                        />
+                      </TableCell>
+                    )}
+
                     {item.withNote && (
-                      <TableCell className="pr-4">
+                      <TableCell>
                         <Input placeholder="—" />
+                      </TableCell>
+                    )}
+
+                    {autoStatus && (
+                      <TableCell className="pr-4 text-center">
+                        <span
+                          className="inline-flex items-center gap-1 text-sm text-muted-foreground"
+                          title="ยังไม่ได้คีย์ค่า"
+                        >
+                          <CircleDashedIcon className="size-4" />
+                          รอค่า
+                        </span>
                       </TableCell>
                     )}
                   </TableRow>
@@ -380,8 +411,19 @@ function ItemPreview({ item, index }: { item: QcItem; index: number }) {
           </CardContent>
         </Card>
       )}
+
+      {tick && autoStatus && (
+        <p className="text-sm text-muted-foreground">
+          ระบบจะขึ้นผลที่คำนวณจากเกณฑ์ในคอลัมน์สถานะ แต่ผลที่บันทึกจริงคือช่องที่ผู้ตรวจติ๊ก
+        </p>
+      )}
     </section>
   );
+}
+
+/** ช่องแรกของแถวต้องมี pl-4 ให้เสมอกับหัวข้ออื่น */
+function cellPad(base: string, isFirst: boolean) {
+  return isFirst ? `${base} pl-4`.trim() : base;
 }
 
 function TickChoice({
