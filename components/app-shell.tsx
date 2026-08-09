@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import {
   BellIcon,
   BoxesIcon,
+  ClipboardCheckIcon,
   FactoryIcon,
   FileChartColumnIcon,
   LayoutDashboardIcon,
@@ -32,6 +33,7 @@ const NAV = [
   { href: "/", label: "ผลิตแบ่งบรรจุ", icon: FactoryIcon },
   { href: "/issuing", label: "จ่ายสินค้าออก", icon: PackageMinusIcon },
   { href: "/stock", label: "สต็อกคงเหลือ", icon: BoxesIcon },
+  { href: "/qc/setup", label: "ตั้งค่าเทมเพลต QC", icon: ClipboardCheckIcon },
   { href: "/reports", label: "รายงาน", icon: FileChartColumnIcon },
   { href: "/design-system", label: "Design system", icon: WarehouseIcon },
 ];
