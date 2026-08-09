@@ -12,6 +12,7 @@ import {
   MenuIcon,
   PackageMinusIcon,
   PackagePlusIcon,
+  ScaleIcon,
   WarehouseIcon,
 } from "lucide-react";
 import { Avatar, AvatarFallback } from "@peckey954/ui/components/ui/avatar";
@@ -30,6 +31,7 @@ import { ThemeToggle } from "@/components/theme-toggle";
 const NAV = [
   { href: "/dashboard", label: "แดชบอร์ด", icon: LayoutDashboardIcon },
   { href: "/receiving", label: "รับสินค้าเข้า", icon: PackagePlusIcon },
+  { href: "/weighing", label: "ใบชั่งน้ำหนัก", icon: ScaleIcon },
   { href: "/", label: "ผลิตแบ่งบรรจุ", icon: FactoryIcon },
   { href: "/issuing", label: "จ่ายสินค้าออก", icon: PackageMinusIcon },
   { href: "/stock", label: "สต็อกคงเหลือ", icon: BoxesIcon },
