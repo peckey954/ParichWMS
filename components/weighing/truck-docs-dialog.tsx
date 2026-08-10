@@ -43,13 +43,14 @@ export function TruckDocsDialog({
         </Button>
       </DialogTrigger>
 
-      <DialogContent className="sm:max-w-2xl">
+      <DialogContent className="sm:max-w-3xl">
         <DialogHeader>
           <DialogTitle>
             เอกสารแนบ — {truck.plate || "ยังไม่ได้ใส่ทะเบียน"}
           </DialogTitle>
           <DialogDescription>
-            สแกนเอกสารแล้วอัปโหลดเก็บไว้กับใบชั่งคันนี้ รองรับรูปภาพและ PDF
+            ลากไฟล์ที่สแกนมาวางในช่องได้เลย หรือคลิกเพื่อเลือกไฟล์
+            รองรับรูปภาพและ PDF
           </DialogDescription>
         </DialogHeader>
 

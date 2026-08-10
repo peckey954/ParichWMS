@@ -13,6 +13,9 @@ export type Attachment = {
   fileName: string;
   /** ขนาดเป็นไบต์ ใช้โชว์ให้รู้ว่าอัปโหลดสำเร็จจริง */
   size: number;
+  /** blob URL ของรูปที่เพิ่งลากเข้ามา ใช้โชว์ตัวอย่างก่อนส่งขึ้นเซิร์ฟเวอร์
+   *  ไฟล์ PDF จะไม่มีค่านี้ */
+  previewUrl?: string;
 };
 
 export type Truck = {
