@@ -34,7 +34,7 @@ const NAV = [
   { href: "/weighing", label: "ใบชั่งน้ำหนัก", icon: ScaleIcon },
   { href: "/", label: "ผลิตแบ่งบรรจุ", icon: FactoryIcon },
   { href: "/issuing", label: "จ่ายสินค้าออก", icon: PackageMinusIcon },
-  { href: "/stock", label: "สต็อกคงเหลือ", icon: BoxesIcon },
+  { href: "/stock", label: "สต็อกทั่วไป", icon: BoxesIcon },
   { href: "/qc/setup", label: "ตั้งค่าเทมเพลต QC", icon: ClipboardCheckIcon },
   { href: "/reports", label: "รายงาน", icon: FileChartColumnIcon },
   { href: "/design-system", label: "Design system", icon: WarehouseIcon },
