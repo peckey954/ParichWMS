@@ -105,11 +105,20 @@ function LotRow({ lot, unit }: { lot: Lot; unit: string }) {
       <div className="flex flex-col gap-3 @3xl:flex-row @3xl:items-start @3xl:justify-between">
         <div className="min-w-0 flex-1 space-y-2">
           <div className="flex items-start justify-between gap-3">
-            <div className="flex flex-wrap items-center gap-2">
-              <ZoneTag zone={lot.zone} />
-              <span className="font-medium">{lot.code}</span>
-              {lot.condition && <ConditionChip condition={lot.condition} />}
-              <PendingChips pending={lot.pending} unit={unit} />
+            {/* จอแคบ: โซน+เลขล็อตบรรทัดหนึ่ง แล้ว chip ลงบรรทัดใหม่
+                จอกว้าง: @3xl:contents ทำให้ chip กลับไปไหลต่อท้ายในแถวเดียวกัน */}
+            <div className="flex min-w-0 flex-col gap-2 @3xl:flex-row @3xl:flex-wrap @3xl:items-center">
+              <div className="flex items-center gap-2">
+                <ZoneTag zone={lot.zone} />
+                <span className="font-medium">{lot.code}</span>
+              </div>
+
+              {(lot.condition || pendingEntries(lot.pending, unit).length > 0) && (
+                <div className="flex flex-wrap items-center gap-2 @3xl:contents">
+                  {lot.condition && <ConditionChip condition={lot.condition} />}
+                  <PendingChips pending={lot.pending} unit={unit} />
+                </div>
+              )}
             </div>
 
             <p className="shrink-0 text-right tabular-nums @3xl:hidden">
@@ -165,18 +174,23 @@ export function ProductCard({
         <div className="px-4 py-3">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0 flex-1 space-y-2">
-              <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
+              {/* จอแคบ: ชื่อสินค้าบรรทัดหนึ่ง แล้ว chip ทั้งชุดลงบรรทัดใหม่
+                  จอกว้าง: @3xl:contents ทำให้ chip กลับไปไหลต่อท้ายชื่อ */}
+              <div className="flex flex-col gap-2 @3xl:flex-row @3xl:flex-wrap @3xl:items-center @3xl:gap-x-2 @3xl:gap-y-1.5">
                 <span className="font-semibold">{product.name}</span>
-                <CategoryChip product={product} />
-                <Badge tone="neutral" appearance="soft">
-                  {product.packing}
-                </Badge>
-                {product.low && (
-                  <Badge tone="danger" appearance="soft">
-                    สต็อกต่ำ
+
+                <div className="flex flex-wrap items-center gap-2 @3xl:contents">
+                  <CategoryChip product={product} />
+                  <Badge tone="neutral" appearance="soft">
+                    {product.packing}
                   </Badge>
-                )}
-                <PendingChips pending={pending} unit={product.unit} />
+                  {product.low && (
+                    <Badge tone="danger" appearance="soft">
+                      สต็อกต่ำ
+                    </Badge>
+                  )}
+                  <PendingChips pending={pending} unit={product.unit} />
+                </div>
               </div>
 
               <CollapsibleTrigger asChild>
