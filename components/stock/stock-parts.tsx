@@ -75,6 +75,25 @@ function PendingChips({
   );
 }
 
+/**
+ * แถวของ chip
+ * จอแคบ — บรรทัดเดียว ไม่ตัดบรรทัด เลื่อนแนวนอนเอาถ้ายาวเกิน (ซ่อนแถบเลื่อน)
+ * จอกว้าง — @3xl:contents ยุบกล่องนี้ทิ้ง chip จึงไหลต่อท้ายในแถวเดิม
+ */
+function ChipRow({ children }: { children: React.ReactNode }) {
+  return (
+    <div
+      className={cn(
+        "flex min-w-0 items-center gap-2 overflow-x-auto",
+        "flex-nowrap [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
+        "@3xl:contents"
+      )}
+    >
+      {children}
+    </div>
+  );
+}
+
 function ZoneTag({ zone }: { zone: string }) {
   return (
     <span className="rounded-md bg-muted px-2 py-0.5 font-mono text-xs text-muted-foreground">
@@ -114,17 +133,17 @@ function LotRow({ lot, unit }: { lot: Lot; unit: string }) {
               </div>
 
               {(lot.condition || pendingEntries(lot.pending, unit).length > 0) && (
-                <div className="flex flex-wrap items-center gap-2 @3xl:contents">
+                <ChipRow>
                   {lot.condition && <ConditionChip condition={lot.condition} />}
                   <PendingChips pending={lot.pending} unit={unit} />
-                </div>
+                </ChipRow>
               )}
             </div>
 
             <p className="shrink-0 text-right tabular-nums @3xl:hidden">
               <span
                 className={cn(
-                  "text-base font-semibold",
+                  "text-lg font-semibold",
                   lot.low && "text-destructive"
                 )}
               >
@@ -179,7 +198,7 @@ export function ProductCard({
               <div className="flex flex-col gap-2 @3xl:flex-row @3xl:flex-wrap @3xl:items-center @3xl:gap-x-2 @3xl:gap-y-1.5">
                 <span className="font-semibold">{product.name}</span>
 
-                <div className="flex flex-wrap items-center gap-2 @3xl:contents">
+                <ChipRow>
                   <CategoryChip product={product} />
                   <Badge tone="neutral" appearance="soft">
                     {product.packing}
@@ -190,7 +209,7 @@ export function ProductCard({
                     </Badge>
                   )}
                   <PendingChips pending={pending} unit={product.unit} />
-                </div>
+                </ChipRow>
               </div>
 
               <CollapsibleTrigger asChild>
@@ -207,7 +226,7 @@ export function ProductCard({
             <p className="shrink-0 text-right tabular-nums">
               <span
                 className={cn(
-                  "text-xl font-semibold",
+                  "text-lg font-semibold",
                   product.low && "text-destructive"
                 )}
               >
