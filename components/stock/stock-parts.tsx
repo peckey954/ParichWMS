@@ -186,7 +186,7 @@ function LotRow({
   );
 
   return (
-    <div className="border-t border-border px-4 py-3">
+    <div className="border-t border-border p-4">
       {/* จอกว้าง: ข้อมูล | ปุ่ม | ยอด อยู่แถวเดียว จัดกึ่งกลางแนวตั้ง
           จอแคบ: ยอดขึ้นไปอยู่ขวาของหัวแถว แล้วปุ่มลงมาเต็มความกว้างข้างล่าง */}
       <div className="flex flex-col gap-3 @3xl:flex-row @3xl:items-center @3xl:justify-between">
@@ -266,7 +266,7 @@ export function ProductCard({
   return (
     <div className="overflow-hidden rounded-xl border border-border bg-card">
       <Collapsible defaultOpen={defaultOpen}>
-        <div className="px-4 py-3">
+        <div className="p-4">
           <div className="flex items-start justify-between gap-3">
             {/* จอกว้าง: ชิปไหลต่อท้ายชื่อในแถวเดียวกัน */}
             <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-1.5">
@@ -292,15 +292,10 @@ export function ProductCard({
           {/* จอแคบเท่านั้น — แถวชิปกว้างเท่าการ์ด เลื่อนดูได้ */}
           {showChips && <ChipScroller>{chips}</ChipScroller>}
 
-          <CollapsibleTrigger asChild>
-            <button
-              type="button"
-              className="group mt-2 flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
-            >
-              {product.lots.length} รายการ · {zoneCount(product)} โซน
-              <ChevronDownIcon className="size-4 transition-transform group-data-[state=open]:rotate-180" />
-            </button>
-          </CollapsibleTrigger>
+          {/* บรรทัดนับ เป็นข้อความเฉย ๆ ไม่ใช่ปุ่ม ปุ่มหุบ/กางย้ายไปอยู่ท้ายการ์ด */}
+          <p className="mt-2 text-sm text-muted-foreground">
+            {product.lots.length} รายการ · {zoneCount(product)} โซน
+          </p>
         </div>
 
         <CollapsibleContent>
@@ -314,6 +309,23 @@ export function ProductCard({
             />
           ))}
         </CollapsibleContent>
+
+        {/* ปุ่มหุบ/กางอยู่ท้ายการ์ด เต็มความกว้าง กดง่ายกว่าไอคอนเล็ก ๆ
+            และไม่ไปปนกับบรรทัดที่บอกจำนวนโซน */}
+        <CollapsibleTrigger asChild>
+          <button
+            type="button"
+            className="group flex w-full items-center justify-center gap-1 border-t border-border p-3 text-sm text-muted-foreground transition-colors hover:bg-accent-hover hover:text-foreground"
+          >
+            <span className="group-data-[state=open]:hidden">
+              ดูรายการ ({product.lots.length})
+            </span>
+            <span className="hidden group-data-[state=open]:inline">
+              ซ่อนรายการ
+            </span>
+            <ChevronDownIcon className="size-4 transition-transform group-data-[state=open]:rotate-180" />
+          </button>
+        </CollapsibleTrigger>
       </Collapsible>
     </div>
   );

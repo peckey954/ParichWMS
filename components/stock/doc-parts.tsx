@@ -70,6 +70,15 @@ const STATUS_CHIP: Record<string, string> = {
     "[--bdg-surface:var(--brand)] [--bdg-text:var(--primary)]",
   issueInternal:
     "[--bdg-surface:var(--warning)] [--bdg-text:var(--warning-foreground)]",
+
+  // เพิ่มสำหรับหน้าประวัติ
+  inbound:
+    "[--bdg-surface:var(--success)] [--bdg-text:var(--success-foreground)]",
+  move: "[--bdg-surface:var(--brand)] [--bdg-text:var(--primary)]",
+  adjust:
+    "[--bdg-surface:var(--tone-violet)] [--bdg-text:var(--tone-violet-foreground)]",
+  failed:
+    "[--bdg-surface:var(--danger)] [--bdg-text:var(--danger-strong)]",
 };
 
 export function StatusChip({

@@ -111,7 +111,26 @@ export function useScrollState({ hideAfter = 160, topAfter = 700 } = {}) {
     (el ?? window).scrollTo({ top: 0, behavior: "smooth" });
   }, [framed, frameRef]);
 
-  return { ...state, scrollToTop };
+  /** เลื่อนให้หัวของ el มาอยู่ใต้ขอบบน โดยเว้นระยะ offset ให้แถบที่ติดบน */
+  const scrollIntoTop = React.useCallback(
+    (el: HTMLElement, offset = 0) => {
+      const frame = framed ? frameRef.current : null;
+      if (frame) {
+        const top =
+          el.getBoundingClientRect().top -
+          frame.getBoundingClientRect().top +
+          frame.scrollTop -
+          offset;
+        frame.scrollTo({ top: Math.max(0, top), behavior: "smooth" });
+      } else {
+        const top = el.getBoundingClientRect().top + window.scrollY - offset;
+        window.scrollTo({ top: Math.max(0, top), behavior: "smooth" });
+      }
+    },
+    [framed, frameRef]
+  );
+
+  return { ...state, scrollToTop, scrollIntoTop };
 }
 
 /** ปุ่มไอคอนสามอันบนหัวเรื่อง */

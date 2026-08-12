@@ -47,17 +47,20 @@ import {
 } from "@peckey954/ui/components/ui/toggle-group";
 import { cn } from "@peckey954/ui/lib/utils";
 import { useDevicePreview, useScrollState } from "@/components/device-preview";
+import { HistoryList } from "@/components/stock/history-list";
 import { InboundList } from "@/components/stock/inbound-list";
 import { IssueList } from "@/components/stock/issue-list";
 import { ProductCard } from "@/components/stock/stock-parts";
 import {
   CATEGORIES,
   CATEGORY_LABEL,
+  HISTORY_ROWS,
   INBOUND_DOCS,
   ISSUE_DOCS,
   PRODUCTS,
   countByCategory,
   isReturn,
+  matchesHistory,
   matchesInbound,
   matchesIssue,
   matchesQuery,
@@ -77,14 +80,17 @@ import {
 function StickyBar({
   framed,
   hidden,
+  barRef,
   children,
 }: {
   framed: boolean;
   hidden: boolean;
+  barRef?: React.RefObject<HTMLDivElement | null>;
   children: React.ReactNode;
 }) {
   return (
     <div
+      ref={barRef}
       className={cn(
         "sticky z-30 -mx-4 mt-3 bg-surface px-4 pb-3 sm:-mx-6 sm:mt-4 sm:px-6",
         "transition-transform duration-200",
@@ -92,11 +98,20 @@ function StickyBar({
         hidden && "-translate-y-[calc(100%+1rem)]"
       )}
       aria-hidden={hidden}
+      // ตอนซ่อน แถบยังอยู่ในหน้าแต่ถูกดันขึ้นไปนอกจอ
+      // ถ้าไม่ปิดการโฟกัส คนกด Tab จะหลุดเข้าไปในของที่มองไม่เห็น
+      inert={hidden}
     >
       {children}
     </div>
   );
 }
+
+/** ชิปแถวบน — ประเภทสินค้าทั้งหมด บวกมุมมองประวัติต่อท้าย */
+const CHIPS: { id: CategoryId | "history"; label: string }[] = [
+  ...CATEGORIES.map((c) => ({ id: c.id as CategoryId | "history", label: c.label })),
+  { id: "history", label: "ประวัติ" },
+];
 
 type IssueKind = "all" | "issue" | "return";
 
@@ -111,10 +126,13 @@ export default function GeneralStockPage() {
   // หน้านี้ขอรู้แค่ว่าตอนนี้อยู่ในกรอบหรือไม่ เพื่อเลือกจุดยึดของแถบติดบน
   const { framed } = useDevicePreview();
   // เลื่อนลงซ่อนแถบเครื่องมือ เลื่อนขึ้นเอากลับมา และโผล่ปุ่มกลับขึ้นบนสุดเมื่อลงมาไกล
-  const { hidden, showTop, scrollToTop } = useScrollState();
+  const { hidden, showTop, scrollToTop, scrollIntoTop } = useScrollState();
   // ของจริงแยกประเภทกันเด็ดขาด ไม่มีมุมมอง "ทั้งหมด"
   // ชิปจึงเป็นการนำทาง (เลือกอยู่เสมอหนึ่งอัน) ไม่ใช่ตัวกรองที่ปิดได้
-  const [cat, setCat] = React.useState<CategoryId>("sack");
+  // "history" เป็นมุมมองพิเศษ ไม่ใช่ประเภทสินค้า แต่อยู่แถวชิปเดียวกัน
+  // เพราะผู้ใช้คิดว่ามันคือ "อีกอย่างที่เลือกดูได้" เหมือนกัน
+  const [cat, setCat] = React.useState<CategoryId | "history">("sack");
+  const isHistory = cat === "history";
   const [lowOnly, setLowOnly] = React.useState(false);
   const [sort, setSort] = React.useState("product");
   const [query, setQuery] = React.useState("");
@@ -148,13 +166,18 @@ export default function GeneralStockPage() {
   const counts = countByCategory(PRODUCTS);
 
   // ค้นหาทำงานอยู่ในประเภทที่เปิดอยู่เท่านั้น
-  const visible = PRODUCTS.filter(
-    (p) => p.category === cat && matchesQuery(p, query) && (!lowOnly || p.low)
-  );
+  const visible = isHistory
+    ? []
+    : PRODUCTS.filter(
+        (p) =>
+          p.category === cat && matchesQuery(p, query) && (!lowOnly || p.low)
+      );
+
+  const historyVisible = HISTORY_ROWS.filter((r) => matchesHistory(r, query));
 
   // หาไม่เจอในประเภทนี้ แต่มีในประเภทอื่น — บอกไว้เผื่อเปิดผิดที่
   const hitsElsewhere =
-    query.trim() === "" || visible.length > 0
+    isHistory || query.trim() === "" || visible.length > 0
       ? []
       : CATEGORIES.filter(
           (c) =>
@@ -187,6 +210,24 @@ export default function GeneralStockPage() {
   // ---------- เลื่อนแถวชิปให้เห็นประเภทที่เปิดอยู่ ----------
   const chipRowRef = React.useRef<HTMLDivElement>(null);
   const chipRefs = React.useRef<Record<string, HTMLButtonElement | null>>({});
+  const stickyRef = React.useRef<HTMLDivElement>(null);
+  const listRef = React.useRef<HTMLDivElement>(null);
+
+  /**
+   * เปลี่ยนประเภทแล้วต้องได้เห็นสินค้าชิ้นแรกทันที
+   * ถ้าปล่อยไว้เฉย ๆ คนที่เลื่อนลงมาลึกแล้วกดสลับประเภท จะเจอกลางรายการใหม่
+   * ซึ่งไม่มีความหมายอะไรเลย
+   *
+   * เลื่อนแค่พอให้หัวรายการมาอยู่ใต้แถบเครื่องมือ ไม่ได้เด้งขึ้นบนสุด
+   * แถบเครื่องมือจึงยังติดขอบอยู่ที่เดิม ไม่กระโดด
+   */
+  const changeCat = (next: CategoryId | "history") => {
+    setCat(next);
+    const list = listRef.current;
+    if (!list) return;
+    const bar = stickyRef.current?.offsetHeight ?? 0;
+    scrollIntoTop(list, bar + (framed ? 0 : 56));
+  };
 
   React.useEffect(() => {
     const row = chipRowRef.current;
@@ -274,7 +315,7 @@ export default function GeneralStockPage() {
                รายการยาว ถ้าปุ่มอยู่บนสุดอย่างเดียวต้องเลื่อนกลับไปกด
                จึงยกสองอย่างที่ใช้ระหว่างไล่ดู (สลับประเภท + ซ่อน/แสดง) มาติดบนไว้
                ลบขอบซ้ายขวาออกด้วย -mx เพื่อให้พื้นหลังเต็มความกว้างตอนติด */}
-          <StickyBar framed={framed} hidden={hidden}>
+          <StickyBar framed={framed} hidden={hidden} barRef={stickyRef}>
           <div className="flex items-center gap-2 pt-2">
             <div
               ref={chipRowRef}
@@ -288,7 +329,7 @@ export default function GeneralStockPage() {
                 aria-label="ประเภทสินค้า"
                 className="flex shrink-0 items-center gap-2"
               >
-                {CATEGORIES.map((c) => {
+                {CHIPS.map((c) => {
                   const on = cat === c.id;
                   return (
                     <button
@@ -298,7 +339,7 @@ export default function GeneralStockPage() {
                       ref={(el) => {
                         chipRefs.current[c.id] = el;
                       }}
-                      onClick={() => setCat(c.id)}
+                      onClick={() => changeCat(c.id)}
                       aria-selected={on}
                       className={cn(
                         "shrink-0 rounded-full border px-3 py-1 text-sm whitespace-nowrap transition-colors",
@@ -307,35 +348,45 @@ export default function GeneralStockPage() {
                           : "border-border text-foreground hover:bg-accent-hover"
                       )}
                     >
-                      {CATEGORY_LABEL[c.id]} ({counts[c.id]})
+                      {c.label} (
+                      {c.id === "history"
+                        ? HISTORY_ROWS.length
+                        : counts[c.id as CategoryId]}
+                      )
                     </button>
                   );
                 })}
               </div>
 
-              <span className="h-5 w-px shrink-0 bg-border" aria-hidden />
+              {/* ประวัติเป็นรายการเหตุการณ์ ไม่ใช่ยอดคงเหลือ จึงไม่มีเรื่องสต็อกต่ำ
+                  ซ่อนชิปไปเลยดีกว่าโชว์แล้วกดไม่ได้ */}
+              {!isHistory && (
+                <>
+                  <span className="h-5 w-px shrink-0 bg-border" aria-hidden />
 
-              {/* ชิปนี้ต่างจากชิปประเภทตรงที่เป็นตัวกรองเปิด/ปิดได้
-                  จึงมีกล่องติ๊กนำหน้าให้เห็นว่ากดเลือกเพิ่มได้ ไม่ใช่ปุ่มสลับหน้า */}
-              <button
-                type="button"
-                role="checkbox"
-                onClick={() => setLowOnly((v) => !v)}
-                aria-checked={lowOnly}
-                className={cn(
-                  "flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1 text-sm whitespace-nowrap transition-colors",
-                  lowOnly
-                    ? "border-primary bg-brand font-medium text-primary"
-                    : "border-border text-foreground hover:bg-accent-hover"
-                )}
-              >
-                {lowOnly ? (
-                  <SquareCheckBigIcon className="size-4" />
-                ) : (
-                  <SquareIcon className="size-4 text-muted-foreground" />
-                )}
-                สต็อกต่ำ
-              </button>
+                  {/* ชิปนี้ต่างจากชิปประเภทตรงที่เป็นตัวกรองเปิด/ปิดได้
+                      จึงมีกล่องติ๊กนำหน้าให้เห็นว่ากดเลือกเพิ่มได้ ไม่ใช่ปุ่มสลับหน้า */}
+                  <button
+                    type="button"
+                    role="checkbox"
+                    onClick={() => setLowOnly((v) => !v)}
+                    aria-checked={lowOnly}
+                    className={cn(
+                      "flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1 text-sm whitespace-nowrap transition-colors",
+                      lowOnly
+                        ? "border-primary bg-brand font-medium text-primary"
+                        : "border-border text-foreground hover:bg-accent-hover"
+                    )}
+                  >
+                    {lowOnly ? (
+                      <SquareCheckBigIcon className="size-4" />
+                    ) : (
+                      <SquareIcon className="size-4 text-muted-foreground" />
+                    )}
+                    สต็อกต่ำ
+                  </button>
+                </>
+              )}
             </div>
           </div>
 
@@ -349,7 +400,11 @@ export default function GeneralStockPage() {
                 <SearchIcon />
               </InputGroupAddon>
               <InputGroupInput
-                placeholder={`ค้นหาใน ${CATEGORY_LABEL[cat]}`}
+                placeholder={
+                  isHistory
+                    ? "ค้นหา..."
+                    : `ค้นหาใน ${CATEGORY_LABEL[cat as CategoryId]}`
+                }
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
               />
@@ -409,11 +464,17 @@ export default function GeneralStockPage() {
                   {/* ผูกค่าเดียวกับชิปสต็อกต่ำด้านบน กดที่ไหนอีกที่ก็ขยับตาม */}
                   <Label
                     htmlFor="filter-low"
-                    className="flex items-center gap-3 font-normal"
+                    className={cn(
+                      "flex items-center gap-3 font-normal",
+                      isHistory && "opacity-50"
+                    )}
                   >
+                    {/* ประวัติเป็นรายการเหตุการณ์ ไม่มียอดคงเหลือให้วัดว่าต่ำหรือไม่
+                        จึงปิดไว้แทนที่จะเอาออก คนจะได้เห็นว่ามีตัวเลือกนี้อยู่ */}
                     <Checkbox
                       id="filter-low"
-                      checked={lowOnly}
+                      checked={lowOnly && !isHistory}
+                      disabled={isHistory}
                       onCheckedChange={(v) => setLowOnly(v === true)}
                     />
                     เฉพาะสต็อกต่ำ
@@ -465,36 +526,42 @@ export default function GeneralStockPage() {
               </PopoverContent>
             </Popover>
 
-            {/* ปุ่มซ่อน/แสดงมาอยู่ข้างค้นหา อยู่ในแถบติดบนจึงเอื้อมถึงตลอดตอนเลื่อน */}
-            <Button
-              variant="outline-primary"
-              size="icon"
-              aria-label={allShown ? "ซ่อนป้ายและปุ่ม" : "แสดงป้ายและปุ่ม"}
-              aria-pressed={!allShown}
-              onClick={toggleAll}
-              className="shrink-0"
-            >
-              {allShown ? <EyeIcon /> : <EyeOffIcon />}
-            </Button>
+            {/* ปุ่มซ่อน/แสดงมาอยู่ข้างค้นหา อยู่ในแถบติดบนจึงเอื้อมถึงตลอดตอนเลื่อน
+                ประวัติเป็นตาราง ไม่มีป้ายกับปุ่มในแถวให้ซ่อน จึงไม่ต้องมีปุ่มนี้ */}
+            {!isHistory && (
+              <Button
+                variant="outline-primary"
+                size="icon"
+                aria-label={allShown ? "ซ่อนป้ายและปุ่ม" : "แสดงป้ายและปุ่ม"}
+                aria-pressed={!allShown}
+                onClick={toggleAll}
+                className="shrink-0"
+              >
+                {allShown ? <EyeIcon /> : <EyeOffIcon />}
+              </Button>
+            )}
           </div>
           </StickyBar>
 
-          {/* ---------- รายการสินค้า ---------- */}
-          <div className="mt-4 space-y-4">
-            {visible.map((p) => (
-              <ProductCard
-                key={p.id}
-                product={p}
-                defaultOpen
-                showChips={showChips}
-                showActions={showActions}
-              />
-            ))}
+          {/* ---------- รายการสินค้า / ประวัติ ---------- */}
+          <div ref={listRef} className="mt-4 space-y-4">
+            {isHistory && <HistoryList rows={historyVisible} />}
 
-            {visible.length === 0 && (
+            {!isHistory &&
+              visible.map((p) => (
+                <ProductCard
+                  key={p.id}
+                  product={p}
+                  defaultOpen
+                  showChips={showChips}
+                  showActions={showActions}
+                />
+              ))}
+
+            {!isHistory && visible.length === 0 && (
               <div className="rounded-xl border border-dashed border-border px-6 py-14 text-center">
                 <p className="font-medium">
-                  ไม่พบใน “{CATEGORY_LABEL[cat]}”
+                  ไม่พบใน “{CATEGORY_LABEL[cat as CategoryId]}”
                 </p>
 
                 {hitsElsewhere.length > 0 ? (
@@ -528,14 +595,17 @@ export default function GeneralStockPage() {
             )}
           </div>
 
-          <div className="mt-8 flex items-center gap-2">
-            <Badge tone="neutral" appearance="outline">
-              {visible.length} สินค้า
-            </Badge>
-            <Badge tone="neutral" appearance="outline">
-              {visible.reduce((n, p) => n + p.lots.length, 0)} ล็อต
-            </Badge>
-          </div>
+          {/* สรุปท้ายรายการนับสินค้ากับล็อต ประวัติไม่มีสองอย่างนี้ */}
+          {!isHistory && (
+            <div className="mt-8 flex items-center gap-2">
+              <Badge tone="neutral" appearance="outline">
+                {visible.length} สินค้า
+              </Badge>
+              <Badge tone="neutral" appearance="outline">
+                {visible.reduce((n, p) => n + p.lots.length, 0)} ล็อต
+              </Badge>
+            </div>
+          )}
             </>
           )}
 
@@ -543,14 +613,14 @@ export default function GeneralStockPage() {
                ไม่มีชิปประเภท ไม่มีเรียงตาม ไม่มีปุ่มส่งออก เพราะไม่เกี่ยวกัน */}
           {tab === "inbound" && (
             <>
-              <StickyBar framed={framed} hidden={hidden}>
+              <StickyBar framed={framed} hidden={hidden} barRef={stickyRef}>
                 <div className="flex items-center gap-2 pt-2">
                   <InputGroup className="min-w-0 flex-1 bg-card">
                     <InputGroupAddon align="inline-start">
                       <SearchIcon />
                     </InputGroupAddon>
                     <InputGroupInput
-                      placeholder="ค้นหาเลขเอกสาร สินค้า ผู้ขาย หรือทะเบียนรถ"
+                      placeholder="ค้นหา..."
                       value={inboundQuery}
                       onChange={(e) => setInboundQuery(e.target.value)}
                     />
@@ -575,7 +645,7 @@ export default function GeneralStockPage() {
           {/* ---------- แท็บรอจ่าย/คืน — ใบขอเบิกกับใบขอคืนอยู่ตารางเดียวกัน ---------- */}
           {tab === "issue" && (
             <>
-              <StickyBar framed={framed} hidden={hidden}>
+              <StickyBar framed={framed} hidden={hidden} barRef={stickyRef}>
                 {/* ทิศทางของเอกสาร เลือกได้ทีละอัน เลื่อนแนวนอนเอาบนจอแคบ */}
                 <div
                   role="tablist"
@@ -613,7 +683,7 @@ export default function GeneralStockPage() {
                       <SearchIcon />
                     </InputGroupAddon>
                     <InputGroupInput
-                      placeholder="ค้นหาเลขที่ขอเบิก สินค้า ผู้ขอ หรือหมายเหตุ"
+                      placeholder="ค้นหา..."
                       value={issueQuery}
                       onChange={(e) => setIssueQuery(e.target.value)}
                     />

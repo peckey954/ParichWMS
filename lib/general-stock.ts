@@ -741,3 +741,236 @@ export function countByCategory(products: Product[]) {
   for (const p of products) out[p.category] += 1;
   return out;
 }
+
+// ---------------------------------------------------------------
+// ประวัติการทำรายการ — ทุกความเคลื่อนไหวของสต็อก ไม่ใช่ยอดคงเหลือ
+// จึงไม่มีเรื่อง "สต็อกต่ำ" ให้กรอง เพราะแต่ละแถวคือเหตุการณ์ ไม่ใช่ของที่มีอยู่
+// ---------------------------------------------------------------
+
+export type HistoryStatus =
+  | "returnInternal"
+  | "returnExternal"
+  | "returnSweep"
+  | "inbound"
+  | "issueInternal"
+  | "issueExternal"
+  | "move"
+  | "adjust"
+  | "failed";
+
+export const HISTORY_STATUS_LABEL: Record<HistoryStatus, string> = {
+  returnInternal: "รับคืน (จากภายใน)",
+  returnExternal: "รับคืน (จากภายนอก)",
+  returnSweep: "รับคืน (กวาดพื้น)",
+  inbound: "รับเข้า",
+  issueInternal: "จ่ายออก (ภายใน)",
+  issueExternal: "จ่ายออก (ภายนอก)",
+  move: "ย้าย",
+  adjust: "ปรับปรุง",
+  failed: "ไม่สามารถจ่ายได้",
+};
+
+export type HistoryRow = {
+  id: string;
+  code: string;
+  createdAt: string;
+  lotNumber?: string;
+  productName: string;
+  packing?: string;
+  /** จำนวนที่ขอทำรายการ */
+  askedCount?: number;
+  /** จำนวนที่ทำได้จริง */
+  doneCount?: number;
+  /** ปริมาณที่ทำได้จริง */
+  doneQty?: number;
+  unit?: string;
+  zone?: string;
+  /** ย้ายโซน มีปลายทางด้วย */
+  zoneTo?: string;
+  note?: string;
+  receiverNote?: string;
+  requester: string;
+  actor?: string;
+  status: HistoryStatus;
+};
+
+export const HISTORY_ROWS: HistoryRow[] = [
+  {
+    id: "h-1",
+    code: "REQ260705/01",
+    createdAt: "1/16/2026 | 10:42:52",
+    lotNumber: "PO260116/01-04",
+    productName: "10-0-4+OM 50%",
+    packing: "12 ขวด",
+    askedCount: 400,
+    doneCount: 400,
+    unit: "ชิ้น",
+    zone: "A-9M",
+    note: "เหลือจากการผลิต",
+    requester: "อลิสา พรสุขสิริ",
+    actor: "อลิสา พรสุขสิริ",
+    status: "returnInternal",
+  },
+  {
+    id: "h-2",
+    code: "REQ260705/02",
+    createdAt: "1/16/2026 | 10:42:52",
+    productName: "10-0-4+OM 50%",
+    packing: "40 Kg",
+    askedCount: 40,
+    requester: "อลิสา พรสุขสิริ",
+    receiverNote: "ของไม่พอในโซนที่ระบุ",
+    status: "failed",
+  },
+  {
+    id: "h-3",
+    code: "WT260705/01",
+    createdAt: "1/16/2026 | 10:42:52",
+    lotNumber: "WT260116/01-04",
+    productName: "10-0-4+OM 50%",
+    doneQty: 10,
+    unit: "ตัน",
+    zone: "A-9M",
+    note: "เหลือจากการผลิต",
+    requester: "อลิสา พรสุขสิริ",
+    actor: "อลิสา พรสุขสิริ",
+    status: "returnSweep",
+  },
+  {
+    id: "h-4",
+    code: "REQ260705/03",
+    createdAt: "1/16/2026 | 10:42:52",
+    lotNumber: "POI260116/01-04",
+    productName: "10-0-4+OM 50%",
+    askedCount: 300,
+    doneCount: 300,
+    unit: "ชิ้น",
+    zone: "A-9M",
+    requester: "อลิสา พรสุขสิริ",
+    actor: "อลิสา พรสุขสิริ",
+    status: "returnExternal",
+  },
+  {
+    id: "h-5",
+    code: "REQ260705/04",
+    createdAt: "1/16/2026 | 10:42:52",
+    lotNumber: "PO260116/01-04",
+    productName: "10-0-4+OM 50%",
+    packing: "40 Kg",
+    askedCount: 10,
+    doneCount: 10,
+    doneQty: 10,
+    unit: "ตัน",
+    zone: "A-4M",
+    zoneTo: "A-2M",
+    note: "จัดโซนใหม่",
+    requester: "ธนกฤต ศรีบุญเรือง",
+    actor: "ธนกฤต ศรีบุญเรือง",
+    status: "move",
+  },
+  {
+    id: "h-6",
+    code: "REQ260705/05",
+    createdAt: "1/16/2026 | 10:42:52",
+    lotNumber: "PO260116/01-04",
+    productName: "10-0-4+OM 50%",
+    packing: "40 Kg",
+    askedCount: -10,
+    doneCount: -10,
+    doneQty: -400,
+    unit: "ลิตร",
+    zone: "A-9M",
+    requester: "อลิสา พรสุขสิริ",
+    actor: "อลิสา พรสุขสิริ",
+    status: "issueInternal",
+  },
+  {
+    id: "h-7",
+    code: "REQ260705/06",
+    createdAt: "1/16/2026 | 10:42:52",
+    lotNumber: "PO260116/01-04",
+    productName: "10-0-4+OM 50%",
+    doneCount: 40,
+    zone: "A-4M",
+    zoneTo: "A-2M",
+    note: "จัดโซนใหม่",
+    requester: "ธนกฤต ศรีบุญเรือง",
+    actor: "ธนกฤต ศรีบุญเรือง",
+    status: "move",
+  },
+  {
+    id: "h-8",
+    code: "REQ260705/07",
+    createdAt: "1/16/2026 | 10:42:52",
+    lotNumber: "PO260116/01-04",
+    productName: "10-0-4+OM 50%",
+    packing: "40 Kg",
+    doneCount: 5,
+    doneQty: 350,
+    unit: "ตัน",
+    zone: "A-9M",
+    note: "ของเกินจากการนับ",
+    requester: "พิมพ์ชนก วงศ์อารีย์",
+    actor: "พิมพ์ชนก วงศ์อารีย์",
+    status: "adjust",
+  },
+  {
+    id: "h-9",
+    code: "REQ260705/08",
+    createdAt: "1/16/2026 | 10:42:52",
+    lotNumber: "PO260116/01-04",
+    productName: "10-0-4+OM 50%",
+    askedCount: -5,
+    doneCount: -5,
+    zone: "A-9M",
+    note: "ของขาดจากการนับ",
+    requester: "พิมพ์ชนก วงศ์อารีย์",
+    actor: "พิมพ์ชนก วงศ์อารีย์",
+    status: "adjust",
+  },
+  {
+    id: "h-10",
+    code: "REQ260705/09",
+    createdAt: "1/16/2026 | 10:42:52",
+    lotNumber: "PO260116/01-04",
+    productName: "10-0-4+OM 50%",
+    packing: "40 Kg",
+    askedCount: -50,
+    doneCount: -50,
+    doneQty: -350,
+    unit: "ตัน",
+    zone: "A-9M",
+    requester: "อลิสา พรสุขสิริ",
+    actor: "อลิสา พรสุขสิริ",
+    status: "issueExternal",
+  },
+  {
+    id: "h-11",
+    code: "PO260705/01",
+    createdAt: "1/16/2026 | 10:42:52",
+    lotNumber: "PO260116/01-04",
+    productName: "10-0-4+OM 50%",
+    packing: "40 Kg",
+    askedCount: 400,
+    doneCount: 400,
+    doneQty: 350,
+    unit: "ตัน",
+    zone: "A-9M",
+    requester: "อลิสา พรสุขสิริ",
+    actor: "อลิสา พรสุขสิริ",
+    status: "inbound",
+  },
+];
+
+export function matchesHistory(r: HistoryRow, q: string): boolean {
+  const s = q.trim().toLowerCase();
+  if (!s) return true;
+  return [
+    r.code,
+    r.lotNumber ?? "",
+    r.productName,
+    r.zone ?? "",
+    r.requester,
+    r.note ?? "",
+  ].some((v) => v.toLowerCase().includes(s));
+}
