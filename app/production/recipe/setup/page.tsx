@@ -3,7 +3,6 @@
 import * as React from "react";
 import Link from "next/link";
 import {
-  CalculatorIcon,
   CloudDownloadIcon,
   CoinsIcon,
   PackageIcon,
@@ -20,6 +19,7 @@ import {
 import { Button } from "@peckey954/ui/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@peckey954/ui/components/ui/tabs";
 import { cn } from "@peckey954/ui/lib/utils";
+import { InputSetup } from "@/components/production/input-setup";
 
 /* ------------------------------------------------------------------
    ตั้งค่าสูตรการผลิต — วางโครงไว้ก่อน รายละเอียดของแต่ละหน้ารอสรุปทีหลัง
@@ -45,13 +45,8 @@ const TABS: {
     label: "Input ข้อมูล",
     icon: SlidersHorizontalIcon,
     purpose:
-      "ใส่เงื่อนไขและข้อจำกัดที่ใช้คำนวณ ระบบจะหาสูตรที่ดีที่สุดให้จากตรงนี้",
-    planned: [
-      "ช่วงธาตุอาหารที่ยอมรับได้ของแต่ละสูตร (N-P-K)",
-      "วัตถุดิบที่อนุญาตให้ใช้ และเพดานการใช้ต่อสูตร",
-      "ข้อจำกัดจากสายการผลิต เช่น กำลังผลิตต่อกะ",
-      "ปุ่มสั่งคำนวณสูตรใหม่ พร้อมผลลัพธ์ก่อน–หลัง",
-    ],
+      "ต้นทุนและค่าธาตุอาหารของวัตถุดิบ กด RUN แล้วระบบจะคำนวณสูตรที่คุ้มที่สุดให้",
+    planned: [],
   },
   {
     id: "sku",
@@ -85,7 +80,7 @@ export default function RecipeSetupPage() {
   const active = TABS.find((t) => t.id === tab)!;
 
   return (
-    <main className="mx-auto w-full max-w-5xl px-4 py-3 sm:px-6 sm:py-5">
+    <main className="mx-auto w-full max-w-7xl px-4 py-3 sm:px-6 sm:py-5">
       <Breadcrumb>
         <BreadcrumbList>
           <BreadcrumbItem>
@@ -111,10 +106,6 @@ export default function RecipeSetupPage() {
             ต้นทางของตัวเลขในตารางสูตรประจำสัปดาห์ แก้ที่นี่แล้วสั่งคำนวณใหม่
           </p>
         </div>
-        <Button disabled>
-          <CalculatorIcon />
-          คำนวณสูตรใหม่
-        </Button>
       </div>
 
       <Tabs
@@ -132,8 +123,15 @@ export default function RecipeSetupPage() {
         </TabsList>
       </Tabs>
 
-      {/* โครงว่างไว้ก่อน บอกไว้ตรง ๆ ว่าหน้านี้จะมีอะไร
+      {tab === "input" && (
+        <div className="mt-4">
+          <InputSetup />
+        </div>
+      )}
+
+      {/* สองแท็บที่เหลือยังเป็นโครง บอกไว้ตรง ๆ ว่าจะมีอะไร
           จะได้คุยกันได้ว่าตกอะไรไปก่อนจะลงมือทำจริง */}
+      {tab !== "input" && (
       <div className="mt-4 rounded-xl border border-border bg-card p-5">
         <div className="flex items-start gap-3">
           <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-brand text-primary">
@@ -171,6 +169,7 @@ export default function RecipeSetupPage() {
           </p>
         )}
       </div>
+      )}
 
       <div className="mt-6">
         <Button asChild variant="outline-primary">
