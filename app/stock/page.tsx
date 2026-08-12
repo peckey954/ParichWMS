@@ -86,7 +86,7 @@ function StickyBar({
   return (
     <div
       className={cn(
-        "sticky z-30 -mx-4 mt-4 bg-surface px-4 pt-1 pb-3 sm:-mx-6 sm:px-6",
+        "sticky z-30 -mx-4 mt-3 bg-surface px-4 pb-3 sm:-mx-6 sm:mt-4 sm:px-6",
         "transition-transform duration-200",
         framed ? "top-0" : "top-14",
         hidden && "-translate-y-[calc(100%+1rem)]"
@@ -207,7 +207,7 @@ export default function GeneralStockPage() {
   return (
     <main className="mx-auto w-full max-w-7xl">
       <div>
-        <div className="px-4 py-5 sm:px-6">
+        <div className="px-4 py-3 sm:px-6 sm:py-5">
           <Breadcrumb>
             <BreadcrumbList>
               <BreadcrumbItem>
@@ -225,7 +225,7 @@ export default function GeneralStockPage() {
           {/* ---------- หัวเรื่อง + ปุ่มเฉพาะแท็บ ----------
                ปุ่มพวกนี้ทำงานกับข้อมูลของแท็บสต็อกเท่านั้น พอไปแท็บอื่น
                ซึ่งเป็นเอกสารคนละชนิดจึงต้องหายไป ไม่ใช่ปุ่มประจำหน้า */}
-          <div className="mt-3 flex items-start justify-between gap-3">
+          <div className="mt-2 flex items-start justify-between gap-3 sm:mt-3">
             <div className="min-w-0">
               <h1 className="text-2xl font-semibold tracking-tight">
                 สต็อกทั่วไป
@@ -253,7 +253,7 @@ export default function GeneralStockPage() {
           <Tabs
             value={tab}
             onValueChange={(v) => setTab(v as typeof tab)}
-            className="mt-5"
+            className="mt-4 sm:mt-5"
           >
             <TabsList className="w-full">
               <TabsTrigger value="stock" className="flex-1">

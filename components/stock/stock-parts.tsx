@@ -107,15 +107,15 @@ function ChipsInline({ children }: { children: React.ReactNode }) {
 /**
  * แถวชิปของจอแคบ — บรรทัดเดียว เลื่อนแนวนอน ไม่ตัดบรรทัด
  *
- * -mx-4 px-4 ดันกล่องออกไปจนสุดขอบการ์ดทั้งสองข้าง แล้วดันเนื้อในกลับเข้ามา 16
- * พื้นที่เลื่อนจึงกว้างเท่าการ์ดจริง ๆ ไม่ใช่แค่ความกว้างของคอลัมน์ข้อความ
- * ต้องวางเป็นลูกโดยตรงของกล่องที่มี px-4 ไม่งั้นระยะจะไม่ตรงขอบ
+ * ไม่ใช้ระยะขอบติดลบแล้ว กล่องนี้จึงกว้างเท่าเนื้อในการ์ด
+ * ชิปตัวสุดท้ายจะหยุดห่างจากขอบการ์ด 16 เสมอ ไม่วิ่งไปชนขอบเวลาเลื่อน
+ * ต้องวางเป็นลูกโดยตรงของกล่องที่มี px-4 ไม่งั้นระยะจะไม่ตรง
  */
 function ChipScroller({ children }: { children: React.ReactNode }) {
   return (
     <div
       className={cn(
-        "-mx-4 mt-2 flex items-center gap-2 overflow-x-auto px-4",
+        "mt-2 flex items-center gap-2 overflow-x-auto",
         "flex-nowrap [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
         "@3xl:hidden"
       )}
@@ -137,14 +137,26 @@ function ZoneTag({ zone }: { zone: string }) {
   );
 }
 
-/** ปุ่มโชว์ตลอด — จอกว้างอยู่ท้ายแถว จอแคบเรียงเต็มความกว้างสองปุ่ม */
+/**
+ * ปุ่มโชว์ตลอด
+ * จอแคบ — เรียงเต็มความกว้างสองปุ่ม แบ่งครึ่งเท่ากัน
+ * จอกว้าง — อยู่ท้ายแถว กว้างเท่ากันทั้งคู่ (w-24) ไม่ใช่กว้างตามความยาวคำ
+ */
 function LotActions() {
   return (
     <div className="flex w-full gap-2 @3xl:w-auto">
-      <Button variant="outline-primary" size="sm" className="flex-1 @3xl:flex-none">
+      <Button
+        variant="outline-primary"
+        size="sm"
+        className="flex-1 @3xl:w-24 @3xl:flex-none"
+      >
         ย้าย
       </Button>
-      <Button variant="outline-primary" size="sm" className="flex-1 @3xl:flex-none">
+      <Button
+        variant="outline-primary"
+        size="sm"
+        className="flex-1 @3xl:w-24 @3xl:flex-none"
+      >
         ปรับปรุง
       </Button>
     </div>
@@ -175,9 +187,9 @@ function LotRow({
 
   return (
     <div className="border-t border-border px-4 py-3">
-      {/* จอกว้าง: ข้อมูล | ปุ่ม | ยอด อยู่แถวเดียว
+      {/* จอกว้าง: ข้อมูล | ปุ่ม | ยอด อยู่แถวเดียว จัดกึ่งกลางแนวตั้ง
           จอแคบ: ยอดขึ้นไปอยู่ขวาของหัวแถว แล้วปุ่มลงมาเต็มความกว้างข้างล่าง */}
-      <div className="flex flex-col gap-3 @3xl:flex-row @3xl:items-start @3xl:justify-between">
+      <div className="flex flex-col gap-3 @3xl:flex-row @3xl:items-center @3xl:justify-between">
         <div className="min-w-0 flex-1">
           <div className="flex items-start justify-between gap-3">
             <div className="flex min-w-0 flex-wrap items-center gap-2">
