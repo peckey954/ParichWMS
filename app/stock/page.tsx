@@ -5,6 +5,8 @@ import {
   ChevronsDownUpIcon,
   ChevronsUpDownIcon,
   DownloadIcon,
+  EyeIcon,
+  EyeOffIcon,
   ListFilterIcon,
   MonitorIcon,
   SearchIcon,
@@ -44,12 +46,15 @@ import {
   ToggleGroupItem,
 } from "@peckey954/ui/components/ui/toggle-group";
 import { cn } from "@peckey954/ui/lib/utils";
+import { InboundCard } from "@/components/stock/inbound-card";
 import { ProductCard } from "@/components/stock/stock-parts";
 import {
   CATEGORIES,
   CATEGORY_LABEL,
+  INBOUND_DOCS,
   PRODUCTS,
   countByCategory,
+  matchesInbound,
   matchesQuery,
   type CategoryId,
 } from "@/lib/general-stock";
@@ -77,6 +82,16 @@ export default function GeneralStockPage() {
   const [query, setQuery] = React.useState("");
   const [showChips, setShowChips] = React.useState(true);
   const [showActions, setShowActions] = React.useState(true);
+  const [tab, setTab] = React.useState<"stock" | "inbound" | "issue">("stock");
+  const [inboundQuery, setInboundQuery] = React.useState("");
+
+  // ปุ่มรูปตาเป็นสวิตช์ตัวใหญ่ — เปิด/ปิดพร้อมกันทั้งป้ายและปุ่ม
+  // ส่วนใน popover ยังแยกเปิดปิดทีละอย่างได้ ทั้งสองทางเขียนค่าชุดเดียวกันจึงไม่หลุดกัน
+  const allShown = showChips && showActions;
+  const toggleAll = () => {
+    setShowChips(!allShown);
+    setShowActions(!allShown);
+  };
 
   const changeDevice = (d: Device) => setView({ device: d, expanded: true });
   const toggleExpand = () => setView((v) => ({ ...v, expanded: !v.expanded }));
@@ -104,6 +119,10 @@ export default function GeneralStockPage() {
                 (!lowOnly || p.low)
             )
         );
+
+  const inboundVisible = INBOUND_DOCS.filter((d) =>
+    matchesInbound(d, inboundQuery)
+  );
 
   // ---------- เลื่อนแถวชิปให้เห็นประเภทที่เปิดอยู่ ----------
   const chipRowRef = React.useRef<HTMLDivElement>(null);
@@ -179,18 +198,52 @@ export default function GeneralStockPage() {
             </BreadcrumbList>
           </Breadcrumb>
 
-          <h1 className="mt-3 text-2xl font-semibold tracking-tight">
-            สต็อกทั่วไป
-          </h1>
-          <p className="mt-1 text-sm text-muted-foreground">จัดการสต็อกทั่วไป</p>
+          {/* ---------- หัวเรื่อง + ปุ่มเฉพาะแท็บ ----------
+               ปุ่มพวกนี้ทำงานกับข้อมูลของแท็บสต็อกเท่านั้น พอไปแท็บอื่น
+               ซึ่งเป็นเอกสารคนละชนิดจึงต้องหายไป ไม่ใช่ปุ่มประจำหน้า */}
+          <div className="mt-3 flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <h1 className="text-2xl font-semibold tracking-tight">
+                สต็อกทั่วไป
+              </h1>
+              <p className="mt-1 text-sm text-muted-foreground">
+                จัดการสต็อกทั่วไป
+              </p>
+            </div>
 
-          <Tabs defaultValue="stock" className="mt-5">
+            {tab === "stock" && (
+              <div className="flex shrink-0 items-center gap-2">
+                <Button
+                  variant="outline-primary"
+                  size="icon"
+                  aria-label={allShown ? "ซ่อนป้ายและปุ่ม" : "แสดงป้ายและปุ่ม"}
+                  aria-pressed={!allShown}
+                  onClick={toggleAll}
+                >
+                  {allShown ? <EyeIcon /> : <EyeOffIcon />}
+                </Button>
+                <Button
+                  variant="outline-primary"
+                  size="icon"
+                  aria-label="ส่งออก CSV"
+                >
+                  <DownloadIcon />
+                </Button>
+              </div>
+            )}
+          </div>
+
+          <Tabs
+            value={tab}
+            onValueChange={(v) => setTab(v as typeof tab)}
+            className="mt-5"
+          >
             <TabsList className="w-full">
               <TabsTrigger value="stock" className="flex-1">
-                สต็อกสินค้า ({PRODUCTS.length})
+                สต็อก ({PRODUCTS.length})
               </TabsTrigger>
               <TabsTrigger value="inbound" className="flex-1">
-                รอรับเข้า (3)
+                รอรับเข้า ({INBOUND_DOCS.length})
               </TabsTrigger>
               <TabsTrigger value="issue" className="flex-1">
                 รอจ่าย/คืน (4)
@@ -198,10 +251,11 @@ export default function GeneralStockPage() {
             </TabsList>
           </Tabs>
 
-          {/* ---------- ประเภทสินค้า + ปุ่มส่งออก ----------
+          {tab === "stock" && (
+            <>
+          {/* ---------- ประเภทสินค้า ----------
                ประเภทเป็นการนำทาง เลือกอยู่เสมอหนึ่งอัน ไม่มี "ทั้งหมด"
-               ต่อท้ายด้วยชิปสต็อกต่ำ (คนละกลุ่ม คั่นด้วยเส้น)
-               ปุ่มส่งออกปักอยู่นอกแถวเลื่อน จะได้ไม่หายไปตอนปัด */}
+               ต่อท้ายด้วยชิปสต็อกต่ำ (คนละกลุ่ม คั่นด้วยเส้น) */}
           <div className="mt-4 flex items-center gap-2">
             <div
               ref={chipRowRef}
@@ -256,15 +310,6 @@ export default function GeneralStockPage() {
                 สต็อกต่ำ
               </button>
             </div>
-
-            <Button
-              variant="outline-primary"
-              size="icon"
-              aria-label="ส่งออก CSV"
-              className="shrink-0"
-            >
-              <DownloadIcon />
-            </Button>
           </div>
 
           {/* ---------- ค้นหา — อยู่ใต้ประเภท เพราะค้นเฉพาะในประเภทที่เปิดอยู่ ---------- */}
@@ -420,6 +465,59 @@ export default function GeneralStockPage() {
               {visible.reduce((n, p) => n + p.lots.length, 0)} ล็อต
             </Badge>
           </div>
+            </>
+          )}
+
+          {/* ---------- แท็บรอรับเข้า — เอกสารสั่งซื้อ คนละชนิดกับสต็อก ----------
+               ไม่มีชิปประเภท ไม่มีเรียงตาม ไม่มีปุ่มส่งออก เพราะไม่เกี่ยวกัน */}
+          {tab === "inbound" && (
+            <>
+              <div className="mt-4 flex items-center gap-2">
+                <InputGroup className="min-w-0 flex-1">
+                  <InputGroupAddon align="inline-start">
+                    <SearchIcon />
+                  </InputGroupAddon>
+                  <InputGroupInput
+                    placeholder="ค้นหาเลขเอกสาร สินค้า ผู้ขาย หรือทะเบียนรถ"
+                    value={inboundQuery}
+                    onChange={(e) => setInboundQuery(e.target.value)}
+                  />
+                </InputGroup>
+                <Button
+                  variant="outline-primary"
+                  size="icon"
+                  aria-label="ตัวกรองเอกสารรอรับเข้า"
+                  className="shrink-0"
+                >
+                  <ListFilterIcon />
+                </Button>
+              </div>
+
+              <div className="mt-4 space-y-4">
+                {inboundVisible.map((d) => (
+                  <InboundCard key={d.id} doc={d} />
+                ))}
+                {inboundVisible.length === 0 && (
+                  <div className="rounded-xl border border-dashed border-border px-6 py-14 text-center">
+                    <p className="font-medium">ไม่พบเอกสารรอรับเข้า</p>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      ลองใช้คำค้นสั้นลง
+                    </p>
+                  </div>
+                )}
+              </div>
+            </>
+          )}
+
+          {tab === "issue" && (
+            <div className="mt-4 rounded-xl border border-dashed border-border px-6 py-16 text-center">
+              <p className="font-medium">รอจ่าย / คืน</p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                ยังไม่ได้ออกแบบหน้านี้ — เป็นเอกสารคนละชนิดกับสองแท็บแรก
+                จึงจะมีเครื่องมือของตัวเองเหมือนกัน
+              </p>
+            </div>
+          )}
         </div>
       </div>
     </main>

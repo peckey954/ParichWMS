@@ -316,6 +316,70 @@ export function matchesQuery(p: Product, q: string): boolean {
   );
 }
 
+// ---------------------------------------------------------------
+// แท็บรอรับเข้า — เป็นเอกสารสั่งซื้อที่รอของเข้าคลัง คนละชนิดกับสต็อก
+// จึงมีเครื่องมือของตัวเอง ไม่แชร์กับแท็บสต็อก
+// ---------------------------------------------------------------
+
+export type InboundDoc = {
+  id: string;
+  code: string;
+  createdAt: string;
+  productName: string;
+  supplier: string;
+  truck: string;
+  arriveDate: string;
+  orderQty: number;
+  orderUnit: string;
+  packing?: string;
+};
+
+export const INBOUND_DOCS: InboundDoc[] = [
+  {
+    id: "in-1",
+    code: "POI260116/01",
+    createdAt: "1/16/2026 | 10:42:52",
+    productName: "21-0-0 ฟูเจียน ผง",
+    supplier: "เอชซี อินเตอร์เนชั่นแนล เทรดดิ้ง จำกัด",
+    truck: "2 กส - 2345",
+    arriveDate: "1/16/2026",
+    orderQty: 400,
+    orderUnit: "ลัง",
+    packing: "12 ขวด",
+  },
+  {
+    id: "in-2",
+    code: "POI260116/02",
+    createdAt: "1/16/2026 | 11:08:14",
+    productName: "กระสอบเปล่า 50 kg ลายเรือใบ",
+    supplier: "โรงงานกระสอบไทยรุ่งเรือง",
+    truck: "70 - 8891",
+    arriveDate: "1/17/2026",
+    orderQty: 12000,
+    orderUnit: "ใบ",
+  },
+  {
+    id: "in-3",
+    code: "POI260116/03",
+    createdAt: "1/16/2026 | 13:20:05",
+    productName: "สติกเกอร์ QR ตรวจสอบย้อนกลับ",
+    supplier: "พริ้นท์เวิร์คส์ เอเชีย",
+    truck: "82 - 4417",
+    arriveDate: "1/18/2026",
+    orderQty: 30,
+    orderUnit: "ม้วน",
+    packing: "1,000 ดวง",
+  },
+];
+
+export function matchesInbound(d: InboundDoc, q: string): boolean {
+  const s = q.trim().toLowerCase();
+  if (!s) return true;
+  return [d.code, d.productName, d.supplier, d.truck].some((v) =>
+    v.toLowerCase().includes(s)
+  );
+}
+
 export function countByCategory(products: Product[]) {
   const out = {} as Record<CategoryId, number>;
   for (const c of CATEGORIES) out[c.id] = 0;
