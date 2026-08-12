@@ -107,7 +107,7 @@ export default function WeighingPage() {
             </BreadcrumbItem>
             <BreadcrumbSeparator />
             <BreadcrumbItem>
-              <BreadcrumbLink href="/weighing">รับสินค้าเข้า</BreadcrumbLink>
+              <BreadcrumbLink href="/weighing">ชั่งน้ำหนัก</BreadcrumbLink>
             </BreadcrumbItem>
             <BreadcrumbSeparator />
             <BreadcrumbItem>

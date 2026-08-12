@@ -20,7 +20,7 @@
 @source "../node_modules/@peckey954/ui/src";
 
 /* ============================================================
-   token เสริมของแอปนี้ — สีบอก "สภาพล็อต" ที่ DS ยังไม่มี
+   token เสริมของแอปนี้ — สีเสริมที่ DS ยังไม่มี tone ให้ (ใช้กับสภาพล็อตและหมวดเมนู)
 
    DS มี tone ให้ 5 ตัว (brand / success / warning / danger / neutral)
    แต่หน้าสต็อกต้องแยก Repack กับ รับสภาพ/กวาดพื้น ออกจากกันด้วย
@@ -30,22 +30,22 @@
    ============================================================ */
 
 [data-brand="parich"] {
-  --lot-info: hsl(210 100% 96%);
-  --lot-info-foreground: hsl(215 85% 34%);
-  --lot-violet: hsl(270 100% 97%);
-  --lot-violet-foreground: hsl(272 55% 45%);
+  --tone-blue: hsl(210 100% 96%);
+  --tone-blue-foreground: hsl(215 85% 34%);
+  --tone-violet: hsl(270 100% 97%);
+  --tone-violet-foreground: hsl(272 55% 45%);
 }
 
 [data-brand="parich"].dark {
-  --lot-info: hsl(212 45% 18%);
-  --lot-info-foreground: hsl(210 90% 76%);
-  --lot-violet: hsl(272 38% 21%);
-  --lot-violet-foreground: hsl(270 85% 82%);
+  --tone-blue: hsl(212 45% 18%);
+  --tone-blue-foreground: hsl(210 90% 76%);
+  --tone-violet: hsl(272 38% 21%);
+  --tone-violet-foreground: hsl(270 85% 82%);
 }
 
 @theme inline {
-  --color-lot-info: var(--lot-info);
-  --color-lot-info-foreground: var(--lot-info-foreground);
-  --color-lot-violet: var(--lot-violet);
-  --color-lot-violet-foreground: var(--lot-violet-foreground);
+  --color-tone-blue: var(--tone-blue);
+  --color-tone-blue-foreground: var(--tone-blue-foreground);
+  --color-tone-violet: var(--tone-violet);
+  --color-tone-violet-foreground: var(--tone-violet-foreground);
 }

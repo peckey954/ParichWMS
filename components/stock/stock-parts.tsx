@@ -33,11 +33,11 @@ import {
 
 const CONDITION_CHIP: Record<LotCondition, string> = {
   repack:
-    "[--bdg-surface:var(--lot-violet)] [--bdg-text:var(--lot-violet-foreground)] [--bdg-border:var(--lot-violet)]",
+    "[--bdg-surface:var(--tone-violet)] [--bdg-text:var(--tone-violet-foreground)] [--bdg-border:var(--tone-violet)]",
   accepted:
-    "[--bdg-surface:var(--lot-info)] [--bdg-text:var(--lot-info-foreground)] [--bdg-border:var(--lot-info)]",
+    "[--bdg-surface:var(--tone-blue)] [--bdg-text:var(--tone-blue-foreground)] [--bdg-border:var(--tone-blue)]",
   sweep:
-    "[--bdg-surface:var(--lot-info)] [--bdg-text:var(--lot-info-foreground)] [--bdg-border:var(--lot-info)]",
+    "[--bdg-surface:var(--tone-blue)] [--bdg-text:var(--tone-blue-foreground)] [--bdg-border:var(--tone-blue)]",
 };
 
 function ConditionChip({ condition }: { condition: LotCondition }) {
