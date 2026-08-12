@@ -103,7 +103,140 @@ export const formatQty = (v: number) =>
 // ข้อมูลตัวอย่าง
 // ---------------------------------------------------------------
 
-export const PRODUCTS: Product[] = [
+/**
+ * สุ่มแบบกำหนดเมล็ดไว้ ผลลัพธ์เหมือนเดิมทุกครั้ง
+ * ห้ามใช้ Math.random เพราะฝั่งเซิร์ฟเวอร์กับเบราว์เซอร์จะได้คนละค่า แล้ว hydration พัง
+ */
+function seeded(n: number) {
+  let s = n * 9301 + 49297;
+  return () => {
+    s = (s * 9301 + 49297) % 233280;
+    return s / 233280;
+  };
+}
+
+const NAME_POOL: Record<CategoryId, string[]> = {
+  sack: [
+    "กระสอบพิมพ์ 15-15-15 ตราเรือใบ",
+    "กระสอบพิมพ์ 16-20-0 ตราเรือใบ",
+    "กระสอบพิมพ์ 46-0-0 ยูเรีย",
+    "กระสอบพิมพ์ 21-0-0 ฟูเจียน",
+    "กระสอบเปล่า 25 kg ลายเรือใบ",
+    "กระสอบสาน PP 50 kg สีขาว",
+    "กระสอบสาน PP 50 kg สีฟ้า",
+    "กระสอบในพลาสติก LDPE",
+    "กระสอบจัมโบ้ 1 ตัน",
+    "กระสอบพิมพ์ 8-24-24 No Filler",
+  ],
+  sticker: [
+    "สติกเกอร์ QR สูตร 15-15-15",
+    "สติกเกอร์ QR สูตร 46-0-0",
+    "สติกเกอร์บาร์โค้ดล็อต",
+    "สติกเกอร์เตือนความชื้น",
+    "สติกเกอร์ตราเรือใบ 10 ซม.",
+    "สติกเกอร์วันผลิต/วันหมดอายุ",
+    "สติกเกอร์รับรอง มกอช.",
+  ],
+  giveaway: [
+    "หมวกแก๊ปตราเรือใบ",
+    "เสื้อโปโลพนักงานขาย",
+    "ร่มพับ 2 ตอน ตราเรือใบ",
+    "กระเป๋าผ้าสปันบอนด์",
+    "แก้วน้ำเก็บความเย็น",
+    "ปฏิทินตั้งโต๊ะ 2569",
+  ],
+  lineSupply: [
+    "ด้ายเย็บกระสอบ เบอร์ 10",
+    "ด้ายเย็บกระสอบ เบอร์ 40",
+    "เข็มเย็บกระสอบ DN-x1",
+    "น้ำมันเกียร์ SAE 90",
+    "จาระบีทนความร้อน",
+    "สายพานลำเลียง PVC 600 mm",
+    "ตะแกรงร่อน 4 mm",
+    "ถุงมือผ้าเคลือบยาง",
+    "หน้ากากกันฝุ่น N95",
+  ],
+};
+
+const UNIT_POOL: Record<CategoryId, { unit: string; packing: string }[]> = {
+  sack: [
+    { unit: "ใบ", packing: "มัดละ 100 ใบ" },
+    { unit: "ใบ", packing: "มัดละ 50 ใบ" },
+  ],
+  sticker: [
+    { unit: "ดวง", packing: "ม้วน" },
+    { unit: "ดวง", packing: "แผ่น" },
+  ],
+  giveaway: [
+    { unit: "ชิ้น", packing: "ลัง" },
+    { unit: "ตัว", packing: "ลัง" },
+  ],
+  lineSupply: [
+    { unit: "ม้วน", packing: "กล่อง" },
+    { unit: "ลิตร", packing: "ถัง 20 ลิตร" },
+    { unit: "คู่", packing: "โหล" },
+  ],
+};
+
+const ZONES = ["A-3M", "A-9M", "B-2L", "C-1S", "D-4S", "E-1S", "F-1M", "F-2M"];
+const CONDITIONS: (LotCondition | undefined)[] = [
+  undefined,
+  undefined,
+  "repack",
+  "accepted",
+  "sweep",
+];
+
+/** สร้างรายการยาว ๆ ไว้ทดสอบว่าเลื่อนดูจริงแล้วเหนื่อยแค่ไหน */
+function generate(): Product[] {
+  const out: Product[] = [];
+  let n = 0;
+
+  for (const cat of CATEGORIES) {
+    NAME_POOL[cat.id].forEach((name, i) => {
+      const rnd = seeded(++n);
+      const spec = UNIT_POOL[cat.id][i % UNIT_POOL[cat.id].length];
+      const lotCount = 1 + Math.floor(rnd() * 3);
+      const low = rnd() < 0.22;
+
+      const lots: Lot[] = Array.from({ length: lotCount }, (_, li) => {
+        const qty = Math.round((5 + rnd() * 900) * (cat.id === "sticker" ? 20 : 1));
+        const day = 1 + Math.floor(rnd() * 27);
+        return {
+          id: `g${n}-l${li}`,
+          zone: ZONES[Math.floor(rnd() * ZONES.length)],
+          code: `PD2605${String(day).padStart(2, "0")}/${String(li + 1).padStart(2, "0")}`,
+          condition: CONDITIONS[Math.floor(rnd() * CONDITIONS.length)],
+          receivedAt: `5/${day}/2026`,
+          ageDays: 30 + Math.floor(rnd() * 30),
+          qty,
+          packNote: spec.packing,
+          pending:
+            rnd() < 0.3
+              ? { inbound: Math.round(rnd() * 500) * 10 }
+              : rnd() < 0.25
+                ? { issue: Math.round(rnd() * 200) * 10 }
+                : {},
+          low: low && li === 0,
+        };
+      });
+
+      out.push({
+        id: `g${n}`,
+        name,
+        sku: `${cat.id.slice(0, 2).toUpperCase()}-${1000 + n}`,
+        category: cat.id,
+        packing: spec.packing,
+        unit: spec.unit,
+        low,
+        lots,
+      });
+    });
+  }
+  return out;
+}
+
+const SEED_PRODUCTS: Product[] = [
   {
     id: "p1",
     name: "กระสอบพิมพ์ 20-8-8 + 1Mg No Filler",
@@ -299,6 +432,9 @@ export const PRODUCTS: Product[] = [
     ],
   },
 ];
+
+/** รวมของที่เขียนมือกับที่สร้างอัตโนมัติ ให้รายการยาวพอจะทดสอบการเลื่อนจริง */
+export const PRODUCTS: Product[] = [...SEED_PRODUCTS, ...generate()];
 
 /**
  * ค้นหาข้ามทุกประเภท — จับทั้งชื่อสินค้า รหัส เลขล็อต และโซน

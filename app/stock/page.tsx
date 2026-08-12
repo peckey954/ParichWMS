@@ -2,8 +2,6 @@
 
 import * as React from "react";
 import {
-  ChevronsDownUpIcon,
-  ChevronsUpDownIcon,
   DownloadIcon,
   EyeIcon,
   EyeOffIcon,
@@ -70,11 +68,10 @@ const DEVICE: Record<Device, { label: string; width: string; px: string }> = {
 
 export default function GeneralStockPage() {
   // เก็บอุปกรณ์กับสถานะย่อ/กางไว้ก้อนเดียว จะได้เปลี่ยนพร้อมกันในการ setState ครั้งเดียว
-  const [view, setView] = React.useState<{ device: Device; expanded: boolean }>({
+  const [view, setView] = React.useState<{ device: Device }>({
     device: "desktop",
-    expanded: true,
   });
-  const { device, expanded } = view;
+  const { device } = view;
   // ของจริงแยกประเภทกันเด็ดขาด ไม่มีมุมมอง "ทั้งหมด"
   // ชิปจึงเป็นการนำทาง (เลือกอยู่เสมอหนึ่งอัน) ไม่ใช่ตัวกรองที่ปิดได้
   const [cat, setCat] = React.useState<CategoryId>("sack");
@@ -94,8 +91,7 @@ export default function GeneralStockPage() {
     setShowActions(!allShown);
   };
 
-  const changeDevice = (d: Device) => setView({ device: d, expanded: true });
-  const toggleExpand = () => setView((v) => ({ ...v, expanded: !v.expanded }));
+  const changeDevice = (d: Device) => setView({ device: d });
 
   // จำนวนบนชิปเป็นยอดจริงของแต่ละประเภท ไม่เปลี่ยนตามคำค้น
   // เพราะเป็นป้ายบอกทาง ไม่ใช่ตัวนับผลลัพธ์
@@ -251,7 +247,8 @@ export default function GeneralStockPage() {
                รายการยาว ถ้าปุ่มอยู่บนสุดอย่างเดียวต้องเลื่อนกลับไปกด
                จึงยกสองอย่างที่ใช้ระหว่างไล่ดู (สลับประเภท + ซ่อน/แสดง) มาติดบนไว้
                ลบขอบซ้ายขวาออกด้วย -mx เพื่อให้พื้นหลังเต็มความกว้างตอนติด */}
-          <div className="sticky top-14 z-30 -mx-4 mt-4 flex items-center gap-2 border-b border-border bg-background px-4 py-2 sm:-mx-6 sm:px-6">
+          <div className="sticky top-14 z-30 -mx-4 mt-4 border-b border-border bg-background px-4 pt-1 pb-3 sm:-mx-6 sm:px-6">
+          <div className="flex items-center gap-2 pt-2">
             <div
               ref={chipRowRef}
               className={cn(
@@ -305,32 +302,11 @@ export default function GeneralStockPage() {
                 สต็อกต่ำ
               </button>
             </div>
-
-            {/* ปักไว้นอกแถวเลื่อน จะได้เอื้อมถึงตลอดไม่ว่าปัดชิปไปไกลแค่ไหน
-                สองปุ่มนี้ใช้ระหว่างไล่ดูรายการทั้งคู่ จึงอยู่ในแถบติดบนด้วยกัน */}
-            <Button
-              variant="outline-primary"
-              size="icon"
-              aria-label={expanded ? "ย่อทุกรายการ" : "กางทุกรายการ"}
-              aria-pressed={!expanded}
-              onClick={toggleExpand}
-              className="shrink-0"
-            >
-              {expanded ? <ChevronsDownUpIcon /> : <ChevronsUpDownIcon />}
-            </Button>
-            <Button
-              variant="outline-primary"
-              size="icon"
-              aria-label={allShown ? "ซ่อนป้ายและปุ่ม" : "แสดงป้ายและปุ่ม"}
-              aria-pressed={!allShown}
-              onClick={toggleAll}
-              className="shrink-0"
-            >
-              {allShown ? <EyeIcon /> : <EyeOffIcon />}
-            </Button>
           </div>
 
-          {/* ---------- ค้นหา — อยู่ใต้ประเภท เพราะค้นเฉพาะในประเภทที่เปิดอยู่ ---------- */}
+          {/* ---------- ค้นหา + ปุ่ม — อยู่ในแถบติดบนเดียวกับชิป ----------
+               ค้นเฉพาะในประเภทที่เปิดอยู่ จึงต้องอยู่ใต้ชิป
+               ปุ่มตัวกรองกับซ่อน/แสดงมาอยู่ข้างช่องค้นหา ตามแบบร่าง */}
           <div className="mt-3 flex items-center gap-2">
             <InputGroup className="min-w-0 flex-1">
               <InputGroupAddon align="inline-start">
@@ -425,16 +401,28 @@ export default function GeneralStockPage() {
                 </div>
               </PopoverContent>
             </Popover>
+
+            {/* ปุ่มซ่อน/แสดงมาอยู่ข้างค้นหา อยู่ในแถบติดบนจึงเอื้อมถึงตลอดตอนเลื่อน */}
+            <Button
+              variant="outline-primary"
+              size="icon"
+              aria-label={allShown ? "ซ่อนป้ายและปุ่ม" : "แสดงป้ายและปุ่ม"}
+              aria-pressed={!allShown}
+              onClick={toggleAll}
+              className="shrink-0"
+            >
+              {allShown ? <EyeIcon /> : <EyeOffIcon />}
+            </Button>
+          </div>
           </div>
 
           {/* ---------- รายการสินค้า ---------- */}
           <div className="mt-4 space-y-4">
             {visible.map((p) => (
-              // ใส่สถานะย่อ/กางไว้ใน key เพื่อรีเซ็ต Collapsible ตอนกดย่อ/กางทั้งหมด
               <ProductCard
-                key={`${p.id}-${expanded}`}
+                key={p.id}
                 product={p}
-                defaultOpen={expanded}
+                defaultOpen
                 showChips={showChips}
                 showActions={showActions}
               />
