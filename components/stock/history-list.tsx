@@ -61,10 +61,13 @@ function Num({
   v,
   suffix,
   tone = true,
+  amount = false,
 }: {
   v?: number;
   suffix?: string;
   tone?: boolean;
+  /** ปริมาณแสดงทศนิยมสองตำแหน่งเสมอ ส่วนจำนวนชิ้นเป็นจำนวนเต็ม */
+  amount?: boolean;
 }) {
   if (v === undefined) return <span className="text-muted-foreground">-</span>;
   return (
@@ -74,7 +77,7 @@ function Num({
         tone && (v < 0 ? "text-danger-strong" : "text-success-solid")
       )}
     >
-      {suffix ? formatAmount(v) : formatQty(v)}
+      {suffix || amount ? formatAmount(v) : formatQty(v)}
       {suffix && <span className="ml-1 font-normal">{suffix}</span>}
     </span>
   );
@@ -189,7 +192,24 @@ export function HistoryList({ rows }: { rows: HistoryRow[] }) {
   );
 }
 
+/**
+ * คำเรียกจำนวนตามชนิดรายการ
+ * "จำนวนทำรายการจริง" ใช้ได้ในตารางที่มีหัวคอลัมน์กำกับ
+ * แต่ในการ์ดที่อ่านทีละใบ บอกไปเลยว่าย้ายหรือปรับปรุงจะเข้าใจเร็วกว่า
+ */
+const ACTION_WORD: Partial<Record<HistoryRow["status"], string>> = {
+  move: "ย้าย",
+  adjust: "ปรับปรุง",
+  inbound: "รับเข้า",
+  returnInternal: "คืน",
+  returnExternal: "คืน",
+  returnSweep: "คืน",
+  issueInternal: "จ่าย",
+  issueExternal: "จ่าย",
+};
+
 function HistoryCard({ row: r }: { row: HistoryRow }) {
+  const word = ACTION_WORD[r.status] ?? "ทำรายการ";
   return (
     <div className="rounded-xl border border-border bg-card p-4">
       <CardHead code={r.code} at={r.createdAt} />
@@ -200,24 +220,23 @@ function HistoryCard({ row: r }: { row: HistoryRow }) {
       </CardBox>
 
       <dl className="mt-3 space-y-1.5 text-sm">
-        {r.askedCount !== undefined && (
-          <CardRow label={`จำนวนขอทำรายการ${r.unit ? ` (${r.unit})` : ""}`}>
-            <Num v={r.askedCount} tone={false} />
-          </CardRow>
-        )}
         {r.doneCount !== undefined && (
-          <CardRow label={`จำนวนทำรายการจริง${r.unit ? ` (${r.unit})` : ""}`}>
+          <CardRow label={`จำนวน${word} (ชิ้น)`}>
             <Num v={r.doneCount} />
           </CardRow>
         )}
         {r.doneQty !== undefined && (
-          <CardRow label={`ปริมาณทำรายการจริง${r.unit ? ` (${r.unit})` : ""}`}>
-            <Num v={r.doneQty} />
+          <CardRow label={`ปริมาณ${word}${r.unit ? ` (${r.unit})` : ""}`}>
+            <Num v={r.doneQty} amount />
+          </CardRow>
+        )}
+        {r.doneCount === undefined && r.doneQty === undefined && (
+          <CardRow label={`จำนวนขอ${word}`}>
+            <Num v={r.askedCount} tone={false} />
           </CardRow>
         )}
         {r.packing && <CardRow label="บรรจุภัณฑ์">{r.packing}</CardRow>}
-        <CardRow label="ผู้ขอทำรายการ">{r.requester}</CardRow>
-        {r.actor && <CardRow label="ผู้ทำรายการ">{r.actor}</CardRow>}
+        <CardRow label="ผู้ทำรายการ">{r.actor ?? r.requester}</CardRow>
         {r.note && <CardRow label="หมายเหตุ">{r.note}</CardRow>}
         {r.receiverNote && (
           <CardRow label="หมายเหตุผู้รับ">{r.receiverNote}</CardRow>

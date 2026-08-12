@@ -49,13 +49,13 @@ import {
 import { cn } from "@peckey954/ui/lib/utils";
 import { useDevicePreview, useScrollState } from "@/components/device-preview";
 import { HistoryList } from "@/components/stock/history-list";
+import { StockLogProvider, useStockLog } from "@/components/stock/stock-log";
 import { InboundList } from "@/components/stock/inbound-list";
 import { IssueList } from "@/components/stock/issue-list";
 import { ProductCard } from "@/components/stock/stock-parts";
 import {
   CATEGORIES,
   CATEGORY_LABEL,
-  HISTORY_ROWS,
   INBOUND_DOCS,
   ISSUE_DOCS,
   PRODUCTS,
@@ -123,9 +123,20 @@ const ISSUE_KINDS: { id: IssueKind; label: string }[] = [
 ];
 
 export default function GeneralStockPage() {
+  // ห่อไว้ที่นี่เพราะทั้งกล่องย้าย/ปรับปรุง และแท็บประวัติ อยู่ใต้หน้านี้ทั้งคู่
+  return (
+    <StockLogProvider>
+      <GeneralStockView />
+    </StockLogProvider>
+  );
+}
+
+function GeneralStockView() {
   // กรอบจำลองอุปกรณ์อยู่ที่ AppShell ปุ่มสลับอยู่บนหัวเรื่อง
   // หน้านี้ขอรู้แค่ว่าตอนนี้อยู่ในกรอบหรือไม่ เพื่อเลือกจุดยึดของแถบติดบน
   const { framed } = useDevicePreview();
+  // ประวัติมาจาก context เพราะการย้าย/ปรับปรุงจะเพิ่มรายการใหม่เข้ามาระหว่างใช้งาน
+  const { rows: logRows } = useStockLog();
   // เลื่อนลงซ่อนแถบเครื่องมือ เลื่อนขึ้นเอากลับมา และโผล่ปุ่มกลับขึ้นบนสุดเมื่อลงมาไกล
   const { hidden, showTop, scrollToTop, scrollIntoTop } = useScrollState();
   // ของจริงแยกประเภทกันเด็ดขาด ไม่มีมุมมอง "ทั้งหมด"
@@ -179,7 +190,7 @@ export default function GeneralStockPage() {
           p.category === cat && matchesQuery(p, query) && (!lowOnly || p.low)
       );
 
-  const historyVisible = HISTORY_ROWS.filter((r) => matchesHistory(r, query));
+  const historyVisible = logRows.filter((r) => matchesHistory(r, query));
 
   // หาไม่เจอในประเภทนี้ แต่มีในประเภทอื่น — บอกไว้เผื่อเปิดผิดที่
   const hitsElsewhere =
@@ -356,7 +367,7 @@ export default function GeneralStockPage() {
                     >
                       {c.label} (
                       {c.id === "history"
-                        ? HISTORY_ROWS.length
+                        ? logRows.length
                         : counts[c.id as CategoryId]}
                       )
                     </button>

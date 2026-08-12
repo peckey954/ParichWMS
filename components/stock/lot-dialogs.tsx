@@ -24,15 +24,20 @@ import {
 import { Textarea } from "@peckey954/ui/components/ui/textarea";
 import { cn } from "@peckey954/ui/lib/utils";
 import { toast } from "sonner";
+import { useStockLog } from "./stock-log";
 import {
   ZONES,
   countDiff,
+  piecesToQty,
   formatAmount,
   formatQty,
   lotPieces,
   qtyAfterMove,
   type Lot,
 } from "@/lib/general-stock";
+
+/** ผู้ทำรายการ — ยังไม่มีระบบผู้ใช้ ใช้ชื่อเดียวกับข้อมูลตัวอย่างไปก่อน */
+const ACTOR = "อลิสา พรสุขสิริ";
 
 /* ------------------------------------------------------------------
    กล่องย้ายสต็อก และกล่องปรับปรุงสต็อก
@@ -190,6 +195,7 @@ export function MoveLotDialog({
   unit: string;
   children: React.ReactNode;
 }) {
+  const { addLog } = useStockLog();
   const max = lotPieces(lot);
   const [open, setOpen] = React.useState(false);
   const [zone, setZone] = React.useState("");
@@ -204,6 +210,21 @@ export function MoveLotDialog({
   };
 
   const save = () => {
+    addLog({
+      code: `MV${lot.code.replace(/\D/g, "").slice(0, 6)}/01`,
+      lotNumber: lot.code,
+      productName,
+      askedCount: pieces,
+      doneCount: pieces,
+      doneQty: piecesToQty(lot, pieces),
+      unit,
+      zone: lot.zone,
+      zoneTo: zone,
+      note: note.trim() || undefined,
+      requester: ACTOR,
+      actor: ACTOR,
+      status: "move",
+    });
     toast.success("บันทึกการย้ายแล้ว", {
       description: `${lot.code} · ${formatQty(pieces)} ชิ้น จาก ${lot.zone} ไป ${zone}`,
     });
@@ -295,6 +316,7 @@ export function AdjustLotDialog({
   unit: string;
   children: React.ReactNode;
 }) {
+  const { addLog } = useStockLog();
   const max = lotPieces(lot) * 2;
   const [open, setOpen] = React.useState(false);
   const [counted, setCounted] = React.useState(0);
@@ -304,6 +326,20 @@ export function AdjustLotDialog({
   const diff = countDiff(lot, counted);
 
   const save = () => {
+    addLog({
+      code: `ADJ${lot.code.replace(/\D/g, "").slice(0, 6)}/01`,
+      lotNumber: lot.code,
+      productName,
+      // ประวัติบันทึก "ส่วนต่าง" ไม่ใช่ยอดที่นับได้ เพราะสิ่งที่เปลี่ยนคือส่วนต่าง
+      doneCount: counted - lotPieces(lot),
+      doneQty: diff,
+      unit,
+      zone: lot.zone,
+      note: note.trim() || undefined,
+      requester: ACTOR,
+      actor: ACTOR,
+      status: "adjust",
+    });
     toast.success("บันทึกการปรับปรุงแล้ว", {
       description: `${lot.code} · นับได้ ${formatQty(counted)} ชิ้น · ส่วนต่าง ${formatAmount(diff)} ${unit}`,
     });

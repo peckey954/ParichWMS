@@ -76,9 +76,10 @@ const STATUS_CHIP: Record<string, string> = {
   // เพิ่มสำหรับหน้าประวัติ
   inbound:
     "[--bdg-surface:var(--success)] [--bdg-text:var(--success-foreground)]",
-  move: "[--bdg-surface:var(--brand)] [--bdg-text:var(--primary)]",
+  // ย้าย = ม่วง ปรับปรุง = ชมพู ตามแบบ
+  move: "[--bdg-surface:var(--tone-violet)] [--bdg-text:var(--tone-violet-foreground)]",
   adjust:
-    "[--bdg-surface:var(--tone-violet)] [--bdg-text:var(--tone-violet-foreground)]",
+    "[--bdg-surface:var(--danger)] [--bdg-text:var(--danger-foreground)]",
   failed:
     "[--bdg-surface:var(--danger)] [--bdg-text:var(--danger-strong)]",
 };
