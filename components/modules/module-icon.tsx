@@ -3,6 +3,7 @@
 import {
   BoxesIcon,
   ChartNoAxesColumnIcon,
+  ClipboardCheckIcon,
   CircleCheckBigIcon,
   ClipboardListIcon,
   ClipboardPlusIcon,
@@ -39,6 +40,7 @@ const ICONS: Record<string, LucideIcon> = {
   boxes: BoxesIcon,
   clipboardPlus: ClipboardPlusIcon,
   clipboardList: ClipboardListIcon,
+  clipboardCheck: ClipboardCheckIcon,
   chart: ChartNoAxesColumnIcon,
   listOrdered: ListOrderedIcon,
   filePlus: FilePlusIcon,

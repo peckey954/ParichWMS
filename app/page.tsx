@@ -29,7 +29,9 @@ export default function AllModulesPage() {
   return (
     <main className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6">
       <div className="max-w-2xl">
-        <InputGroup>
+        {/* พื้นช่องค้นหาเป็นสีการ์ด (ขาว) ให้ต่างจากพื้นเทาของพื้นที่เนื้อหา
+            ค่าเริ่มต้นของ InputGroup เป็นพื้นโปร่ง สีเทาจะทะลุขึ้นมา */}
+        <InputGroup className="bg-card">
           <InputGroupAddon align="inline-start">
             <SearchIcon />
           </InputGroupAddon>
@@ -91,7 +93,11 @@ function ModuleCard({
       {m.pending !== undefined && (
         <PendingBadge count={m.pending} className="absolute top-3 right-3" />
       )}
-      <IconBox name={m.icon} tone={tone} />
+      <IconBox
+        name={m.icon}
+        tone={tone}
+        className="transition-transform duration-150 motion-safe:group-hover:scale-105"
+      />
       <div className="mt-6">
         <p className="font-semibold">{m.label}</p>
         <p className="mt-0.5 text-sm text-muted-foreground">{m.code}</p>
@@ -100,9 +106,10 @@ function ModuleCard({
   );
 
   const base =
-    "relative flex h-full flex-col rounded-xl border border-border bg-card p-4 shadow-sm";
+    "group relative flex h-full flex-col rounded-xl border border-border bg-card p-4 shadow-sm";
 
   // หน้าที่ยังไม่ได้ทำ — หน้าตาเหมือนใบอื่นทุกอย่าง แค่กดแล้วไม่ไปไหน
+  // ไม่ใส่เอฟเฟกต์ตอนชี้ด้วย ไม่งั้นจะหลอกว่ากดได้
   if (!m.href) {
     return (
       <div className={base} aria-disabled>
@@ -116,7 +123,11 @@ function ModuleCard({
       href={m.href}
       className={cn(
         base,
-        "transition-colors hover:border-primary",
+        // ชี้ค้าง: ยกขึ้นเล็กน้อย เงาลึกขึ้น ขอบเปลี่ยนเป็นสีแบรนด์
+        "transition-[transform,box-shadow,border-color] duration-150",
+        "hover:border-primary hover:shadow-md motion-safe:hover:-translate-y-0.5",
+        // กด: กดลงไปนิดหนึ่งให้รู้สึกว่ากดติด
+        "motion-safe:active:translate-y-0 active:shadow-sm",
         "focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none"
       )}
     >

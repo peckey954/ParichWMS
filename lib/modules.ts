@@ -101,10 +101,39 @@ export const MODULES: ModuleItem[] = [
   { id: "report", group: "accounting", label: "ส่งออกรายงาน", code: "FM-PD-01-01", icon: "fileOutput" },
 ];
 
-/** เมนูตั้งค่าระบบ อยู่ท้ายเมนูข้าง ไม่ใช่โมดูลงานประจำวัน */
-export const SYSTEM_LINKS: { id: string; label: string; icon: string; href: string }[] = [
-  { id: "qc-template", label: "ตั้งค่าเทมเพลต QC", icon: "settings", href: "/qc/setup" },
-  { id: "design-system", label: "Design system", icon: "palette", href: "/design-system" },
+/**
+ * ท้ายเมนูข้างมีรายการเดียว พาไปหน้ารวมการตั้งค่า
+ * ของพวกนี้ไม่ใช่งานประจำวัน ไม่ควรกินที่ในเมนูหลักคนละบรรทัด
+ */
+export const SYSTEM_LINK = {
+  id: "settings",
+  label: "ตั้งค่าระบบ",
+  icon: "settings",
+  href: "/settings",
+};
+
+/** รายการที่อยู่ในหน้าตั้งค่าระบบ */
+export const SETTINGS_ITEMS: {
+  id: string;
+  label: string;
+  description: string;
+  icon: string;
+  href: string;
+}[] = [
+  {
+    id: "qc-template",
+    label: "ตั้งค่าเทมเพลตฟอร์ม QC",
+    description: "สร้างและแก้ไขโครงฟอร์มตรวจคุณภาพ กำหนดช่วงเวลาที่ใช้และกลุ่มผู้ใช้",
+    icon: "clipboardCheck",
+    href: "/qc/setup",
+  },
+  {
+    id: "design-system",
+    label: "Design system",
+    description: "ตัวอย่าง component และโทเคนสีทั้งหมดที่ระบบใช้",
+    icon: "palette",
+    href: "/design-system",
+  },
 ];
 
 export const modulesOf = (group: ModuleGroupId) =>

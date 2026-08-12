@@ -4,7 +4,7 @@ import * as React from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
-import { BellIcon, MenuIcon } from "lucide-react";
+import { BellIcon, MenuIcon, XIcon } from "lucide-react";
 import { Avatar, AvatarFallback } from "@peckey954/ui/components/ui/avatar";
 import { Button } from "@peckey954/ui/components/ui/button";
 import {
@@ -23,7 +23,7 @@ import { ModuleIcon } from "@/components/modules/module-icon";
 import { PendingBadge } from "@/components/modules/pending-badge";
 import {
   MODULE_GROUPS,
-  SYSTEM_LINKS,
+  SYSTEM_LINK,
   modulesOf,
   type ModuleItem,
 } from "@/lib/modules";
@@ -61,12 +61,24 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 <MenuIcon />
               </Button>
             </SheetTrigger>
-            <SheetContent side="left" className="w-80 gap-0 p-0">
-              <SheetHeader className="border-b border-sidebar-border">
+            {/* [&>button]:hidden ปิดปุ่มปิดที่ DS ใส่มาให้เอง
+                ของเดิมโดน Radix โฟกัสอัตโนมัติตอนเปิด เลยขึ้นวงแหวนสีส้มรอบกากบาท
+                ทำเป็นปุ่มของเราแทน จะได้เป็นกากบาทเปล่า ๆ ไม่มีพื้นหลัง */}
+            <SheetContent
+              side="left"
+              className="w-80 gap-0 p-0 [&>button]:hidden"
+            >
+              <SheetHeader className="flex-row items-center justify-between border-b border-sidebar-border">
                 <SheetTitle className="flex items-center gap-2">
                   <BrandMark />
                   Parich WMS
                 </SheetTitle>
+                <SheetClose
+                  aria-label="ปิดเมนู"
+                  className="rounded-sm text-muted-foreground transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                >
+                  <XIcon className="size-5" strokeWidth={1.5} />
+                </SheetClose>
               </SheetHeader>
               <SidebarBody pathname={pathname} closeOnClick />
             </SheetContent>
@@ -167,9 +179,7 @@ function SidebarBody({
       </div>
 
       <div className="border-t border-sidebar-border px-2 py-3">
-        <nav className="flex flex-col gap-0.5">
-          {SYSTEM_LINKS.map((s) => item(s))}
-        </nav>
+        <nav className="flex flex-col gap-0.5">{item(SYSTEM_LINK)}</nav>
       </div>
     </>
   );
