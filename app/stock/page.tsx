@@ -32,6 +32,7 @@ import {
   InputGroupInput,
 } from "@peckey954/ui/components/ui/input-group";
 import { Label } from "@peckey954/ui/components/ui/label";
+import { Separator } from "@peckey954/ui/components/ui/separator";
 import {
   Popover,
   PopoverContent,
@@ -305,7 +306,18 @@ export default function GeneralStockPage() {
               </button>
             </div>
 
-            {/* ปักไว้นอกแถวเลื่อน จะได้เอื้อมถึงตลอดไม่ว่าปัดชิปไปไกลแค่ไหน */}
+            {/* ปักไว้นอกแถวเลื่อน จะได้เอื้อมถึงตลอดไม่ว่าปัดชิปไปไกลแค่ไหน
+                สองปุ่มนี้ใช้ระหว่างไล่ดูรายการทั้งคู่ จึงอยู่ในแถบติดบนด้วยกัน */}
+            <Button
+              variant="outline-primary"
+              size="icon"
+              aria-label={expanded ? "ย่อทุกรายการ" : "กางทุกรายการ"}
+              aria-pressed={!expanded}
+              onClick={toggleExpand}
+              className="shrink-0"
+            >
+              {expanded ? <ChevronsDownUpIcon /> : <ChevronsUpDownIcon />}
+            </Button>
             <Button
               variant="outline-primary"
               size="icon"
@@ -347,15 +359,40 @@ export default function GeneralStockPage() {
                   )}
                 </Button>
               </PopoverTrigger>
-              <PopoverContent align="end" className="w-64">
+              <PopoverContent align="end" className="w-72">
                 <PopoverHeader>
-                  <PopoverTitle>การแสดงผล</PopoverTitle>
+                  <PopoverTitle>ตัวกรองและการแสดงผล</PopoverTitle>
                   <PopoverDescription>
-                    ซ่อนบางอย่างเพื่อให้กวาดตาดูตัวเลขง่ายขึ้น
+                    เก็บของที่ตั้งครั้งเดียวจบไว้ในนี้ หน้าหลักจะได้ไม่รก
                   </PopoverDescription>
                 </PopoverHeader>
 
-                <div className="mt-3 space-y-3">
+                <div className="mt-4 space-y-2">
+                  <Label className="text-sm">เรียงตาม</Label>
+                  <ToggleGroup
+                    type="single"
+                    variant="outline"
+                    size="sm"
+                    value={sort}
+                    onValueChange={(v) => v && setSort(v)}
+                    className="w-full"
+                  >
+                    <ToggleGroupItem value="product" className="flex-1">
+                      สินค้า
+                    </ToggleGroupItem>
+                    <ToggleGroupItem value="zone" className="flex-1">
+                      โซน
+                    </ToggleGroupItem>
+                    <ToggleGroupItem value="fifo" className="flex-1">
+                      FIFO
+                    </ToggleGroupItem>
+                  </ToggleGroup>
+                </div>
+
+                <Separator className="my-4" />
+
+                <div className="space-y-3">
+                  <Label className="text-sm">แสดงในรายการ</Label>
                   <Label
                     htmlFor="show-chips"
                     className="flex items-center gap-3 font-normal"
@@ -390,31 +427,8 @@ export default function GeneralStockPage() {
             </Popover>
           </div>
 
-          {/* ---------- เรียงลำดับ + ย่อ/กาง ---------- */}
-          <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="text-sm text-muted-foreground">เรียงตาม</span>
-              <ToggleGroup
-                type="single"
-                variant="outline"
-                size="sm"
-                value={sort}
-                onValueChange={(v) => v && setSort(v)}
-              >
-                <ToggleGroupItem value="product">สินค้า</ToggleGroupItem>
-                <ToggleGroupItem value="zone">โซน</ToggleGroupItem>
-                <ToggleGroupItem value="fifo">FIFO</ToggleGroupItem>
-              </ToggleGroup>
-            </div>
-
-            <Button variant="ghost" size="sm" onClick={toggleExpand}>
-              {expanded ? <ChevronsDownUpIcon /> : <ChevronsUpDownIcon />}
-              {expanded ? "ย่อทั้งหมด" : "กางทั้งหมด"}
-            </Button>
-          </div>
-
           {/* ---------- รายการสินค้า ---------- */}
-          <div className="mt-5 space-y-4">
+          <div className="mt-4 space-y-4">
             {visible.map((p) => (
               // ใส่สถานะย่อ/กางไว้ใน key เพื่อรีเซ็ต Collapsible ตอนกดย่อ/กางทั้งหมด
               <ProductCard
