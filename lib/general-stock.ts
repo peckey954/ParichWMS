@@ -99,6 +99,13 @@ export function pendingEntries(p: Pending, unit: string) {
 export const formatQty = (v: number) =>
   v.toLocaleString("th-TH", { maximumFractionDigits: 2 });
 
+/** ปริมาณในเอกสาร แสดงทศนิยมสองตำแหน่งเสมอ และคั่นหลักพัน */
+export const formatAmount = (v: number) =>
+  v.toLocaleString("th-TH", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+
 // ---------------------------------------------------------------
 // ข้อมูลตัวอย่าง
 // ---------------------------------------------------------------
@@ -462,56 +469,268 @@ export type InboundDoc = {
   code: string;
   createdAt: string;
   productName: string;
+  /** บรรทัดรองใต้ชื่อสินค้า เช่น แหล่งผลิต/ลักษณะ */
+  productSub?: string;
   supplier: string;
   truck: string;
   arriveDate: string;
   orderQty: number;
   orderUnit: string;
   packing?: string;
+  /** รับเข้าคลังไปแล้วเท่าไร ที่เหลือคือค้างรับ */
+  receivedQty: number;
 };
+
+export const outstandingQty = (d: InboundDoc) =>
+  Math.max(0, d.orderQty - d.receivedQty);
 
 export const INBOUND_DOCS: InboundDoc[] = [
   {
     id: "in-1",
     code: "POI260116/01",
     createdAt: "1/16/2026 | 10:42:52",
-    productName: "21-0-0 ฟูเจียน ผง",
+    productName: "21-0-0",
+    productSub: "ฟูเจียน ผง",
     supplier: "เอชซี อินเตอร์เนชั่นแนล เทรดดิ้ง จำกัด",
     truck: "2 กส - 2345",
-    arriveDate: "1/16/2026",
+    arriveDate: "18/06/2026",
     orderQty: 400,
     orderUnit: "ลัง",
     packing: "12 ขวด",
+    receivedQty: 350,
   },
   {
     id: "in-2",
     code: "POI260116/02",
     createdAt: "1/16/2026 | 11:08:14",
-    productName: "กระสอบเปล่า 50 kg ลายเรือใบ",
+    productName: "กระสอบเปล่า 50 kg",
+    productSub: "ลายเรือใบ",
     supplier: "โรงงานกระสอบไทยรุ่งเรือง",
     truck: "70 - 8891",
-    arriveDate: "1/17/2026",
+    arriveDate: "18/06/2026",
     orderQty: 12000,
     orderUnit: "ใบ",
+    receivedQty: 11600,
   },
   {
     id: "in-3",
     code: "POI260116/03",
     createdAt: "1/16/2026 | 13:20:05",
-    productName: "สติกเกอร์ QR ตรวจสอบย้อนกลับ",
+    productName: "สติกเกอร์ QR",
+    productSub: "ตรวจสอบย้อนกลับ",
     supplier: "พริ้นท์เวิร์คส์ เอเชีย",
     truck: "82 - 4417",
-    arriveDate: "1/18/2026",
+    arriveDate: "19/06/2026",
     orderQty: 30,
     orderUnit: "ม้วน",
     packing: "1,000 ดวง",
+    receivedQty: 0,
+  },
+  {
+    id: "in-4",
+    code: "PO260116/04",
+    createdAt: "1/16/2026 | 14:02:31",
+    productName: "10-0-4+OM 50%",
+    productSub: "ฟูเจียน ผง",
+    supplier: "เอชซี อินเตอร์เนชั่นแนล เทรดดิ้ง จำกัด",
+    truck: "กง - 1234",
+    arriveDate: "19/06/2026",
+    orderQty: 800,
+    orderUnit: "ลิตร",
+    receivedQty: 350,
+  },
+  {
+    id: "in-5",
+    code: "PO260116/05",
+    createdAt: "1/16/2026 | 15:47:09",
+    productName: "ถุงมือผ้าเคลือบยาง",
+    productSub: "ไซซ์ L",
+    supplier: "เซฟตี้พลัส ซัพพลาย",
+    truck: "กข - 1234, กข - 1235",
+    arriveDate: "19/06/2026",
+    orderQty: 400,
+    orderUnit: "ชิ้น",
+    packing: "50 Kg",
+    receivedQty: 100,
   },
 ];
 
 export function matchesInbound(d: InboundDoc, q: string): boolean {
   const s = q.trim().toLowerCase();
   if (!s) return true;
-  return [d.code, d.productName, d.supplier, d.truck].some((v) =>
+  return [d.code, d.productName, d.productSub ?? "", d.supplier, d.truck].some(
+    (v) => v.toLowerCase().includes(s)
+  );
+}
+
+// ---------------------------------------------------------------
+// แท็บรอจ่าย/คืน — ใบขอเบิกและใบขอคืน อยู่ตารางเดียวกัน
+// แยกกันด้วยเครื่องหมายของจำนวน จ่ายออกเป็นลบ รับคืนเป็นบวก
+// ---------------------------------------------------------------
+
+export type IssueStatus =
+  | "returnSweep"
+  | "returnInternal"
+  | "returnExternal"
+  | "issueExternal"
+  | "issueInternal";
+
+export const ISSUE_STATUS_LABEL: Record<IssueStatus, string> = {
+  returnSweep: "รอรับคืน (กวาดพื้น)",
+  returnInternal: "รอรับคืน (จากภายใน)",
+  returnExternal: "รอรับคืน (จากภายนอก)",
+  issueExternal: "รอจ่ายออก (ภายนอก)",
+  issueInternal: "รอจ่ายออก (ภายใน)",
+};
+
+/** รับคืนของเข้าคลัง จ่ายออกของออกจากคลัง ใช้แยกกลุ่มและเลือกสีตัวเลข */
+export const isReturn = (s: IssueStatus) => s.startsWith("return");
+
+export type IssueDoc = {
+  id: string;
+  code: string;
+  createdAt: string;
+  productName: string;
+  packing?: string;
+  /** จำนวนหน่วยนับ ติดลบ = จ่ายออก */
+  count?: number;
+  /** ปริมาณ ติดลบ = จ่ายออก */
+  qty: number;
+  unit: string;
+  note?: string;
+  requester: string;
+  editedBy?: string;
+  status: IssueStatus;
+};
+
+export const ISSUE_DOCS: IssueDoc[] = [
+  {
+    id: "is-1",
+    code: "WT260116/01",
+    createdAt: "1/16/2026 | 10:42:52",
+    productName: "10-0-4+OM 50%",
+    qty: 40,
+    unit: "ตัน",
+    requester: "อลิสา พรสุขสิริ",
+    status: "returnSweep",
+  },
+  {
+    id: "is-2",
+    code: "REQ260116/01",
+    createdAt: "1/16/2026 | 10:42:52",
+    productName: "10-0-4+OM 50%",
+    count: 400,
+    qty: 400,
+    unit: "ตัน",
+    note: "เหลือจากการผลิต",
+    requester: "อลิสา พรสุขสิริ",
+    editedBy: "อลิสา พรสุขสิริ",
+    status: "returnInternal",
+  },
+  {
+    id: "is-3",
+    code: "REQ260116/02",
+    createdAt: "1/16/2026 | 10:42:52",
+    productName: "10-0-4+OM 50%",
+    packing: "50 Kg",
+    count: 40,
+    qty: 40,
+    unit: "ลิตร",
+    requester: "อลิสา พรสุขสิริ",
+    status: "returnExternal",
+  },
+  {
+    id: "is-4",
+    code: "REQ260116/03",
+    createdAt: "1/16/2026 | 10:42:52",
+    productName: "10-0-4+OM 50%",
+    packing: "40 Kg",
+    count: -10,
+    qty: -400,
+    unit: "ตัน",
+    note: "ใช้งาน",
+    requester: "อลิสา พรสุขสิริ",
+    status: "issueExternal",
+  },
+  {
+    id: "is-5",
+    code: "REQ260116/04",
+    createdAt: "1/16/2026 | 10:42:52",
+    productName: "10-0-4+OM 50%",
+    count: -50,
+    qty: -350,
+    unit: "ตัน",
+    requester: "อลิสา พรสุขสิริ",
+    status: "issueInternal",
+  },
+  {
+    id: "is-6",
+    code: "WT260116/02",
+    createdAt: "1/17/2026 | 08:15:03",
+    productName: "กระสอบเปล่า 50 kg ลายเรือใบ",
+    count: 120,
+    qty: 120,
+    unit: "ใบ",
+    note: "เก็บตกจากไลน์ 2",
+    requester: "ธนกฤต ศรีบุญเรือง",
+    status: "returnSweep",
+  },
+  {
+    id: "is-7",
+    code: "REQ260117/01",
+    createdAt: "1/17/2026 | 09:31:44",
+    productName: "สติกเกอร์ QR ตรวจสอบย้อนกลับ",
+    packing: "1,000 ดวง",
+    count: -6,
+    qty: -6000,
+    unit: "ดวง",
+    note: "ใช้กับล็อตส่งออก",
+    requester: "ธนกฤต ศรีบุญเรือง",
+    status: "issueInternal",
+  },
+  {
+    id: "is-8",
+    code: "REQ260117/02",
+    createdAt: "1/17/2026 | 11:02:19",
+    productName: "ถุงมือผ้าเคลือบยาง ไซซ์ L",
+    count: -80,
+    qty: -80,
+    unit: "คู่",
+    requester: "พิมพ์ชนก วงศ์อารีย์",
+    editedBy: "ธนกฤต ศรีบุญเรือง",
+    status: "issueExternal",
+  },
+  {
+    id: "is-9",
+    code: "WT260117/01",
+    createdAt: "1/17/2026 | 14:20:57",
+    productName: "ถุงมือผ้าเคลือบยาง ไซซ์ L",
+    count: 15,
+    qty: 15,
+    unit: "คู่",
+    note: "คืนของไม่ได้ใช้",
+    requester: "พิมพ์ชนก วงศ์อารีย์",
+    status: "returnInternal",
+  },
+  {
+    id: "is-10",
+    code: "WT260118/01",
+    createdAt: "1/18/2026 | 08:44:12",
+    productName: "ปุ๋ยเกล็ด 20-20-20",
+    packing: "25 Kg",
+    count: 8,
+    qty: 200,
+    unit: "กก.",
+    note: "ลูกค้าคืนสินค้า",
+    requester: "อลิสา พรสุขสิริ",
+    status: "returnExternal",
+  },
+];
+
+export function matchesIssue(d: IssueDoc, q: string): boolean {
+  const s = q.trim().toLowerCase();
+  if (!s) return true;
+  return [d.code, d.productName, d.requester, d.note ?? ""].some((v) =>
     v.toLowerCase().includes(s)
   );
 }

@@ -46,18 +46,30 @@ import {
 } from "@peckey954/ui/components/ui/toggle-group";
 import { cn } from "@peckey954/ui/lib/utils";
 import { useDevicePreview } from "@/components/device-preview";
-import { InboundCard } from "@/components/stock/inbound-card";
+import { InboundList } from "@/components/stock/inbound-list";
+import { IssueList } from "@/components/stock/issue-list";
 import { ProductCard } from "@/components/stock/stock-parts";
 import {
   CATEGORIES,
   CATEGORY_LABEL,
   INBOUND_DOCS,
+  ISSUE_DOCS,
   PRODUCTS,
   countByCategory,
+  isReturn,
   matchesInbound,
+  matchesIssue,
   matchesQuery,
   type CategoryId,
 } from "@/lib/general-stock";
+
+type IssueKind = "all" | "issue" | "return";
+
+const ISSUE_KINDS: { id: IssueKind; label: string }[] = [
+  { id: "all", label: "ทั้งหมด" },
+  { id: "issue", label: "รอจ่ายออก" },
+  { id: "return", label: "รอรับคืน" },
+];
 
 export default function GeneralStockPage() {
   // กรอบจำลองอุปกรณ์อยู่ที่ AppShell ปุ่มสลับอยู่บนหัวเรื่อง
@@ -73,6 +85,8 @@ export default function GeneralStockPage() {
   const [showActions, setShowActions] = React.useState(true);
   const [tab, setTab] = React.useState<"stock" | "inbound" | "issue">("stock");
   const [inboundQuery, setInboundQuery] = React.useState("");
+  const [issueQuery, setIssueQuery] = React.useState("");
+  const [issueKind, setIssueKind] = React.useState<IssueKind>("all");
 
   // ปุ่มรูปตาเป็นสวิตช์ตัวใหญ่ — เปิด/ปิดพร้อมกันทั้งป้ายและปุ่ม
   // ส่วนใน popover ยังแยกเปิดปิดทีละอย่างได้ ทั้งสองทางเขียนค่าชุดเดียวกันจึงไม่หลุดกัน
@@ -118,6 +132,19 @@ export default function GeneralStockPage() {
 
   const inboundVisible = INBOUND_DOCS.filter((d) =>
     matchesInbound(d, inboundQuery)
+  );
+
+  // จำนวนบนชิปนับจากยอดจริงทั้งหมด ไม่เปลี่ยนตามคำค้น เหมือนชิปประเภทสินค้า
+  const issueCounts = {
+    all: ISSUE_DOCS.length,
+    issue: ISSUE_DOCS.filter((d) => !isReturn(d.status)).length,
+    return: ISSUE_DOCS.filter((d) => isReturn(d.status)).length,
+  };
+  const issueVisible = ISSUE_DOCS.filter(
+    (d) =>
+      matchesIssue(d, issueQuery) &&
+      (issueKind === "all" ||
+        (issueKind === "return") === isReturn(d.status))
   );
 
   // ---------- เลื่อนแถวชิปให้เห็นประเภทที่เปิดอยู่ ----------
@@ -199,7 +226,7 @@ export default function GeneralStockPage() {
                 รอรับเข้า ({INBOUND_DOCS.length})
               </TabsTrigger>
               <TabsTrigger value="issue" className="flex-1">
-                รอจ่าย/คืน (4)
+                รอจ่าย/คืน ({ISSUE_DOCS.length})
               </TabsTrigger>
             </TabsList>
           </Tabs>
@@ -508,30 +535,71 @@ export default function GeneralStockPage() {
                 </Button>
               </div>
 
-              <div className="mt-4 space-y-4">
-                {inboundVisible.map((d) => (
-                  <InboundCard key={d.id} doc={d} />
-                ))}
-                {inboundVisible.length === 0 && (
-                  <div className="rounded-xl border border-dashed border-border px-6 py-14 text-center">
-                    <p className="font-medium">ไม่พบเอกสารรอรับเข้า</p>
-                    <p className="mt-1 text-sm text-muted-foreground">
-                      ลองใช้คำค้นสั้นลง
-                    </p>
-                  </div>
-                )}
+              <div className="mt-4">
+                <InboundList docs={inboundVisible} />
               </div>
             </>
           )}
 
+          {/* ---------- แท็บรอจ่าย/คืน — ใบขอเบิกกับใบขอคืนอยู่ตารางเดียวกัน ---------- */}
           {tab === "issue" && (
-            <div className="mt-4 rounded-xl border border-dashed border-border px-6 py-16 text-center">
-              <p className="font-medium">รอจ่าย / คืน</p>
-              <p className="mt-1 text-sm text-muted-foreground">
-                ยังไม่ได้ออกแบบหน้านี้ — เป็นเอกสารคนละชนิดกับสองแท็บแรก
-                จึงจะมีเครื่องมือของตัวเองเหมือนกัน
-              </p>
-            </div>
+            <>
+              <div className="mt-4 flex items-center gap-2">
+                <InputGroup className="min-w-0 flex-1">
+                  <InputGroupAddon align="inline-start">
+                    <SearchIcon />
+                  </InputGroupAddon>
+                  <InputGroupInput
+                    placeholder="ค้นหาเลขที่ขอเบิก สินค้า ผู้ขอ หรือหมายเหตุ"
+                    value={issueQuery}
+                    onChange={(e) => setIssueQuery(e.target.value)}
+                  />
+                </InputGroup>
+                <Button
+                  variant="outline-primary"
+                  size="icon"
+                  aria-label="ตัวกรองใบขอเบิก / ขอคืน"
+                  className="shrink-0"
+                >
+                  <ListFilterIcon />
+                </Button>
+              </div>
+
+              {/* ทิศทางของเอกสาร เลือกได้ทีละอัน เลื่อนแนวนอนเอาบนจอแคบ */}
+              <div
+                role="tablist"
+                aria-label="ประเภทเอกสาร"
+                className={cn(
+                  "mt-3 flex items-center gap-2 overflow-x-auto",
+                  "flex-nowrap [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+                )}
+              >
+                {ISSUE_KINDS.map((k) => {
+                  const on = issueKind === k.id;
+                  return (
+                    <button
+                      key={k.id}
+                      type="button"
+                      role="tab"
+                      aria-selected={on}
+                      onClick={() => setIssueKind(k.id)}
+                      className={cn(
+                        "shrink-0 rounded-full border px-3 py-1 text-sm whitespace-nowrap transition-colors",
+                        on
+                          ? "border-primary bg-brand font-medium text-primary"
+                          : "border-border text-foreground hover:bg-accent-hover"
+                      )}
+                    >
+                      {k.label} ({issueCounts[k.id]})
+                    </button>
+                  );
+                })}
+              </div>
+
+              <div className="mt-4">
+                <IssueList docs={issueVisible} />
+              </div>
+            </>
           )}
         </div>
       </div>

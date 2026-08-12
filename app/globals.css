@@ -96,6 +96,7 @@
 
 @theme inline {
   --color-surface: var(--surface);
+  --color-danger-strong: var(--danger-strong);
 
   --color-cat-yellow: var(--cat-yellow);
   --color-cat-yellow-foreground: var(--cat-yellow-foreground);
