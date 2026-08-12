@@ -300,6 +300,22 @@ export const PRODUCTS: Product[] = [
   },
 ];
 
+/**
+ * ค้นหาข้ามทุกประเภท — จับทั้งชื่อสินค้า รหัส เลขล็อต และโซน
+ * ตั้งใจไม่กรองด้วยประเภทในนี้ เพราะ search ควรมองเห็นทั้งคลัง
+ * แล้วค่อยให้ผู้ใช้เลือกย่อลงด้วยชิปทีหลัง
+ */
+export function matchesQuery(p: Product, q: string): boolean {
+  const s = q.trim().toLowerCase();
+  if (!s) return true;
+  if (p.name.toLowerCase().includes(s)) return true;
+  if (p.sku.toLowerCase().includes(s)) return true;
+  return p.lots.some(
+    (l) =>
+      l.code.toLowerCase().includes(s) || l.zone.toLowerCase().includes(s)
+  );
+}
+
 export function countByCategory(products: Product[]) {
   const out = {} as Record<CategoryId, number>;
   for (const c of CATEGORIES) out[c.id] = 0;

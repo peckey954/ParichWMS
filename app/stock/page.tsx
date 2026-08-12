@@ -42,6 +42,7 @@ import {
   CATEGORY_LABEL,
   PRODUCTS,
   countByCategory,
+  matchesQuery,
   type CategoryId,
 } from "@/lib/general-stock";
 
@@ -64,17 +65,27 @@ export default function GeneralStockPage() {
   const [cat, setCat] = React.useState<CategoryId | null>(null);
   const [lowOnly, setLowOnly] = React.useState(false);
   const [sort, setSort] = React.useState("product");
+  const [query, setQuery] = React.useState("");
   const [showChips, setShowChips] = React.useState(true);
   const [showActions, setShowActions] = React.useState(true);
 
   const changeDevice = (d: Device) => setView({ device: d, expanded: true });
   const toggleExpand = () => setView((v) => ({ ...v, expanded: !v.expanded }));
 
-  const counts = countByCategory(PRODUCTS);
-
-  const visible = PRODUCTS.filter(
-    (p) => (cat === null || p.category === cat) && (!lowOnly || p.low)
+  // ลำดับการกรอง: ค้นหา+สต็อกต่ำ ก่อน แล้วค่อยกรองประเภททีหลัง
+  // ทำแบบนี้ตัวเลขบนชิปจะบอกได้ว่า "ผลค้นหาอยู่ในประเภทไหนบ้าง"
+  // และรู้ได้ว่าของที่หาเจออยู่นอกประเภทที่เลือกไว้หรือเปล่า
+  const matched = PRODUCTS.filter(
+    (p) => matchesQuery(p, query) && (!lowOnly || p.low)
   );
+  const counts = countByCategory(matched);
+  const visible = matched.filter((p) => cat === null || p.category === cat);
+
+  // หาไม่เจอในประเภทที่เลือก แต่มีอยู่ในประเภทอื่น
+  const foundElsewhere =
+    query.trim() !== "" && cat !== null && visible.length === 0
+      ? matched.length
+      : 0;
 
   // กดซ้ำที่อันเดิม = กลับไปดูทั้งหมด จะได้ไม่ต้องเลื่อนไปหาปุ่ม "ทั้งหมด"
   const pickCat = (id: CategoryId) => setCat((c) => (c === id ? null : id));
@@ -158,7 +169,11 @@ export default function GeneralStockPage() {
               <InputGroupAddon align="inline-start">
                 <SearchIcon />
               </InputGroupAddon>
-              <InputGroupInput placeholder="ค้นหา..." />
+              <InputGroupInput
+                  placeholder="ค้นหาชื่อสินค้า รหัส เลขล็อต หรือโซน"
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                />
             </InputGroup>
             <div className="flex items-center gap-2">
               <Button variant="outline-primary" size="icon" aria-label="ตัวกรอง">
@@ -191,7 +206,7 @@ export default function GeneralStockPage() {
                   : "border-border text-foreground hover:bg-accent-hover"
               )}
             >
-              ทั้งหมด ({PRODUCTS.length})
+              ทั้งหมด ({matched.length})
             </button>
 
             {CATEGORIES.map((c) => {
@@ -292,11 +307,35 @@ export default function GeneralStockPage() {
             ))}
 
             {visible.length === 0 && (
-              <div className="rounded-xl border border-dashed border-border py-16 text-center">
-                <p className="font-medium">ไม่พบสินค้าตามตัวกรอง</p>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  ลองเอาตัวกรองบางอันออก
-                </p>
+              <div className="rounded-xl border border-dashed border-border px-6 py-14 text-center">
+                {foundElsewhere > 0 ? (
+                  <>
+                    {/* หาเจอ แต่อยู่คนละประเภทกับที่เลือกไว้ — บอกแล้วให้กดข้ามได้เลย
+                        ดีกว่าเงียบ ๆ แล้วให้ผู้ใช้เดาเองว่าทำไมไม่เจอ */}
+                    <p className="font-medium">
+                      ไม่พบใน “{CATEGORY_LABEL[cat as CategoryId]}”
+                    </p>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      แต่เจอ {foundElsewhere} รายการในประเภทอื่น
+                    </p>
+                    <Button
+                      variant="outline-primary"
+                      size="sm"
+                      className="mt-4"
+                      onClick={() => setCat(null)}
+                    >
+                      <SearchIcon />
+                      ค้นหาทุกประเภท
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    <p className="font-medium">ไม่พบสินค้าตามที่ค้นหา</p>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      ลองใช้คำค้นสั้นลง หรือเอาตัวกรองบางอันออก
+                    </p>
+                  </>
+                )}
               </div>
             )}
           </div>
