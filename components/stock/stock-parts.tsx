@@ -8,6 +8,7 @@ import {
   CollapsibleContent,
 } from "@peckey954/ui/components/ui/collapsible";
 import { cn } from "@peckey954/ui/lib/utils";
+import { AdjustLotDialog, MoveLotDialog } from "./lot-dialogs";
 import {
   CATEGORY_LABEL,
   CONDITION_LABEL,
@@ -136,27 +137,32 @@ function ZoneTag({ zone }: { zone: string }) {
 }
 
 /**
- * ปุ่มโชว์ตลอด
+ * ปุ่มโชว์ตลอด แต่ละปุ่มเปิดกล่องของตัวเอง
  * จอแคบ — เรียงเต็มความกว้างสองปุ่ม แบ่งครึ่งเท่ากัน
  * จอกว้าง — อยู่ท้ายแถว กว้างเท่ากันทั้งคู่ (w-24) ไม่ใช่กว้างตามความยาวคำ
  */
-function LotActions() {
+function LotActions({
+  lot,
+  productName,
+  unit,
+}: {
+  lot: Lot;
+  productName: string;
+  unit: string;
+}) {
+  const cls = "flex-1 @3xl:w-24 @3xl:flex-none";
   return (
     <div className="flex w-full gap-2 @3xl:w-auto">
-      <Button
-        variant="outline-primary"
-        size="sm"
-        className="flex-1 @3xl:w-24 @3xl:flex-none"
-      >
-        ย้าย
-      </Button>
-      <Button
-        variant="outline-primary"
-        size="sm"
-        className="flex-1 @3xl:w-24 @3xl:flex-none"
-      >
-        ปรับปรุง
-      </Button>
+      <MoveLotDialog lot={lot} productName={productName} unit={unit}>
+        <Button variant="outline-primary" size="sm" className={cls}>
+          ย้าย
+        </Button>
+      </MoveLotDialog>
+      <AdjustLotDialog lot={lot} productName={productName} unit={unit}>
+        <Button variant="outline-primary" size="sm" className={cls}>
+          ปรับปรุง
+        </Button>
+      </AdjustLotDialog>
     </div>
   );
 }
@@ -164,11 +170,13 @@ function LotActions() {
 function LotRow({
   lot,
   unit,
+  productName,
   showChips,
   showActions,
 }: {
   lot: Lot;
   unit: string;
+  productName: string;
   showChips: boolean;
   showActions: boolean;
 }) {
@@ -218,7 +226,9 @@ function LotRow({
         </div>
 
         <div className="flex shrink-0 items-center gap-3">
-          {showActions && <LotActions />}
+          {showActions && (
+            <LotActions lot={lot} productName={productName} unit={unit} />
+          )}
           <p className="hidden w-28 text-right tabular-nums @3xl:block">
             <span
               className={cn(
@@ -303,6 +313,7 @@ export function ProductCard({
               key={lot.id}
               lot={lot}
               unit={product.unit}
+              productName={product.name}
               showChips={showChips}
               showActions={showActions}
             />

@@ -45,6 +45,10 @@ export type Lot = {
   qty: number;
   /** คำอธิบายการบรรจุของล็อตนี้ เช่น "500 ชิ้น (0.8 ตัน/ชิ้น)" */
   packNote: string;
+  /** จำนวนชิ้นในล็อต ใช้กับกล่องย้าย/ปรับปรุงที่นับเป็นชิ้น */
+  pieces?: number;
+  /** น้ำหนักต่อชิ้น แสดงคู่กับจำนวนชิ้น */
+  kgPerPiece?: number;
   pending: Pending;
   low?: boolean;
 };
@@ -185,7 +189,18 @@ const UNIT_POOL: Record<CategoryId, { unit: string; packing: string }[]> = {
   ],
 };
 
-const ZONES = ["A-3M", "A-9M", "B-2L", "C-1S", "D-4S", "E-1S", "F-1M", "F-2M"];
+/** โซนทั้งหมดในคลัง ใช้ทั้งตอนสร้างข้อมูลตัวอย่างและตอนเลือกปลายทางในกล่องย้ายสต็อก */
+export const ZONES = [
+  "A-3M",
+  "A-9M",
+  "A-10",
+  "B-2L",
+  "C-1S",
+  "D-4S",
+  "E-1S",
+  "F-1M",
+  "F-2M",
+];
 const CONDITIONS: (LotCondition | undefined)[] = [
   undefined,
   undefined,
@@ -218,6 +233,8 @@ function generate(): Product[] {
           ageDays: 30 + Math.floor(rnd() * 30),
           qty,
           packNote: spec.packing,
+          pieces: Math.max(1, Math.round(qty / (1 + Math.floor(rnd() * 4)))),
+          kgPerPiece: 25 + Math.floor(rnd() * 4) * 25,
           pending:
             rnd() < 0.3
               ? { inbound: Math.round(rnd() * 500) * 10 }
@@ -261,6 +278,8 @@ const SEED_PRODUCTS: Product[] = [
         ageDays: 44,
         qty: 8,
         packNote: "500 ชิ้น (0.8 ตัน/ชิ้น)",
+        pieces: 500,
+        kgPerPiece: 50,
         pending: { inbound: 300, issue: 300 },
         low: true,
       },
@@ -273,6 +292,8 @@ const SEED_PRODUCTS: Product[] = [
         ageDays: 44,
         qty: 80,
         packNote: "500 ชิ้น (0.8 ตัน/ชิ้น)",
+        pieces: 500,
+        kgPerPiece: 50,
         pending: {},
       },
       {
@@ -284,6 +305,8 @@ const SEED_PRODUCTS: Product[] = [
         ageDays: 44,
         qty: 80,
         packNote: "500 ชิ้น (0.8 ตัน/ชิ้น)",
+        pieces: 500,
+        kgPerPiece: 50,
         pending: {},
       },
     ],
@@ -974,3 +997,27 @@ export function matchesHistory(r: HistoryRow, q: string): boolean {
     r.note ?? "",
   ].some((v) => v.toLowerCase().includes(s));
 }
+
+// ---------------------------------------------------------------
+// ย้าย / ปรับปรุงสต็อก
+// ---------------------------------------------------------------
+
+/**
+ * แปลงจำนวนชิ้นเป็นปริมาณตามหน่วยของสินค้า
+ * ล็อตที่ไม่ได้บอกน้ำหนักต่อชิ้นไว้ ถือว่าจำนวนกับปริมาณเป็นตัวเดียวกัน
+ */
+export function piecesToQty(lot: Lot, pieces: number): number {
+  if (!lot.pieces || lot.pieces === 0) return pieces;
+  return (lot.qty / lot.pieces) * pieces;
+}
+
+/** ยอดคงเหลือหลังย้ายออกไปกี่ชิ้น */
+export const qtyAfterMove = (lot: Lot, pieces: number) =>
+  Math.max(0, lot.qty - piecesToQty(lot, pieces));
+
+/** ส่วนต่างจากการนับจริง ติดลบ = ของหาย บวก = ของเกิน */
+export const countDiff = (lot: Lot, counted: number) =>
+  piecesToQty(lot, counted) - lot.qty;
+
+/** จำนวนชิ้นทั้งหมดของล็อต ใช้เป็นเพดานของช่องกรอก */
+export const lotPieces = (lot: Lot) => lot.pieces ?? Math.round(lot.qty);

@@ -1,0 +1,386 @@
+"use client";
+
+import * as React from "react";
+import { MinusIcon, PlusIcon } from "lucide-react";
+import { Button } from "@peckey954/ui/components/ui/button";
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@peckey954/ui/components/ui/dialog";
+import { Input } from "@peckey954/ui/components/ui/input";
+import { Label } from "@peckey954/ui/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@peckey954/ui/components/ui/select";
+import { Textarea } from "@peckey954/ui/components/ui/textarea";
+import { cn } from "@peckey954/ui/lib/utils";
+import { toast } from "sonner";
+import {
+  ZONES,
+  countDiff,
+  formatAmount,
+  formatQty,
+  lotPieces,
+  qtyAfterMove,
+  type Lot,
+} from "@/lib/general-stock";
+
+/* ------------------------------------------------------------------
+   กล่องย้ายสต็อก และกล่องปรับปรุงสต็อก
+   หัวกล่องเหมือนกันทั้งคู่ ต่างกันที่ตัวเลขสรุปกับช่องกรอก
+------------------------------------------------------------------ */
+
+/** หัวกล่อง — โซน ชื่อสินค้า และบรรทัดล็อต */
+function LotHeading({
+  lot,
+  productName,
+}: {
+  lot: Lot;
+  productName: string;
+}) {
+  return (
+    <DialogHeader className="gap-1 text-left">
+      <DialogTitle className="flex flex-wrap items-center gap-3">
+        <span className="rounded-md bg-secondary px-2.5 py-0.5 text-sm font-semibold text-primary">
+          {lot.zone}
+        </span>
+        <span className="text-lg">{productName}</span>
+      </DialogTitle>
+      <p className="text-sm text-muted-foreground">
+        {lot.code} · รับ {lot.receivedAt} ({lot.ageDays} วัน)
+      </p>
+    </DialogHeader>
+  );
+}
+
+/** กล่องสรุปยอด พื้นส้มอ่อน จอแคบเรียงลงมา จอกว้างเรียงเป็นคอลัมน์ */
+function SummaryBox({ children }: { children: React.ReactNode }) {
+  return (
+    <dl className="grid grid-cols-2 gap-x-6 gap-y-4 rounded-lg bg-brand px-4 py-3 sm:grid-cols-3">
+      {children}
+    </dl>
+  );
+}
+
+function SummaryItem({
+  label,
+  children,
+  className,
+}: {
+  label: string;
+  children: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <div>
+      <dt className="text-sm text-muted-foreground">{label}</dt>
+      <dd className={cn("mt-1 font-semibold tabular-nums", className)}>
+        {children}
+      </dd>
+    </div>
+  );
+}
+
+/**
+ * ช่องกรอกจำนวนแบบมีปุ่มลบ/บวก
+ * กรอกเองก็ได้ ปุ่มไว้ปรับทีละหน่วยตอนใช้บนมือถือ
+ * บังคับให้อยู่ในช่วง 0 ถึง max เสมอ กันกรอกเกินของที่มีจริง
+ */
+function NumberStepper({
+  id,
+  value,
+  max,
+  onChange,
+}: {
+  id: string;
+  value: number;
+  max: number;
+  onChange: (v: number) => void;
+}) {
+  const clamp = (v: number) => Math.min(max, Math.max(0, v));
+  return (
+    <div className="flex items-center rounded-md border border-input bg-card shadow-xs">
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon"
+        aria-label="ลดลง"
+        disabled={value <= 0}
+        onClick={() => onChange(clamp(value - 1))}
+      >
+        <MinusIcon />
+      </Button>
+      <Input
+        id={id}
+        inputMode="numeric"
+        value={value}
+        onChange={(e) => {
+          const n = Number(e.target.value.replace(/[^\d]/g, ""));
+          onChange(clamp(Number.isNaN(n) ? 0 : n));
+        }}
+        className="border-0 bg-transparent text-center font-semibold tabular-nums shadow-none focus-visible:ring-0 dark:bg-transparent"
+      />
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon"
+        aria-label="เพิ่มขึ้น"
+        disabled={value >= max}
+        onClick={() => onChange(clamp(value + 1))}
+      >
+        <PlusIcon />
+      </Button>
+    </div>
+  );
+}
+
+/** ปุ่มท้ายกล่อง กว้างเท่ากันทั้งคู่ */
+function Actions({
+  onSave,
+  saveDisabled,
+}: {
+  onSave: () => void;
+  saveDisabled?: boolean;
+}) {
+  return (
+    <DialogFooter className="grid grid-cols-2 gap-3 sm:flex sm:justify-end">
+      <DialogClose asChild>
+        <Button variant="outline-primary" className="sm:w-32">
+          ย้อนกลับ
+        </Button>
+      </DialogClose>
+      <Button className="sm:w-32" disabled={saveDisabled} onClick={onSave}>
+        บันทึก
+      </Button>
+    </DialogFooter>
+  );
+}
+
+/** จำนวนชิ้นพร้อมน้ำหนักต่อชิ้น ใช้ซ้ำในทั้งสองกล่อง */
+function PiecesValue({ lot }: { lot: Lot }) {
+  return (
+    <span className="flex flex-wrap items-baseline gap-x-3">
+      <span>{formatQty(lotPieces(lot))} ชิ้น</span>
+      {lot.kgPerPiece && (
+        <span className="font-normal">{lot.kgPerPiece} Kg/ชิ้น</span>
+      )}
+    </span>
+  );
+}
+
+/* ------------------------------ ย้ายสต็อก ------------------------------ */
+
+export function MoveLotDialog({
+  lot,
+  productName,
+  unit,
+  children,
+}: {
+  lot: Lot;
+  productName: string;
+  unit: string;
+  children: React.ReactNode;
+}) {
+  const max = lotPieces(lot);
+  const [open, setOpen] = React.useState(false);
+  const [zone, setZone] = React.useState("");
+  const [pieces, setPieces] = React.useState(0);
+  const [note, setNote] = React.useState("");
+
+  // key ทำให้ฟอร์มเริ่มใหม่ทุกครั้งที่เปิด ไม่ค้างค่าจากรอบก่อน
+  const reset = () => {
+    setZone("");
+    setPieces(0);
+    setNote("");
+  };
+
+  const save = () => {
+    toast.success("บันทึกการย้ายแล้ว", {
+      description: `${lot.code} · ${formatQty(pieces)} ชิ้น จาก ${lot.zone} ไป ${zone}`,
+    });
+    setOpen(false);
+  };
+
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(v) => {
+        setOpen(v);
+        if (v) reset();
+      }}
+    >
+      <DialogTrigger asChild>{children}</DialogTrigger>
+      <DialogContent className="sm:max-w-lg">
+        <LotHeading lot={lot} productName={productName} />
+
+        <h3 className="text-lg font-semibold">ย้ายสต็อก</h3>
+
+        <SummaryBox>
+          <SummaryItem label={`ปริมาณในคลัง (${unit})`}>
+            {formatAmount(lot.qty)}
+          </SummaryItem>
+          <SummaryItem label="จำนวนในคลัง (ชิ้น)">
+            <PiecesValue lot={lot} />
+          </SummaryItem>
+          <SummaryItem label={`คงเหลือในคลัง (${unit})`}>
+            {formatAmount(qtyAfterMove(lot, pieces))}
+          </SummaryItem>
+        </SummaryBox>
+
+        <div className="space-y-2">
+          <Label htmlFor="move-zone">โซนที่ต้องการย้าย</Label>
+          <Select value={zone} onValueChange={setZone}>
+            <SelectTrigger id="move-zone" className="w-full">
+              <SelectValue placeholder="เลือกโซนปลายทาง" />
+            </SelectTrigger>
+            <SelectContent>
+              {ZONES.filter((z) => z !== lot.zone).map((z) => (
+                <SelectItem key={z} value={z}>
+                  {z}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="move-pieces">จำนวนที่ต้องการย้าย (ชิ้น)</Label>
+          <NumberStepper
+            id="move-pieces"
+            value={pieces}
+            max={max}
+            onChange={setPieces}
+          />
+          <p className="text-sm text-muted-foreground">
+            ย้ายได้มากสุด {formatQty(max)} ชิ้น
+          </p>
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="move-note">หมายเหตุการย้าย</Label>
+          <Textarea
+            id="move-note"
+            placeholder="หมายเหตุ"
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+          />
+        </div>
+
+        {/* ต้องเลือกโซนและใส่จำนวนก่อน ไม่งั้นบันทึกไปก็ไม่มีความหมาย */}
+        <Actions onSave={save} saveDisabled={!zone || pieces === 0} />
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+/* ---------------------------- ปรับปรุงสต็อก ---------------------------- */
+
+export function AdjustLotDialog({
+  lot,
+  productName,
+  unit,
+  children,
+}: {
+  lot: Lot;
+  productName: string;
+  unit: string;
+  children: React.ReactNode;
+}) {
+  const max = lotPieces(lot) * 2;
+  const [open, setOpen] = React.useState(false);
+  const [counted, setCounted] = React.useState(0);
+  const [touched, setTouched] = React.useState(false);
+  const [note, setNote] = React.useState("");
+
+  const diff = countDiff(lot, counted);
+
+  const save = () => {
+    toast.success("บันทึกการปรับปรุงแล้ว", {
+      description: `${lot.code} · นับได้ ${formatQty(counted)} ชิ้น · ส่วนต่าง ${formatAmount(diff)} ${unit}`,
+    });
+    setOpen(false);
+  };
+
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(v) => {
+        setOpen(v);
+        if (v) {
+          setCounted(0);
+          setTouched(false);
+          setNote("");
+        }
+      }}
+    >
+      <DialogTrigger asChild>{children}</DialogTrigger>
+      <DialogContent className="sm:max-w-lg">
+        <LotHeading lot={lot} productName={productName} />
+
+        <h3 className="text-lg font-semibold">ปรับปรุงสต็อก</h3>
+
+        <SummaryBox>
+          <SummaryItem label={`ปริมาณในคลัง (${unit})`}>
+            {formatAmount(lot.qty)}
+          </SummaryItem>
+          <SummaryItem label="จำนวนในคลัง (ชิ้น)">
+            <PiecesValue lot={lot} />
+          </SummaryItem>
+          {/* ยังไม่ได้นับก็ยังไม่มีส่วนต่าง แสดงขีดไว้ก่อน
+              พอนับแล้วค่อยขึ้นสี ขาดเป็นแดง เกินเป็นเขียว */}
+          <SummaryItem
+            label={`ส่วนต่าง (${unit})`}
+            className={cn(
+              !touched && "text-muted-foreground",
+              touched && diff < 0 && "text-danger-strong",
+              touched && diff > 0 && "text-success-solid"
+            )}
+          >
+            {touched ? formatAmount(diff) : "-"}
+          </SummaryItem>
+        </SummaryBox>
+
+        <div className="space-y-2">
+          <Label htmlFor="adjust-count">นับจำนวนจริง (ชิ้น)</Label>
+          <NumberStepper
+            id="adjust-count"
+            value={counted}
+            max={max}
+            onChange={(v) => {
+              setCounted(v);
+              setTouched(true);
+            }}
+          />
+          <p className="text-sm text-muted-foreground">
+            ในระบบมี {formatQty(lotPieces(lot))} ชิ้น
+          </p>
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="adjust-note">หมายเหตุการปรับปรุง</Label>
+          <Textarea
+            id="adjust-note"
+            placeholder="หมายเหตุ"
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+          />
+        </div>
+
+        {/* ยอดไม่ตรงต้องบอกเหตุผลเสมอ ไม่งั้นตรวจย้อนหลังไม่ได้ว่าหายไปไหน */}
+        <Actions
+          onSave={save}
+          saveDisabled={!touched || (diff !== 0 && note.trim() === "")}
+        />
+      </DialogContent>
+    </Dialog>
+  );
+}
