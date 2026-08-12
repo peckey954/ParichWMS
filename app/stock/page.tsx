@@ -60,10 +60,13 @@ import {
 
 type Device = "desktop" | "tablet" | "mobile";
 
-const DEVICE: Record<Device, { label: string; width: string; px: string }> = {
-  desktop: { label: "เดสก์ท็อป", width: "100%", px: "เต็มจอ" },
-  tablet: { label: "แท็บเล็ต", width: "834px", px: "834px" },
-  mobile: { label: "มือถือ", width: "390px", px: "390px" },
+const DEVICE: Record<
+  Device,
+  { label: string; width: string; height: string; px: string }
+> = {
+  desktop: { label: "เดสก์ท็อป", width: "100%", height: "auto", px: "เต็มจอ" },
+  tablet: { label: "แท็บเล็ต", width: "834px", height: "900px", px: "834 × 900" },
+  mobile: { label: "มือถือ", width: "390px", height: "780px", px: "390 × 780" },
 };
 
 export default function GeneralStockPage() {
@@ -92,6 +95,10 @@ export default function GeneralStockPage() {
   };
 
   const changeDevice = (d: Device) => setView({ device: d });
+
+  // ในโหมดจำลอง กรอบเป็นตัวเลื่อนเอง แถบติดบนจึงยึดที่ขอบบนกรอบ (top-0)
+  // ส่วนโหมดเต็มจอ หน้าเว็บเป็นตัวเลื่อน ต้องเว้นให้ header ของแอปที่ติดบนอยู่ (top-14)
+  const framed = device !== "desktop";
 
   // จำนวนบนชิปเป็นยอดจริงของแต่ละประเภท ไม่เปลี่ยนตามคำค้น
   // เพราะเป็นป้ายบอกทาง ไม่ใช่ตัวนับผลลัพธ์
@@ -171,14 +178,20 @@ export default function GeneralStockPage() {
         </span>
       </div>
 
-      {/* ---------- กรอบจำลองอุปกรณ์ ---------- */}
+      {/* ---------- กรอบจำลองอุปกรณ์ ----------
+           กรอบต้องเป็น "ตัวเลื่อน" จริง ไม่ใช่แค่กล่อง overflow-hidden
+           เพราะ position: sticky ยึดกับบรรพบุรุษที่เลื่อนได้เท่านั้น
+           ถ้าใช้ overflow-hidden แถบติดบนจะไม่ทำงานในโหมดจำลอง */}
       <div
         className={cn(
           "@container mx-auto w-full transition-[max-width] duration-300",
-          device !== "desktop" &&
-            "overflow-hidden rounded-2xl border border-border shadow-sm"
+          framed &&
+            "overflow-y-auto overscroll-contain rounded-2xl border border-border shadow-sm"
         )}
-        style={{ maxWidth: DEVICE[device].width }}
+        style={{
+          maxWidth: DEVICE[device].width,
+          height: framed ? DEVICE[device].height : undefined,
+        }}
       >
         <div className="px-4 py-5 sm:px-6">
           <Breadcrumb>
@@ -247,7 +260,12 @@ export default function GeneralStockPage() {
                รายการยาว ถ้าปุ่มอยู่บนสุดอย่างเดียวต้องเลื่อนกลับไปกด
                จึงยกสองอย่างที่ใช้ระหว่างไล่ดู (สลับประเภท + ซ่อน/แสดง) มาติดบนไว้
                ลบขอบซ้ายขวาออกด้วย -mx เพื่อให้พื้นหลังเต็มความกว้างตอนติด */}
-          <div className="sticky top-14 z-30 -mx-4 mt-4 border-b border-border bg-background px-4 pt-1 pb-3 sm:-mx-6 sm:px-6">
+          <div
+            className={cn(
+              "sticky z-30 -mx-4 mt-4 border-b border-border bg-background px-4 pt-1 pb-3 sm:-mx-6 sm:px-6",
+              framed ? "top-0" : "top-14"
+            )}
+          >
           <div className="flex items-center gap-2 pt-2">
             <div
               ref={chipRowRef}
