@@ -6,12 +6,12 @@ import {
   EyeIcon,
   EyeOffIcon,
   ListFilterIcon,
-  MonitorIcon,
   SearchIcon,
   SlidersHorizontalIcon,
-  SmartphoneIcon,
-  TabletIcon,
+  SquareCheckBigIcon,
+  SquareIcon,
   TagIcon,
+  TriangleAlertIcon,
 } from "lucide-react";
 import { Badge } from "@peckey954/ui/components/ui/badge";
 import {
@@ -45,6 +45,7 @@ import {
   ToggleGroupItem,
 } from "@peckey954/ui/components/ui/toggle-group";
 import { cn } from "@peckey954/ui/lib/utils";
+import { useDevicePreview } from "@/components/device-preview";
 import { InboundCard } from "@/components/stock/inbound-card";
 import { ProductCard } from "@/components/stock/stock-parts";
 import {
@@ -58,23 +59,10 @@ import {
   type CategoryId,
 } from "@/lib/general-stock";
 
-type Device = "desktop" | "tablet" | "mobile";
-
-const DEVICE: Record<
-  Device,
-  { label: string; width: string; height: string; px: string }
-> = {
-  desktop: { label: "เดสก์ท็อป", width: "100%", height: "auto", px: "เต็มจอ" },
-  tablet: { label: "แท็บเล็ต", width: "834px", height: "900px", px: "834 × 900" },
-  mobile: { label: "มือถือ", width: "390px", height: "780px", px: "390 × 780" },
-};
-
 export default function GeneralStockPage() {
-  // เก็บอุปกรณ์กับสถานะย่อ/กางไว้ก้อนเดียว จะได้เปลี่ยนพร้อมกันในการ setState ครั้งเดียว
-  const [view, setView] = React.useState<{ device: Device }>({
-    device: "desktop",
-  });
-  const { device } = view;
+  // กรอบจำลองอุปกรณ์อยู่ที่ AppShell ปุ่มสลับอยู่บนหัวเรื่อง
+  // หน้านี้ขอรู้แค่ว่าตอนนี้อยู่ในกรอบหรือไม่ เพื่อเลือกจุดยึดของแถบติดบน
+  const { framed } = useDevicePreview();
   // ของจริงแยกประเภทกันเด็ดขาด ไม่มีมุมมอง "ทั้งหมด"
   // ชิปจึงเป็นการนำทาง (เลือกอยู่เสมอหนึ่งอัน) ไม่ใช่ตัวกรองที่ปิดได้
   const [cat, setCat] = React.useState<CategoryId>("sack");
@@ -93,12 +81,6 @@ export default function GeneralStockPage() {
     setShowChips(!allShown);
     setShowActions(!allShown);
   };
-
-  const changeDevice = (d: Device) => setView({ device: d });
-
-  // ในโหมดจำลอง กรอบเป็นตัวเลื่อนเอง แถบติดบนจึงยึดที่ขอบบนกรอบ (top-0)
-  // ส่วนโหมดเต็มจอ หน้าเว็บเป็นตัวเลื่อน ต้องเว้นให้ header ของแอปที่ติดบนอยู่ (top-14)
-  const framed = device !== "desktop";
 
   // จำนวนบนชิปเป็นยอดจริงของแต่ละประเภท ไม่เปลี่ยนตามคำค้น
   // เพราะเป็นป้ายบอกทาง ไม่ใช่ตัวนับผลลัพธ์
@@ -149,50 +131,8 @@ export default function GeneralStockPage() {
   }, [cat]);
 
   return (
-    <main className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6">
-      {/* ---------- แถบเครื่องมือสำหรับรีวิวดีไซน์ ---------- */}
-      <div className="mb-6 flex flex-wrap items-center gap-3 rounded-xl border border-border bg-muted px-4 py-3">
-        <Label className="text-sm">ดูแบบ</Label>
-        <ToggleGroup
-          type="single"
-          variant="outline"
-          size="sm"
-          value={device}
-          onValueChange={(v) => v && changeDevice(v as Device)}
-        >
-          <ToggleGroupItem value="desktop" aria-label="ดูแบบเดสก์ท็อป">
-            <MonitorIcon />
-            เดสก์ท็อป
-          </ToggleGroupItem>
-          <ToggleGroupItem value="tablet" aria-label="ดูแบบแท็บเล็ต">
-            <TabletIcon />
-            แท็บเล็ต
-          </ToggleGroupItem>
-          <ToggleGroupItem value="mobile" aria-label="ดูแบบมือถือ">
-            <SmartphoneIcon />
-            มือถือ
-          </ToggleGroupItem>
-        </ToggleGroup>
-        <span className="text-sm tabular-nums text-muted-foreground">
-          {DEVICE[device].px}
-        </span>
-      </div>
-
-      {/* ---------- กรอบจำลองอุปกรณ์ ----------
-           กรอบต้องเป็น "ตัวเลื่อน" จริง ไม่ใช่แค่กล่อง overflow-hidden
-           เพราะ position: sticky ยึดกับบรรพบุรุษที่เลื่อนได้เท่านั้น
-           ถ้าใช้ overflow-hidden แถบติดบนจะไม่ทำงานในโหมดจำลอง */}
-      <div
-        className={cn(
-          "@container mx-auto w-full transition-[max-width] duration-300",
-          framed &&
-            "overflow-y-auto overscroll-contain rounded-2xl border border-border shadow-sm"
-        )}
-        style={{
-          maxWidth: DEVICE[device].width,
-          height: framed ? DEVICE[device].height : undefined,
-        }}
-      >
+    <main className="mx-auto w-full max-w-7xl">
+      <div>
         <div className="px-4 py-5 sm:px-6">
           <Breadcrumb>
             <BreadcrumbList>
@@ -260,9 +200,13 @@ export default function GeneralStockPage() {
                รายการยาว ถ้าปุ่มอยู่บนสุดอย่างเดียวต้องเลื่อนกลับไปกด
                จึงยกสองอย่างที่ใช้ระหว่างไล่ดู (สลับประเภท + ซ่อน/แสดง) มาติดบนไว้
                ลบขอบซ้ายขวาออกด้วย -mx เพื่อให้พื้นหลังเต็มความกว้างตอนติด */}
+          {/* พื้นหลังต้องเป็นสีเดียวกับพื้นที่เนื้อหา (bg-surface) ไม่งั้นตอนติดบน
+              จะเห็นเป็นแถบสีขาวโผล่ทับของข้างหลังชัดเป็นเหลี่ยม
+              ในโหมดจำลอง กรอบเป็นตัวเลื่อนเอง จึงยึดที่ขอบบนกรอบ (top-0)
+              โหมดเต็มจอ หน้าเว็บเป็นตัวเลื่อน ต้องเว้นให้หัวเรื่องที่ติดบนอยู่ (top-14) */}
           <div
             className={cn(
-              "sticky z-30 -mx-4 mt-4 border-b border-border bg-background px-4 pt-1 pb-3 sm:-mx-6 sm:px-6",
+              "sticky z-30 -mx-4 mt-4 border-b border-border bg-surface px-4 pt-1 pb-3 sm:-mx-6 sm:px-6",
               framed ? "top-0" : "top-14"
             )}
           >
@@ -306,17 +250,25 @@ export default function GeneralStockPage() {
 
               <span className="h-5 w-px shrink-0 bg-border" aria-hidden />
 
+              {/* ชิปนี้ต่างจากชิปประเภทตรงที่เป็นตัวกรองเปิด/ปิดได้
+                  จึงมีกล่องติ๊กนำหน้าให้เห็นว่ากดเลือกเพิ่มได้ ไม่ใช่ปุ่มสลับหน้า */}
               <button
                 type="button"
+                role="checkbox"
                 onClick={() => setLowOnly((v) => !v)}
-                aria-pressed={lowOnly}
+                aria-checked={lowOnly}
                 className={cn(
-                  "shrink-0 rounded-full border px-3 py-1 text-sm whitespace-nowrap transition-colors",
+                  "flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1 text-sm whitespace-nowrap transition-colors",
                   lowOnly
                     ? "border-primary bg-brand font-medium text-primary"
                     : "border-border text-foreground hover:bg-accent-hover"
                 )}
               >
+                {lowOnly ? (
+                  <SquareCheckBigIcon className="size-4" />
+                ) : (
+                  <SquareIcon className="size-4 text-muted-foreground" />
+                )}
                 สต็อกต่ำ
               </button>
             </div>
@@ -348,7 +300,7 @@ export default function GeneralStockPage() {
                   className="relative shrink-0"
                 >
                   <ListFilterIcon />
-                  {(!showChips || !showActions) && (
+                  {(!showChips || !showActions || lowOnly) && (
                     <span className="absolute top-1 right-1 size-2 rounded-full bg-primary" />
                   )}
                 </Button>
@@ -361,7 +313,29 @@ export default function GeneralStockPage() {
                   </PopoverDescription>
                 </PopoverHeader>
 
-                <div className="mt-4 space-y-2">
+                {/* ตัวกรองเดียวกับชิปสต็อกต่ำด้านบน ผูกกับค่าเดียวกัน
+                    กดที่ไหนก็ได้ อีกที่จะขยับตาม ไม่หลุดจากกัน */}
+                <div className="mt-4 space-y-3">
+                  <Label className="text-sm">กรอง</Label>
+                  <Label
+                    htmlFor="filter-low"
+                    className="flex items-center gap-3 font-normal"
+                  >
+                    <Checkbox
+                      id="filter-low"
+                      checked={lowOnly}
+                      onCheckedChange={(v) => setLowOnly(v === true)}
+                    />
+                    <span className="flex items-center gap-2">
+                      <TriangleAlertIcon className="size-4" />
+                      เฉพาะสต็อกต่ำ
+                    </span>
+                  </Label>
+                </div>
+
+                <Separator className="my-4" />
+
+                <div className="space-y-2">
                   <Label className="text-sm">เรียงตาม</Label>
                   <ToggleGroup
                     type="single"

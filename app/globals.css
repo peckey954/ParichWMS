@@ -38,10 +38,16 @@
 
 [data-brand="parich"] {
   --surface: hsl(0 0% 98%);
+
+  /* แดงสดสำหรับป้ายสต็อกต่ำ
+     --danger-foreground ของ DS เป็นแดงอมน้ำตาลค่อนข้างทึม
+     ตัวนี้สดกว่ามากและยังได้คอนทราสต์ 4.64:1 บนพื้น --danger ผ่าน AA */
+  --danger-strong: hsl(0 84% 45%);
 }
 
 [data-brand="parich"].dark {
   --surface: hsl(20 15% 7%);
+  --danger-strong: hsl(0 90% 71%);
 }
 
 /* --- ชุดที่ 1: สีประจำหมวดเมนู (ตามไฟล์ Figma ของ Parich WMS) ---

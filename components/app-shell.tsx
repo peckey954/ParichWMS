@@ -17,6 +17,11 @@ import {
 } from "@peckey954/ui/components/ui/sheet";
 import { TooltipProvider } from "@peckey954/ui/components/ui/tooltip";
 import { cn } from "@peckey954/ui/lib/utils";
+import {
+  DeviceFrame,
+  DevicePreviewProvider,
+  DevicePreviewToggle,
+} from "@/components/device-preview";
 import { LightTooltip } from "@/components/light-tooltip";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { ModuleIcon } from "@/components/modules/module-icon";
@@ -29,6 +34,14 @@ import {
 } from "@/lib/modules";
 
 export function AppShell({ children }: { children: React.ReactNode }) {
+  return (
+    <DevicePreviewProvider>
+      <Shell>{children}</Shell>
+    </DevicePreviewProvider>
+  );
+}
+
+function Shell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   // ค่าเริ่มต้นคือหุบ — เปิดหน้าไหนก็เห็นเนื้อหาเต็มความกว้างไว้ก่อน
   const [expanded, setExpanded] = React.useState(false);
@@ -90,6 +103,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </Link>
 
           <div className="ml-auto flex items-center gap-1">
+            {/* เครื่องมือรีวิวดีไซน์ ซ่อนบนจอแคบเพราะจอแคบก็คือมือถืออยู่แล้ว */}
+            <DevicePreviewToggle className="mr-1 hidden md:flex" />
             <ThemeToggle />
             <Button variant="ghost" size="icon" aria-label="การแจ้งเตือน">
               <BellIcon />
@@ -114,7 +129,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </aside>
 
         {/* พื้นที่เนื้อหาเป็นเทาอ่อน ให้การ์ดสีขาวลอยขึ้นมา ตามไฟล์ Figma */}
-        <div className="min-w-0 flex-1 bg-surface">{children}</div>
+        <div className="min-w-0 flex-1 bg-surface">
+          <DeviceFrame>{children}</DeviceFrame>
+        </div>
       </div>
     </div>
   );

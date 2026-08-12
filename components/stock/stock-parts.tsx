@@ -56,6 +56,9 @@ function CategoryChip({ product }: { product: Product }) {
   );
 }
 
+/** ป้ายพื้นอ่อนในหน้านี้ไม่มีเส้นขอบ ให้ดูเป็นพื้นสีล้วนก้อนเดียว */
+const NO_BORDER = "[--bdg-border:transparent]";
+
 function PendingChips({
   pending,
   unit,
@@ -67,7 +70,12 @@ function PendingChips({
   return (
     <>
       {items.map((it) => (
-        <Badge key={it.key} tone="warning" appearance="soft">
+        <Badge
+          key={it.key}
+          tone="warning"
+          appearance="soft"
+          className={NO_BORDER}
+        >
           {it.label} {formatQty(it.qty)} {it.unit}
         </Badge>
       ))}
@@ -75,18 +83,41 @@ function PendingChips({
   );
 }
 
+/** ป้ายสต็อกต่ำ — แดงสดกว่าค่าเริ่มต้นของ DS ดูรายละเอียดที่ app/globals.css */
+function LowChip() {
+  return (
+    <Badge
+      tone="danger"
+      appearance="soft"
+      className={cn(NO_BORDER, "[--bdg-text:var(--danger-strong)] font-semibold")}
+    >
+      สต็อกต่ำ
+    </Badge>
+  );
+}
+
 /**
- * แถวของ chip
- * จอแคบ — บรรทัดเดียว ไม่ตัดบรรทัด เลื่อนแนวนอนเอาถ้ายาวเกิน (ซ่อนแถบเลื่อน)
- * จอกว้าง — @3xl:contents ยุบกล่องนี้ทิ้ง chip จึงไหลต่อท้ายในแถวเดิม
+ * จอกว้าง — display:contents ยุบกล่องนี้ทิ้ง chip จึงไหลต่อท้ายชื่อในแถวเดิม
+ * จอแคบ — ซ่อน แล้วไปใช้ ChipScroller แทน
  */
-function ChipRow({ children }: { children: React.ReactNode }) {
+function ChipsInline({ children }: { children: React.ReactNode }) {
+  return <div className="hidden @3xl:contents">{children}</div>;
+}
+
+/**
+ * แถวชิปของจอแคบ — บรรทัดเดียว เลื่อนแนวนอน ไม่ตัดบรรทัด
+ *
+ * -mx-4 px-4 ดันกล่องออกไปจนสุดขอบการ์ดทั้งสองข้าง แล้วดันเนื้อในกลับเข้ามา 16
+ * พื้นที่เลื่อนจึงกว้างเท่าการ์ดจริง ๆ ไม่ใช่แค่ความกว้างของคอลัมน์ข้อความ
+ * ต้องวางเป็นลูกโดยตรงของกล่องที่มี px-4 ไม่งั้นระยะจะไม่ตรงขอบ
+ */
+function ChipScroller({ children }: { children: React.ReactNode }) {
   return (
     <div
       className={cn(
-        "flex min-w-0 items-center gap-2 overflow-x-auto",
+        "-mx-4 mt-2 flex items-center gap-2 overflow-x-auto px-4",
         "flex-nowrap [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
-        "@3xl:contents"
+        "@3xl:hidden"
       )}
     >
       {children}
@@ -94,9 +125,14 @@ function ChipRow({ children }: { children: React.ReactNode }) {
   );
 }
 
+/**
+ * ป้ายโซน — เป็นรหัสตำแหน่งที่ต้องอ่านให้ออก ไม่ใช่ข้อความรอง
+ * เดิมใช้ --muted-foreground บนพื้น --muted ได้คอนทราสต์ 4.36:1 ซึ่งตกเกณฑ์
+ * เปลี่ยนเป็น --secondary-foreground เป็นคู่สีเทาอ่อน/ตัวเข้มของ DS
+ */
 function ZoneTag({ zone }: { zone: string }) {
   return (
-    <span className="rounded-md bg-muted px-2 py-0.5 font-mono text-xs text-muted-foreground">
+    <span className="rounded-md bg-secondary px-2 py-0.5 font-mono text-xs font-medium text-secondary-foreground">
       {zone}
     </span>
   );
@@ -127,31 +163,28 @@ function LotRow({
   showChips: boolean;
   showActions: boolean;
 }) {
+  const hasChips =
+    lot.condition !== undefined ||
+    pendingEntries(lot.pending, unit).length > 0;
+
+  const chips = (
+    <>
+      {lot.condition && <ConditionChip condition={lot.condition} />}
+      <PendingChips pending={lot.pending} unit={unit} />
+    </>
+  );
+
   return (
     <div className="border-t border-border px-4 py-3">
       {/* จอกว้าง: ข้อมูล | ปุ่ม | ยอด อยู่แถวเดียว
           จอแคบ: ยอดขึ้นไปอยู่ขวาของหัวแถว แล้วปุ่มลงมาเต็มความกว้างข้างล่าง */}
       <div className="flex flex-col gap-3 @3xl:flex-row @3xl:items-start @3xl:justify-between">
-        <div className="min-w-0 flex-1 space-y-2">
+        <div className="min-w-0 flex-1">
           <div className="flex items-start justify-between gap-3">
-            {/* จอแคบ: โซน+เลขล็อตบรรทัดหนึ่ง แล้ว chip ลงบรรทัดใหม่
-                จอกว้าง: @3xl:contents ทำให้ chip กลับไปไหลต่อท้ายในแถวเดียวกัน */}
-            <div className="flex min-w-0 flex-col gap-2 @3xl:flex-row @3xl:flex-wrap @3xl:items-center">
-              <div className="flex items-center gap-2">
-                <ZoneTag zone={lot.zone} />
-                <span className="font-medium">{lot.code}</span>
-              </div>
-
-              {showChips &&
-                (lot.condition ||
-                  pendingEntries(lot.pending, unit).length > 0) && (
-                  <ChipRow>
-                    {lot.condition && (
-                      <ConditionChip condition={lot.condition} />
-                    )}
-                    <PendingChips pending={lot.pending} unit={unit} />
-                  </ChipRow>
-                )}
+            <div className="flex min-w-0 flex-wrap items-center gap-2">
+              <ZoneTag zone={lot.zone} />
+              <span className="font-medium">{lot.code}</span>
+              {showChips && hasChips && <ChipsInline>{chips}</ChipsInline>}
             </div>
 
             <p className="shrink-0 text-right tabular-nums @3xl:hidden">
@@ -167,7 +200,10 @@ function LotRow({
             </p>
           </div>
 
-          <p className="text-sm text-muted-foreground">
+          {/* จอแคบเท่านั้น — แถวชิปกว้างเท่าการ์ด เลื่อนดูได้ */}
+          {showChips && hasChips && <ChipScroller>{chips}</ChipScroller>}
+
+          <p className="mt-2 text-sm text-muted-foreground">
             รับ {lot.receivedAt} ({lot.ageDays} วัน) · {lot.packNote}
           </p>
         </div>
@@ -205,42 +241,26 @@ export function ProductCard({
   const total = productTotal(product);
   const pending = rollupPending(product);
 
+  const chips = (
+    <>
+      <CategoryChip product={product} />
+      <Badge tone="neutral" appearance="soft" className={NO_BORDER}>
+        {product.packing}
+      </Badge>
+      {product.low && <LowChip />}
+      <PendingChips pending={pending} unit={product.unit} />
+    </>
+  );
+
   return (
     <div className="overflow-hidden rounded-xl border border-border bg-card">
       <Collapsible defaultOpen={defaultOpen}>
         <div className="px-4 py-3">
           <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0 flex-1 space-y-2">
-              {/* จอแคบ: ชื่อสินค้าบรรทัดหนึ่ง แล้ว chip ทั้งชุดลงบรรทัดใหม่
-                  จอกว้าง: @3xl:contents ทำให้ chip กลับไปไหลต่อท้ายชื่อ */}
-              <div className="flex flex-col gap-2 @3xl:flex-row @3xl:flex-wrap @3xl:items-center @3xl:gap-x-2 @3xl:gap-y-1.5">
-                <span className="font-semibold">{product.name}</span>
-
-                {showChips && (
-                  <ChipRow>
-                    <CategoryChip product={product} />
-                    <Badge tone="neutral" appearance="soft">
-                      {product.packing}
-                    </Badge>
-                    {product.low && (
-                      <Badge tone="danger" appearance="soft">
-                        สต็อกต่ำ
-                      </Badge>
-                    )}
-                    <PendingChips pending={pending} unit={product.unit} />
-                  </ChipRow>
-                )}
-              </div>
-
-              <CollapsibleTrigger asChild>
-                <button
-                  type="button"
-                  className="group flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
-                >
-                  {product.lots.length} รายการ · {zoneCount(product)} โซน
-                  <ChevronDownIcon className="size-4 transition-transform group-data-[state=open]:rotate-180" />
-                </button>
-              </CollapsibleTrigger>
+            {/* จอกว้าง: ชิปไหลต่อท้ายชื่อในแถวเดียวกัน */}
+            <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-1.5">
+              <span className="font-semibold">{product.name}</span>
+              {showChips && <ChipsInline>{chips}</ChipsInline>}
             </div>
 
             <p className="shrink-0 text-right tabular-nums">
@@ -257,6 +277,19 @@ export function ProductCard({
               </span>
             </p>
           </div>
+
+          {/* จอแคบเท่านั้น — แถวชิปกว้างเท่าการ์ด เลื่อนดูได้ */}
+          {showChips && <ChipScroller>{chips}</ChipScroller>}
+
+          <CollapsibleTrigger asChild>
+            <button
+              type="button"
+              className="group mt-2 flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
+            >
+              {product.lots.length} รายการ · {zoneCount(product)} โซน
+              <ChevronDownIcon className="size-4 transition-transform group-data-[state=open]:rotate-180" />
+            </button>
+          </CollapsibleTrigger>
         </div>
 
         <CollapsibleContent>
