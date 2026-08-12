@@ -116,7 +116,15 @@ function LotActions() {
   );
 }
 
-function LotRow({ lot, unit }: { lot: Lot; unit: string }) {
+function LotRow({
+  lot,
+  unit,
+  showActions,
+}: {
+  lot: Lot;
+  unit: string;
+  showActions: boolean;
+}) {
   return (
     <div className="border-t border-border px-4 py-3">
       {/* จอกว้าง: ข้อมูล | ปุ่ม | ยอด อยู่แถวเดียว
@@ -159,7 +167,7 @@ function LotRow({ lot, unit }: { lot: Lot; unit: string }) {
         </div>
 
         <div className="flex shrink-0 items-center gap-3">
-          <LotActions />
+          {showActions && <LotActions />}
           <p className="hidden w-28 text-right tabular-nums @3xl:block">
             <span
               className={cn(
@@ -180,9 +188,11 @@ function LotRow({ lot, unit }: { lot: Lot; unit: string }) {
 export function ProductCard({
   product,
   defaultOpen,
+  showActions,
 }: {
   product: Product;
   defaultOpen: boolean;
+  showActions: boolean;
 }) {
   const total = productTotal(product);
   const pending = rollupPending(product);
@@ -241,7 +251,12 @@ export function ProductCard({
 
         <CollapsibleContent>
           {product.lots.map((lot) => (
-            <LotRow key={lot.id} lot={lot} unit={product.unit} />
+            <LotRow
+              key={lot.id}
+              lot={lot}
+              unit={product.unit}
+              showActions={showActions}
+            />
           ))}
         </CollapsibleContent>
       </Collapsible>

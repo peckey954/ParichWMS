@@ -5,6 +5,8 @@ import {
   ChevronsDownUpIcon,
   ChevronsUpDownIcon,
   DownloadIcon,
+  EyeIcon,
+  EyeOffIcon,
   ListFilterIcon,
   MonitorIcon,
   SearchIcon,
@@ -58,9 +60,11 @@ export default function GeneralStockPage() {
     expanded: true,
   });
   const { device, expanded } = view;
-  const [cats, setCats] = React.useState<CategoryId[]>([]);
+  // เลือกประเภทได้ทีละอย่างเดียว — null = ทั้งหมด
+  const [cat, setCat] = React.useState<CategoryId | null>(null);
   const [lowOnly, setLowOnly] = React.useState(false);
   const [sort, setSort] = React.useState("product");
+  const [showActions, setShowActions] = React.useState(true);
 
   const changeDevice = (d: Device) => setView({ device: d, expanded: true });
   const toggleExpand = () => setView((v) => ({ ...v, expanded: !v.expanded }));
@@ -68,14 +72,11 @@ export default function GeneralStockPage() {
   const counts = countByCategory(PRODUCTS);
 
   const visible = PRODUCTS.filter(
-    (p) =>
-      (cats.length === 0 || cats.includes(p.category)) && (!lowOnly || p.low)
+    (p) => (cat === null || p.category === cat) && (!lowOnly || p.low)
   );
 
-  const toggleCat = (id: CategoryId) =>
-    setCats((prev) =>
-      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
-    );
+  // กดซ้ำที่อันเดิม = กลับไปดูทั้งหมด จะได้ไม่ต้องเลื่อนไปหาปุ่ม "ทั้งหมด"
+  const pickCat = (id: CategoryId) => setCat((c) => (c === id ? null : id));
 
   return (
     <main className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6">
@@ -169,17 +170,39 @@ export default function GeneralStockPage() {
             </div>
           </div>
 
-          {/* ---------- ชิปกรองประเภท ---------- */}
-          <div className="mt-4 flex flex-wrap items-center gap-2">
+          {/* ---------- ชิปกรองประเภท — บรรทัดเดียว ปัดเลื่อน เลือกได้ทีละอัน ---------- */}
+          <div
+            className={cn(
+              "mt-4 flex items-center gap-2 overflow-x-auto",
+              "flex-nowrap [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+            )}
+            role="group"
+            aria-label="กรองตามประเภทสินค้า"
+          >
+            <button
+              type="button"
+              onClick={() => setCat(null)}
+              aria-pressed={cat === null}
+              className={cn(
+                "shrink-0 rounded-full border px-3 py-1 text-sm transition-colors",
+                cat === null
+                  ? "border-primary bg-brand text-primary"
+                  : "border-border text-foreground hover:bg-accent-hover"
+              )}
+            >
+              ทั้งหมด ({PRODUCTS.length})
+            </button>
+
             {CATEGORIES.map((c) => {
-              const on = cats.includes(c.id);
+              const on = cat === c.id;
               return (
                 <button
                   key={c.id}
                   type="button"
-                  onClick={() => toggleCat(c.id)}
+                  onClick={() => pickCat(c.id)}
+                  aria-pressed={on}
                   className={cn(
-                    "rounded-full border px-3 py-1 text-sm transition-colors",
+                    "shrink-0 rounded-full border px-3 py-1 text-sm whitespace-nowrap transition-colors",
                     on
                       ? "border-primary bg-brand text-primary"
                       : "border-border text-foreground hover:bg-accent-hover"
@@ -189,23 +212,11 @@ export default function GeneralStockPage() {
                 </button>
               );
             })}
-
-            <Label
-              htmlFor="low-only"
-              className="flex items-center gap-2 rounded-full border border-border px-3 py-1 text-sm font-normal"
-            >
-              <Checkbox
-                id="low-only"
-                checked={lowOnly}
-                onCheckedChange={(v) => setLowOnly(v === true)}
-              />
-              สต็อกต่ำ
-            </Label>
           </div>
 
-          {/* ---------- เรียงลำดับ + ย่อ/กาง ---------- */}
+          {/* ---------- เรียงลำดับ + ตัวควบคุมมุมมอง ---------- */}
           <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <span className="text-sm text-muted-foreground">เรียงตาม</span>
               <ToggleGroup
                 type="single"
@@ -218,12 +229,37 @@ export default function GeneralStockPage() {
                 <ToggleGroupItem value="zone">โซน</ToggleGroupItem>
                 <ToggleGroupItem value="fifo">FIFO</ToggleGroupItem>
               </ToggleGroup>
+
+              <Label
+                htmlFor="low-only"
+                className="flex items-center gap-2 rounded-full border border-border px-3 py-1 text-sm font-normal"
+              >
+                <Checkbox
+                  id="low-only"
+                  checked={lowOnly}
+                  onCheckedChange={(v) => setLowOnly(v === true)}
+                />
+                สต็อกต่ำ
+              </Label>
             </div>
 
-            <Button variant="ghost" size="sm" onClick={toggleExpand}>
-              {expanded ? <ChevronsDownUpIcon /> : <ChevronsUpDownIcon />}
-              {expanded ? "ย่อทั้งหมด" : "กางทั้งหมด"}
-            </Button>
+            <div className="flex items-center gap-1">
+              {/* ซ่อนปุ่มจัดการเพื่อให้กวาดตาดูตัวเลขได้ง่ายขึ้น */}
+              <Button
+                variant="ghost"
+                size="sm"
+                aria-pressed={!showActions}
+                onClick={() => setShowActions((v) => !v)}
+              >
+                {showActions ? <EyeOffIcon /> : <EyeIcon />}
+                {showActions ? "ซ่อนปุ่มจัดการ" : "แสดงปุ่มจัดการ"}
+              </Button>
+
+              <Button variant="ghost" size="sm" onClick={toggleExpand}>
+                {expanded ? <ChevronsDownUpIcon /> : <ChevronsUpDownIcon />}
+                {expanded ? "ย่อทั้งหมด" : "กางทั้งหมด"}
+              </Button>
+            </div>
           </div>
 
           {/* ---------- รายการสินค้า ---------- */}
@@ -234,6 +270,7 @@ export default function GeneralStockPage() {
                 key={`${p.id}-${expanded}`}
                 product={p}
                 defaultOpen={expanded}
+                showActions={showActions}
               />
             ))}
 
