@@ -7,6 +7,7 @@ import {
   EyeIcon,
   EyeOffIcon,
   ListFilterIcon,
+  ListIcon,
   RotateCcwIcon,
   SearchIcon,
   SlidersHorizontalIcon,
@@ -138,6 +139,9 @@ export default function GeneralStockPage() {
   const [query, setQuery] = React.useState("");
   const [showChips, setShowChips] = React.useState(true);
   const [showActions, setShowActions] = React.useState(true);
+  // เปิด/ปิดรายการล็อตพร้อมกันทั้งหน้า อยู่ในตัวกรองอย่างเดียว
+  // ไม่มีปุ่มแยกรายใบ เพราะรายการยาวมาก กดทีละใบไม่ไหว
+  const [showLots, setShowLots] = React.useState(true);
   const [tab, setTab] = React.useState<"stock" | "inbound" | "issue">("stock");
   const [inboundQuery, setInboundQuery] = React.useState("");
   const [issueQuery, setIssueQuery] = React.useState("");
@@ -153,12 +157,14 @@ export default function GeneralStockPage() {
 
   // ค่าที่ popover เป็นเจ้าของ — ล้างได้ทีเดียวจบ
   // ไม่ล้างประเภทสินค้ากับคำค้น เพราะสองอย่างนั้นเป็นการนำทาง ไม่ใช่ตัวกรอง
-  const isDefault = !lowOnly && sort === "product" && showChips && showActions;
+  const isDefault =
+    !lowOnly && sort === "product" && showChips && showActions && showLots;
   const resetFilters = () => {
     setLowOnly(false);
     setSort("product");
     setShowChips(true);
     setShowActions(true);
+    setShowLots(true);
   };
 
   // จำนวนบนชิปเป็นยอดจริงของแต่ละประเภท ไม่เปลี่ยนตามคำค้น
@@ -509,6 +515,27 @@ export default function GeneralStockPage() {
                       ปุ่มย้าย / ปรับปรุง
                     </span>
                   </Label>
+
+                  {/* หุบ/กางรายการล็อตทั้งหน้าจากที่นี่ที่เดียว
+                      ปิดแล้วเหลือแต่หัวสินค้า ไล่ดูภาพรวมได้เร็วขึ้นมาก */}
+                  <Label
+                    htmlFor="show-lots"
+                    className={cn(
+                      "flex items-center gap-3 font-normal",
+                      isHistory && "opacity-50"
+                    )}
+                  >
+                    <Checkbox
+                      id="show-lots"
+                      checked={showLots && !isHistory}
+                      disabled={isHistory}
+                      onCheckedChange={(v) => setShowLots(v === true)}
+                    />
+                    <span className="flex items-center gap-2">
+                      <ListIcon className="size-4" />
+                      รายการล็อตในสินค้า
+                    </span>
+                  </Label>
                 </div>
 
                 {/* ปิดไว้ตอนทุกอย่างเป็นค่าเริ่มต้นอยู่แล้ว จะได้รู้ว่ามีอะไรให้ล้างไหม */}
@@ -552,7 +579,7 @@ export default function GeneralStockPage() {
                 <ProductCard
                   key={p.id}
                   product={p}
-                  defaultOpen
+                  showLots={showLots}
                   showChips={showChips}
                   showActions={showActions}
                 />

@@ -1,5 +1,6 @@
 "use client";
 
+import * as React from "react";
 import { Button } from "@peckey954/ui/components/ui/button";
 import { Separator } from "@peckey954/ui/components/ui/separator";
 import {
@@ -10,12 +11,26 @@ import {
   TableHeader,
   TableRow,
 } from "@peckey954/ui/components/ui/table";
+import { cn } from "@peckey954/ui/lib/utils";
 import {
   formatQty,
   outstandingQty,
   type InboundDoc,
 } from "@/lib/general-stock";
-import { CardBox, CardHead, CardRow, EmptyDocs } from "./doc-parts";
+import {
+  CardBox,
+  CardHead,
+  CardRow,
+  COL_FIRST,
+  COL_LAST,
+  EmptyDocs,
+  HEAD_FIRST,
+  HEAD_LAST,
+  STICKY_HEAD,
+  TableFrame,
+  TablePager,
+  paginate,
+} from "./doc-parts";
 
 /**
  * เอกสารรอรับเข้า
@@ -25,7 +40,12 @@ import { CardBox, CardHead, CardRow, EmptyDocs } from "./doc-parts";
  * ใช้ container query (@3xl) ไม่ใช่ breakpoint ของหน้าต่าง
  * เพราะกรอบจำลองอุปกรณ์วัดจากความกว้างของกล่อง ไม่ใช่ขนาดจอจริง
  */
+const PAGE_SIZE = 8;
+
 export function InboundList({ docs }: { docs: InboundDoc[] }) {
+  const [page, setPage] = React.useState(1);
+  const { pages, safe, slice } = paginate(docs, page, PAGE_SIZE);
+
   if (docs.length === 0) {
     return (
       <EmptyDocs title="ไม่พบเอกสารรอรับเข้า" hint="ลองใช้คำค้นสั้นลง" />
@@ -42,12 +62,12 @@ export function InboundList({ docs }: { docs: InboundDoc[] }) {
       </div>
 
       {/* ---------- จอกว้าง: ตาราง ---------- */}
-      <div className="hidden overflow-hidden rounded-xl border border-border bg-card @3xl:block">
-        <div className="overflow-x-auto">
+      <div className="hidden @3xl:block">
+        <TableFrame>
           <Table>
-            <TableHeader>
+            <TableHeader className={STICKY_HEAD}>
               <TableRow>
-                <TableHead>เลขที่ใบสั่งซื้อ</TableHead>
+                <TableHead className={HEAD_FIRST}>เลขที่ใบสั่งซื้อ</TableHead>
                 <TableHead>สินค้า</TableHead>
                 <TableHead>บริษัท</TableHead>
                 <TableHead>วันที่รถจะเข้าล่าสุด</TableHead>
@@ -55,16 +75,18 @@ export function InboundList({ docs }: { docs: InboundDoc[] }) {
                 <TableHead>บรรจุภัณฑ์</TableHead>
                 <TableHead className="text-right">สั่งซื้อ</TableHead>
                 <TableHead className="text-right">รับแล้ว</TableHead>
-                <TableHead className="text-right">รับเข้าสินค้า</TableHead>
+                <TableHead className={cn(HEAD_LAST, "text-right")}>รับเข้าสินค้า</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {docs.map((d) => {
+              {slice.map((d) => {
                 const left = outstandingQty(d);
                 return (
                   <TableRow key={d.id}>
-                    <TableCell>
-                      <span className="block font-medium">{d.code}</span>
+                    <TableCell className={COL_FIRST}>
+                      <span className="block font-medium whitespace-nowrap">
+                        {d.code}
+                      </span>
                       <span className="block text-sm text-muted-foreground">
                         {d.createdAt}
                       </span>
@@ -107,7 +129,7 @@ export function InboundList({ docs }: { docs: InboundDoc[] }) {
                         </span>
                       )}
                     </TableCell>
-                    <TableCell className="text-right">
+                    <TableCell className={cn(COL_LAST, "text-right")}>
                       <Button variant="outline-primary" size="sm">
                         รับเข้า
                       </Button>
@@ -117,7 +139,9 @@ export function InboundList({ docs }: { docs: InboundDoc[] }) {
               })}
             </TableBody>
           </Table>
-        </div>
+
+          <TablePager page={safe} pages={pages} onChange={setPage} />
+        </TableFrame>
       </div>
     </>
   );

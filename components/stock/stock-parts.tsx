@@ -1,13 +1,11 @@
 "use client";
 
 import * as React from "react";
-import { ChevronDownIcon } from "lucide-react";
 import { Badge } from "@peckey954/ui/components/ui/badge";
 import { Button } from "@peckey954/ui/components/ui/button";
 import {
   Collapsible,
   CollapsibleContent,
-  CollapsibleTrigger,
 } from "@peckey954/ui/components/ui/collapsible";
 import { cn } from "@peckey954/ui/lib/utils";
 import {
@@ -240,12 +238,13 @@ function LotRow({
 
 export function ProductCard({
   product,
-  defaultOpen,
+  showLots,
   showChips,
   showActions,
 }: {
   product: Product;
-  defaultOpen: boolean;
+  /** เปิด/ปิดรายการล็อตพร้อมกันทั้งหน้า สั่งจากตัวกรอง ไม่มีปุ่มแยกรายใบ */
+  showLots: boolean;
   showChips: boolean;
   showActions: boolean;
 }) {
@@ -265,7 +264,7 @@ export function ProductCard({
 
   return (
     <div className="overflow-hidden rounded-xl border border-border bg-card">
-      <Collapsible defaultOpen={defaultOpen}>
+      <Collapsible open={showLots}>
         <div className="p-4">
           <div className="flex items-start justify-between gap-3">
             {/* จอกว้าง: ชิปไหลต่อท้ายชื่อในแถวเดียวกัน */}
@@ -309,23 +308,6 @@ export function ProductCard({
             />
           ))}
         </CollapsibleContent>
-
-        {/* ปุ่มหุบ/กางอยู่ท้ายการ์ด เต็มความกว้าง กดง่ายกว่าไอคอนเล็ก ๆ
-            และไม่ไปปนกับบรรทัดที่บอกจำนวนโซน */}
-        <CollapsibleTrigger asChild>
-          <button
-            type="button"
-            className="group flex w-full items-center justify-center gap-1 border-t border-border p-3 text-sm text-muted-foreground transition-colors hover:bg-accent-hover hover:text-foreground"
-          >
-            <span className="group-data-[state=open]:hidden">
-              ดูรายการ ({product.lots.length})
-            </span>
-            <span className="hidden group-data-[state=open]:inline">
-              ซ่อนรายการ
-            </span>
-            <ChevronDownIcon className="size-4 transition-transform group-data-[state=open]:rotate-180" />
-          </button>
-        </CollapsibleTrigger>
       </Collapsible>
     </div>
   );

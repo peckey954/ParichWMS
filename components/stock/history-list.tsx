@@ -1,5 +1,6 @@
 "use client";
 
+import * as React from "react";
 import { ArrowRightIcon } from "lucide-react";
 import { Separator } from "@peckey954/ui/components/ui/separator";
 import {
@@ -17,7 +18,21 @@ import {
   formatQty,
   type HistoryRow,
 } from "@/lib/general-stock";
-import { CardBox, CardHead, CardRow, EmptyDocs, StatusChip } from "./doc-parts";
+import {
+  CardBox,
+  CardHead,
+  CardRow,
+  COL_FIRST,
+  COL_LAST,
+  EmptyDocs,
+  HEAD_FIRST,
+  HEAD_LAST,
+  STICKY_HEAD,
+  StatusChip,
+  TableFrame,
+  TablePager,
+  paginate,
+} from "./doc-parts";
 
 /** ป้ายโซนแบบเดียวกับในรายการสต็อก */
 function Zone({ zone }: { zone: string }) {
@@ -71,7 +86,12 @@ function Num({
  *
  * นี่คือ "เหตุการณ์" ไม่ใช่ยอดคงเหลือ จึงไม่มีเรื่องสต็อกต่ำให้กรอง
  */
+const PAGE_SIZE = 8;
+
 export function HistoryList({ rows }: { rows: HistoryRow[] }) {
+  const [page, setPage] = React.useState(1);
+  const { pages, safe, slice } = paginate(rows, page, PAGE_SIZE);
+
   if (rows.length === 0) {
     return (
       <EmptyDocs
@@ -91,12 +111,12 @@ export function HistoryList({ rows }: { rows: HistoryRow[] }) {
       </div>
 
       {/* ---------- จอกว้าง: ตาราง ---------- */}
-      <div className="hidden overflow-hidden rounded-xl border border-border bg-card @3xl:block">
-        <div className="overflow-x-auto">
+      <div className="hidden @3xl:block">
+        <TableFrame>
           <Table>
-            <TableHeader>
+            <TableHeader className={STICKY_HEAD}>
               <TableRow>
-                <TableHead>เลขที่ทำรายการ</TableHead>
+                <TableHead className={HEAD_FIRST}>เลขที่ทำรายการ</TableHead>
                 <TableHead>Lot Number</TableHead>
                 <TableHead>สินค้า</TableHead>
                 <TableHead>บรรจุภัณฑ์</TableHead>
@@ -105,13 +125,15 @@ export function HistoryList({ rows }: { rows: HistoryRow[] }) {
                 <TableHead className="text-right">ปริมาณทำรายการจริง</TableHead>
                 <TableHead>โซน</TableHead>
                 <TableHead>หมายเหตุ</TableHead>
-                <TableHead>สถานะ</TableHead>
+                <TableHead>ผู้ขอทำรายการ</TableHead>
+                <TableHead>ผู้ทำรายการ</TableHead>
+                <TableHead className={HEAD_LAST}>สถานะ</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {rows.map((r) => (
+              {slice.map((r) => (
                 <TableRow key={r.id}>
-                  <TableCell>
+                  <TableCell className={COL_FIRST}>
                     <span className="block font-medium whitespace-nowrap">
                       {r.code}
                     </span>
@@ -143,7 +165,13 @@ export function HistoryList({ rows }: { rows: HistoryRow[] }) {
                   <TableCell className="max-w-40 truncate" title={r.note}>
                     {r.note ?? "-"}
                   </TableCell>
-                  <TableCell>
+                  <TableCell className="whitespace-nowrap">
+                    {r.requester}
+                  </TableCell>
+                  <TableCell className="whitespace-nowrap">
+                    {r.actor ?? "-"}
+                  </TableCell>
+                  <TableCell className={COL_LAST}>
                     <StatusChip
                       status={r.status}
                       label={HISTORY_STATUS_LABEL[r.status]}
@@ -153,7 +181,9 @@ export function HistoryList({ rows }: { rows: HistoryRow[] }) {
               ))}
             </TableBody>
           </Table>
-        </div>
+
+          <TablePager page={safe} pages={pages} onChange={setPage} />
+        </TableFrame>
       </div>
     </>
   );

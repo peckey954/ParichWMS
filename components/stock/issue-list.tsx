@@ -1,5 +1,6 @@
 "use client";
 
+import * as React from "react";
 import { Separator } from "@peckey954/ui/components/ui/separator";
 import {
   Table,
@@ -20,9 +21,17 @@ import {
   CardBox,
   CardHead,
   CardRow,
+  COL_FIRST,
+  COL_LAST,
   EmptyDocs,
+  HEAD_FIRST,
+  HEAD_LAST,
+  STICKY_HEAD,
   SignedNumber,
   StatusChip,
+  TableFrame,
+  TablePager,
+  paginate,
 } from "./doc-parts";
 
 /**
@@ -32,7 +41,12 @@ import {
  * จ่ายออกเก็บเป็นเลขติดลบ รับคืนเป็นบวก ตัวเลขจึงบอกทิศทางได้เองด้วยสี
  * ไม่ต้องพึ่งป้ายสถานะอย่างเดียว
  */
+const PAGE_SIZE = 8;
+
 export function IssueList({ docs }: { docs: IssueDoc[] }) {
+  const [page, setPage] = React.useState(1);
+  const { pages, safe, slice } = paginate(docs, page, PAGE_SIZE);
+
   if (docs.length === 0) {
     return (
       <EmptyDocs
@@ -52,28 +66,30 @@ export function IssueList({ docs }: { docs: IssueDoc[] }) {
       </div>
 
       {/* ---------- จอกว้าง: ตาราง ---------- */}
-      <div className="hidden overflow-hidden rounded-xl border border-border bg-card @3xl:block">
-        <div className="overflow-x-auto">
+      <div className="hidden @3xl:block">
+        <TableFrame>
           <Table>
-            <TableHeader>
+            <TableHeader className={STICKY_HEAD}>
               <TableRow>
-                <TableHead>เลขที่ขอเบิก</TableHead>
+                <TableHead className={HEAD_FIRST}>เลขที่ขอเบิก</TableHead>
                 <TableHead>สินค้า</TableHead>
                 <TableHead>บรรจุภัณฑ์</TableHead>
                 <TableHead className="text-right">จำนวน</TableHead>
                 <TableHead className="text-right">ปริมาณ</TableHead>
                 <TableHead>หมายเหตุ</TableHead>
                 <TableHead>ผู้ขอทำรายการ</TableHead>
-                <TableHead>สถานะ</TableHead>
+                <TableHead className={HEAD_LAST}>สถานะ</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {docs.map((d) => {
+              {slice.map((d) => {
                 const plus = isReturn(d.status);
                 return (
                   <TableRow key={d.id}>
-                    <TableCell>
-                      <span className="block font-medium">{d.code}</span>
+                    <TableCell className={COL_FIRST}>
+                      <span className="block font-medium whitespace-nowrap">
+                        {d.code}
+                      </span>
                       <span className="block text-sm text-muted-foreground">
                         {d.createdAt}
                       </span>
@@ -108,7 +124,7 @@ export function IssueList({ docs }: { docs: IssueDoc[] }) {
                         </span>
                       )}
                     </TableCell>
-                    <TableCell>
+                    <TableCell className={COL_LAST}>
                       <StatusChip
                         status={d.status}
                         label={ISSUE_STATUS_LABEL[d.status]}
@@ -119,7 +135,9 @@ export function IssueList({ docs }: { docs: IssueDoc[] }) {
               })}
             </TableBody>
           </Table>
-        </div>
+
+          <TablePager page={safe} pages={pages} onChange={setPage} />
+        </TableFrame>
       </div>
     </>
   );

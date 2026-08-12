@@ -1,6 +1,8 @@
 "use client";
 
+import { ChevronLeftIcon, ChevronRightIcon } from "lucide-react";
 import { Badge } from "@peckey954/ui/components/ui/badge";
+import { Button } from "@peckey954/ui/components/ui/button";
 import { cn } from "@peckey954/ui/lib/utils";
 
 /* ------------------------------------------------------------------
@@ -138,4 +140,113 @@ export function EmptyDocs({
       <p className="mt-1 text-sm text-muted-foreground">{hint}</p>
     </div>
   );
+}
+
+/* ------------------------------------------------------------------
+   กรอบตาราง — เลื่อนได้ทั้งสองแกนอยู่ข้างใน หัวตารางกับคอลัมน์หน้า/หลังตรึงไว้
+------------------------------------------------------------------ */
+
+/**
+ * Table ของ DS ห่อตัวเองด้วยกล่อง overflow-x-auto อยู่แล้ว
+ * เติมความสูงสูงสุดเข้าไปให้กล่องนั้น มันจึงกลายเป็นตัวเลื่อนแนวตั้งด้วย
+ * ผลคือหน้าเว็บไม่ยาวขึ้นตามจำนวนแถว เลื่อนดูข้อมูลอยู่ในกรอบตารางเท่านั้น
+ */
+export function TableFrame({ children }: { children: React.ReactNode }) {
+  return (
+    <div
+      className={cn(
+        "overflow-hidden rounded-xl border border-border bg-card",
+        "[&_[data-slot=table-container]]:max-h-[60vh]",
+        "[&_[data-slot=table-container]]:overflow-auto"
+      )}
+    >
+      {children}
+    </div>
+  );
+}
+
+/** หัวตารางตรึงไว้ด้านบนตอนเลื่อนขึ้นลง */
+export const STICKY_HEAD = "[&_th]:sticky [&_th]:top-0 [&_th]:z-20 [&_th]:bg-card";
+
+/** คอลัมน์แรกตรึงซ้าย คอลัมน์สุดท้ายตรึงขวา เลื่อนแนวนอนได้เฉพาะตรงกลาง */
+export const COL_FIRST = "sticky left-0 z-10 border-r border-border bg-card";
+export const COL_LAST = "sticky right-0 z-10 border-l border-border bg-card";
+/** เซลล์หัวที่เป็นคอลัมน์ตรึงด้วย ต้องอยู่เหนือทั้งสองชั้น */
+export const HEAD_FIRST = "left-0 z-30! border-r border-border";
+export const HEAD_LAST = "right-0 z-30! border-l border-border";
+
+/**
+ * แบ่งหน้า — ใช้ Button ของ DS ไม่ใช่ Pagination
+ * เพราะ Pagination ของ DS สร้างเป็น <a href> ไว้สำหรับเปลี่ยน URL
+ * แต่ที่นี่เป็นการเปลี่ยนสถานะในหน้า ปุ่มจึงตรงความหมายกว่าและกด Enter ได้ถูกต้อง
+ */
+export function TablePager({
+  page,
+  pages,
+  onChange,
+}: {
+  page: number;
+  pages: number;
+  onChange: (p: number) => void;
+}) {
+  if (pages <= 1) return null;
+
+  // หน้าเยอะให้ย่อด้วยจุดไข่ปลา โชว์หน้าแรก หน้าท้าย และรอบ ๆ หน้าปัจจุบัน
+  const nums: (number | "gap")[] = [];
+  for (let i = 1; i <= pages; i++) {
+    if (i === 1 || i === pages || Math.abs(i - page) <= 1) nums.push(i);
+    else if (nums.at(-1) !== "gap") nums.push("gap");
+  }
+
+  return (
+    <nav
+      aria-label="แบ่งหน้า"
+      className="flex flex-wrap items-center justify-center gap-1 border-t border-border p-3"
+    >
+      <Button
+        variant="ghost"
+        size="sm"
+        disabled={page === 1}
+        onClick={() => onChange(page - 1)}
+      >
+        <ChevronLeftIcon />
+        ก่อนหน้า
+      </Button>
+
+      {nums.map((n, i) =>
+        n === "gap" ? (
+          <span key={`gap-${i}`} className="px-2 text-muted-foreground">
+            …
+          </span>
+        ) : (
+          <Button
+            key={n}
+            variant={n === page ? "outline-primary" : "ghost"}
+            size="icon"
+            aria-current={n === page ? "page" : undefined}
+            onClick={() => onChange(n)}
+          >
+            {n}
+          </Button>
+        )
+      )}
+
+      <Button
+        variant="ghost"
+        size="sm"
+        disabled={page === pages}
+        onClick={() => onChange(page + 1)}
+      >
+        ถัดไป
+        <ChevronRightIcon />
+      </Button>
+    </nav>
+  );
+}
+
+/** ตัดข้อมูลตามหน้า พร้อมคืนจำนวนหน้าทั้งหมด */
+export function paginate<T>(rows: T[], page: number, size: number) {
+  const pages = Math.max(1, Math.ceil(rows.length / size));
+  const safe = Math.min(page, pages);
+  return { pages, safe, slice: rows.slice((safe - 1) * size, safe * size) };
 }
