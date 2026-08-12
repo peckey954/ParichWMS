@@ -61,8 +61,9 @@ export default function GeneralStockPage() {
     expanded: true,
   });
   const { device, expanded } = view;
-  // เลือกประเภทได้ทีละอย่างเดียว — null = ทั้งหมด
-  const [cat, setCat] = React.useState<CategoryId | null>(null);
+  // ของจริงแยกประเภทกันเด็ดขาด ไม่มีมุมมอง "ทั้งหมด"
+  // ชิปจึงเป็นการนำทาง (เลือกอยู่เสมอหนึ่งอัน) ไม่ใช่ตัวกรองที่ปิดได้
+  const [cat, setCat] = React.useState<CategoryId>("sack");
   const [lowOnly, setLowOnly] = React.useState(false);
   const [sort, setSort] = React.useState("product");
   const [query, setQuery] = React.useState("");
@@ -72,43 +73,38 @@ export default function GeneralStockPage() {
   const changeDevice = (d: Device) => setView({ device: d, expanded: true });
   const toggleExpand = () => setView((v) => ({ ...v, expanded: !v.expanded }));
 
-  // ลำดับการกรอง: ค้นหา+สต็อกต่ำ ก่อน แล้วค่อยกรองประเภททีหลัง
-  // ทำแบบนี้ตัวเลขบนชิปจะบอกได้ว่า "ผลค้นหาอยู่ในประเภทไหนบ้าง"
-  // และรู้ได้ว่าของที่หาเจออยู่นอกประเภทที่เลือกไว้หรือเปล่า
-  const matched = PRODUCTS.filter(
-    (p) => matchesQuery(p, query) && (!lowOnly || p.low)
+  // จำนวนบนชิปเป็นยอดจริงของแต่ละประเภท ไม่เปลี่ยนตามคำค้น
+  // เพราะเป็นป้ายบอกทาง ไม่ใช่ตัวนับผลลัพธ์
+  const counts = countByCategory(PRODUCTS);
+
+  // ค้นหาทำงานอยู่ในประเภทที่เปิดอยู่เท่านั้น
+  const visible = PRODUCTS.filter(
+    (p) => p.category === cat && matchesQuery(p, query) && (!lowOnly || p.low)
   );
-  const counts = countByCategory(matched);
-  const visible = matched.filter((p) => cat === null || p.category === cat);
 
-  // หาไม่เจอในประเภทที่เลือก แต่มีอยู่ในประเภทอื่น
-  const foundElsewhere =
-    query.trim() !== "" && cat !== null && visible.length === 0
-      ? matched.length
-      : 0;
+  // หาไม่เจอในประเภทนี้ แต่มีในประเภทอื่น — บอกไว้เผื่อเปิดผิดที่
+  const hitsElsewhere =
+    query.trim() === "" || visible.length > 0
+      ? []
+      : CATEGORIES.filter(
+          (c) =>
+            c.id !== cat &&
+            PRODUCTS.some(
+              (p) =>
+                p.category === c.id &&
+                matchesQuery(p, query) &&
+                (!lowOnly || p.low)
+            )
+        );
 
-  // กดซ้ำที่อันเดิม = กลับไปดูทั้งหมด จะได้ไม่ต้องเลื่อนไปหาปุ่ม "ทั้งหมด"
-  const pickCat = (id: CategoryId) => setCat((c) => (c === id ? null : id));
-
-  // ---------- เลื่อนแถวชิปให้เห็นตัวที่มีผลลัพธ์เอง ----------
+  // ---------- เลื่อนแถวชิปให้เห็นประเภทที่เปิดอยู่ ----------
   const chipRowRef = React.useRef<HTMLDivElement>(null);
   const chipRefs = React.useRef<Record<string, HTMLButtonElement | null>>({});
 
-  // counts เป็น object ใหม่ทุกรอบ ใช้เป็น dep ตรง ๆ ไม่ได้ ต้องแปลงเป็น string ก่อน
-  const countsKey = CATEGORIES.map((c) => counts[c.id]).join(",");
-
   React.useEffect(() => {
-    if (!query.trim()) return;
     const row = chipRowRef.current;
-    if (!row) return;
-
-    // ประเภทที่เลือกอยู่มีผลลัพธ์ก็เลื่อนไปที่มัน ถ้าไม่มีก็เลื่อนไปประเภทแรกที่เจอของ
-    const key =
-      cat && counts[cat] > 0
-        ? cat
-        : (CATEGORIES.find((c) => counts[c.id] > 0)?.id ?? "all");
-    const chip = chipRefs.current[key];
-    if (!chip) return;
+    const chip = chipRefs.current[cat];
+    if (!row || !chip) return;
 
     // คำนวณเองแทน scrollIntoView เพราะตัวนั้นจะลากหน้าเว็บเลื่อนแนวตั้งไปด้วย
     const rowBox = row.getBoundingClientRect();
@@ -119,8 +115,7 @@ export default function GeneralStockPage() {
     } else if (chipBox.right > rowBox.right) {
       row.scrollBy({ left: chipBox.right - rowBox.right + pad, behavior: "smooth" });
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [query, cat, countsKey]);
+  }, [cat]);
 
   return (
     <main className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6">
@@ -195,17 +190,54 @@ export default function GeneralStockPage() {
             </TabsList>
           </Tabs>
 
-          {/* ---------- ค้นหา + เครื่องมือ ---------- */}
-          <div className="mt-4 flex flex-col gap-3 @3xl:flex-row @3xl:items-center">
+          {/* ---------- ประเภทสินค้า = การนำทาง อยู่เหนือช่องค้นหา ----------
+               แต่ละประเภทแยกกันเด็ดขาด ไม่มี "ทั้งหมด" เลือกอยู่เสมอหนึ่งอัน
+               บรรทัดเดียว ปัดเลื่อนได้บนจอแคบ */}
+          <div
+            ref={chipRowRef}
+            className={cn(
+              "mt-4 flex items-center gap-2 overflow-x-auto",
+              "flex-nowrap [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+            )}
+            role="tablist"
+            aria-label="ประเภทสินค้า"
+          >
+            {CATEGORIES.map((c) => {
+              const on = cat === c.id;
+              return (
+                <button
+                  key={c.id}
+                  type="button"
+                  role="tab"
+                  ref={(el) => {
+                    chipRefs.current[c.id] = el;
+                  }}
+                  onClick={() => setCat(c.id)}
+                  aria-selected={on}
+                  className={cn(
+                    "shrink-0 rounded-full border px-3 py-1 text-sm whitespace-nowrap transition-colors",
+                    on
+                      ? "border-primary bg-brand font-medium text-primary"
+                      : "border-border text-foreground hover:bg-accent-hover"
+                  )}
+                >
+                  {CATEGORY_LABEL[c.id]} ({counts[c.id]})
+                </button>
+              );
+            })}
+          </div>
+
+          {/* ---------- ค้นหา — อยู่ใต้ประเภท เพราะค้นเฉพาะในประเภทที่เปิดอยู่ ---------- */}
+          <div className="mt-3 flex flex-col gap-3 @3xl:flex-row @3xl:items-center">
             <InputGroup className="flex-1">
               <InputGroupAddon align="inline-start">
                 <SearchIcon />
               </InputGroupAddon>
               <InputGroupInput
-                  placeholder="ค้นหาชื่อสินค้า รหัส เลขล็อต หรือโซน"
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                />
+                placeholder={`ค้นหาใน ${CATEGORY_LABEL[cat]} — ชื่อ รหัส เลขล็อต หรือโซน`}
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+              />
             </InputGroup>
             <div className="flex items-center gap-2">
               <Button variant="outline-primary" size="icon" aria-label="ตัวกรอง">
@@ -216,57 +248,6 @@ export default function GeneralStockPage() {
                 ส่งออก CSV
               </Button>
             </div>
-          </div>
-
-          {/* ---------- ชิปกรองประเภท — บรรทัดเดียว ปัดเลื่อน เลือกได้ทีละอัน ---------- */}
-          <div
-            ref={chipRowRef}
-            className={cn(
-              "mt-4 flex items-center gap-2 overflow-x-auto",
-              "flex-nowrap [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-            )}
-            role="group"
-            aria-label="กรองตามประเภทสินค้า"
-          >
-            <button
-              type="button"
-              ref={(el) => {
-                chipRefs.current.all = el;
-              }}
-              onClick={() => setCat(null)}
-              aria-pressed={cat === null}
-              className={cn(
-                "shrink-0 rounded-full border px-3 py-1 text-sm transition-colors",
-                cat === null
-                  ? "border-primary bg-brand text-primary"
-                  : "border-border text-foreground hover:bg-accent-hover"
-              )}
-            >
-              ทั้งหมด ({matched.length})
-            </button>
-
-            {CATEGORIES.map((c) => {
-              const on = cat === c.id;
-              return (
-                <button
-                  key={c.id}
-                  type="button"
-                  ref={(el) => {
-                    chipRefs.current[c.id] = el;
-                  }}
-                  onClick={() => pickCat(c.id)}
-                  aria-pressed={on}
-                  className={cn(
-                    "shrink-0 rounded-full border px-3 py-1 text-sm whitespace-nowrap transition-colors",
-                    on
-                      ? "border-primary bg-brand text-primary"
-                      : "border-border text-foreground hover:bg-accent-hover"
-                  )}
-                >
-                  {CATEGORY_LABEL[c.id]} ({counts[c.id]})
-                </button>
-              );
-            })}
           </div>
 
           {/* ---------- เรียงลำดับ + ตัวควบคุมมุมมอง ---------- */}
@@ -347,33 +328,36 @@ export default function GeneralStockPage() {
 
             {visible.length === 0 && (
               <div className="rounded-xl border border-dashed border-border px-6 py-14 text-center">
-                {foundElsewhere > 0 ? (
+                <p className="font-medium">
+                  ไม่พบใน “{CATEGORY_LABEL[cat]}”
+                </p>
+
+                {hitsElsewhere.length > 0 ? (
                   <>
-                    {/* หาเจอ แต่อยู่คนละประเภทกับที่เลือกไว้ — บอกแล้วให้กดข้ามได้เลย
-                        ดีกว่าเงียบ ๆ แล้วให้ผู้ใช้เดาเองว่าทำไมไม่เจอ */}
-                    <p className="font-medium">
-                      ไม่พบใน “{CATEGORY_LABEL[cat as CategoryId]}”
-                    </p>
+                    {/* ประเภทแยกกันก็จริง แต่คนหาเลขล็อตมักไม่รู้ว่าอยู่ประเภทไหน
+                        บอกไว้ให้กดข้ามไปได้เลย ดีกว่าปล่อยให้ไล่เปิดทีละอัน */}
                     <p className="mt-1 text-sm text-muted-foreground">
-                      แต่เจอ {foundElsewhere} รายการในประเภทอื่น
+                      แต่เจอในประเภทอื่น
                     </p>
-                    <Button
-                      variant="outline-primary"
-                      size="sm"
-                      className="mt-4"
-                      onClick={() => setCat(null)}
-                    >
-                      <SearchIcon />
-                      ค้นหาทุกประเภท
-                    </Button>
+                    <div className="mt-4 flex flex-wrap justify-center gap-2">
+                      {hitsElsewhere.map((c) => (
+                        <Button
+                          key={c.id}
+                          variant="outline-primary"
+                          size="sm"
+                          onClick={() => setCat(c.id)}
+                        >
+                          ไปที่ {CATEGORY_LABEL[c.id]}
+                        </Button>
+                      ))}
+                    </div>
                   </>
                 ) : (
-                  <>
-                    <p className="font-medium">ไม่พบสินค้าตามที่ค้นหา</p>
-                    <p className="mt-1 text-sm text-muted-foreground">
-                      ลองใช้คำค้นสั้นลง หรือเอาตัวกรองบางอันออก
-                    </p>
-                  </>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    {query.trim()
+                      ? "ลองใช้คำค้นสั้นลง หรือเอาตัวกรองบางอันออก"
+                      : "ยังไม่มีสินค้าในประเภทนี้"}
+                  </p>
                 )}
               </div>
             )}
