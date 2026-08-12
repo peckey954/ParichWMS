@@ -3,7 +3,6 @@
 import * as React from "react";
 import Link from "next/link";
 import { SearchIcon } from "lucide-react";
-import { Badge } from "@peckey954/ui/components/ui/badge";
 import {
   InputGroup,
   InputGroupAddon,
@@ -11,6 +10,7 @@ import {
 } from "@peckey954/ui/components/ui/input-group";
 import { cn } from "@peckey954/ui/lib/utils";
 import { IconBox, TONE_DOT } from "@/components/modules/module-icon";
+import { PendingBadge } from "@/components/modules/pending-badge";
 import {
   MODULE_GROUPS,
   searchModules,
@@ -89,13 +89,7 @@ function ModuleCard({
   const body = (
     <>
       {m.pending !== undefined && (
-        <Badge
-          tone="brand"
-          appearance="soft"
-          className="absolute top-3 right-3"
-        >
-          รอ {m.pending}
-        </Badge>
+        <PendingBadge count={m.pending} className="absolute top-3 right-3" />
       )}
       <IconBox name={m.icon} tone={tone} />
       <div className="mt-6">

@@ -5,7 +5,6 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { BellIcon, MenuIcon, WarehouseIcon } from "lucide-react";
 import { Avatar, AvatarFallback } from "@peckey954/ui/components/ui/avatar";
-import { Badge } from "@peckey954/ui/components/ui/badge";
 import { Button } from "@peckey954/ui/components/ui/button";
 import {
   Sheet,
@@ -24,6 +23,7 @@ import {
 import { cn } from "@peckey954/ui/lib/utils";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { ICON_STROKE, ModuleIcon } from "@/components/modules/module-icon";
+import { PendingBadge } from "@/components/modules/pending-badge";
 import {
   MODULE_GROUPS,
   SYSTEM_LINKS,
@@ -104,7 +104,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <SidebarBody pathname={pathname} collapsed={!expanded} />
         </aside>
 
-        <div className="min-w-0 flex-1">{children}</div>
+        {/* พื้นที่เนื้อหาเป็นเทาอ่อน ให้การ์ดสีขาวลอยขึ้นมา ตามไฟล์ Figma */}
+        <div className="min-w-0 flex-1 bg-surface">{children}</div>
       </div>
     </div>
   );
@@ -230,9 +231,7 @@ const NavItem = React.forwardRef<
         <>
           <span className="truncate">{label}</span>
           {pending !== undefined && (
-            <Badge tone="brand" appearance="soft" className="ml-1 shrink-0">
-              รอ {pending}
-            </Badge>
+            <PendingBadge count={pending} className="ml-1 shrink-0" />
           )}
         </>
       )}

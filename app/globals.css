@@ -31,6 +31,19 @@
    ให้เพิ่ม token ใหม่ ไม่ใช่ hardcode ลงใน component
    ============================================================ */
 
+/* --- พื้นหลังพื้นที่เนื้อหา ---
+   Figma ใช้เทาอ่อน #FAFAFA ให้การ์ดสีขาวลอยขึ้นมา
+   ไม่ทับ --background ของ DS เพราะหัวเรื่องกับเมนูข้างยังต้องเป็นสีเดิม
+   อันนี้เป็นสีของ "พื้นที่เนื้อหา" อย่างเดียว */
+
+[data-brand="parich"] {
+  --surface: hsl(0 0% 98%);
+}
+
+[data-brand="parich"].dark {
+  --surface: hsl(20 15% 7%);
+}
+
 /* --- ชุดที่ 1: สีประจำหมวดเมนู (ตามไฟล์ Figma ของ Parich WMS) ---
    ใช้เป็นพื้นกล่องไอคอน + จุดนำหน้าชื่อหมวด เป็นสีสำหรับ "จำแนก"
    คู่สีอ่อน/เข้ม 500 ของแต่ละสี ใช้กับกราฟิกเท่านั้น ไม่ใช้กับข้อความเล็ก
@@ -76,6 +89,8 @@
 }
 
 @theme inline {
+  --color-surface: var(--surface);
+
   --color-cat-yellow: var(--cat-yellow);
   --color-cat-yellow-foreground: var(--cat-yellow-foreground);
   --color-cat-blue: var(--cat-blue);
