@@ -119,10 +119,12 @@ function LotActions() {
 function LotRow({
   lot,
   unit,
+  showChips,
   showActions,
 }: {
   lot: Lot;
   unit: string;
+  showChips: boolean;
   showActions: boolean;
 }) {
   return (
@@ -140,12 +142,16 @@ function LotRow({
                 <span className="font-medium">{lot.code}</span>
               </div>
 
-              {(lot.condition || pendingEntries(lot.pending, unit).length > 0) && (
-                <ChipRow>
-                  {lot.condition && <ConditionChip condition={lot.condition} />}
-                  <PendingChips pending={lot.pending} unit={unit} />
-                </ChipRow>
-              )}
+              {showChips &&
+                (lot.condition ||
+                  pendingEntries(lot.pending, unit).length > 0) && (
+                  <ChipRow>
+                    {lot.condition && (
+                      <ConditionChip condition={lot.condition} />
+                    )}
+                    <PendingChips pending={lot.pending} unit={unit} />
+                  </ChipRow>
+                )}
             </div>
 
             <p className="shrink-0 text-right tabular-nums @3xl:hidden">
@@ -188,10 +194,12 @@ function LotRow({
 export function ProductCard({
   product,
   defaultOpen,
+  showChips,
   showActions,
 }: {
   product: Product;
   defaultOpen: boolean;
+  showChips: boolean;
   showActions: boolean;
 }) {
   const total = productTotal(product);
@@ -208,18 +216,20 @@ export function ProductCard({
               <div className="flex flex-col gap-2 @3xl:flex-row @3xl:flex-wrap @3xl:items-center @3xl:gap-x-2 @3xl:gap-y-1.5">
                 <span className="font-semibold">{product.name}</span>
 
-                <ChipRow>
-                  <CategoryChip product={product} />
-                  <Badge tone="neutral" appearance="soft">
-                    {product.packing}
-                  </Badge>
-                  {product.low && (
-                    <Badge tone="danger" appearance="soft">
-                      สต็อกต่ำ
+                {showChips && (
+                  <ChipRow>
+                    <CategoryChip product={product} />
+                    <Badge tone="neutral" appearance="soft">
+                      {product.packing}
                     </Badge>
-                  )}
-                  <PendingChips pending={pending} unit={product.unit} />
-                </ChipRow>
+                    {product.low && (
+                      <Badge tone="danger" appearance="soft">
+                        สต็อกต่ำ
+                      </Badge>
+                    )}
+                    <PendingChips pending={pending} unit={product.unit} />
+                  </ChipRow>
+                )}
               </div>
 
               <CollapsibleTrigger asChild>
@@ -255,6 +265,7 @@ export function ProductCard({
               key={lot.id}
               lot={lot}
               unit={product.unit}
+              showChips={showChips}
               showActions={showActions}
             />
           ))}

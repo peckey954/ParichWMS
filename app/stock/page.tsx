@@ -5,13 +5,13 @@ import {
   ChevronsDownUpIcon,
   ChevronsUpDownIcon,
   DownloadIcon,
-  EyeIcon,
-  EyeOffIcon,
   ListFilterIcon,
   MonitorIcon,
   SearchIcon,
+  SlidersHorizontalIcon,
   SmartphoneIcon,
   TabletIcon,
+  TagIcon,
 } from "lucide-react";
 import { Badge } from "@peckey954/ui/components/ui/badge";
 import {
@@ -64,6 +64,7 @@ export default function GeneralStockPage() {
   const [cat, setCat] = React.useState<CategoryId | null>(null);
   const [lowOnly, setLowOnly] = React.useState(false);
   const [sort, setSort] = React.useState("product");
+  const [showChips, setShowChips] = React.useState(true);
   const [showActions, setShowActions] = React.useState(true);
 
   const changeDevice = (d: Device) => setView({ device: d, expanded: true });
@@ -243,17 +244,32 @@ export default function GeneralStockPage() {
               </Label>
             </div>
 
-            <div className="flex items-center gap-1">
-              {/* ซ่อนปุ่มจัดการเพื่อให้กวาดตาดูตัวเลขได้ง่ายขึ้น */}
-              <Button
-                variant="ghost"
+            {/* ซ่อนป้าย/ปุ่มเพื่อให้กวาดตาดูตัวเลขได้ง่ายขึ้น
+                ติดไว้เป็น ToggleGroup ชุดเดียว จะได้ไม่มีปุ่มเรียงเต็มแถว */}
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-sm text-muted-foreground">แสดง</span>
+              <ToggleGroup
+                type="multiple"
+                variant="outline"
                 size="sm"
-                aria-pressed={!showActions}
-                onClick={() => setShowActions((v) => !v)}
+                value={[
+                  ...(showChips ? ["chips"] : []),
+                  ...(showActions ? ["actions"] : []),
+                ]}
+                onValueChange={(vals) => {
+                  setShowChips(vals.includes("chips"));
+                  setShowActions(vals.includes("actions"));
+                }}
               >
-                {showActions ? <EyeOffIcon /> : <EyeIcon />}
-                {showActions ? "ซ่อนปุ่มจัดการ" : "แสดงปุ่มจัดการ"}
-              </Button>
+                <ToggleGroupItem value="chips" aria-label="แสดงป้ายทั้งหมด">
+                  <TagIcon />
+                  ป้าย
+                </ToggleGroupItem>
+                <ToggleGroupItem value="actions" aria-label="แสดงปุ่มจัดการ">
+                  <SlidersHorizontalIcon />
+                  ปุ่มจัดการ
+                </ToggleGroupItem>
+              </ToggleGroup>
 
               <Button variant="ghost" size="sm" onClick={toggleExpand}>
                 {expanded ? <ChevronsDownUpIcon /> : <ChevronsUpDownIcon />}
@@ -270,6 +286,7 @@ export default function GeneralStockPage() {
                 key={`${p.id}-${expanded}`}
                 product={p}
                 defaultOpen={expanded}
+                showChips={showChips}
                 showActions={showActions}
               />
             ))}
