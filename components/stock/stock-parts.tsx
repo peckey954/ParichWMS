@@ -126,15 +126,12 @@ function ChipScroller({ children }: { children: React.ReactNode }) {
 }
 
 /**
- * ป้ายโซน — เป็นรหัสตำแหน่งที่ต้องอ่านให้ออก ไม่ใช่ข้อความรอง
- *
- * ไม่ใช้ font-mono แล้ว เพราะโปรเจกต์นี้ไม่ได้ตั้ง --font-mono ไว้
- * มันเลยตกไปใช้ฟอนต์ monospace ของเครื่อง ซึ่งไม่ใช่ Sarabun
- * ตอนนี้ไม่ระบุฟอนต์จึงรับ font-sans (Sarabun) ต่อมาจากข้างบน
+ * ป้ายโซน — รหัสตำแหน่งในคลัง ตัวอักษรสีแบรนด์บนพื้นเทาอ่อน
+ * ไม่ระบุฟอนต์ จึงรับ font-sans (Sarabun) ต่อมาจากข้างบน
  */
 function ZoneTag({ zone }: { zone: string }) {
   return (
-    <span className="rounded-md bg-secondary px-2 py-0.5 text-xs font-semibold text-secondary-foreground">
+    <span className="rounded-md bg-secondary px-2.5 py-0.5 text-sm font-semibold text-primary">
       {zone}
     </span>
   );

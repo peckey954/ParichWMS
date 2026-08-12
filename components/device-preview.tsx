@@ -25,12 +25,19 @@ export const DEVICE: Record<
   mobile: { label: "มือถือ", width: "390px", height: "780px" },
 };
 
-type Ctx = { device: Device; framed: boolean; setDevice: (d: Device) => void };
+type Ctx = {
+  device: Device;
+  framed: boolean;
+  setDevice: (d: Device) => void;
+  /** กล่องที่เลื่อนจริงตอนจำลองอุปกรณ์ ตอนเต็มจอคือหน้าต่าง */
+  frameRef: React.RefObject<HTMLDivElement | null>;
+};
 
 const DevicePreviewContext = React.createContext<Ctx>({
   device: "desktop",
   framed: false,
   setDevice: () => {},
+  frameRef: { current: null },
 });
 
 export const useDevicePreview = () => React.useContext(DevicePreviewContext);
@@ -41,8 +48,9 @@ export function DevicePreviewProvider({
   children: React.ReactNode;
 }) {
   const [device, setDevice] = React.useState<Device>("desktop");
+  const frameRef = React.useRef<HTMLDivElement>(null);
   const value = React.useMemo(
-    () => ({ device, framed: device !== "desktop", setDevice }),
+    () => ({ device, framed: device !== "desktop", setDevice, frameRef }),
     [device]
   );
   return (
@@ -50,6 +58,60 @@ export function DevicePreviewProvider({
       {children}
     </DevicePreviewContext.Provider>
   );
+}
+
+/**
+ * สถานะการเลื่อนของหน้า
+ *
+ * ต้องรู้ก่อนว่าใครเป็นตัวเลื่อน — ตอนจำลองอุปกรณ์คือกรอบ ตอนเต็มจอคือหน้าต่าง
+ * ไม่งั้นดักฟังผิดตัวแล้วจะไม่เกิดอะไรขึ้นเลยในโหมดจำลอง
+ *
+ * hidden  = กำลังเลื่อนลง ใช้ซ่อนแถบเครื่องมือให้เห็นเนื้อหาเต็ม ๆ
+ * showTop = เลื่อนลงมาไกลแล้ว ควรมีปุ่มกลับขึ้นบนสุด
+ */
+export function useScrollState({ hideAfter = 160, topAfter = 700 } = {}) {
+  const { framed, frameRef } = useDevicePreview();
+  const [state, setState] = React.useState({ hidden: false, showTop: false });
+
+  React.useEffect(() => {
+    const el = framed ? frameRef.current : null;
+    const target: HTMLElement | Window = el ?? window;
+    const read = () => (el ? el.scrollTop : window.scrollY);
+
+    let last = read();
+    let ticking = false;
+
+    const onScroll = () => {
+      if (ticking) return;
+      ticking = true;
+      requestAnimationFrame(() => {
+        ticking = false;
+        const y = read();
+        const dy = y - last;
+        // ขยับน้อยกว่านี้ถือว่าเป็นการสั่น ไม่นับเป็นการเปลี่ยนทิศ
+        const moved = Math.abs(dy) > 6;
+        if (moved) last = y;
+
+        setState((prev) => {
+          const hidden = moved ? dy > 0 && y > hideAfter : prev.hidden;
+          const showTop = y > topAfter;
+          return prev.hidden === hidden && prev.showTop === showTop
+            ? prev
+            : { hidden, showTop };
+        });
+      });
+    };
+
+    target.addEventListener("scroll", onScroll, { passive: true });
+    return () => target.removeEventListener("scroll", onScroll);
+  }, [framed, frameRef, hideAfter, topAfter]);
+
+  const scrollToTop = React.useCallback(() => {
+    const el = framed ? frameRef.current : null;
+    (el ?? window).scrollTo({ top: 0, behavior: "smooth" });
+  }, [framed, frameRef]);
+
+  return { ...state, scrollToTop };
 }
 
 /** ปุ่มไอคอนสามอันบนหัวเรื่อง */
@@ -88,9 +150,10 @@ export function DevicePreviewToggle({ className }: { className?: string }) {
  * วัดความกว้างจากกล่องนี้ ไม่ใช่จากขนาดหน้าต่าง
  */
 export function DeviceFrame({ children }: { children: React.ReactNode }) {
-  const { device, framed } = useDevicePreview();
+  const { device, framed, frameRef } = useDevicePreview();
   return (
     <div
+      ref={frameRef}
       className={cn(
         "@container mx-auto w-full bg-surface transition-[max-width] duration-300",
         framed &&

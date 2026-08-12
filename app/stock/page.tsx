@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import {
+  ArrowUpIcon,
   DownloadIcon,
   EyeIcon,
   EyeOffIcon,
@@ -45,7 +46,7 @@ import {
   ToggleGroupItem,
 } from "@peckey954/ui/components/ui/toggle-group";
 import { cn } from "@peckey954/ui/lib/utils";
-import { useDevicePreview } from "@/components/device-preview";
+import { useDevicePreview, useScrollState } from "@/components/device-preview";
 import { InboundList } from "@/components/stock/inbound-list";
 import { IssueList } from "@/components/stock/issue-list";
 import { ProductCard } from "@/components/stock/stock-parts";
@@ -63,6 +64,40 @@ import {
   type CategoryId,
 } from "@/lib/general-stock";
 
+/**
+ * แถบเครื่องมือที่ติดบนตอนเลื่อน
+ *
+ * เลื่อนลง = ซ่อนไปข้างบน ไม่มีอะไรบังเวลาไล่ดูของ
+ * เลื่อนขึ้น = โผล่กลับมาทันที เพราะการเลื่อนขึ้นแปลว่ากำลังหาอะไรอยู่
+ *
+ * พื้นหลังเป็นสีเดียวกับพื้นที่เนื้อหา ไม่มีเส้นคั่นใต้แถบ
+ * ในโหมดจำลอง กรอบเป็นตัวเลื่อนเอง จึงยึดที่ขอบบนกรอบ (top-0)
+ * โหมดเต็มจอ หน้าเว็บเป็นตัวเลื่อน ต้องเว้นให้หัวเรื่องที่ติดบนอยู่ (top-14)
+ */
+function StickyBar({
+  framed,
+  hidden,
+  children,
+}: {
+  framed: boolean;
+  hidden: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <div
+      className={cn(
+        "sticky z-30 -mx-4 mt-4 bg-surface px-4 pt-1 pb-3 sm:-mx-6 sm:px-6",
+        "transition-transform duration-200",
+        framed ? "top-0" : "top-14",
+        hidden && "-translate-y-[calc(100%+1rem)]"
+      )}
+      aria-hidden={hidden}
+    >
+      {children}
+    </div>
+  );
+}
+
 type IssueKind = "all" | "issue" | "return";
 
 const ISSUE_KINDS: { id: IssueKind; label: string }[] = [
@@ -75,6 +110,8 @@ export default function GeneralStockPage() {
   // กรอบจำลองอุปกรณ์อยู่ที่ AppShell ปุ่มสลับอยู่บนหัวเรื่อง
   // หน้านี้ขอรู้แค่ว่าตอนนี้อยู่ในกรอบหรือไม่ เพื่อเลือกจุดยึดของแถบติดบน
   const { framed } = useDevicePreview();
+  // เลื่อนลงซ่อนแถบเครื่องมือ เลื่อนขึ้นเอากลับมา และโผล่ปุ่มกลับขึ้นบนสุดเมื่อลงมาไกล
+  const { hidden, showTop, scrollToTop } = useScrollState();
   // ของจริงแยกประเภทกันเด็ดขาด ไม่มีมุมมอง "ทั้งหมด"
   // ชิปจึงเป็นการนำทาง (เลือกอยู่เสมอหนึ่งอัน) ไม่ใช่ตัวกรองที่ปิดได้
   const [cat, setCat] = React.useState<CategoryId>("sack");
@@ -237,16 +274,7 @@ export default function GeneralStockPage() {
                รายการยาว ถ้าปุ่มอยู่บนสุดอย่างเดียวต้องเลื่อนกลับไปกด
                จึงยกสองอย่างที่ใช้ระหว่างไล่ดู (สลับประเภท + ซ่อน/แสดง) มาติดบนไว้
                ลบขอบซ้ายขวาออกด้วย -mx เพื่อให้พื้นหลังเต็มความกว้างตอนติด */}
-          {/* พื้นหลังต้องเป็นสีเดียวกับพื้นที่เนื้อหา (bg-surface) ไม่งั้นตอนติดบน
-              จะเห็นเป็นแถบสีขาวโผล่ทับของข้างหลังชัดเป็นเหลี่ยม
-              ในโหมดจำลอง กรอบเป็นตัวเลื่อนเอง จึงยึดที่ขอบบนกรอบ (top-0)
-              โหมดเต็มจอ หน้าเว็บเป็นตัวเลื่อน ต้องเว้นให้หัวเรื่องที่ติดบนอยู่ (top-14) */}
-          <div
-            className={cn(
-              "sticky z-30 -mx-4 mt-4 border-b border-border bg-surface px-4 pt-1 pb-3 sm:-mx-6 sm:px-6",
-              framed ? "top-0" : "top-14"
-            )}
-          >
+          <StickyBar framed={framed} hidden={hidden}>
           <div className="flex items-center gap-2 pt-2">
             <div
               ref={chipRowRef}
@@ -315,7 +343,8 @@ export default function GeneralStockPage() {
                ค้นเฉพาะในประเภทที่เปิดอยู่ จึงต้องอยู่ใต้ชิป
                ปุ่มตัวกรองกับซ่อน/แสดงมาอยู่ข้างช่องค้นหา ตามแบบร่าง */}
           <div className="mt-3 flex items-center gap-2">
-            <InputGroup className="min-w-0 flex-1">
+            {/* พื้นขาว ตัดกับพื้นเทาของแถบที่ติดบน */}
+            <InputGroup className="min-w-0 flex-1 bg-card">
               <InputGroupAddon align="inline-start">
                 <SearchIcon />
               </InputGroupAddon>
@@ -448,7 +477,7 @@ export default function GeneralStockPage() {
               {allShown ? <EyeIcon /> : <EyeOffIcon />}
             </Button>
           </div>
-          </div>
+          </StickyBar>
 
           {/* ---------- รายการสินค้า ---------- */}
           <div className="mt-4 space-y-4">
@@ -514,26 +543,28 @@ export default function GeneralStockPage() {
                ไม่มีชิปประเภท ไม่มีเรียงตาม ไม่มีปุ่มส่งออก เพราะไม่เกี่ยวกัน */}
           {tab === "inbound" && (
             <>
-              <div className="mt-4 flex items-center gap-2">
-                <InputGroup className="min-w-0 flex-1">
-                  <InputGroupAddon align="inline-start">
-                    <SearchIcon />
-                  </InputGroupAddon>
-                  <InputGroupInput
-                    placeholder="ค้นหาเลขเอกสาร สินค้า ผู้ขาย หรือทะเบียนรถ"
-                    value={inboundQuery}
-                    onChange={(e) => setInboundQuery(e.target.value)}
-                  />
-                </InputGroup>
-                <Button
-                  variant="outline-primary"
-                  size="icon"
-                  aria-label="ตัวกรองเอกสารรอรับเข้า"
-                  className="shrink-0"
-                >
-                  <ListFilterIcon />
-                </Button>
-              </div>
+              <StickyBar framed={framed} hidden={hidden}>
+                <div className="flex items-center gap-2 pt-2">
+                  <InputGroup className="min-w-0 flex-1 bg-card">
+                    <InputGroupAddon align="inline-start">
+                      <SearchIcon />
+                    </InputGroupAddon>
+                    <InputGroupInput
+                      placeholder="ค้นหาเลขเอกสาร สินค้า ผู้ขาย หรือทะเบียนรถ"
+                      value={inboundQuery}
+                      onChange={(e) => setInboundQuery(e.target.value)}
+                    />
+                  </InputGroup>
+                  <Button
+                    variant="outline-primary"
+                    size="icon"
+                    aria-label="ตัวกรองเอกสารรอรับเข้า"
+                    className="shrink-0"
+                  >
+                    <ListFilterIcon />
+                  </Button>
+                </div>
+              </StickyBar>
 
               <div className="mt-4">
                 <InboundList docs={inboundVisible} />
@@ -544,63 +575,83 @@ export default function GeneralStockPage() {
           {/* ---------- แท็บรอจ่าย/คืน — ใบขอเบิกกับใบขอคืนอยู่ตารางเดียวกัน ---------- */}
           {tab === "issue" && (
             <>
-              <div className="mt-4 flex items-center gap-2">
-                <InputGroup className="min-w-0 flex-1">
-                  <InputGroupAddon align="inline-start">
-                    <SearchIcon />
-                  </InputGroupAddon>
-                  <InputGroupInput
-                    placeholder="ค้นหาเลขที่ขอเบิก สินค้า ผู้ขอ หรือหมายเหตุ"
-                    value={issueQuery}
-                    onChange={(e) => setIssueQuery(e.target.value)}
-                  />
-                </InputGroup>
-                <Button
-                  variant="outline-primary"
-                  size="icon"
-                  aria-label="ตัวกรองใบขอเบิก / ขอคืน"
-                  className="shrink-0"
+              <StickyBar framed={framed} hidden={hidden}>
+                {/* ทิศทางของเอกสาร เลือกได้ทีละอัน เลื่อนแนวนอนเอาบนจอแคบ */}
+                <div
+                  role="tablist"
+                  aria-label="ประเภทเอกสาร"
+                  className={cn(
+                    "flex items-center gap-2 overflow-x-auto pt-2",
+                    "flex-nowrap [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+                  )}
                 >
-                  <ListFilterIcon />
-                </Button>
-              </div>
+                  {ISSUE_KINDS.map((k) => {
+                    const on = issueKind === k.id;
+                    return (
+                      <button
+                        key={k.id}
+                        type="button"
+                        role="tab"
+                        aria-selected={on}
+                        onClick={() => setIssueKind(k.id)}
+                        className={cn(
+                          "shrink-0 rounded-full border px-3 py-1 text-sm whitespace-nowrap transition-colors",
+                          on
+                            ? "border-primary bg-brand font-medium text-primary"
+                            : "border-border text-foreground hover:bg-accent-hover"
+                        )}
+                      >
+                        {k.label} ({issueCounts[k.id]})
+                      </button>
+                    );
+                  })}
+                </div>
 
-              {/* ทิศทางของเอกสาร เลือกได้ทีละอัน เลื่อนแนวนอนเอาบนจอแคบ */}
-              <div
-                role="tablist"
-                aria-label="ประเภทเอกสาร"
-                className={cn(
-                  "mt-3 flex items-center gap-2 overflow-x-auto",
-                  "flex-nowrap [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-                )}
-              >
-                {ISSUE_KINDS.map((k) => {
-                  const on = issueKind === k.id;
-                  return (
-                    <button
-                      key={k.id}
-                      type="button"
-                      role="tab"
-                      aria-selected={on}
-                      onClick={() => setIssueKind(k.id)}
-                      className={cn(
-                        "shrink-0 rounded-full border px-3 py-1 text-sm whitespace-nowrap transition-colors",
-                        on
-                          ? "border-primary bg-brand font-medium text-primary"
-                          : "border-border text-foreground hover:bg-accent-hover"
-                      )}
-                    >
-                      {k.label} ({issueCounts[k.id]})
-                    </button>
-                  );
-                })}
-              </div>
+                <div className="mt-3 flex items-center gap-2">
+                  <InputGroup className="min-w-0 flex-1 bg-card">
+                    <InputGroupAddon align="inline-start">
+                      <SearchIcon />
+                    </InputGroupAddon>
+                    <InputGroupInput
+                      placeholder="ค้นหาเลขที่ขอเบิก สินค้า ผู้ขอ หรือหมายเหตุ"
+                      value={issueQuery}
+                      onChange={(e) => setIssueQuery(e.target.value)}
+                    />
+                  </InputGroup>
+                  <Button
+                    variant="outline-primary"
+                    size="icon"
+                    aria-label="ตัวกรองใบขอเบิก / ขอคืน"
+                    className="shrink-0"
+                  >
+                    <ListFilterIcon />
+                  </Button>
+                </div>
+              </StickyBar>
 
               <div className="mt-4">
                 <IssueList docs={issueVisible} />
               </div>
             </>
           )}
+
+          {/* ---------- ปุ่มกลับขึ้นบนสุด ----------
+               sticky ไม่ใช่ fixed เพราะตัวที่เลื่อนอาจเป็นกรอบจำลอง ไม่ใช่หน้าต่าง
+               ถ้าใช้ fixed ปุ่มจะไปเกาะขอบจอ ไม่ใช่ขอบกรอบ
+               h-0 ไม่ให้กินที่ในหน้า ปุ่มจึงลอยทับเนื้อหาแทนที่จะดันของลง */}
+          <div className="pointer-events-none sticky bottom-6 z-30 flex h-0 items-end justify-end">
+            <Button
+              size="icon"
+              aria-label="กลับขึ้นบนสุด"
+              onClick={scrollToTop}
+              className={cn(
+                "pointer-events-auto -translate-y-full rounded-full shadow-lg transition-opacity duration-200",
+                showTop ? "opacity-100" : "pointer-events-none opacity-0"
+              )}
+            >
+              <ArrowUpIcon />
+            </Button>
+          </div>
         </div>
       </div>
     </main>
