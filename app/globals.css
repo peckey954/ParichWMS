@@ -38,16 +38,10 @@
 
 [data-brand="parich"] {
   --surface: hsl(0 0% 98%);
-
-  /* ส้มเข้มสำหรับ "ตัวอักษรบนพื้นส้มอ่อน"
-     --primary (#F97316) บน --brand ได้คอนทราสต์แค่ 2.67:1 ซึ่งตกเกณฑ์
-     ตัวนี้ได้ 4.97:1 ผ่าน AA สำหรับตัวอักษรขนาดเล็ก และยังอ่านออกว่าเป็นส้ม */
-  --brand-strong: hsl(22 90% 38%);
 }
 
 [data-brand="parich"].dark {
   --surface: hsl(20 15% 7%);
-  --brand-strong: hsl(28 100% 72%);
 }
 
 /* --- ชุดที่ 1: สีประจำหมวดเมนู (ตามไฟล์ Figma ของ Parich WMS) ---
@@ -96,7 +90,6 @@
 
 @theme inline {
   --color-surface: var(--surface);
-  --color-brand-strong: var(--brand-strong);
 
   --color-cat-yellow: var(--cat-yellow);
   --color-cat-yellow-foreground: var(--cat-yellow-foreground);

@@ -277,20 +277,19 @@ const NavItem = React.forwardRef<
 });
 
 /**
- * โลโก้บนหัวเรื่อง ใช้เฉพาะส่วนต้นไม้ที่ตัดมาเป็นสี่เหลี่ยมจัตุรัส
- * โลโก้เต็มมีคำว่า PARICH อยู่ด้วย พอย่อเหลือ 32px ตัวหนังสือจะอ่านไม่ออก
- * และซ้ำกับข้อความ "Parich WMS" ที่อยู่ติดกันอยู่แล้ว
- * ตัวเต็มเก็บไว้ที่ public/parich-logo.png เผื่อใช้กับหน้าล็อกอินหรือเอกสารพิมพ์
+ * โลโก้เต็มใบ ไม่ตัดส่วนไหนออก
+ * รูปเป็นแนวตั้ง (592x652) จึงล็อกความสูงแล้วปล่อยความกว้างตามสัดส่วน
+ * ถ้าบังคับเป็นจัตุรัสรูปจะถูกบีบหรือโดนครอบตัด
  */
 function BrandMark() {
   return (
     <Image
-      src="/parich-mark.png"
+      src="/parich-logo.png"
       alt=""
-      width={400}
-      height={400}
+      width={592}
+      height={652}
       priority
-      className="size-8 shrink-0 rounded-md"
+      className="h-9 w-auto shrink-0 rounded-md"
     />
   );
 }
