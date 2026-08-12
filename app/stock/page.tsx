@@ -30,6 +30,14 @@ import {
   InputGroupInput,
 } from "@peckey954/ui/components/ui/input-group";
 import { Label } from "@peckey954/ui/components/ui/label";
+import {
+  Popover,
+  PopoverContent,
+  PopoverDescription,
+  PopoverHeader,
+  PopoverTitle,
+  PopoverTrigger,
+} from "@peckey954/ui/components/ui/popover";
 import { Tabs, TabsList, TabsTrigger } from "@peckey954/ui/components/ui/tabs";
 import {
   ToggleGroup,
@@ -190,67 +198,148 @@ export default function GeneralStockPage() {
             </TabsList>
           </Tabs>
 
-          {/* ---------- ประเภทสินค้า = การนำทาง อยู่เหนือช่องค้นหา ----------
-               แต่ละประเภทแยกกันเด็ดขาด ไม่มี "ทั้งหมด" เลือกอยู่เสมอหนึ่งอัน
-               บรรทัดเดียว ปัดเลื่อนได้บนจอแคบ */}
-          <div
-            ref={chipRowRef}
-            className={cn(
-              "mt-4 flex items-center gap-2 overflow-x-auto",
-              "flex-nowrap [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-            )}
-            role="tablist"
-            aria-label="ประเภทสินค้า"
-          >
-            {CATEGORIES.map((c) => {
-              const on = cat === c.id;
-              return (
-                <button
-                  key={c.id}
-                  type="button"
-                  role="tab"
-                  ref={(el) => {
-                    chipRefs.current[c.id] = el;
-                  }}
-                  onClick={() => setCat(c.id)}
-                  aria-selected={on}
-                  className={cn(
-                    "shrink-0 rounded-full border px-3 py-1 text-sm whitespace-nowrap transition-colors",
-                    on
-                      ? "border-primary bg-brand font-medium text-primary"
-                      : "border-border text-foreground hover:bg-accent-hover"
-                  )}
-                >
-                  {CATEGORY_LABEL[c.id]} ({counts[c.id]})
-                </button>
-              );
-            })}
+          {/* ---------- ประเภทสินค้า + ปุ่มส่งออก ----------
+               ประเภทเป็นการนำทาง เลือกอยู่เสมอหนึ่งอัน ไม่มี "ทั้งหมด"
+               ต่อท้ายด้วยชิปสต็อกต่ำ (คนละกลุ่ม คั่นด้วยเส้น)
+               ปุ่มส่งออกปักอยู่นอกแถวเลื่อน จะได้ไม่หายไปตอนปัด */}
+          <div className="mt-4 flex items-center gap-2">
+            <div
+              ref={chipRowRef}
+              className={cn(
+                "flex min-w-0 flex-1 items-center gap-2 overflow-x-auto",
+                "flex-nowrap [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+              )}
+            >
+              <div
+                role="tablist"
+                aria-label="ประเภทสินค้า"
+                className="flex shrink-0 items-center gap-2"
+              >
+                {CATEGORIES.map((c) => {
+                  const on = cat === c.id;
+                  return (
+                    <button
+                      key={c.id}
+                      type="button"
+                      role="tab"
+                      ref={(el) => {
+                        chipRefs.current[c.id] = el;
+                      }}
+                      onClick={() => setCat(c.id)}
+                      aria-selected={on}
+                      className={cn(
+                        "shrink-0 rounded-full border px-3 py-1 text-sm whitespace-nowrap transition-colors",
+                        on
+                          ? "border-primary bg-brand font-medium text-primary"
+                          : "border-border text-foreground hover:bg-accent-hover"
+                      )}
+                    >
+                      {CATEGORY_LABEL[c.id]} ({counts[c.id]})
+                    </button>
+                  );
+                })}
+              </div>
+
+              <span className="h-5 w-px shrink-0 bg-border" aria-hidden />
+
+              <button
+                type="button"
+                onClick={() => setLowOnly((v) => !v)}
+                aria-pressed={lowOnly}
+                className={cn(
+                  "shrink-0 rounded-full border px-3 py-1 text-sm whitespace-nowrap transition-colors",
+                  lowOnly
+                    ? "border-primary bg-brand font-medium text-primary"
+                    : "border-border text-foreground hover:bg-accent-hover"
+                )}
+              >
+                สต็อกต่ำ
+              </button>
+            </div>
+
+            <Button
+              variant="outline-primary"
+              size="icon"
+              aria-label="ส่งออก CSV"
+              className="shrink-0"
+            >
+              <DownloadIcon />
+            </Button>
           </div>
 
           {/* ---------- ค้นหา — อยู่ใต้ประเภท เพราะค้นเฉพาะในประเภทที่เปิดอยู่ ---------- */}
-          <div className="mt-3 flex flex-col gap-3 @3xl:flex-row @3xl:items-center">
-            <InputGroup className="flex-1">
+          <div className="mt-3 flex items-center gap-2">
+            <InputGroup className="min-w-0 flex-1">
               <InputGroupAddon align="inline-start">
                 <SearchIcon />
               </InputGroupAddon>
               <InputGroupInput
-                placeholder={`ค้นหาใน ${CATEGORY_LABEL[cat]} — ชื่อ รหัส เลขล็อต หรือโซน`}
+                placeholder={`ค้นหาใน ${CATEGORY_LABEL[cat]}`}
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
               />
             </InputGroup>
-            <div className="flex items-center gap-2">
-              <Button variant="outline-primary" size="icon" aria-label="ตัวกรอง">
-                <ListFilterIcon />
-              </Button>
-              <Button variant="outline-primary" className="flex-1 @3xl:flex-none">
-                <DownloadIcon />
-                ส่งออก CSV
-              </Button>
-            </div>
+
+            {/* ตัวเลือกการแสดงผลเก็บไว้ในนี้ ไม่ต้องกินแถวข้างนอก
+                มีจุดบอกเมื่อมีการซ่อนอะไรอยู่ จะได้ไม่ลืมว่าเคยปิดไว้ */}
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline-primary"
+                  size="icon"
+                  aria-label="ตัวกรองและการแสดงผล"
+                  className="relative shrink-0"
+                >
+                  <ListFilterIcon />
+                  {(!showChips || !showActions) && (
+                    <span className="absolute top-1 right-1 size-2 rounded-full bg-primary" />
+                  )}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent align="end" className="w-64">
+                <PopoverHeader>
+                  <PopoverTitle>การแสดงผล</PopoverTitle>
+                  <PopoverDescription>
+                    ซ่อนบางอย่างเพื่อให้กวาดตาดูตัวเลขง่ายขึ้น
+                  </PopoverDescription>
+                </PopoverHeader>
+
+                <div className="mt-3 space-y-3">
+                  <Label
+                    htmlFor="show-chips"
+                    className="flex items-center gap-3 font-normal"
+                  >
+                    <Checkbox
+                      id="show-chips"
+                      checked={showChips}
+                      onCheckedChange={(v) => setShowChips(v === true)}
+                    />
+                    <span className="flex items-center gap-2">
+                      <TagIcon className="size-4" />
+                      ป้ายในรายการ
+                    </span>
+                  </Label>
+
+                  <Label
+                    htmlFor="show-actions"
+                    className="flex items-center gap-3 font-normal"
+                  >
+                    <Checkbox
+                      id="show-actions"
+                      checked={showActions}
+                      onCheckedChange={(v) => setShowActions(v === true)}
+                    />
+                    <span className="flex items-center gap-2">
+                      <SlidersHorizontalIcon className="size-4" />
+                      ปุ่มย้าย / ปรับปรุง
+                    </span>
+                  </Label>
+                </div>
+              </PopoverContent>
+            </Popover>
           </div>
 
-          {/* ---------- เรียงลำดับ + ตัวควบคุมมุมมอง ---------- */}
+          {/* ---------- เรียงลำดับ + ย่อ/กาง ---------- */}
           <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
             <div className="flex flex-wrap items-center gap-2">
               <span className="text-sm text-muted-foreground">เรียงตาม</span>
@@ -265,52 +354,12 @@ export default function GeneralStockPage() {
                 <ToggleGroupItem value="zone">โซน</ToggleGroupItem>
                 <ToggleGroupItem value="fifo">FIFO</ToggleGroupItem>
               </ToggleGroup>
-
-              <Label
-                htmlFor="low-only"
-                className="flex items-center gap-2 rounded-full border border-border px-3 py-1 text-sm font-normal"
-              >
-                <Checkbox
-                  id="low-only"
-                  checked={lowOnly}
-                  onCheckedChange={(v) => setLowOnly(v === true)}
-                />
-                สต็อกต่ำ
-              </Label>
             </div>
 
-            {/* ซ่อนป้าย/ปุ่มเพื่อให้กวาดตาดูตัวเลขได้ง่ายขึ้น
-                ติดไว้เป็น ToggleGroup ชุดเดียว จะได้ไม่มีปุ่มเรียงเต็มแถว */}
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="text-sm text-muted-foreground">แสดง</span>
-              <ToggleGroup
-                type="multiple"
-                variant="outline"
-                size="sm"
-                value={[
-                  ...(showChips ? ["chips"] : []),
-                  ...(showActions ? ["actions"] : []),
-                ]}
-                onValueChange={(vals) => {
-                  setShowChips(vals.includes("chips"));
-                  setShowActions(vals.includes("actions"));
-                }}
-              >
-                <ToggleGroupItem value="chips" aria-label="แสดงป้ายทั้งหมด">
-                  <TagIcon />
-                  ป้าย
-                </ToggleGroupItem>
-                <ToggleGroupItem value="actions" aria-label="แสดงปุ่มจัดการ">
-                  <SlidersHorizontalIcon />
-                  ปุ่มจัดการ
-                </ToggleGroupItem>
-              </ToggleGroup>
-
-              <Button variant="ghost" size="sm" onClick={toggleExpand}>
-                {expanded ? <ChevronsDownUpIcon /> : <ChevronsUpDownIcon />}
-                {expanded ? "ย่อทั้งหมด" : "กางทั้งหมด"}
-              </Button>
-            </div>
+            <Button variant="ghost" size="sm" onClick={toggleExpand}>
+              {expanded ? <ChevronsDownUpIcon /> : <ChevronsUpDownIcon />}
+              {expanded ? "ย่อทั้งหมด" : "กางทั้งหมด"}
+            </Button>
           </div>
 
           {/* ---------- รายการสินค้า ---------- */}
