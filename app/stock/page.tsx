@@ -213,15 +213,8 @@ export default function GeneralStockPage() {
 
             {tab === "stock" && (
               <div className="flex shrink-0 items-center gap-2">
-                <Button
-                  variant="outline-primary"
-                  size="icon"
-                  aria-label={allShown ? "ซ่อนป้ายและปุ่ม" : "แสดงป้ายและปุ่ม"}
-                  aria-pressed={!allShown}
-                  onClick={toggleAll}
-                >
-                  {allShown ? <EyeIcon /> : <EyeOffIcon />}
-                </Button>
+                {/* ส่งออกเป็นงานทำครั้งเดียวจบ ไม่ต้องเอื้อมถึงตอนไล่ดูรายการ
+                    จึงอยู่บนหัวเรื่องพอ ส่วนปุ่มซ่อน/แสดงย้ายไปอยู่แถบติดบน */}
                 <Button
                   variant="outline-primary"
                   size="icon"
@@ -253,10 +246,11 @@ export default function GeneralStockPage() {
 
           {tab === "stock" && (
             <>
-          {/* ---------- ประเภทสินค้า ----------
-               ประเภทเป็นการนำทาง เลือกอยู่เสมอหนึ่งอัน ไม่มี "ทั้งหมด"
-               ต่อท้ายด้วยชิปสต็อกต่ำ (คนละกลุ่ม คั่นด้วยเส้น) */}
-          <div className="mt-4 flex items-center gap-2">
+          {/* ---------- ประเภทสินค้า + ปุ่มซ่อน/แสดง — ติดบนตอนเลื่อน ----------
+               รายการยาว ถ้าปุ่มอยู่บนสุดอย่างเดียวต้องเลื่อนกลับไปกด
+               จึงยกสองอย่างที่ใช้ระหว่างไล่ดู (สลับประเภท + ซ่อน/แสดง) มาติดบนไว้
+               ลบขอบซ้ายขวาออกด้วย -mx เพื่อให้พื้นหลังเต็มความกว้างตอนติด */}
+          <div className="sticky top-14 z-30 -mx-4 mt-4 flex items-center gap-2 border-b border-border bg-background px-4 py-2 sm:-mx-6 sm:px-6">
             <div
               ref={chipRowRef}
               className={cn(
@@ -310,6 +304,18 @@ export default function GeneralStockPage() {
                 สต็อกต่ำ
               </button>
             </div>
+
+            {/* ปักไว้นอกแถวเลื่อน จะได้เอื้อมถึงตลอดไม่ว่าปัดชิปไปไกลแค่ไหน */}
+            <Button
+              variant="outline-primary"
+              size="icon"
+              aria-label={allShown ? "ซ่อนป้ายและปุ่ม" : "แสดงป้ายและปุ่ม"}
+              aria-pressed={!allShown}
+              onClick={toggleAll}
+              className="shrink-0"
+            >
+              {allShown ? <EyeIcon /> : <EyeOffIcon />}
+            </Button>
           </div>
 
           {/* ---------- ค้นหา — อยู่ใต้ประเภท เพราะค้นเฉพาะในประเภทที่เปิดอยู่ ---------- */}
