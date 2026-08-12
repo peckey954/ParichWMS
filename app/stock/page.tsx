@@ -90,6 +90,38 @@ export default function GeneralStockPage() {
   // กดซ้ำที่อันเดิม = กลับไปดูทั้งหมด จะได้ไม่ต้องเลื่อนไปหาปุ่ม "ทั้งหมด"
   const pickCat = (id: CategoryId) => setCat((c) => (c === id ? null : id));
 
+  // ---------- เลื่อนแถวชิปให้เห็นตัวที่มีผลลัพธ์เอง ----------
+  const chipRowRef = React.useRef<HTMLDivElement>(null);
+  const chipRefs = React.useRef<Record<string, HTMLButtonElement | null>>({});
+
+  // counts เป็น object ใหม่ทุกรอบ ใช้เป็น dep ตรง ๆ ไม่ได้ ต้องแปลงเป็น string ก่อน
+  const countsKey = CATEGORIES.map((c) => counts[c.id]).join(",");
+
+  React.useEffect(() => {
+    if (!query.trim()) return;
+    const row = chipRowRef.current;
+    if (!row) return;
+
+    // ประเภทที่เลือกอยู่มีผลลัพธ์ก็เลื่อนไปที่มัน ถ้าไม่มีก็เลื่อนไปประเภทแรกที่เจอของ
+    const key =
+      cat && counts[cat] > 0
+        ? cat
+        : (CATEGORIES.find((c) => counts[c.id] > 0)?.id ?? "all");
+    const chip = chipRefs.current[key];
+    if (!chip) return;
+
+    // คำนวณเองแทน scrollIntoView เพราะตัวนั้นจะลากหน้าเว็บเลื่อนแนวตั้งไปด้วย
+    const rowBox = row.getBoundingClientRect();
+    const chipBox = chip.getBoundingClientRect();
+    const pad = 12;
+    if (chipBox.left < rowBox.left) {
+      row.scrollBy({ left: chipBox.left - rowBox.left - pad, behavior: "smooth" });
+    } else if (chipBox.right > rowBox.right) {
+      row.scrollBy({ left: chipBox.right - rowBox.right + pad, behavior: "smooth" });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [query, cat, countsKey]);
+
   return (
     <main className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6">
       {/* ---------- แถบเครื่องมือสำหรับรีวิวดีไซน์ ---------- */}
@@ -188,6 +220,7 @@ export default function GeneralStockPage() {
 
           {/* ---------- ชิปกรองประเภท — บรรทัดเดียว ปัดเลื่อน เลือกได้ทีละอัน ---------- */}
           <div
+            ref={chipRowRef}
             className={cn(
               "mt-4 flex items-center gap-2 overflow-x-auto",
               "flex-nowrap [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
@@ -197,6 +230,9 @@ export default function GeneralStockPage() {
           >
             <button
               type="button"
+              ref={(el) => {
+                chipRefs.current.all = el;
+              }}
               onClick={() => setCat(null)}
               aria-pressed={cat === null}
               className={cn(
@@ -215,6 +251,9 @@ export default function GeneralStockPage() {
                 <button
                   key={c.id}
                   type="button"
+                  ref={(el) => {
+                    chipRefs.current[c.id] = el;
+                  }}
                   onClick={() => pickCat(c.id)}
                   aria-pressed={on}
                   className={cn(
