@@ -20,14 +20,46 @@
 @source "../node_modules/@peckey954/ui/src";
 
 /* ============================================================
-   token เสริมของแอปนี้ — สีเสริมที่ DS ยังไม่มี tone ให้ (ใช้กับสภาพล็อตและหมวดเมนู)
+   token เสริมของแอปนี้ — สีที่ DS ยังไม่มี tone ให้
 
    DS มี tone ให้ 5 ตัว (brand / success / warning / danger / neutral)
-   แต่หน้าสต็อกต้องแยก Repack กับ รับสภาพ/กวาดพื้น ออกจากกันด้วย
-   ถ้าใช้ tone เดิมจะไปชนกับสีแบรนด์และสีเตือน จึงเพิ่ม token ใหม่
-   ตามกฎข้อ 2 ของ AGENTS.md (ต้องการสีที่ไม่มีใน token ให้เพิ่ม token
-   ไม่ใช่ hardcode ลงใน component)
+   ซึ่งทั้งหมดเป็นสีเชิงความหมาย (ต้องรีบ / สำเร็จ / ผิดพลาด)
+   แต่มีสองที่ในแอปนี้ที่ต้องใช้สีเพื่อ "แยกประเภท" ไม่ใช่บอกสถานะ
+   ถ้าไปยืม tone เดิมมาใช้ ผู้ใช้จะอ่านผิดว่าเป็นการเตือน
+
+   ทำตามกฎข้อ 2 ของ AGENTS.md — ต้องการสีที่ไม่มีใน token
+   ให้เพิ่ม token ใหม่ ไม่ใช่ hardcode ลงใน component
    ============================================================ */
+
+/* --- ชุดที่ 1: สีประจำหมวดเมนู (ตามไฟล์ Figma ของ Parich WMS) ---
+   ใช้เป็นพื้นกล่องไอคอน + จุดนำหน้าชื่อหมวด เป็นสีสำหรับ "จำแนก"
+   คู่สีอ่อน/เข้ม 500 ของแต่ละสี ใช้กับกราฟิกเท่านั้น ไม่ใช้กับข้อความเล็ก
+   หมวดผลิตยืม --brand/--primary ของแบรนด์มาเลย จะได้ไม่มีสีส้มซ้ำสองชุด */
+
+[data-brand="parich"] {
+  --cat-yellow: hsl(55 92% 95%);
+  --cat-yellow-foreground: hsl(48 96% 47%);
+  --cat-blue: hsl(214 100% 97%);
+  --cat-blue-foreground: hsl(217 91% 60%);
+  --cat-orange: var(--brand);
+  --cat-orange-foreground: var(--primary);
+  --cat-purple: hsl(270 100% 98%);
+  --cat-purple-foreground: hsl(271 91% 65%);
+  --cat-sky: hsl(204 100% 97%);
+  --cat-sky-foreground: hsl(199 89% 48%);
+}
+
+[data-brand="parich"].dark {
+  --cat-yellow: hsl(48 40% 14%);
+  --cat-blue: hsl(217 45% 17%);
+  --cat-purple: hsl(271 40% 18%);
+  --cat-sky: hsl(199 45% 15%);
+}
+
+/* --- ชุดที่ 2: สีสภาพล็อตในหน้าสต็อก ---
+   ต้องแยก Repack ออกจาก รับสภาพ/กวาดพื้น
+   แยกจากชุดหมวดเมนูเพราะอันนี้เป็นพื้นหลังของ "ข้อความ 12px"
+   จึงต้องใช้สีตัวอักษรที่เข้มกว่าเพื่อให้ผ่านคอนทราสต์ AA */
 
 [data-brand="parich"] {
   --tone-blue: hsl(210 100% 96%);
@@ -44,6 +76,17 @@
 }
 
 @theme inline {
+  --color-cat-yellow: var(--cat-yellow);
+  --color-cat-yellow-foreground: var(--cat-yellow-foreground);
+  --color-cat-blue: var(--cat-blue);
+  --color-cat-blue-foreground: var(--cat-blue-foreground);
+  --color-cat-orange: var(--cat-orange);
+  --color-cat-orange-foreground: var(--cat-orange-foreground);
+  --color-cat-purple: var(--cat-purple);
+  --color-cat-purple-foreground: var(--cat-purple-foreground);
+  --color-cat-sky: var(--cat-sky);
+  --color-cat-sky-foreground: var(--cat-sky-foreground);
+
   --color-tone-blue: var(--tone-blue);
   --color-tone-blue-foreground: var(--tone-blue-foreground);
   --color-tone-violet: var(--tone-violet);

@@ -13,7 +13,6 @@ import { cn } from "@peckey954/ui/lib/utils";
 import { IconBox, TONE_DOT } from "@/components/modules/module-icon";
 import {
   MODULE_GROUPS,
-  MODULES,
   searchModules,
   type ModuleItem,
 } from "@/lib/modules";
@@ -47,7 +46,10 @@ export default function AllModulesPage() {
           <section key={g.id}>
             <div className="flex items-center gap-2">
               <span
-                className={cn("size-3 shrink-0 rounded-full", TONE_DOT[g.tone])}
+                className={cn(
+                  "size-2.5 shrink-0 rounded-full",
+                  TONE_DOT[g.tone]
+                )}
                 aria-hidden
               />
               <h2 className="font-semibold">{g.label}</h2>
@@ -73,11 +75,6 @@ export default function AllModulesPage() {
           </div>
         )}
       </div>
-
-      <p className="mt-10 text-sm text-muted-foreground">
-        เปิดใช้งานแล้ว {MODULES.filter((m) => m.href).length} จาก{" "}
-        {MODULES.length} ระบบ · ที่เหลือยังไม่ได้ทำหน้าจอ กดไม่ได้
-      </p>
     </main>
   );
 }
@@ -93,32 +90,28 @@ function ModuleCard({
     <>
       {m.pending !== undefined && (
         <Badge
-          tone="warning"
+          tone="brand"
           appearance="soft"
-          className="absolute top-2 right-2"
+          className="absolute top-3 right-3"
         >
           รอ {m.pending}
         </Badge>
       )}
       <IconBox name={m.icon} tone={tone} />
-      <div className="mt-3">
-        <p className="font-medium">{m.label}</p>
+      <div className="mt-6">
+        <p className="font-semibold">{m.label}</p>
         <p className="mt-0.5 text-sm text-muted-foreground">{m.code}</p>
       </div>
     </>
   );
 
   const base =
-    "relative flex h-full flex-col rounded-xl border border-border bg-card p-4 transition-colors";
+    "relative flex h-full flex-col rounded-xl border border-border bg-card p-4 shadow-sm";
 
-  // ยังไม่ได้ทำหน้านั้น — ทำให้กดไม่ได้และบอกไว้ตรง ๆ ดีกว่าปล่อยให้กดแล้วเจอ 404
+  // หน้าที่ยังไม่ได้ทำ — หน้าตาเหมือนใบอื่นทุกอย่าง แค่กดแล้วไม่ไปไหน
   if (!m.href) {
     return (
-      <div
-        className={cn(base, "opacity-55")}
-        aria-disabled
-        title="ยังไม่ได้ทำหน้านี้"
-      >
+      <div className={base} aria-disabled>
         {body}
       </div>
     );
@@ -129,7 +122,7 @@ function ModuleCard({
       href={m.href}
       className={cn(
         base,
-        "hover:border-primary hover:bg-accent-hover",
+        "transition-colors hover:border-primary",
         "focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none"
       )}
     >

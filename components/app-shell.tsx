@@ -3,14 +3,9 @@
 import * as React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import {
-  BellIcon,
-  MenuIcon,
-  PanelLeftCloseIcon,
-  PanelLeftOpenIcon,
-  WarehouseIcon,
-} from "lucide-react";
+import { BellIcon, MenuIcon, WarehouseIcon } from "lucide-react";
 import { Avatar, AvatarFallback } from "@peckey954/ui/components/ui/avatar";
+import { Badge } from "@peckey954/ui/components/ui/badge";
 import { Button } from "@peckey954/ui/components/ui/button";
 import {
   Sheet,
@@ -28,23 +23,36 @@ import {
 } from "@peckey954/ui/components/ui/tooltip";
 import { cn } from "@peckey954/ui/lib/utils";
 import { ThemeToggle } from "@/components/theme-toggle";
-import { ModuleIcon, TONE_DOT } from "@/components/modules/module-icon";
+import { ICON_STROKE, ModuleIcon } from "@/components/modules/module-icon";
 import {
   MODULE_GROUPS,
   SYSTEM_LINKS,
   modulesOf,
-  readyModules,
+  type ModuleItem,
 } from "@/lib/modules";
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const [expanded, setExpanded] = React.useState(true);
+  // ค่าเริ่มต้นคือหุบ — เปิดหน้าไหนก็เห็นเนื้อหาเต็มความกว้างไว้ก่อน
+  const [expanded, setExpanded] = React.useState(false);
 
   return (
     <div className="flex min-h-screen flex-col">
       <header className="sticky top-0 z-40 border-b border-border bg-background">
         <div className="flex h-14 items-center gap-3 px-4">
-          {/* จอแคบ — เมนูเป็นลิ้นชัก จอกว้างใช้เมนูข้างถาวรแทน */}
+          {/* จอกว้าง — ปุ่มนี้สลับเมนูข้างระหว่างแถบไอคอนกับแบบเต็ม */}
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label={expanded ? "หุบเมนู" : "ขยายเมนู"}
+            aria-expanded={expanded}
+            onClick={() => setExpanded((v) => !v)}
+            className="hidden lg:inline-flex"
+          >
+            <MenuIcon />
+          </Button>
+
+          {/* จอแคบ — ปุ่มเดียวกันเปิดเป็นลิ้นชักแทน */}
           <Sheet>
             <SheetTrigger asChild>
               <Button
@@ -56,14 +64,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 <MenuIcon />
               </Button>
             </SheetTrigger>
-            <SheetContent side="left" className="w-80 overflow-y-auto p-0">
-              <SheetHeader>
+            <SheetContent side="left" className="w-80 gap-0 p-0">
+              <SheetHeader className="border-b border-sidebar-border">
                 <SheetTitle className="flex items-center gap-2">
                   <BrandMark />
                   Parich WMS
                 </SheetTitle>
               </SheetHeader>
-              <SidebarNav pathname={pathname} closeOnClick />
+              <SidebarBody pathname={pathname} closeOnClick />
             </SheetContent>
           </Sheet>
 
@@ -87,33 +95,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <div className="flex flex-1">
         <aside
           className={cn(
-            "sticky top-14 hidden h-[calc(100vh-3.5rem)] shrink-0 overflow-y-auto",
-            "border-r border-border bg-sidebar lg:block",
+            "sticky top-14 hidden h-[calc(100vh-3.5rem)] shrink-0 flex-col",
+            "border-r border-sidebar-border bg-sidebar lg:flex",
             "transition-[width] duration-200",
             expanded ? "w-72" : "w-16"
           )}
         >
-          <div
-            className={cn(
-              "flex items-center px-3 py-2",
-              expanded ? "justify-end" : "justify-center"
-            )}
-          >
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => setExpanded((v) => !v)}
-              aria-label={expanded ? "ย่อเมนู" : "ขยายเมนู"}
-            >
-              {expanded ? <PanelLeftCloseIcon /> : <PanelLeftOpenIcon />}
-            </Button>
-          </div>
-
-          {expanded ? (
-            <SidebarNav pathname={pathname} />
-          ) : (
-            <IconRail pathname={pathname} />
-          )}
+          <SidebarBody pathname={pathname} collapsed={!expanded} />
         </aside>
 
         <div className="min-w-0 flex-1">{children}</div>
@@ -123,172 +111,164 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 }
 
 /* ------------------------------------------------------------------
-   เมนูเต็ม — จัดกลุ่มตามทะเบียนโมดูล ใช้ทั้งในลิ้นชัก (จอแคบ)
-   และเมนูข้างแบบขยาย (จอกว้าง)
+   ตัวเมนูจริง ใช้ร่วมกันสามที่ — ลิ้นชักจอแคบ เมนูข้างแบบเต็ม และแบบหุบ
+   ต่างกันแค่ collapsed กับต้องปิดลิ้นชักหลังกดหรือไม่
 ------------------------------------------------------------------ */
-function SidebarNav({
+function SidebarBody({
   pathname,
+  collapsed = false,
   closeOnClick = false,
 }: {
   pathname: string;
+  collapsed?: boolean;
   closeOnClick?: boolean;
 }) {
-  /** ในลิ้นชักต้องปิดเมนูหลังกด ในเมนูข้างถาวรไม่ต้อง */
-  const link = (
-    key: string,
-    href: string,
-    icon: string,
-    label: string
-  ) => {
+  const item = (m: {
+    id: string;
+    href?: string;
+    icon: string;
+    label: string;
+    pending?: number;
+  }) => {
     const node = (
-      <NavLink
-        href={href}
-        icon={icon}
-        label={label}
-        active={pathname === href}
+      <NavItem
+        href={m.href}
+        icon={m.icon}
+        label={m.label}
+        pending={m.pending}
+        collapsed={collapsed}
+        active={pathname === m.href}
       />
     );
-    return closeOnClick ? (
-      <SheetClose asChild key={key}>
+    // ปิดลิ้นชักได้เฉพาะอันที่กดไปไหนได้จริง
+    return closeOnClick && m.href ? (
+      <SheetClose asChild key={m.id}>
         {node}
       </SheetClose>
     ) : (
-      <React.Fragment key={key}>{node}</React.Fragment>
+      <React.Fragment key={m.id}>{node}</React.Fragment>
     );
   };
 
-  return (
-    <nav className="flex flex-col gap-5 px-3 pt-1 pb-6">
-      <section className="space-y-1">
-        <GroupLabel>หน้าหลัก</GroupLabel>
-        {link("home", "/", "grid", "ระบบทั้งหมด")}
-      </section>
+  const body = (
+    <>
+      <div className="flex-1 overflow-y-auto px-2 py-3">
+        <nav className={cn("flex flex-col", collapsed ? "gap-3" : "gap-4")}>
+          <section className="flex flex-col gap-0.5">
+            {!collapsed && <GroupLabel>หน้าหลัก</GroupLabel>}
+            {item({ id: "home", href: "/", icon: "grid", label: "ระบบทั้งหมด" })}
+          </section>
 
-      {MODULE_GROUPS.map((g) => (
-        <section key={g.id} className="space-y-1">
-          <GroupLabel dot={TONE_DOT[g.tone]}>{g.label}</GroupLabel>
-          {modulesOf(g.id).map((m) =>
-            m.href ? (
-              link(m.id, m.href, m.icon, m.label)
-            ) : (
-              <NavLink key={m.id} icon={m.icon} label={m.label} />
-            )
-          )}
-        </section>
-      ))}
+          {MODULE_GROUPS.map((g) => (
+            <section key={g.id} className="flex flex-col gap-0.5">
+              {!collapsed && <GroupLabel>{g.label}</GroupLabel>}
+              {modulesOf(g.id).map((m: ModuleItem) => item(m))}
+            </section>
+          ))}
+        </nav>
+      </div>
 
-      <section className="space-y-1">
-        <GroupLabel>ตั้งค่าระบบ</GroupLabel>
-        {SYSTEM_LINKS.map((s) => link(s.id, s.href, s.icon, s.label))}
-      </section>
-    </nav>
+      <div className="border-t border-sidebar-border px-2 py-3">
+        <nav className="flex flex-col gap-0.5">
+          {SYSTEM_LINKS.map((s) => item(s))}
+        </nav>
+      </div>
+    </>
   );
-}
-
-/**
- * แถบไอคอน — เอาเฉพาะหน้าที่เปิดใช้งานได้จริง
- * ถ้ายัดทุกโมดูลลงมาโดยไม่มีชื่อกำกับ จะกลายเป็นไอคอนยี่สิบตัวที่เดาไม่ออกว่าอะไร
- */
-function IconRail({ pathname }: { pathname: string }) {
-  const links = [
-    { id: "home", href: "/", icon: "grid", label: "ระบบทั้งหมด" },
-    ...readyModules().map((m) => ({
-      id: m.id,
-      href: m.href!,
-      icon: m.icon,
-      label: m.label,
-    })),
-    ...SYSTEM_LINKS,
-  ];
 
   return (
     <TooltipProvider delayDuration={200}>
-      <nav className="flex flex-col items-center gap-1 pb-6">
-        {links.map((l) => {
-          const active = pathname === l.href;
-          return (
-            <Tooltip key={l.id}>
-              <TooltipTrigger asChild>
-                <Link
-                  href={l.href}
-                  aria-label={l.label}
-                  aria-current={active ? "page" : undefined}
-                  className={cn(
-                    "flex size-10 items-center justify-center rounded-md transition-colors",
-                    active
-                      ? "bg-primary text-primary-foreground"
-                      : "text-foreground hover:bg-accent-hover"
-                  )}
-                >
-                  <ModuleIcon name={l.icon} className="size-5" />
-                </Link>
-              </TooltipTrigger>
-              <TooltipContent side="right">{l.label}</TooltipContent>
-            </Tooltip>
-          );
-        })}
-      </nav>
+      {closeOnClick ? (
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+          {body}
+        </div>
+      ) : (
+        body
+      )}
     </TooltipProvider>
   );
 }
 
-function GroupLabel({
-  children,
-  dot,
-}: {
-  children: React.ReactNode;
-  dot?: string;
-}) {
+function GroupLabel({ children }: { children: React.ReactNode }) {
   return (
-    <p className="flex items-center gap-2 px-3 pt-1 pb-0.5 text-xs font-medium text-muted-foreground">
-      {dot && <span className={cn("size-2 rounded-full", dot)} aria-hidden />}
+    <p className="px-3 pt-1 pb-1 text-xs font-medium text-muted-foreground">
       {children}
     </p>
   );
 }
 
-/** ไม่ส่ง href = ยังไม่ได้ทำหน้านั้น แสดงเป็นข้อความจาง ๆ กดไม่ได้ */
-const NavLink = React.forwardRef<
-  HTMLAnchorElement,
+/**
+ * ไม่มี href = ยังไม่ได้ทำหน้านั้น หน้าตาเหมือนอันอื่นทุกอย่าง แค่กดแล้วไม่ไปไหน
+ * ไม่ทำให้จางลงตามที่ตกลงกันไว้
+ */
+const NavItem = React.forwardRef<
+  HTMLElement,
   Omit<React.ComponentPropsWithoutRef<"a">, "href"> & {
     href?: string;
     icon: string;
     label: string;
+    pending?: number;
     active?: boolean;
+    collapsed?: boolean;
   }
->(function NavLink({ href, icon, label, active, className, ...props }, ref) {
-  const base =
-    "flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors";
+>(function NavItem(
+  { href, icon, label, pending, active, collapsed, className, ...props },
+  ref
+) {
+  const base = cn(
+    "flex items-center rounded-md text-sm transition-colors",
+    collapsed ? "size-10 justify-center self-center" : "gap-3 px-3 py-2",
+    active
+      ? "bg-brand font-medium text-primary ring-1 ring-primary/20 ring-inset"
+      : "text-sidebar-foreground"
+  );
 
-  if (!href) {
-    return (
-      <span
-        className={cn(base, "text-muted-foreground opacity-60")}
-        title="ยังไม่ได้ทำหน้านี้"
-      >
-        <ModuleIcon name={icon} className="size-4 shrink-0" />
-        <span className="truncate">{label}</span>
-      </span>
-    );
-  }
+  const inner = (
+    <>
+      <ModuleIcon name={icon} className="size-5 shrink-0" />
+      {!collapsed && (
+        <>
+          <span className="truncate">{label}</span>
+          {pending !== undefined && (
+            <Badge tone="brand" appearance="soft" className="ml-1 shrink-0">
+              รอ {pending}
+            </Badge>
+          )}
+        </>
+      )}
+    </>
+  );
 
-  return (
+  const node = href ? (
     <Link
-      ref={ref}
+      ref={ref as React.Ref<HTMLAnchorElement>}
       href={href}
       aria-current={active ? "page" : undefined}
-      className={cn(
-        base,
-        active
-          ? "bg-primary text-primary-foreground"
-          : "text-foreground hover:bg-accent-hover",
-        className
-      )}
+      className={cn(base, !active && "hover:bg-accent-hover", className)}
       {...props}
     >
-      <ModuleIcon name={icon} className="size-4 shrink-0" />
-      <span className="truncate">{label}</span>
+      {inner}
     </Link>
+  ) : (
+    <span
+      ref={ref as React.Ref<HTMLSpanElement>}
+      aria-disabled
+      className={cn(base, className)}
+    >
+      {inner}
+    </span>
+  );
+
+  // ตอนหุบไม่มีชื่อกำกับ ต้องมี tooltip ไม่งั้นเดาไอคอนไม่ออก
+  if (!collapsed) return node;
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>{node}</TooltipTrigger>
+      <TooltipContent side="right">
+        {label}
+        {pending !== undefined && ` · รอ ${pending}`}
+      </TooltipContent>
+    </Tooltip>
   );
 });
 
@@ -298,7 +278,7 @@ function BrandMark() {
       aria-hidden
       className="flex size-8 items-center justify-center rounded-md bg-primary text-primary-foreground"
     >
-      <WarehouseIcon className="size-4" />
+      <WarehouseIcon className="size-4" strokeWidth={ICON_STROKE} />
     </span>
   );
 }

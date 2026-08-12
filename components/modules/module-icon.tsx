@@ -24,14 +24,12 @@ import {
   ShoppingCartIcon,
   SquareCheckBigIcon,
   WarehouseIcon,
+  type LucideIcon,
 } from "lucide-react";
 import { cn } from "@peckey954/ui/lib/utils";
 import type { GroupTone } from "@/lib/modules";
 
-const ICONS: Record<
-  string,
-  React.ComponentType<{ className?: string }>
-> = {
+const ICONS: Record<string, LucideIcon> = {
   squareCheck: SquareCheckBigIcon,
   cart: ShoppingCartIcon,
   circleCheck: CircleCheckBigIcon,
@@ -57,6 +55,9 @@ const ICONS: Record<
   grid: LayoutGridIcon,
 };
 
+/** เส้นไอคอนบางกว่าค่าเริ่มต้นของ lucide (2) ให้ตรงกับไฟล์ Figma */
+export const ICON_STROKE = 1.5;
+
 export function ModuleIcon({
   name,
   className,
@@ -65,26 +66,25 @@ export function ModuleIcon({
   className?: string;
 }) {
   const Icon = ICONS[name] ?? LayoutGridIcon;
-  return <Icon className={className} />;
+  return <Icon className={className} strokeWidth={ICON_STROKE} />;
 }
 
-/**
- * สีพื้นกล่องไอคอนแยกตามหมวด
- * amber/orange ใช้ token ของ DS ที่มีอยู่ ส่วน blue/violet ใช้ token เสริมที่เพิ่มไว้ใน globals.css
- */
+/** พื้นกล่องไอคอนของแต่ละหมวด — token ล้วน ดูค่าจริงได้ที่ app/globals.css */
 export const TONE_BOX: Record<GroupTone, string> = {
-  amber: "bg-warning text-warning-foreground",
-  blue: "bg-tone-blue text-tone-blue-foreground",
-  orange: "bg-brand text-primary",
-  violet: "bg-tone-violet text-tone-violet-foreground",
+  yellow: "bg-cat-yellow text-cat-yellow-foreground",
+  blue: "bg-cat-blue text-cat-blue-foreground",
+  orange: "bg-cat-orange text-cat-orange-foreground",
+  purple: "bg-cat-purple text-cat-purple-foreground",
+  sky: "bg-cat-sky text-cat-sky-foreground",
 };
 
-/** จุดกลมหน้าชื่อหมวด ใช้สีเดียวกับกล่องไอคอนแต่เป็นตัวอักษร */
+/** จุดกลมหน้าชื่อหมวด ใช้สีเข้มของหมวดนั้น */
 export const TONE_DOT: Record<GroupTone, string> = {
-  amber: "bg-warning-solid",
-  blue: "bg-tone-blue-foreground",
-  orange: "bg-primary",
-  violet: "bg-tone-violet-foreground",
+  yellow: "bg-cat-yellow-foreground",
+  blue: "bg-cat-blue-foreground",
+  orange: "bg-cat-orange-foreground",
+  purple: "bg-cat-purple-foreground",
+  sky: "bg-cat-sky-foreground",
 };
 
 export function IconBox({
@@ -99,12 +99,12 @@ export function IconBox({
   return (
     <span
       className={cn(
-        "flex size-10 shrink-0 items-center justify-center rounded-lg",
+        "flex size-12 shrink-0 items-center justify-center rounded-xl",
         TONE_BOX[tone],
         className
       )}
     >
-      <ModuleIcon name={name} className="size-5" />
+      <ModuleIcon name={name} className="size-6" />
     </span>
   );
 }

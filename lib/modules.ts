@@ -14,7 +14,7 @@ export type ModuleGroupId =
   | "accounting";
 
 /** สีประจำหมวด อ้าง token ล้วน ไม่มีค่าสีจริงในนี้ */
-export type GroupTone = "amber" | "blue" | "orange" | "violet";
+export type GroupTone = "yellow" | "blue" | "orange" | "purple" | "sky";
 
 export type ModuleGroup = {
   id: ModuleGroupId;
@@ -23,11 +23,11 @@ export type ModuleGroup = {
 };
 
 export const MODULE_GROUPS: ModuleGroup[] = [
-  { id: "purchase", label: "การสั่งซื้อสินค้า", tone: "amber" },
+  { id: "purchase", label: "การสั่งซื้อสินค้า", tone: "yellow" },
   { id: "warehouse", label: "การคลังสินค้า", tone: "blue" },
   { id: "production", label: "การผลิตสินค้า", tone: "orange" },
-  { id: "qc", label: "การตรวจคุณภาพสินค้า", tone: "violet" },
-  { id: "accounting", label: "บัญชี", tone: "blue" },
+  { id: "qc", label: "การตรวจคุณภาพสินค้า", tone: "purple" },
+  { id: "accounting", label: "บัญชี", tone: "sky" },
 ];
 
 export type ModuleItem = {
