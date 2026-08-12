@@ -34,6 +34,11 @@ export type ModuleItem = {
   id: string;
   group: ModuleGroupId;
   label: string;
+  /**
+   * ชื่อแบบสั้นสำหรับจอแคบ ใส่เฉพาะเมนูที่ชื่อเต็มยาวจนโดนตัดบนมือถือ
+   * ไม่ใส่ = ใช้ชื่อเต็มทุกขนาดจอ
+   */
+  shortLabel?: string;
   code: string;
   /** ชื่อไอคอน แมปเป็น component ที่ components/modules/module-icon.tsx */
   icon: string;
@@ -90,7 +95,14 @@ export const MODULES: ModuleItem[] = [
   // ---------- การตรวจคุณภาพสินค้า ----------
   { id: "qc-raw", group: "qc", label: "ตรวจรับวัตถุดิบ", code: "FM-QC-02-03", icon: "filePlus", pending: 7 },
   { id: "qc-fg-in", group: "qc", label: "ตรวจรับสินค้า", code: "FM-QC-02-03", icon: "packageSearch" },
-  { id: "qc-pre", group: "qc", label: "ตรวจวัตถุดิบก่อนผลิต", code: "FM-PD-01-03", icon: "listTodo" },
+  {
+    id: "qc-pre",
+    group: "qc",
+    label: "ตรวจวัตถุดิบก่อนผลิต",
+    shortLabel: "ตรวจก่อนผลิต",
+    code: "FM-PD-01-03",
+    icon: "listTodo",
+  },
   { id: "qc-machine", group: "qc", label: "ตรวจเครื่องจักร", code: "FM-PD-01-03", icon: "scanSearch" },
   { id: "qc-inline", group: "qc", label: "ตรวจระหว่างผลิต", code: "FM-ST-01-02", icon: "searchCheck" },
   { id: "qc-post", group: "qc", label: "ตรวจหลังผลิต", code: "FM-QC-02-04", icon: "packageCheck" },
@@ -144,8 +156,11 @@ export const readyModules = () => MODULES.filter((m) => m.href);
 export function searchModules(q: string): ModuleItem[] {
   const s = q.trim().toLowerCase();
   if (!s) return MODULES;
+  // ค้นชื่อย่อได้ด้วย คนที่เห็นชื่อย่อบนมือถือจะได้พิมพ์ตามที่เห็นแล้วเจอ
   return MODULES.filter(
     (m) =>
-      m.label.toLowerCase().includes(s) || m.code.toLowerCase().includes(s)
+      m.label.toLowerCase().includes(s) ||
+      m.shortLabel?.toLowerCase().includes(s) ||
+      m.code.toLowerCase().includes(s)
   );
 }

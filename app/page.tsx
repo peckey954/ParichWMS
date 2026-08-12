@@ -98,9 +98,16 @@ function ModuleCard({
         tone={tone}
         className="transition-transform duration-150 motion-safe:group-hover:scale-105"
       />
-      <div className="mt-6">
-        <p className="font-semibold">{m.label}</p>
-        <p className="mt-0.5 text-sm text-muted-foreground">{m.code}</p>
+      {/* ชื่อยาวเกินการ์ดให้ตัดท้ายเป็น … ไม่ตกบรรทัดใหม่ การ์ดจะได้สูงเท่ากันทุกใบ
+          จอแคบใช้ชื่อย่อถ้ามี ชื่อเต็มยังอยู่ใน title ให้ชี้ดูได้ */}
+      <div className="mt-6 min-w-0">
+        <p className="truncate font-semibold" title={m.label}>
+          <span className="sm:hidden">{m.shortLabel ?? m.label}</span>
+          <span className="hidden sm:inline">{m.label}</span>
+        </p>
+        <p className="mt-0.5 truncate text-sm text-muted-foreground">
+          {m.code}
+        </p>
       </div>
     </>
   );
