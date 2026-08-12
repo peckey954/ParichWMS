@@ -90,7 +90,15 @@ export const MODULES: ModuleItem[] = [
     pending: 5,
   },
   { id: "bulk", group: "production", label: "ผลิตปุ๋ย Bulk Blend", code: "FM-PD-01-03", icon: "chart" },
-  { id: "recipe", group: "production", label: "สูตรการผลิตประจำสัปดาห์", code: "FM-PD-01-03", icon: "listOrdered" },
+  {
+    id: "recipe",
+    group: "production",
+    label: "สูตรการผลิตประจำสัปดาห์",
+    shortLabel: "สูตรประจำสัปดาห์",
+    code: "FM-PD-01-03",
+    icon: "listOrdered",
+    href: "/production/recipe",
+  },
 
   // ---------- การตรวจคุณภาพสินค้า ----------
   { id: "qc-raw", group: "qc", label: "ตรวจรับวัตถุดิบ", code: "FM-QC-02-03", icon: "filePlus", pending: 7 },
