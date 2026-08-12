@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { useRouter } from "next/navigation";
 import {
   ChevronDownIcon,
   FlaskConicalIcon,
@@ -63,6 +64,7 @@ import {
 ------------------------------------------------------------------ */
 
 export function InputSetup() {
+  const router = useRouter();
   const [rows, setRows] = React.useState<RawMaterialDraft[]>(RAW_MATERIALS);
   const [lastRun, setLastRun] = React.useState<string | null>(null);
   const seq = React.useRef(0);
@@ -94,9 +96,11 @@ export function InputSetup() {
     setLastRun(
       `${d.getMonth() + 1}/${d.getDate()}/${d.getFullYear()} | ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`
     );
-    toast.success("สั่งคำนวณสูตรแล้ว", {
-      description: `ใช้วัตถุดิบ ${rows.length} รายการ · ผลลัพธ์จะไปแทนที่สูตรประจำสัปดาห์ชุดเดิม`,
+    toast.success("คำนวณสูตรเสร็จแล้ว", {
+      description: `ใช้วัตถุดิบ ${rows.length} รายการ`,
     });
+    // พาไปดูผลทันที ไม่ต้องให้ไปหาเองว่าผลอยู่ตรงไหน
+    router.push("/production/recipe/optimized");
   };
 
   return (
@@ -257,7 +261,7 @@ export function InputSetup() {
             <p className="mt-0.5 text-sm text-muted-foreground">
               {lastRun
                 ? `คำนวณล่าสุด ${lastRun}`
-                : "ผลลัพธ์จะไปแทนที่สูตรประจำสัปดาห์ชุดเดิมทั้งหมด"}
+                : "คำนวณเสร็จแล้วจะพาไปดูผลทันที และแทนที่ผลชุดเดิมทั้งหมด"}
             </p>
           </div>
           <Button size="lg" onClick={run} disabled={rows.length === 0}>
