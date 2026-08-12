@@ -2,8 +2,9 @@
 
 import * as React from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
-import { BellIcon, MenuIcon, WarehouseIcon } from "lucide-react";
+import { BellIcon, MenuIcon } from "lucide-react";
 import { Avatar, AvatarFallback } from "@peckey954/ui/components/ui/avatar";
 import { Button } from "@peckey954/ui/components/ui/button";
 import {
@@ -14,15 +15,11 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@peckey954/ui/components/ui/sheet";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@peckey954/ui/components/ui/tooltip";
+import { TooltipProvider } from "@peckey954/ui/components/ui/tooltip";
 import { cn } from "@peckey954/ui/lib/utils";
+import { LightTooltip } from "@/components/light-tooltip";
 import { ThemeToggle } from "@/components/theme-toggle";
-import { ICON_STROKE, ModuleIcon } from "@/components/modules/module-icon";
+import { ModuleIcon } from "@/components/modules/module-icon";
 import { PendingBadge } from "@/components/modules/pending-badge";
 import {
   MODULE_GROUPS,
@@ -238,10 +235,14 @@ const NavItem = React.forwardRef<
     </>
   );
 
+  // ตอนหุบไม่มีข้อความในปุ่มเลย ต้องใส่ชื่อกำกับไว้ให้โปรแกรมอ่านหน้าจอ
+  const a11yLabel = collapsed ? label : undefined;
+
   const node = href ? (
     <Link
       ref={ref as React.Ref<HTMLAnchorElement>}
       href={href}
+      aria-label={a11yLabel}
       aria-current={active ? "page" : undefined}
       className={cn(base, !active && "hover:bg-accent-hover", className)}
       {...props}
@@ -251,6 +252,7 @@ const NavItem = React.forwardRef<
   ) : (
     <span
       ref={ref as React.Ref<HTMLSpanElement>}
+      aria-label={a11yLabel}
       aria-disabled
       className={cn(base, className)}
     >
@@ -261,23 +263,34 @@ const NavItem = React.forwardRef<
   // ตอนหุบไม่มีชื่อกำกับ ต้องมี tooltip ไม่งั้นเดาไอคอนไม่ออก
   if (!collapsed) return node;
   return (
-    <Tooltip>
-      <TooltipTrigger asChild>{node}</TooltipTrigger>
-      <TooltipContent side="right">
-        {label}
-        {pending !== undefined && ` · รอ ${pending}`}
-      </TooltipContent>
-    </Tooltip>
+    <LightTooltip
+      label={
+        <>
+          {label}
+          {pending !== undefined && ` · รอ ${pending}`}
+        </>
+      }
+    >
+      {node}
+    </LightTooltip>
   );
 });
 
+/**
+ * โลโก้บนหัวเรื่อง ใช้เฉพาะส่วนต้นไม้ที่ตัดมาเป็นสี่เหลี่ยมจัตุรัส
+ * โลโก้เต็มมีคำว่า PARICH อยู่ด้วย พอย่อเหลือ 32px ตัวหนังสือจะอ่านไม่ออก
+ * และซ้ำกับข้อความ "Parich WMS" ที่อยู่ติดกันอยู่แล้ว
+ * ตัวเต็มเก็บไว้ที่ public/parich-logo.png เผื่อใช้กับหน้าล็อกอินหรือเอกสารพิมพ์
+ */
 function BrandMark() {
   return (
-    <span
-      aria-hidden
-      className="flex size-8 items-center justify-center rounded-md bg-primary text-primary-foreground"
-    >
-      <WarehouseIcon className="size-4" strokeWidth={ICON_STROKE} />
-    </span>
+    <Image
+      src="/parich-mark.png"
+      alt=""
+      width={400}
+      height={400}
+      priority
+      className="size-8 shrink-0 rounded-md"
+    />
   );
 }
