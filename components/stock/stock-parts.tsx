@@ -127,12 +127,14 @@ function ChipScroller({ children }: { children: React.ReactNode }) {
 
 /**
  * ป้ายโซน — เป็นรหัสตำแหน่งที่ต้องอ่านให้ออก ไม่ใช่ข้อความรอง
- * เดิมใช้ --muted-foreground บนพื้น --muted ได้คอนทราสต์ 4.36:1 ซึ่งตกเกณฑ์
- * เปลี่ยนเป็น --secondary-foreground เป็นคู่สีเทาอ่อน/ตัวเข้มของ DS
+ *
+ * ไม่ใช้ font-mono แล้ว เพราะโปรเจกต์นี้ไม่ได้ตั้ง --font-mono ไว้
+ * มันเลยตกไปใช้ฟอนต์ monospace ของเครื่อง ซึ่งไม่ใช่ Sarabun
+ * ตอนนี้ไม่ระบุฟอนต์จึงรับ font-sans (Sarabun) ต่อมาจากข้างบน
  */
 function ZoneTag({ zone }: { zone: string }) {
   return (
-    <span className="rounded-md bg-secondary px-2 py-0.5 font-mono text-xs font-medium text-secondary-foreground">
+    <span className="rounded-md bg-secondary px-2 py-0.5 text-xs font-semibold text-secondary-foreground">
       {zone}
     </span>
   );

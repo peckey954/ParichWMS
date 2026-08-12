@@ -6,12 +6,12 @@ import {
   EyeIcon,
   EyeOffIcon,
   ListFilterIcon,
+  RotateCcwIcon,
   SearchIcon,
   SlidersHorizontalIcon,
   SquareCheckBigIcon,
   SquareIcon,
   TagIcon,
-  TriangleAlertIcon,
 } from "lucide-react";
 import { Badge } from "@peckey954/ui/components/ui/badge";
 import {
@@ -80,6 +80,16 @@ export default function GeneralStockPage() {
   const toggleAll = () => {
     setShowChips(!allShown);
     setShowActions(!allShown);
+  };
+
+  // ค่าที่ popover เป็นเจ้าของ — ล้างได้ทีเดียวจบ
+  // ไม่ล้างประเภทสินค้ากับคำค้น เพราะสองอย่างนั้นเป็นการนำทาง ไม่ใช่ตัวกรอง
+  const isDefault = !lowOnly && sort === "product" && showChips && showActions;
+  const resetFilters = () => {
+    setLowOnly(false);
+    setSort("product");
+    setShowChips(true);
+    setShowActions(true);
   };
 
   // จำนวนบนชิปเป็นยอดจริงของแต่ละประเภท ไม่เปลี่ยนตามคำค้น
@@ -300,7 +310,7 @@ export default function GeneralStockPage() {
                   className="relative shrink-0"
                 >
                   <ListFilterIcon />
-                  {(!showChips || !showActions || lowOnly) && (
+                  {!isDefault && (
                     <span className="absolute top-1 right-1 size-2 rounded-full bg-primary" />
                   )}
                 </Button>
@@ -313,29 +323,7 @@ export default function GeneralStockPage() {
                   </PopoverDescription>
                 </PopoverHeader>
 
-                {/* ตัวกรองเดียวกับชิปสต็อกต่ำด้านบน ผูกกับค่าเดียวกัน
-                    กดที่ไหนก็ได้ อีกที่จะขยับตาม ไม่หลุดจากกัน */}
-                <div className="mt-4 space-y-3">
-                  <Label className="text-sm">กรอง</Label>
-                  <Label
-                    htmlFor="filter-low"
-                    className="flex items-center gap-3 font-normal"
-                  >
-                    <Checkbox
-                      id="filter-low"
-                      checked={lowOnly}
-                      onCheckedChange={(v) => setLowOnly(v === true)}
-                    />
-                    <span className="flex items-center gap-2">
-                      <TriangleAlertIcon className="size-4" />
-                      เฉพาะสต็อกต่ำ
-                    </span>
-                  </Label>
-                </div>
-
-                <Separator className="my-4" />
-
-                <div className="space-y-2">
+                <div className="mt-4 space-y-2">
                   <Label className="text-sm">เรียงตาม</Label>
                   <ToggleGroup
                     type="single"
@@ -361,6 +349,20 @@ export default function GeneralStockPage() {
 
                 <div className="space-y-3">
                   <Label className="text-sm">แสดงในรายการ</Label>
+
+                  {/* ผูกค่าเดียวกับชิปสต็อกต่ำด้านบน กดที่ไหนอีกที่ก็ขยับตาม */}
+                  <Label
+                    htmlFor="filter-low"
+                    className="flex items-center gap-3 font-normal"
+                  >
+                    <Checkbox
+                      id="filter-low"
+                      checked={lowOnly}
+                      onCheckedChange={(v) => setLowOnly(v === true)}
+                    />
+                    เฉพาะสต็อกต่ำ
+                  </Label>
+
                   <Label
                     htmlFor="show-chips"
                     className="flex items-center gap-3 font-normal"
@@ -391,6 +393,19 @@ export default function GeneralStockPage() {
                     </span>
                   </Label>
                 </div>
+
+                {/* ปิดไว้ตอนทุกอย่างเป็นค่าเริ่มต้นอยู่แล้ว จะได้รู้ว่ามีอะไรให้ล้างไหม */}
+                <Separator className="my-4" />
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full"
+                  disabled={isDefault}
+                  onClick={resetFilters}
+                >
+                  <RotateCcwIcon />
+                  ล้างค่า
+                </Button>
               </PopoverContent>
             </Popover>
 
