@@ -3,7 +3,6 @@
 import * as React from "react";
 import Link from "next/link";
 import {
-  CloudDownloadIcon,
   CoinsIcon,
   PackageIcon,
   SlidersHorizontalIcon,
@@ -19,6 +18,7 @@ import {
 import { Button } from "@peckey954/ui/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@peckey954/ui/components/ui/tabs";
 import { cn } from "@peckey954/ui/lib/utils";
+import { CostSetup } from "@/components/production/cost-setup";
 import { InputSetup } from "@/components/production/input-setup";
 
 /* ------------------------------------------------------------------
@@ -65,13 +65,8 @@ const TABS: {
     label: "ตั้งค่าต้นทุน",
     icon: CoinsIcon,
     purpose:
-      "ราคาวัตถุดิบที่ใช้หาสูตรที่คุ้มที่สุด ดึงจากระบบจัดซื้อได้ และคีทับเองได้",
-    planned: [
-      "ราคาต่อหน่วยของวัตถุดิบแต่ละตัว",
-      "ดึงราคาล่าสุดจากใบสั่งซื้อ พร้อมบอกว่าดึงมาเมื่อไร",
-      "คีทับเองได้ และเห็นชัดว่าแถวไหนถูกแก้มือ",
-      "ประวัติการเปลี่ยนราคา",
-    ],
+      "ต้นทุนต่อถุงและราคาขายจริงของแต่ละสูตร ค่าที่เหมือนกันทุกสูตรแก้ครั้งเดียวจบ",
+    planned: [],
   },
 ];
 
@@ -129,9 +124,15 @@ export default function RecipeSetupPage() {
         </div>
       )}
 
-      {/* สองแท็บที่เหลือยังเป็นโครง บอกไว้ตรง ๆ ว่าจะมีอะไร
+      {tab === "cost" && (
+        <div className="mt-4">
+          <CostSetup />
+        </div>
+      )}
+
+      {/* แท็บ SKU ยังเป็นโครง บอกไว้ตรง ๆ ว่าจะมีอะไร
           จะได้คุยกันได้ว่าตกอะไรไปก่อนจะลงมือทำจริง */}
-      {tab !== "input" && (
+      {tab === "sku" && (
       <div className="mt-4 rounded-xl border border-border bg-card p-5">
         <div className="flex items-start gap-3">
           <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-brand text-primary">
@@ -162,12 +163,6 @@ export default function RecipeSetupPage() {
           </ul>
         </div>
 
-        {tab === "cost" && (
-          <p className="mt-4 flex items-center gap-2 text-sm text-muted-foreground">
-            <CloudDownloadIcon className="size-4 shrink-0" />
-            ดึงราคาจากระบบจัดซื้อได้ และคีทับเองได้ทั้งสองทาง
-          </p>
-        )}
       </div>
       )}
 
