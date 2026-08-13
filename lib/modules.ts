@@ -118,7 +118,14 @@ export const MODULES: ModuleItem[] = [
   { id: "qc-complaint", group: "qc", label: "ร้องเรียนลูกค้า", code: "FM-PD-01-03", icon: "complaint", pending: 2 },
 
   // ---------- บัญชี ----------
-  { id: "report", group: "accounting", label: "ส่งออกรายงาน", code: "FM-PD-01-01", icon: "fileOutput" },
+  {
+    id: "report",
+    group: "accounting",
+    label: "ส่งออกรายงาน",
+    code: "FM-PD-01-01",
+    icon: "fileOutput",
+    href: "/reports",
+  },
 ];
 
 /**

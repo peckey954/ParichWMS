@@ -166,6 +166,11 @@
   --color-cat-sky: var(--cat-sky);
   --color-cat-sky-foreground: var(--cat-sky-foreground);
 
+  --color-chip-yellow: var(--chip-yellow);
+  --color-chip-green-foreground: var(--chip-green-foreground);
+  --color-chip-yellow-foreground: var(--chip-yellow-foreground);
+  --color-chip-red-foreground: var(--chip-red-foreground);
+
   --color-tone-blue: var(--tone-blue);
   --color-tone-blue-foreground: var(--tone-blue-foreground);
   --color-tone-violet: var(--tone-violet);
