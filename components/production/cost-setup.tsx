@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { ChevronRightIcon, ListIcon, SearchIcon, TableIcon } from "lucide-react";
+import { ArrowDownToLineIcon, ChevronRightIcon, SearchIcon } from "lucide-react";
 import { Badge } from "@peckey954/ui/components/ui/badge";
 import { Button } from "@peckey954/ui/components/ui/button";
 import {
@@ -9,58 +9,66 @@ import {
   InputGroupAddon,
   InputGroupInput,
 } from "@peckey954/ui/components/ui/input-group";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@peckey954/ui/components/ui/popover";
 import { Progress } from "@peckey954/ui/components/ui/progress";
 import {
-  ToggleGroup,
-  ToggleGroupItem,
-} from "@peckey954/ui/components/ui/toggle-group";
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectLabel,
+  SelectTrigger,
+  SelectValue,
+} from "@peckey954/ui/components/ui/select";
 import { cn } from "@peckey954/ui/lib/utils";
 import { toast } from "sonner";
 import { RECIPE_GROUP_LABEL } from "@/lib/recipe";
 import {
   COST_FIELDS,
   COST_ROWS,
+  FIELD_GROUP_LABEL,
   blanksByField,
   computeCost,
+  fieldsByGroup,
   filledCells,
   formatBaht,
   matchesCost,
   rowBlanks,
   totalCells,
   type CostRow,
+  type FieldGroup,
   type FieldKey,
 } from "@/lib/recipe-cost";
-import { CostByField } from "./cost-by-field";
-import { CostRowSheet } from "./cost-row-sheet";
+import { CostRowDrawer } from "./cost-row-drawer";
 import { CostTable } from "./cost-table";
 
 /* ------------------------------------------------------------------
    แท็บตั้งค่าต้นทุน
 
    ทุกช่องที่หัวเป็นสีส้มในไฟล์ต้นทางคือช่องกรอกรายสูตร รวม 17 ช่อง
-   คูณจำนวนสูตรแล้วเป็นหลักห้าร้อยช่อง ซึ่งเยอะจริงและตัดออกไม่ได้
+   คูณจำนวนสูตรแล้วเป็นหลักห้าร้อยช่อง
 
-   จึงไม่แก้ด้วยการลดจำนวนช่อง แต่แก้ด้วยสามอย่าง
-     1. ไล่ตามคอลัมน์ ไม่ใช่ตามแถว — ตรงกับงานจริงที่แก้ค่าเดียวข้ามหลายสูตร
-     2. เติมทั้งคอลัมน์รวดเดียว แล้วค่อยไล่แก้เฉพาะสูตรที่ต่าง
-     3. บอกความคืบหน้าตลอด ว่ากรอกไปกี่ช่องแล้ว และเหลือคอลัมน์ไหน
-
-   ตั้งใจไม่ทำ — ยกตาราง 21 คอลัมน์ลงมือถือแล้วให้เลื่อนแนวนอน
+   จอกว้าง — ตารางเต็ม หน้าตาตรงกับไฟล์ Excel ที่สุด
+   จอแคบ  — รายการสูตร กดแล้วดึง drawer ขึ้นมากรอกครบ 17 ช่องในนั้น
 ------------------------------------------------------------------ */
 
-type Mode = "field" | "table";
+const GROUP_ORDER: FieldGroup[] = ["cost", "rate", "budget", "price"];
 
 export function CostSetup() {
   const [rows, setRows] = React.useState<CostRow[]>(COST_ROWS);
   const [query, setQuery] = React.useState("");
-  const [mode, setMode] = React.useState<Mode>("field");
-  const [field, setField] = React.useState<FieldKey>("rawMaterial");
   const [openId, setOpenId] = React.useState<string | null>(null);
 
   const patch = (id: string, key: FieldKey, value: string) =>
     setRows((prev) =>
       prev.map((r) => (r.id === id ? { ...r, [key]: value } : r))
     );
+
+  const visible = rows.filter((r) => matchesCost(r, query));
 
   /** เติมค่าเดียวกันให้ทุกสูตรที่กำลังแสดงอยู่ ไม่ใช่ทุกสูตรในระบบ
       ถ้ากรองอยู่แล้วเติมทั้งหมด จะไปทับสูตรที่มองไม่เห็นโดยไม่รู้ตัว */
@@ -69,14 +77,18 @@ export function CostSetup() {
     setRows((prev) =>
       prev.map((r) => (ids.has(r.id) ? { ...r, [key]: value } : r))
     );
-    const label = COST_FIELDS.find((f) => f.key === key)!.label;
-    toast.success(`เติม ${label} แล้ว`, {
+    toast.success(`เติม ${COST_FIELDS.find((f) => f.key === key)!.label} แล้ว`, {
       description: `${ids.size} สูตร · แก้รายตัวทับได้ตามปกติ`,
     });
   };
 
-  const visible = rows.filter((r) => matchesCost(r, query));
-  const open = rows.find((r) => r.id === openId) ?? null;
+  const openIndex = visible.findIndex((r) => r.id === openId);
+  const open = openIndex >= 0 ? visible[openIndex] : null;
+
+  const step = (delta: number) => {
+    const next = visible[openIndex + delta];
+    if (next) setOpenId(next.id);
+  };
 
   const done = filledCells(rows);
   const all = totalCells(rows);
@@ -114,26 +126,14 @@ export function CostSetup() {
         <Progress value={(done / all) * 100} className="mt-3" />
 
         {pending.length > 0 ? (
-          <div className="mt-3 flex flex-wrap items-center gap-2">
-            <span className="text-sm text-muted-foreground">ยังว่าง:</span>
+          <p className="mt-3 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+            ยังว่าง:
             {pending.map((f) => (
-              // กดแล้วกระโดดไปกรอกคอลัมน์นั้นเลย ไม่ต้องไล่หาเอง
-              <Button
-                key={f.key}
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  setField(f.key);
-                  setMode("field");
-                }}
-              >
-                {f.label}
-                <Badge tone="warning" appearance="soft">
-                  {f.blank}
-                </Badge>
-              </Button>
+              <Badge key={f.key} tone="warning" appearance="soft">
+                {f.label} {f.blank}
+              </Badge>
             ))}
-          </div>
+          </p>
         ) : (
           <p className="mt-3 text-sm text-muted-foreground">
             กรอกครบทุกช่องแล้ว · ราคาขาย {formatBaht(priceRange.min)}–
@@ -157,30 +157,13 @@ export function CostSetup() {
               />
             </InputGroup>
           </div>
-
-          {/* ตารางเต็มเลือกได้เฉพาะจอกว้าง จอแคบใช้ทีละช่องอย่างเดียว */}
-          <ToggleGroup
-            type="single"
-            value={mode}
-            onValueChange={(v) => v && setMode(v as Mode)}
-            variant="outline"
-            className="hidden @3xl:flex"
-          >
-            <ToggleGroupItem value="field" className="px-3">
-              <ListIcon />
-              ทีละช่อง
-            </ToggleGroupItem>
-            <ToggleGroupItem value="table" className="px-3">
-              <TableIcon />
-              ตารางเต็ม
-            </ToggleGroupItem>
-          </ToggleGroup>
+          <FillDown count={visible.length} onFill={fillDown} />
         </div>
 
         {query.trim() !== "" && (
           <p className="mt-2 text-sm text-muted-foreground">
             กรองอยู่ {visible.length} จาก {rows.length} สูตร ·
-            ปุ่มเติมทั้งคอลัมน์จะเติมเฉพาะที่แสดงอยู่
+            เติมทั้งคอลัมน์จะเติมเฉพาะที่แสดงอยู่
           </p>
         )}
       </section>
@@ -192,36 +175,18 @@ export function CostSetup() {
         </div>
       ) : (
         <>
+          {/* จอแคบ: รายการสูตร กดแล้วเปิด drawer */}
           <div className="@3xl:hidden">
-            <CostByField
-              rows={visible}
-              field={field}
-              onFieldChange={setField}
-              onPatch={patch}
-              onFillDown={fillDown}
-            />
             <RowList rows={visible} onOpen={(r) => setOpenId(r.id)} />
           </div>
 
+          {/* จอกว้าง: ตารางเต็ม */}
           <div className="hidden @3xl:block">
-            {mode === "table" ? (
-              <CostTable
-                rows={visible}
-                onPatch={patch}
-                onOpenRow={(r) => setOpenId(r.id)}
-              />
-            ) : (
-              <>
-                <CostByField
-                  rows={visible}
-                  field={field}
-                  onFieldChange={setField}
-                  onPatch={patch}
-                  onFillDown={fillDown}
-                />
-                <RowList rows={visible} onOpen={(r) => setOpenId(r.id)} />
-              </>
-            )}
+            <CostTable
+              rows={visible}
+              onPatch={patch}
+              onOpenRow={(r) => setOpenId(r.id)}
+            />
           </div>
         </>
       )}
@@ -235,17 +200,99 @@ export function CostSetup() {
         </Button>
       </div>
 
-      <CostRowSheet
+      <CostRowDrawer
         row={open}
         open={openId !== null}
         onOpenChange={(v) => !v && setOpenId(null)}
         onPatch={patch}
+        onStep={step}
       />
     </div>
   );
 }
 
-/** รายการสูตร กดเข้าไปกรอกครบทั้ง 17 ช่องของสูตรนั้นในจอเดียว */
+/**
+ * เติมค่าเดียวกันทั้งคอลัมน์
+ *
+ * 561 ช่องที่ค่าซ้ำกันเกือบหมด ถ้าไม่มีทางลัดนี้ต้องพิมพ์เลขเดิม 33 ครั้งต่อคอลัมน์
+ * ไม่ได้แทนช่องกรอกรายสูตร แก้รายตัวทับได้ตามปกติ
+ */
+function FillDown({
+  count,
+  onFill,
+}: {
+  count: number;
+  onFill: (key: FieldKey, value: string) => void;
+}) {
+  const [open, setOpen] = React.useState(false);
+  const [field, setField] = React.useState<FieldKey>("handling");
+  const [value, setValue] = React.useState("");
+
+  const active = COST_FIELDS.find((f) => f.key === field)!;
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button variant="outline" className="bg-card">
+          <ArrowDownToLineIcon />
+          เติมทั้งคอลัมน์
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent align="end" className="w-80 space-y-3">
+        <div>
+          <p className="font-medium">เติมค่าเดียวกันทุกสูตร</p>
+          <p className="mt-0.5 text-sm text-muted-foreground">
+            ใส่ครั้งเดียวได้ทั้ง {count} สูตร แล้วค่อยแก้เฉพาะตัวที่ต่าง
+          </p>
+        </div>
+
+        <Select value={field} onValueChange={(v) => setField(v as FieldKey)}>
+          <SelectTrigger className="w-full">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {GROUP_ORDER.map((g) => (
+              <SelectGroup key={g}>
+                <SelectLabel>{FIELD_GROUP_LABEL[g]}</SelectLabel>
+                {fieldsByGroup(g).map((f) => (
+                  <SelectItem key={f.key} value={f.key}>
+                    {f.label}
+                  </SelectItem>
+                ))}
+              </SelectGroup>
+            ))}
+          </SelectContent>
+        </Select>
+
+        <InputGroup className="bg-card">
+          <InputGroupInput
+            aria-label={`ค่าที่จะเติมให้ ${active.label}`}
+            inputMode="decimal"
+            placeholder="0"
+            value={value}
+            onChange={(e) => setValue(e.target.value)}
+            className="text-right tabular-nums"
+          />
+          <InputGroupAddon align="inline-end">{active.suffix}</InputGroupAddon>
+        </InputGroup>
+
+        <Button
+          className="w-full"
+          disabled={value.trim() === ""}
+          onClick={() => {
+            onFill(field, value);
+            setValue("");
+            setOpen(false);
+          }}
+        >
+          เติม {count} สูตร
+        </Button>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+/** รายการสูตรบนจอแคบ กดแล้วเปิด drawer กรอกครบทุกช่องของสูตรนั้น */
 function RowList({
   rows,
   onOpen,
@@ -254,17 +301,20 @@ function RowList({
   onOpen: (row: CostRow) => void;
 }) {
   return (
-    <div className="mt-4">
-      <p className="mb-2 text-sm text-muted-foreground">
-        หรือเปิดทีละสูตรเพื่อกรอกให้ครบทุกช่องของสูตรนั้นรวดเดียว
-      </p>
-      <div className="overflow-hidden rounded-xl border border-border bg-card">
-        {rows.map((row, i) => {
-          const r = computeCost(row);
-          const blanks = rowBlanks(row);
-          return (
+    <div className="overflow-hidden rounded-xl border border-border bg-card">
+      {rows.map((row, i) => {
+        const r = computeCost(row);
+        const blanks = rowBlanks(row);
+        const prev = i > 0 ? rows[i - 1].group : null;
+
+        return (
+          <React.Fragment key={row.id}>
+            {row.group !== prev && (
+              <p className="bg-surface px-4 py-2 text-sm font-medium text-muted-foreground">
+                {RECIPE_GROUP_LABEL[row.group]}
+              </p>
+            )}
             <button
-              key={row.id}
               type="button"
               onClick={() => onOpen(row)}
               className={cn(
@@ -277,7 +327,7 @@ function RowList({
               <span className="min-w-0 flex-1">
                 <span className="block truncate font-medium">{row.sku}</span>
                 <span className="block text-sm text-muted-foreground">
-                  {RECIPE_GROUP_LABEL[row.group]} · {row.size} กก.
+                  {row.size} กก. · ต้นทุนรวม {formatBaht(r.total)}
                 </span>
               </span>
               {blanks > 0 && (
@@ -295,9 +345,9 @@ function RowList({
               </span>
               <ChevronRightIcon className="size-4 shrink-0 text-muted-foreground" />
             </button>
-          );
-        })}
-      </div>
+          </React.Fragment>
+        );
+      })}
     </div>
   );
 }
