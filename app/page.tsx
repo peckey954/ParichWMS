@@ -130,9 +130,9 @@ function ModuleCard({
       href={m.href}
       className={cn(
         base,
-        // ชี้ค้าง: ยกขึ้นเล็กน้อย เงาลึกขึ้น ขอบเปลี่ยนเป็นสีแบรนด์
-        "transition-[transform,box-shadow,border-color] duration-150",
-        "hover:border-primary hover:shadow-md motion-safe:hover:-translate-y-0.5",
+        // ชี้ค้าง: ยกขึ้นเล็กน้อย เงาลึกขึ้น ขอบไม่เปลี่ยนสี
+        "transition-[transform,box-shadow] duration-150",
+        "hover:shadow-md motion-safe:hover:-translate-y-0.5",
         // กด: กดลงไปนิดหนึ่งให้รู้สึกว่ากดติด
         "motion-safe:active:translate-y-0 active:shadow-sm",
         "focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none"
