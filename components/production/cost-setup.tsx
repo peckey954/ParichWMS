@@ -9,6 +9,7 @@ import {
   InputGroupAddon,
   InputGroupInput,
 } from "@peckey954/ui/components/ui/input-group";
+import { Progress } from "@peckey954/ui/components/ui/progress";
 import {
   ToggleGroup,
   ToggleGroupItem,
@@ -17,95 +18,133 @@ import { cn } from "@peckey954/ui/lib/utils";
 import { toast } from "sonner";
 import { RECIPE_GROUP_LABEL } from "@/lib/recipe";
 import {
-  COST_DEFAULTS,
+  COST_FIELDS,
   COST_ROWS,
+  blanksByField,
   computeCost,
+  filledCells,
   formatBaht,
   matchesCost,
-  overrideCount,
-  type CostDefaults,
+  rowBlanks,
+  totalCells,
   type CostRow,
-  type RowFieldKey,
+  type FieldKey,
 } from "@/lib/recipe-cost";
 import { CostByField } from "./cost-by-field";
-import { CostDefaultsCard } from "./cost-defaults";
 import { CostRowSheet } from "./cost-row-sheet";
 import { CostTable } from "./cost-table";
 
 /* ------------------------------------------------------------------
    แท็บตั้งค่าต้นทุน
 
-   ไฟล์ Excel ต้นทางมี 25 คอลัมน์ ซึ่งกรอกบนมือถือไม่ได้เลย
-   แต่พอไล่ค่าจริงแล้ว 12 จาก 15 คอลัมน์ที่กรอกได้เป็นค่าเดียวกันทุกแถว
-   งานกรอกจริงจึงเหลือ 3 ช่องต่อสูตร ไม่ใช่ 15
+   ทุกช่องที่หัวเป็นสีส้มในไฟล์ต้นทางคือช่องกรอกรายสูตร รวม 17 ช่อง
+   คูณจำนวนสูตรแล้วเป็นหลักห้าร้อยช่อง ซึ่งเยอะจริงและตัดออกไม่ได้
 
-   หน้าเลยแบ่งเป็นสามชั้นตามความถี่ที่แก้
-     1. ค่าตั้งต้น    — แก้ครั้งเดียวใช้ทั้งตาราง
-     2. แก้ทีละช่อง   — "Nitro ขึ้นราคา ไล่แก้ทุกสูตร" คือค่าเริ่มต้นบนจอแคบ
-     3. แก้ทีละสูตร   — เปิดเต็มจอ ใช้ตอนสูตรนั้นต้องต่างจากคนอื่น
+   จึงไม่แก้ด้วยการลดจำนวนช่อง แต่แก้ด้วยสามอย่าง
+     1. ไล่ตามคอลัมน์ ไม่ใช่ตามแถว — ตรงกับงานจริงที่แก้ค่าเดียวข้ามหลายสูตร
+     2. เติมทั้งคอลัมน์รวดเดียว แล้วค่อยไล่แก้เฉพาะสูตรที่ต่าง
+     3. บอกความคืบหน้าตลอด ว่ากรอกไปกี่ช่องแล้ว และเหลือคอลัมน์ไหน
 
-   ตั้งใจไม่ทำ — ยกตาราง 25 คอลัมน์ลงมือถือแล้วให้เลื่อนแนวนอน
-   ล็อกชื่อสูตรกับราคาขายไว้สองข้างแล้วเหลือพื้นที่กลางไม่ถึงร้อยพิกเซล
+   ตั้งใจไม่ทำ — ยกตาราง 21 คอลัมน์ลงมือถือแล้วให้เลื่อนแนวนอน
 ------------------------------------------------------------------ */
 
 type Mode = "field" | "table";
 
 export function CostSetup() {
-  const [defaults, setDefaults] = React.useState<CostDefaults>(COST_DEFAULTS);
   const [rows, setRows] = React.useState<CostRow[]>(COST_ROWS);
   const [query, setQuery] = React.useState("");
   const [mode, setMode] = React.useState<Mode>("field");
+  const [field, setField] = React.useState<FieldKey>("rawMaterial");
   const [openId, setOpenId] = React.useState<string | null>(null);
 
-  const patch = (id: string, key: RowFieldKey, value: string) =>
+  const patch = (id: string, key: FieldKey, value: string) =>
     setRows((prev) =>
       prev.map((r) => (r.id === id ? { ...r, [key]: value } : r))
     );
 
-  const setOverride = (id: string, key: string, value: string) =>
+  /** เติมค่าเดียวกันให้ทุกสูตรที่กำลังแสดงอยู่ ไม่ใช่ทุกสูตรในระบบ
+      ถ้ากรองอยู่แล้วเติมทั้งหมด จะไปทับสูตรที่มองไม่เห็นโดยไม่รู้ตัว */
+  const fillDown = (key: FieldKey, value: string) => {
+    const ids = new Set(visible.map((r) => r.id));
     setRows((prev) =>
-      prev.map((r) =>
-        r.id === id ? { ...r, override: { ...r.override, [key]: value } } : r
-      )
+      prev.map((r) => (ids.has(r.id) ? { ...r, [key]: value } : r))
     );
+    const label = COST_FIELDS.find((f) => f.key === key)!.label;
+    toast.success(`เติม ${label} แล้ว`, {
+      description: `${ids.size} สูตร · แก้รายตัวทับได้ตามปกติ`,
+    });
+  };
 
   const visible = rows.filter((r) => matchesCost(r, query));
-  const overridden = rows.filter((r) => overrideCount(r.override) > 0).length;
   const open = rows.find((r) => r.id === openId) ?? null;
 
+  const done = filledCells(rows);
+  const all = totalCells(rows);
+  const pending = blanksByField(rows);
+
   const priceRange = React.useMemo(() => {
-    const prices = rows.map((r) => computeCost(r, defaults).price);
+    const prices = rows.map((r) => computeCost(r).price);
     return { min: Math.min(...prices), max: Math.max(...prices) };
-  }, [rows, defaults]);
+  }, [rows]);
 
   const save = () =>
     toast.success("บันทึกค่าต้นทุนแล้ว", {
-      description: `${rows.length} สูตร · ราคาขาย ${formatBaht(priceRange.min)}–${formatBaht(priceRange.max)} บาท`,
+      description: `${rows.length} สูตร · กรอกครบ ${done} จาก ${all} ช่อง`,
     });
 
   return (
     <div className="space-y-4">
-      <CostDefaultsCard
-        value={defaults}
-        onChange={setDefaults}
-        overriddenRows={overridden}
-      />
-
-      {/* ---------- แถบเครื่องมือของรายสูตร ---------- */}
+      {/* ---------- ความคืบหน้า ----------
+          561 ช่องไม่มีทางกรอกจบในรอบเดียว ต้องบอกได้ว่าค้างตรงไหน
+          ไม่งั้นคนจะไม่กล้าปิดหน้าไปทำอย่างอื่น */}
       <section className="rounded-xl border border-border bg-card p-4">
         <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-          <h3 className="font-semibold">
-            ค่าเฉพาะสูตร
+          <p className="font-semibold">
+            ความคืบหน้า
             <span className="ml-2 text-sm font-normal text-muted-foreground">
-              {rows.length} สูตร · กรอกแค่ 3 ช่องต่อสูตร
+              {rows.length} สูตร × {COST_FIELDS.length} ช่อง
             </span>
-          </h3>
-          <Badge tone="neutral" appearance="soft">
-            ราคาขาย {formatBaht(priceRange.min)}–{formatBaht(priceRange.max)} บาท
-          </Badge>
+          </p>
+          <p className="text-sm tabular-nums">
+            <span className="text-lg font-semibold">{done}</span>
+            <span className="text-muted-foreground"> / {all} ช่อง</span>
+          </p>
         </div>
 
-        <div className="mt-3 flex flex-wrap items-center gap-2">
+        <Progress value={(done / all) * 100} className="mt-3" />
+
+        {pending.length > 0 ? (
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <span className="text-sm text-muted-foreground">ยังว่าง:</span>
+            {pending.map((f) => (
+              // กดแล้วกระโดดไปกรอกคอลัมน์นั้นเลย ไม่ต้องไล่หาเอง
+              <Button
+                key={f.key}
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setField(f.key);
+                  setMode("field");
+                }}
+              >
+                {f.label}
+                <Badge tone="warning" appearance="soft">
+                  {f.blank}
+                </Badge>
+              </Button>
+            ))}
+          </div>
+        ) : (
+          <p className="mt-3 text-sm text-muted-foreground">
+            กรอกครบทุกช่องแล้ว · ราคาขาย {formatBaht(priceRange.min)}–
+            {formatBaht(priceRange.max)} บาท
+          </p>
+        )}
+      </section>
+
+      {/* ---------- แถบเครื่องมือ ---------- */}
+      <section className="rounded-xl border border-border bg-card p-4">
+        <div className="flex flex-wrap items-center gap-2">
           <div className="min-w-52 flex-1">
             <InputGroup className="bg-card">
               <InputGroupAddon align="inline-start">
@@ -119,7 +158,7 @@ export function CostSetup() {
             </InputGroup>
           </div>
 
-          {/* ตารางเลือกได้เฉพาะจอกว้าง จอแคบใช้ทีละช่องอย่างเดียว */}
+          {/* ตารางเต็มเลือกได้เฉพาะจอกว้าง จอแคบใช้ทีละช่องอย่างเดียว */}
           <ToggleGroup
             type="single"
             value={mode}
@@ -133,10 +172,17 @@ export function CostSetup() {
             </ToggleGroupItem>
             <ToggleGroupItem value="table" className="px-3">
               <TableIcon />
-              ตาราง
+              ตารางเต็ม
             </ToggleGroupItem>
           </ToggleGroup>
         </div>
+
+        {query.trim() !== "" && (
+          <p className="mt-2 text-sm text-muted-foreground">
+            กรองอยู่ {visible.length} จาก {rows.length} สูตร ·
+            ปุ่มเติมทั้งคอลัมน์จะเติมเฉพาะที่แสดงอยู่
+          </p>
+        )}
       </section>
 
       {visible.length === 0 ? (
@@ -146,27 +192,35 @@ export function CostSetup() {
         </div>
       ) : (
         <>
-          {/* จอแคบ: ทีละช่อง + รายการสูตรให้กดเข้าไปแก้ทีละตัว */}
           <div className="@3xl:hidden">
-            <CostByField rows={visible} defaults={defaults} onPatch={patch} />
-            <RowList
+            <CostByField
               rows={visible}
-              defaults={defaults}
-              onOpen={(r) => setOpenId(r.id)}
+              field={field}
+              onFieldChange={setField}
+              onPatch={patch}
+              onFillDown={fillDown}
             />
+            <RowList rows={visible} onOpen={(r) => setOpenId(r.id)} />
           </div>
 
-          {/* จอกว้าง: สลับได้ระหว่างทีละช่องกับตารางเต็ม */}
           <div className="hidden @3xl:block">
             {mode === "table" ? (
               <CostTable
                 rows={visible}
-                defaults={defaults}
                 onPatch={patch}
                 onOpenRow={(r) => setOpenId(r.id)}
               />
             ) : (
-              <CostByField rows={visible} defaults={defaults} onPatch={patch} />
+              <>
+                <CostByField
+                  rows={visible}
+                  field={field}
+                  onFieldChange={setField}
+                  onPatch={patch}
+                  onFillDown={fillDown}
+                />
+                <RowList rows={visible} onOpen={(r) => setOpenId(r.id)} />
+              </>
             )}
           </div>
         </>
@@ -174,7 +228,7 @@ export function CostSetup() {
 
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-card p-4">
         <p className="min-w-0 text-sm text-muted-foreground">
-          แก้แล้วมีผลกับราคาขายทันที กดบันทึกเพื่อส่งค่าไปให้ฝ่ายผลิตและบัญชี
+          แก้แล้วราคาขายขยับทันที กดบันทึกเพื่อส่งค่าไปให้ฝ่ายผลิตและบัญชี
         </p>
         <Button size="lg" onClick={save}>
           บันทึก
@@ -183,35 +237,31 @@ export function CostSetup() {
 
       <CostRowSheet
         row={open}
-        defaults={defaults}
         open={openId !== null}
         onOpenChange={(v) => !v && setOpenId(null)}
         onPatch={patch}
-        onOverride={setOverride}
       />
     </div>
   );
 }
 
-/** รายการสูตรบนจอแคบ กดเข้าไปแก้ทั้งสูตรพร้อมปรับค่าตั้งต้นทับได้ */
+/** รายการสูตร กดเข้าไปกรอกครบทั้ง 17 ช่องของสูตรนั้นในจอเดียว */
 function RowList({
   rows,
-  defaults,
   onOpen,
 }: {
   rows: CostRow[];
-  defaults: CostDefaults;
   onOpen: (row: CostRow) => void;
 }) {
   return (
     <div className="mt-4">
       <p className="mb-2 text-sm text-muted-foreground">
-        หรือเปิดทีละสูตรเพื่อแก้ครบทุกช่องพร้อมปรับค่าตั้งต้นเฉพาะสูตรนั้น
+        หรือเปิดทีละสูตรเพื่อกรอกให้ครบทุกช่องของสูตรนั้นรวดเดียว
       </p>
       <div className="overflow-hidden rounded-xl border border-border bg-card">
         {rows.map((row, i) => {
-          const r = computeCost(row, defaults);
-          const overrides = overrideCount(row.override);
+          const r = computeCost(row);
+          const blanks = rowBlanks(row);
           return (
             <button
               key={row.id}
@@ -230,9 +280,9 @@ function RowList({
                   {RECIPE_GROUP_LABEL[row.group]} · {row.size} กก.
                 </span>
               </span>
-              {overrides > 0 && (
+              {blanks > 0 && (
                 <Badge tone="warning" appearance="soft" className="shrink-0">
-                  ทับ {overrides}
+                  ว่าง {blanks}
                 </Badge>
               )}
               <span className="shrink-0 text-right">

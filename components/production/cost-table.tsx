@@ -2,7 +2,6 @@
 
 import * as React from "react";
 import { PencilIcon } from "lucide-react";
-import { Badge } from "@peckey954/ui/components/ui/badge";
 import { Button } from "@peckey954/ui/components/ui/button";
 import { Input } from "@peckey954/ui/components/ui/input";
 import {
@@ -24,34 +23,32 @@ import {
 } from "@/components/stock/doc-parts";
 import { RECIPE_GROUP_LABEL } from "@/lib/recipe";
 import {
-  ROW_FIELDS,
+  COST_FIELDS,
   computeCost,
   formatBaht,
-  overrideCount,
-  type CostDefaults,
+  isBlank,
   type CostRow,
-  type RowFieldKey,
+  type FieldKey,
 } from "@/lib/recipe-cost";
 
 /* ------------------------------------------------------------------
-   ตารางบนจอกว้าง
+   ตารางเต็มบนจอกว้าง — 17 ช่องกรอก + 4 คอลัมน์ผลคำนวณ
 
-   คอลัมน์ที่กรอกได้เหลือสามช่อง ที่เหลือเป็นผลคำนวณ จึงไม่ต้องเลื่อน
-   แนวนอนไกลเหมือนไฟล์ Excel ต้นทาง
+   หน้าตาตรงกับไฟล์ต้นทางที่สุด ใช้ตอนอยากเห็นภาพรวมหรือเทียบข้ามสูตร
+   หัวคอลัมน์ที่กรอกได้เป็นสีแบรนด์ คอลัมน์ผลคำนวณเป็นสีข้อความปกติ
+   แยกออกจากกันด้วยสายตาเหมือนสีหัวในไฟล์ Excel
 
-   ชื่อสูตรตรึงซ้าย ราคาขายตรึงขวา เพราะสองอย่างนี้คือสิ่งที่ต้องเห็น
-   ตลอดเวลาที่กำลังไล่แก้ตัวเลขตรงกลาง
+   ชื่อสูตรตรึงซ้าย ราคาขายตรึงขวา เพราะสองอย่างนี้ต้องเห็นตลอด
+   ตอนเลื่อนไล่แก้ตัวเลขตรงกลาง
 ------------------------------------------------------------------ */
 
 export function CostTable({
   rows,
-  defaults,
   onPatch,
   onOpenRow,
 }: {
   rows: CostRow[];
-  defaults: CostDefaults;
-  onPatch: (id: string, key: RowFieldKey, value: string) => void;
+  onPatch: (id: string, key: FieldKey, value: string) => void;
   onOpenRow: (row: CostRow) => void;
 }) {
   return (
@@ -59,16 +56,20 @@ export function CostTable({
       <Table>
         <TableHeader className={STICKY_HEAD}>
           <TableRow>
-            <TableHead className={cn(HEAD_FIRST, "min-w-72")}>สูตร</TableHead>
-            <TableHead className="text-right">บรรจุ (กก.)</TableHead>
-            <TableHead className="text-right">ต้นทุนวัตถุดิบ</TableHead>
-            {ROW_FIELDS.map((f) => (
-              // หัวคอลัมน์ที่กรอกได้เป็นสีแบรนด์ แยกจากคอลัมน์ผลคำนวณ
-              <TableHead key={f.key} className="text-right text-primary">
+            <TableHead className={cn(HEAD_FIRST, "min-w-64")}>สูตร</TableHead>
+            <TableHead className="text-right whitespace-nowrap">
+              บรรจุ (กก.)
+            </TableHead>
+
+            {COST_FIELDS.map((f) => (
+              <TableHead
+                key={f.key}
+                className="text-right whitespace-nowrap text-primary"
+              >
                 {f.label}
               </TableHead>
             ))}
-            {/* หัวคอลัมน์ตัวเลขห้ามตกบรรทัดหรือโดนตัด ไม่งั้นอ่านไม่ออกว่าคอลัมน์อะไร */}
+
             <TableHead className="text-right whitespace-nowrap">
               ต้นทุนการผลิต
             </TableHead>
@@ -87,16 +88,13 @@ export function CostTable({
 
         <TableBody>
           {rows.map((row, i) => {
-            const r = computeCost(row, defaults);
-            const overrides = overrideCount(row.override);
+            const r = computeCost(row);
             // เทียบกับแถวก่อนหน้าตรง ๆ ไม่เก็บสถานะไว้นอกลูป
-            // ตัวแปรที่ไล่เขียนทับระหว่างเรนเดอร์ทำให้ผลเพี้ยนตอนเรนเดอร์ซ้ำ
             const head = i === 0 || rows[i - 1].group !== row.group;
 
             return (
               <TableRow key={row.id}>
                 <TableCell className={COL_FIRST}>
-                  {/* ชื่อกลุ่มขึ้นแค่แถวแรกของกลุ่ม ไม่ซ้ำทุกแถวให้รก */}
                   {head && (
                     <span className="mb-0.5 block text-sm text-muted-foreground">
                       {RECIPE_GROUP_LABEL[row.group]}
@@ -108,11 +106,8 @@ export function CostTable({
                 <TableCell className="text-right tabular-nums">
                   {row.size}
                 </TableCell>
-                <TableCell className="text-right tabular-nums">
-                  {formatBaht(row.rawMaterial)}
-                </TableCell>
 
-                {ROW_FIELDS.map((f) => (
+                {COST_FIELDS.map((f) => (
                   <TableCell key={f.key}>
                     <Input
                       aria-label={`${f.label} ของ ${row.sku}`}
@@ -120,7 +115,11 @@ export function CostTable({
                       placeholder="0"
                       value={row[f.key]}
                       onChange={(e) => onPatch(row.id, f.key, e.target.value)}
-                      className="w-28 text-right tabular-nums"
+                      className={cn(
+                        "w-24 text-right tabular-nums",
+                        // ช่องว่างขอบเหลือง ไล่หาช่องที่ยังไม่ได้กรอกได้ด้วยตา
+                        isBlank(row[f.key]) && "border-chip-yellow-foreground/50"
+                      )}
                     />
                   </TableCell>
                 ))}
@@ -139,7 +138,7 @@ export function CostTable({
                   <Button
                     variant="ghost"
                     size="icon"
-                    aria-label={`ตั้งค่าเฉพาะสูตร ${row.sku}`}
+                    aria-label={`เปิดสูตร ${row.sku}`}
                     onClick={() => onOpenRow(row)}
                   >
                     <PencilIcon />
@@ -153,11 +152,6 @@ export function CostTable({
                   <span className="block whitespace-nowrap text-primary tabular-nums">
                     {formatBaht(r.price)}
                   </span>
-                  {overrides > 0 && (
-                    <Badge tone="warning" appearance="soft" className="mt-1">
-                      ทับ {overrides}
-                    </Badge>
-                  )}
                 </TableCell>
               </TableRow>
             );
