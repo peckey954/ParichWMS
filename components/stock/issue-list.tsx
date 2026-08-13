@@ -41,7 +41,7 @@ import {
  * จ่ายออกเก็บเป็นเลขติดลบ รับคืนเป็นบวก ตัวเลขจึงบอกทิศทางได้เองด้วยสี
  * ไม่ต้องพึ่งป้ายสถานะอย่างเดียว
  */
-const PAGE_SIZE = 8;
+const PAGE_SIZE = 15;
 
 export function IssueList({ docs }: { docs: IssueDoc[] }) {
   const [page, setPage] = React.useState(1);
@@ -59,10 +59,14 @@ export function IssueList({ docs }: { docs: IssueDoc[] }) {
   return (
     <>
       {/* ---------- จอแคบ: การ์ด ---------- */}
-      <div className="space-y-4 @3xl:hidden">
-        {docs.map((d) => (
-          <IssueCard key={d.id} doc={d} />
-        ))}
+      {/* แบ่งหน้าเหมือนฝั่งตาราง ไม่งั้นจอมือถือจะโหลดการ์ดทั้งกองพร้อมกัน */}
+      <div className="@3xl:hidden">
+        <div className="space-y-4">
+          {slice.map((d) => (
+            <IssueCard key={d.id} doc={d} />
+          ))}
+        </div>
+        <TablePager page={safe} pages={pages} onChange={setPage} />
       </div>
 
       {/* ---------- จอกว้าง: ตาราง ---------- */}

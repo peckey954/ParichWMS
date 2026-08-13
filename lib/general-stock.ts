@@ -507,7 +507,80 @@ export type InboundDoc = {
 export const outstandingQty = (d: InboundDoc) =>
   Math.max(0, d.orderQty - d.receivedQty);
 
-export const INBOUND_DOCS: InboundDoc[] = [
+/* ------------------------------------------------------------------
+   คลังข้อมูลกลางของทั้งสามแท็บเอกสาร
+
+   แต่ละแท็บมีแถวที่เขียนมือไว้ตรงกับไฟล์ออกแบบอยู่แล้ว ส่วนที่เหลือ
+   ต่อท้ายด้วยตัวสร้าง เพื่อให้ตารางยาวพอจะเห็นการเลื่อนและการแบ่งหน้าจริง
+   ทุกค่าอิง seeded() ตัวเดิม ไม่มี Math.random ไม่มี Date.now
+   เลขจึงเหมือนกันทั้งฝั่งเซิร์ฟเวอร์และเบราว์เซอร์ hydration ไม่เพี้ยน
+------------------------------------------------------------------ */
+
+const DOC_ACTORS = [
+  "อลิสา พรสุขสิริ",
+  "ธนกฤต ศรีบุญเรือง",
+  "พิมพ์ชนก วงศ์อารีย์",
+  "ณัฐวุฒิ แก้วประเสริฐ",
+  "สุชานาถ อินทร์ทอง",
+  "กิตติพงศ์ ใจดีงาม",
+];
+
+const DOC_ITEMS: {
+  name: string;
+  sub: string;
+  packing?: string;
+  unit: string;
+}[] = [
+  { name: "10-0-4+OM 50%", sub: "ฟูเจียน ผง", packing: "40 Kg", unit: "ตัน" },
+  { name: "กระสอบเปล่า 50 kg", sub: "ลายเรือใบ", unit: "ใบ" },
+  {
+    name: "สติกเกอร์ QR",
+    sub: "ตรวจสอบย้อนกลับ",
+    packing: "1,000 ดวง",
+    unit: "ดวง",
+  },
+  { name: "ถุงมือผ้าเคลือบยาง", sub: "ไซซ์ L", unit: "คู่" },
+  {
+    name: "ปุ๋ยเกล็ด 20-20-20",
+    sub: "ละลายน้ำ",
+    packing: "25 Kg",
+    unit: "กก.",
+  },
+  { name: "21-0-0", sub: "ฟูเจียน ผง", packing: "50 Kg", unit: "ตัน" },
+  { name: "เทปพันสายพาน", sub: "หน้ากว้าง 2 นิ้ว", unit: "ม้วน" },
+  {
+    name: "น้ำมันหล่อลื่นสายพาน",
+    sub: "ISO VG46",
+    packing: "ถัง 20 ลิตร",
+    unit: "ลิตร",
+  },
+  { name: "เสื้อโปโลพนักงาน", sub: "ไซซ์ XL", unit: "ตัว" },
+  { name: "กระสอบพิมพ์ 46-0-0", sub: "ยูเรีย", unit: "ใบ" },
+  { name: "16-20-0", sub: "เม็ดปั้น", packing: "50 Kg", unit: "ตัน" },
+  { name: "หมึกพิมพ์วันที่", sub: "สีดำ", packing: "ขวด 500 ml", unit: "ขวด" },
+];
+
+const DOC_SUPPLIERS = [
+  "เอชซี อินเตอร์เนชั่นแนล เทรดดิ้ง จำกัด",
+  "โรงงานกระสอบไทยรุ่งเรือง",
+  "พริ้นท์เวิร์คส์ เอเชีย",
+  "เซฟตี้พลัส ซัพพลาย",
+  "ยูนิเวอร์แซล เคมิคอล กรุ๊ป",
+  "ไทยแอกโกร อินดัสทรี",
+];
+
+const pad = (n: number) => String(n).padStart(2, "0");
+
+/** วันเวลาของเอกสาร เดินถอยหลังจาก 18/1/2026 ทีละวัน */
+function docStamp(seq: number, rnd: () => number) {
+  const day = 18 - (seq % 14);
+  return `1/${day}/2026 | ${pad(8 + (seq % 9))}:${pad(Math.floor(rnd() * 60))}:${pad(Math.floor(rnd() * 60))}`;
+}
+
+const pick = <T,>(pool: T[], rnd: () => number) =>
+  pool[Math.floor(rnd() * pool.length)];
+
+const SEED_INBOUND: InboundDoc[] = [
   {
     id: "in-1",
     code: "POI260116/01",
@@ -578,6 +651,36 @@ export const INBOUND_DOCS: InboundDoc[] = [
   },
 ];
 
+function moreInbound(count = 25): InboundDoc[] {
+  return Array.from({ length: count }, (_, i) => {
+    const rnd = seeded(700 + i);
+    const item = DOC_ITEMS[i % DOC_ITEMS.length];
+    const orderQty = Math.round((20 + rnd() * 980) / 10) * 10;
+    // ส่วนใหญ่รับมาแล้วบางส่วน บางใบยังไม่ได้รับเลย บางใบรับครบแล้ว
+    const ratio = rnd();
+    const receivedQty =
+      ratio < 0.18 ? 0 : ratio > 0.88 ? orderQty : Math.round(orderQty * ratio);
+    const day = 18 - (i % 12);
+
+    return {
+      id: `in-g${i + 1}`,
+      code: `PO2601${pad(day)}/${pad((i % 9) + 1)}`,
+      createdAt: docStamp(i, rnd),
+      productName: item.name,
+      productSub: item.sub,
+      supplier: pick(DOC_SUPPLIERS, rnd),
+      truck: `${pad(10 + Math.floor(rnd() * 89))} - ${1000 + Math.floor(rnd() * 8999)}`,
+      arriveDate: `${pad(day + 2)}/01/2026`,
+      orderQty,
+      orderUnit: item.unit,
+      packing: item.packing,
+      receivedQty,
+    } satisfies InboundDoc;
+  });
+}
+
+export const INBOUND_DOCS: InboundDoc[] = [...SEED_INBOUND, ...moreInbound()];
+
 export function matchesInbound(d: InboundDoc, q: string): boolean {
   const s = q.trim().toLowerCase();
   if (!s) return true;
@@ -626,7 +729,7 @@ export type IssueDoc = {
   status: IssueStatus;
 };
 
-export const ISSUE_DOCS: IssueDoc[] = [
+const SEED_ISSUE: IssueDoc[] = [
   {
     id: "is-1",
     code: "WT260116/01",
@@ -750,6 +853,53 @@ export const ISSUE_DOCS: IssueDoc[] = [
   },
 ];
 
+/** เวียนสถานะให้ครบทั้งห้าแบบ จะได้เห็นครบทุกสีชิปในหน้าเดียว */
+const ISSUE_CYCLE: IssueStatus[] = [
+  "returnSweep",
+  "issueInternal",
+  "returnInternal",
+  "issueExternal",
+  "returnExternal",
+];
+
+const ISSUE_NOTES = [
+  "เหลือจากการผลิต",
+  "ใช้งานไลน์ 2",
+  "เก็บตกหน้าโกดัง",
+  "ลูกค้าคืนสินค้า",
+  "เบิกไปทดสอบเครื่อง",
+  "คืนของไม่ได้ใช้",
+];
+
+function moreIssue(count = 32): IssueDoc[] {
+  return Array.from({ length: count }, (_, i) => {
+    const rnd = seeded(300 + i);
+    const item = DOC_ITEMS[(i + 3) % DOC_ITEMS.length];
+    const status = ISSUE_CYCLE[i % ISSUE_CYCLE.length];
+    const plus = isReturn(status);
+    const sign = plus ? 1 : -1;
+    const count_ = Math.round((5 + rnd() * 400) / 5) * 5;
+    const day = 18 - (i % 14);
+
+    return {
+      id: `is-g${i + 1}`,
+      code: `${plus ? "WT" : "REQ"}2601${pad(day)}/${pad((i % 8) + 1)}`,
+      createdAt: docStamp(i, rnd),
+      productName: `${item.name} ${item.sub}`,
+      packing: rnd() < 0.6 ? item.packing : undefined,
+      count: rnd() < 0.85 ? sign * count_ : undefined,
+      qty: sign * Math.round(count_ * (1 + Math.floor(rnd() * 10))),
+      unit: item.unit,
+      note: rnd() < 0.55 ? pick(ISSUE_NOTES, rnd) : undefined,
+      requester: pick(DOC_ACTORS, rnd),
+      editedBy: rnd() < 0.25 ? pick(DOC_ACTORS, rnd) : undefined,
+      status,
+    } satisfies IssueDoc;
+  });
+}
+
+export const ISSUE_DOCS: IssueDoc[] = [...SEED_ISSUE, ...moreIssue()];
+
 export function matchesIssue(d: IssueDoc, q: string): boolean {
   const s = q.trim().toLowerCase();
   if (!s) return true;
@@ -817,7 +967,7 @@ export type HistoryRow = {
   status: HistoryStatus;
 };
 
-export const HISTORY_ROWS: HistoryRow[] = [
+const SEED_HISTORY: HistoryRow[] = [
   {
     id: "h-1",
     code: "REQ260705/01",
@@ -984,6 +1134,81 @@ export const HISTORY_ROWS: HistoryRow[] = [
     status: "inbound",
   },
 ];
+
+/** เวียนให้ครบทั้งเก้าแบบ ประวัติจึงเห็นชิปครบทุกสีโดยไม่ต้องเลื่อนหา */
+const HISTORY_CYCLE: HistoryStatus[] = [
+  "inbound",
+  "issueInternal",
+  "move",
+  "returnSweep",
+  "adjust",
+  "issueExternal",
+  "returnInternal",
+  "failed",
+  "returnExternal",
+];
+
+const HISTORY_NOTES = [
+  "จัดโซนใหม่",
+  "ของเกินจากการนับ",
+  "ของขาดจากการนับ",
+  "เหลือจากการผลิต",
+  "ย้ายเข้าโซนใกล้ไลน์",
+  "รวมล็อตย่อย",
+];
+
+const FAIL_NOTES = [
+  "ของไม่พอในโซนที่ระบุ",
+  "ล็อตถูกล็อกไว้รอ QC",
+  "เลขล็อตไม่ตรงกับใบขอเบิก",
+];
+
+function moreHistory(count = 40): HistoryRow[] {
+  return Array.from({ length: count }, (_, i) => {
+    const rnd = seeded(900 + i);
+    const item = DOC_ITEMS[(i + 5) % DOC_ITEMS.length];
+    const status = HISTORY_CYCLE[i % HISTORY_CYCLE.length];
+    const out = status.startsWith("issue");
+    const sign = out ? -1 : 1;
+    const asked = Math.round((5 + rnd() * 400) / 5) * 5;
+    // จ่ายไม่สำเร็จคือขอไปแล้วทำไม่ได้เลย จึงมีแต่ยอดที่ขอ ไม่มียอดที่ทำได้
+    const failed = status === "failed";
+    const done = failed ? undefined : sign * asked;
+    const who = pick(DOC_ACTORS, rnd);
+    const day = 18 - (i % 14);
+    const zone = ZONES[Math.floor(rnd() * ZONES.length)];
+
+    return {
+      id: `h-g${i + 1}`,
+      code: `${status === "inbound" ? "PO" : out ? "REQ" : "WT"}2601${pad(day)}/${pad((i % 9) + 1)}`,
+      createdAt: docStamp(i, rnd),
+      lotNumber: failed ? undefined : `PO2601${pad(day)}/${pad((i % 6) + 1)}-04`,
+      productName: `${item.name} ${item.sub}`,
+      packing: rnd() < 0.6 ? item.packing : undefined,
+      askedCount: sign * asked,
+      doneCount: done,
+      doneQty:
+        failed || rnd() < 0.25
+          ? undefined
+          : sign * Math.round(asked * (1 + Math.floor(rnd() * 8))),
+      unit: item.unit,
+      zone,
+      zoneTo:
+        status === "move"
+          ? ZONES.filter((z) => z !== zone)[
+              Math.floor(rnd() * (ZONES.length - 1))
+            ]
+          : undefined,
+      note: failed ? undefined : rnd() < 0.5 ? pick(HISTORY_NOTES, rnd) : undefined,
+      receiverNote: failed ? pick(FAIL_NOTES, rnd) : undefined,
+      requester: who,
+      actor: failed ? undefined : who,
+      status,
+    } satisfies HistoryRow;
+  });
+}
+
+export const HISTORY_ROWS: HistoryRow[] = [...SEED_HISTORY, ...moreHistory()];
 
 export function matchesHistory(r: HistoryRow, q: string): boolean {
   const s = q.trim().toLowerCase();

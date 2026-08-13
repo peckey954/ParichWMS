@@ -58,30 +58,37 @@ export function CardRow({
 /**
  * ป้ายสถานะของใบขอเบิก/ขอคืน
  *
- * ใช้ token ที่มีอยู่แล้วทั้งหมด สองสีของสภาพล็อต (ฟ้า/ม่วง) ถูกเลือกมา
- * ให้ผ่านคอนทราสต์กับตัวอักษรขนาดเล็กอยู่แล้ว จึงหยิบมาใช้ต่อได้เลย
+ * คู่สีตรงกับตัวแปรในไฟล์ Figma โหนด 1146-213842 ทุกตัว
+ * ห้าสถานะแรกอยู่ในตารางเดียวกัน จึงต้องแยกสีให้ครบห้า ไม่ซ้ำกัน
  */
+// เขียนคลาสเต็มทุกตัว ห้ามประกอบชื่อด้วย template string
+// Tailwind อ่านซอร์สเป็นข้อความตรง ๆ ถ้าประกอบเอาตอนรัน utility จะไม่ถูกสร้าง
 const STATUS_CHIP: Record<string, string> = {
+  // กวาดพื้น — ฟ้าอ่อน
   returnSweep:
-    "[--bdg-surface:var(--tone-blue)] [--bdg-text:var(--tone-blue-foreground)]",
+    "[--bdg-surface:var(--chip-sky)] [--bdg-text:var(--chip-sky-foreground)]",
+  // จากภายใน — น้ำเงิน
   returnInternal:
-    "[--bdg-surface:var(--tone-blue)] [--bdg-text:var(--tone-blue-foreground)]",
+    "[--bdg-surface:var(--chip-blue)] [--bdg-text:var(--chip-blue-foreground)]",
+  // จากภายนอก — ม่วง
   returnExternal:
-    "[--bdg-surface:var(--tone-violet)] [--bdg-text:var(--tone-violet-foreground)]",
+    "[--bdg-surface:var(--chip-purple)] [--bdg-text:var(--chip-purple-foreground)]",
+  // จ่ายภายนอก — ส้มแบรนด์
   issueExternal:
-    "[--bdg-surface:var(--brand)] [--bdg-text:var(--primary)]",
+    "[--bdg-surface:var(--chip-orange)] [--bdg-text:var(--chip-orange-foreground)]",
+  // จ่ายภายใน — เหลือง
   issueInternal:
-    "[--bdg-surface:var(--warning)] [--bdg-text:var(--warning-foreground)]",
+    "[--bdg-surface:var(--chip-yellow)] [--bdg-text:var(--chip-yellow-foreground)]",
 
-  // เพิ่มสำหรับหน้าประวัติ
+  // เพิ่มสำหรับหน้าประวัติ ใช้จานสีชุดเดียวกันจะได้เป็นชุดเดียว
   inbound:
-    "[--bdg-surface:var(--success)] [--bdg-text:var(--success-foreground)]",
+    "[--bdg-surface:var(--chip-green)] [--bdg-text:var(--chip-green-foreground)]",
   // ย้าย = ม่วง ปรับปรุง = ชมพู ตามแบบ
-  move: "[--bdg-surface:var(--tone-violet)] [--bdg-text:var(--tone-violet-foreground)]",
+  move: "[--bdg-surface:var(--chip-purple)] [--bdg-text:var(--chip-purple-foreground)]",
   adjust:
-    "[--bdg-surface:var(--danger)] [--bdg-text:var(--danger-foreground)]",
+    "[--bdg-surface:var(--chip-pink)] [--bdg-text:var(--chip-pink-foreground)]",
   failed:
-    "[--bdg-surface:var(--danger)] [--bdg-text:var(--danger-strong)]",
+    "[--bdg-surface:var(--chip-red)] [--bdg-text:var(--chip-red-foreground)]",
 };
 
 export function StatusChip({
@@ -104,7 +111,8 @@ export function StatusChip({
   );
 }
 
-/** ตัวเลขที่มีทิศทาง — เข้าคลังเป็นเขียว ออกจากคลังเป็นแดง */
+/** ตัวเลขที่มีทิศทาง — เข้าคลังเป็นเขียว ออกจากคลังเป็นแดง
+    เขียวใช้ --success-strong (#16A34A) ตามไฟล์ออกแบบ สดกว่า --success-solid ของ DS */
 export function SignedNumber({
   value,
   suffix,
@@ -118,7 +126,7 @@ export function SignedNumber({
     <span
       className={cn(
         "font-semibold tabular-nums",
-        positive ? "text-success-solid" : "text-danger-strong"
+        positive ? "text-success-strong" : "text-danger-strong"
       )}
     >
       {value}

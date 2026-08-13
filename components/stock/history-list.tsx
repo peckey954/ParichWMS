@@ -74,7 +74,7 @@ function Num({
     <span
       className={cn(
         "font-semibold tabular-nums",
-        tone && (v < 0 ? "text-danger-strong" : "text-success-solid")
+        tone && (v < 0 ? "text-danger-strong" : "text-success-strong")
       )}
     >
       {suffix || amount ? formatAmount(v) : formatQty(v)}
@@ -89,7 +89,7 @@ function Num({
  *
  * นี่คือ "เหตุการณ์" ไม่ใช่ยอดคงเหลือ จึงไม่มีเรื่องสต็อกต่ำให้กรอง
  */
-const PAGE_SIZE = 8;
+const PAGE_SIZE = 15;
 
 export function HistoryList({ rows }: { rows: HistoryRow[] }) {
   const [page, setPage] = React.useState(1);
@@ -107,10 +107,14 @@ export function HistoryList({ rows }: { rows: HistoryRow[] }) {
   return (
     <>
       {/* ---------- จอแคบ: การ์ด ---------- */}
-      <div className="space-y-4 @3xl:hidden">
-        {rows.map((r) => (
-          <HistoryCard key={r.id} row={r} />
-        ))}
+      {/* แบ่งหน้าเหมือนฝั่งตาราง ไม่งั้นจอมือถือจะโหลดการ์ดทั้งกองพร้อมกัน */}
+      <div className="@3xl:hidden">
+        <div className="space-y-4">
+          {slice.map((r) => (
+            <HistoryCard key={r.id} row={r} />
+          ))}
+        </div>
+        <TablePager page={safe} pages={pages} onChange={setPage} />
       </div>
 
       {/* ---------- จอกว้าง: ตาราง ---------- */}

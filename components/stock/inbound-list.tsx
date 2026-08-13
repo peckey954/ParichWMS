@@ -40,7 +40,7 @@ import {
  * ใช้ container query (@3xl) ไม่ใช่ breakpoint ของหน้าต่าง
  * เพราะกรอบจำลองอุปกรณ์วัดจากความกว้างของกล่อง ไม่ใช่ขนาดจอจริง
  */
-const PAGE_SIZE = 8;
+const PAGE_SIZE = 15;
 
 export function InboundList({ docs }: { docs: InboundDoc[] }) {
   const [page, setPage] = React.useState(1);
@@ -55,10 +55,14 @@ export function InboundList({ docs }: { docs: InboundDoc[] }) {
   return (
     <>
       {/* ---------- จอแคบ: การ์ด ---------- */}
-      <div className="space-y-4 @3xl:hidden">
-        {docs.map((d) => (
-          <InboundCard key={d.id} doc={d} />
-        ))}
+      {/* แบ่งหน้าเหมือนฝั่งตาราง ไม่งั้นจอมือถือจะโหลดการ์ดทั้งกองพร้อมกัน */}
+      <div className="@3xl:hidden">
+        <div className="space-y-4">
+          {slice.map((d) => (
+            <InboundCard key={d.id} doc={d} />
+          ))}
+        </div>
+        <TablePager page={safe} pages={pages} onChange={setPage} />
       </div>
 
       {/* ---------- จอกว้าง: ตาราง ---------- */}

@@ -43,11 +43,17 @@
      --danger-foreground ของ DS เป็นแดงอมน้ำตาลค่อนข้างทึม
      ตัวนี้สดกว่ามากและยังได้คอนทราสต์ 4.64:1 บนพื้น --danger ผ่าน AA */
   --danger-strong: hsl(0 84% 45%);
+
+  /* เขียวสดสำหรับตัวเลขที่เข้าคลัง (รับเข้า / รับคืน)
+     --success-solid ของ DS อิงสเกล Radix ซึ่งเข้มกว่าแบบใน Figma
+     ตัวนี้คือค่า success ในไฟล์ออกแบบตรงตัว */
+  --success-strong: #16a34a;
 }
 
 [data-brand="parich"].dark {
   --surface: hsl(20 15% 7%);
   --danger-strong: hsl(0 90% 71%);
+  --success-strong: #4ade80;
 }
 
 /* --- ชุดที่ 1: สีประจำหมวดเมนู (ตามไฟล์ Figma ของ Parich WMS) ---
@@ -94,9 +100,60 @@
   --tone-violet-foreground: hsl(270 85% 82%);
 }
 
+/* --- ชุดที่ 3: สีป้ายสถานะเอกสาร (ตาราง รอจ่าย/คืน และ ประวัติ) ---
+   ถอดค่ามาจากตัวแปรในไฟล์ Figma โหนด 1146-213842 ตรงทุกตัว
+   ห้าสถานะต้องแยกออกจากกันด้วยสายตาในตารางเดียว จึงต้องเป็นห้าสี
+   ไม่ยืมชุดหมวดเมนู (--cat-*) เพราะคนละความหมาย แก้ชุดหนึ่งไม่ควรลามอีกชุด
+
+   หมายเหตุคอนทราสต์ — คู่สี 50/500 แบบนี้ได้ราว 2.6–3.4:1 ยังไม่ผ่าน AA
+   ที่รับได้เพราะข้อความในชิปซ้ำกับคอลัมน์อื่นในแถวอยู่แล้ว สีไม่ใช่ข้อมูลเดียว
+   และเจ้าของงานเลือกความสดตามไฟล์ออกแบบ */
+
+/* เขียนเป็น hex ตรง ๆ ไม่แปลงเป็น hsl เพราะแปลงแล้วเพี้ยนไป 1–2 ระดับ
+   ค่าพวกนี้คือค่าที่คัดลอกมาจากไฟล์ออกแบบ ต้องตรงตัวอักษรต่ออักษร */
+[data-brand="parich"] {
+  --chip-sky: #f0f9ff;
+  --chip-sky-foreground: #0ea5e9;
+  --chip-blue: #eff6ff;
+  --chip-blue-foreground: #2563eb;
+  --chip-purple: #faf5ff;
+  --chip-purple-foreground: #a855f7;
+  --chip-orange: #fff7ed;
+  --chip-orange-foreground: #f97316;
+  --chip-yellow: #fefce8;
+  --chip-yellow-foreground: #ca8a04;
+  --chip-green: #f0fdf4;
+  --chip-green-foreground: #16a34a;
+  --chip-red: #fef2f2;
+  --chip-red-foreground: #dc2626;
+  --chip-pink: #fdf2f8;
+  --chip-pink-foreground: #ec4899;
+}
+
+/* โหมดมืดสลับหัวท้าย — พื้นเป็นเฉด 950 ตัวอักษรเป็นเฉด 300/400 ของสีเดียวกัน */
+[data-brand="parich"].dark {
+  --chip-sky: #082f49;
+  --chip-sky-foreground: #7dd3fc;
+  --chip-blue: #172554;
+  --chip-blue-foreground: #60a5fa;
+  --chip-purple: #3b0764;
+  --chip-purple-foreground: #d8b4fe;
+  --chip-orange: #431407;
+  --chip-orange-foreground: #fdba74;
+  --chip-yellow: #422006;
+  --chip-yellow-foreground: #facc15;
+  --chip-green: #052e16;
+  --chip-green-foreground: #4ade80;
+  --chip-red: #450a0a;
+  --chip-red-foreground: #f87171;
+  --chip-pink: #500724;
+  --chip-pink-foreground: #f9a8d4;
+}
+
 @theme inline {
   --color-surface: var(--surface);
   --color-danger-strong: var(--danger-strong);
+  --color-success-strong: var(--success-strong);
 
   --color-cat-yellow: var(--cat-yellow);
   --color-cat-yellow-foreground: var(--cat-yellow-foreground);

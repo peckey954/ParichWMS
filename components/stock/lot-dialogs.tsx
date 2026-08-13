@@ -378,7 +378,7 @@ export function AdjustLotDialog({
             className={cn(
               !touched && "text-muted-foreground",
               touched && diff < 0 && "text-danger-strong",
-              touched && diff > 0 && "text-success-solid"
+              touched && diff > 0 && "text-success-strong"
             )}
           >
             {touched ? formatAmount(diff) : "-"}
