@@ -49,9 +49,65 @@ export function DevicePreviewProvider({
 }) {
   const [device, setDevice] = React.useState<Device>("desktop");
   const frameRef = React.useRef<HTMLDivElement>(null);
+  const framed = device !== "desktop";
+
+  /*
+   * บอกตำแหน่งและขนาดของกรอบจำลองให้ CSS รู้
+   *
+   * Dialog / Sheet / Drawer วาดผ่าน portal ไปไว้ที่ body จึงอยู่นอกกรอบ
+   * container query มองไม่เห็น และ breakpoint ของหน้าต่างก็ยังเป็นขนาดจอจริง
+   * ผลคือกดเปิดในโหมดมือถือแล้วได้กล่องขนาดเดสก์ท็อป
+   *
+   * แก้ด้วยการส่งพิกัดกรอบออกไปเป็นตัวแปร CSS แล้วให้ globals.css
+   * ดึงกล่องพวกนี้กลับมาอยู่ในกรอบและคุมขนาดตามอุปกรณ์ที่เลือก
+   */
+  React.useEffect(() => {
+    const root = document.documentElement;
+
+    const clear = () => {
+      root.removeAttribute("data-device-frame");
+      for (const k of ["x", "y", "w", "h", "r", "b"]) {
+        root.style.removeProperty(`--frame-${k}`);
+      }
+    };
+
+    if (!framed) {
+      clear();
+      return;
+    }
+
+    const apply = () => {
+      const el = frameRef.current;
+      if (!el) return;
+      const r = el.getBoundingClientRect();
+      root.setAttribute("data-device-frame", "on");
+      root.style.setProperty("--frame-x", `${r.left}px`);
+      root.style.setProperty("--frame-y", `${r.top}px`);
+      root.style.setProperty("--frame-w", `${r.width}px`);
+      root.style.setProperty("--frame-h", `${r.height}px`);
+      // ระยะจากขอบขวา/ขอบล่างของหน้าต่าง ใช้กับถาดที่ยึดจากสองด้านนั้น
+      root.style.setProperty("--frame-r", `${window.innerWidth - r.right}px`);
+      root.style.setProperty("--frame-b", `${window.innerHeight - r.bottom}px`);
+    };
+
+    apply();
+    const ro = new ResizeObserver(apply);
+    if (frameRef.current) ro.observe(frameRef.current);
+    window.addEventListener("resize", apply);
+    // true = ดักตอนหน้าเลื่อน กรอบขยับตามแล้วกล่องต้องขยับด้วย
+    window.addEventListener("scroll", apply, true);
+
+    return () => {
+      ro.disconnect();
+      window.removeEventListener("resize", apply);
+      window.removeEventListener("scroll", apply, true);
+      clear();
+    };
+  }, [framed]);
+
   const value = React.useMemo(
-    () => ({ device, framed: device !== "desktop", setDevice, frameRef }),
-    [device]
+    () => ({ device, framed, setDevice, frameRef }),
+    [device, framed]
   );
   return (
     <DevicePreviewContext.Provider value={value}>

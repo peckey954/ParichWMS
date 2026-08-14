@@ -213,7 +213,7 @@ export default function DesignSystemPage() {
       {/* ---------------- ฟอร์ม ---------------- */}
       <section className="mt-10 space-y-4">
         <h2 className="text-lg font-semibold">ฟอร์ม</h2>
-        <div className="grid gap-6 md:grid-cols-2">
+        <div className="grid gap-6 @3xl:grid-cols-2">
           <Card>
             <CardHeader>
               <CardTitle>input · select · textarea</CardTitle>
@@ -396,7 +396,7 @@ export default function DesignSystemPage() {
             ทุกช่องอ้าง token ไม่มีค่าสีจริงในโค้ดหน้านี้
           </p>
         </div>
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <div className="grid grid-cols-2 gap-3 @2xl:grid-cols-4">
           <div className="rounded-lg bg-primary p-4 text-primary-foreground">
             <p className="text-sm font-medium">primary</p>
           </div>

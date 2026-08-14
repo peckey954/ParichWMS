@@ -43,7 +43,7 @@ export function TruckDocsDialog({
         </Button>
       </DialogTrigger>
 
-      <DialogContent className="sm:max-w-3xl">
+      <DialogContent className="@container sm:max-w-3xl">
         <DialogHeader>
           <DialogTitle>
             เอกสารแนบ — {truck.plate || "ยังไม่ได้ใส่ทะเบียน"}
@@ -54,7 +54,7 @@ export function TruckDocsDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="grid gap-5 sm:grid-cols-2">
+        <div className="grid gap-5 @md:grid-cols-2">
           <AttachmentSlot
             id={`sup-${truck.id}`}
             label="ใบชั่งของซัพพลายเออร์"

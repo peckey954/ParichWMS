@@ -150,6 +150,61 @@
   --chip-pink-foreground: #f9a8d4;
 }
 
+/* ============================================================
+   โหมดจำลองอุปกรณ์ — ดึงกล่องที่วาดผ่าน portal กลับเข้ากรอบ
+
+   Dialog / Sheet / Drawer ของ DS วาดไปไว้ที่ body ไม่ใช่ในกรอบจำลอง
+   ทั้ง container query และ breakpoint ของหน้าต่างจึงมองไม่เห็นกรอบ
+   กดเปิดในโหมดมือถือก็เลยได้กล่องเต็มขนาดเดสก์ท็อป
+
+   ตัวแปร --frame-* มาจาก DevicePreviewProvider (วัดจากกรอบจริงทุกครั้งที่ขยับ)
+   ตรงนี้เอามาบังคับพิกัดกับขนาด ให้เหมือนเปิดบนเครื่องจริง
+   ============================================================ */
+
+:root[data-device-frame="on"] [data-slot="dialog-overlay"],
+:root[data-device-frame="on"] [data-slot="sheet-overlay"],
+:root[data-device-frame="on"] [data-slot="drawer-overlay"] {
+  inset: auto;
+  top: var(--frame-y);
+  left: var(--frame-x);
+  width: var(--frame-w);
+  height: var(--frame-h);
+  border-radius: var(--radius-2xl, 1rem);
+}
+
+/* กล่องกลางจอ — ยังใช้ translate -50% ของ DS อยู่ จึงเลื่อนจุดยึดไปกลางกรอบพอ */
+:root[data-device-frame="on"] [data-slot="dialog-content"] {
+  top: calc(var(--frame-y) + var(--frame-h) / 2);
+  left: calc(var(--frame-x) + var(--frame-w) / 2);
+  width: calc(var(--frame-w) - 2rem);
+  max-width: calc(var(--frame-w) - 2rem);
+  max-height: calc(var(--frame-h) - 2rem);
+  overflow-y: auto;
+}
+
+/* ถาดด้านข้าง — สูงเท่ากรอบ ไม่ใช่เต็มหน้าต่าง */
+:root[data-device-frame="on"] [data-slot="sheet-content"] {
+  top: var(--frame-y);
+  bottom: var(--frame-b);
+  height: auto;
+  max-width: calc(var(--frame-w) - 2rem);
+}
+:root[data-device-frame="on"] [data-slot="sheet-content"][class*="right-0"] {
+  right: var(--frame-r);
+}
+:root[data-device-frame="on"] [data-slot="sheet-content"][class*="left-0"] {
+  left: var(--frame-x);
+}
+
+/* ถาดดึงขึ้นจากล่าง — ยึดขอบล่างของกรอบ ไม่ใช่ขอบล่างหน้าต่าง */
+:root[data-device-frame="on"] [data-slot="drawer-content"] {
+  left: var(--frame-x);
+  right: auto;
+  bottom: var(--frame-b);
+  width: var(--frame-w);
+  max-height: calc(var(--frame-h) - 2rem);
+}
+
 @theme inline {
   --color-surface: var(--surface);
   --color-danger-strong: var(--danger-strong);

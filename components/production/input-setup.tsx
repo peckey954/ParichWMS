@@ -117,7 +117,7 @@ export function InputSetup() {
           </Badge>
         </SectionHead>
 
-        <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+        <div className="mt-4 grid gap-3 @2xl:grid-cols-2 @5xl:grid-cols-3">
           {rows.map((r) => (
             <div key={r.id} className="space-y-1.5">
               <Label

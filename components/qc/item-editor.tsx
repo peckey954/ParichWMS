@@ -142,7 +142,7 @@ export function ItemEditor({
         </div>
 
         {/* ---- 2 แกนอิสระ: คีย์ค่าอะไร / ตัดสินยังไง ---- */}
-        <div className="grid gap-3 pl-9 sm:grid-cols-3">
+        <div className="grid gap-3 pl-9 @2xl:grid-cols-3">
           <div className="space-y-2">
             <Label htmlFor={`${item.id}-capture`}>ผู้ตรวจต้องคีย์อะไร</Label>
             <Select
@@ -328,7 +328,7 @@ export function ItemEditor({
                       ? "ผู้ตรวจติ๊กเอง แต่ระบบจะขึ้นผลที่คำนวณจากเกณฑ์นี้ให้ดูเป็นตัวช่วย"
                       : "ตั้งเกณฑ์ไว้ได้ แต่จะไม่ถูกนำไปตัดสินเพราะเลือกไม่ต้องตัดสิน"}
                 </p>
-                <div className="grid gap-3 sm:grid-cols-3">
+                <div className="grid gap-3 @2xl:grid-cols-3">
                   <div className="space-y-2">
                     <Label>เกณฑ์ตัวเลข</Label>
                     <Select
@@ -408,7 +408,7 @@ export function ItemEditor({
               />
 
               {item.repeatable && (
-                <div className="grid gap-3 pl-6 sm:grid-cols-2">
+                <div className="grid gap-3 pl-6 @2xl:grid-cols-2">
                   <div className="space-y-2">
                     <Label>จำนวนครั้งเริ่มต้น</Label>
                     <Input

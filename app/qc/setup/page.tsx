@@ -169,7 +169,7 @@ export default function QcSetupPage() {
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-5">
-                <div className="grid gap-4 sm:grid-cols-2">
+                <div className="grid gap-4 @2xl:grid-cols-2">
                   <div className="space-y-2 sm:col-span-2">
                     <Label htmlFor="tpl-name">ชื่อเทมเพลต</Label>
                     <Input

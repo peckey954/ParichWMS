@@ -132,7 +132,7 @@ export default function ProductionOrderPage() {
               </div>
             </div>
 
-            <div className="grid gap-4 rounded-lg bg-muted p-4 sm:grid-cols-2">
+            <div className="grid gap-4 rounded-lg bg-muted p-4 @2xl:grid-cols-2">
               <div>
                 <p className="text-sm text-muted-foreground">สั่งผลิต (ตัน)</p>
                 <p className="mt-1 text-lg font-semibold">

@@ -60,7 +60,9 @@ export default function AllModulesPage() {
               </span>
             </div>
 
-            <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+            {/* วัดจากความกว้างของกรอบเนื้อหา ไม่ใช่ขนาดหน้าต่าง
+                ไม่งั้นโหมดจำลองมือถือจะยังขึ้นสี่ใบต่อแถวเพราะจอจริงยังกว้างอยู่ */}
+            <div className="mt-3 grid grid-cols-2 gap-3 @2xl:grid-cols-3 @4xl:grid-cols-4">
               {g.items.map((m) => (
                 <ModuleCard key={m.id} module={m} tone={g.tone} />
               ))}

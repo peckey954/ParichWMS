@@ -139,7 +139,7 @@ export default function WeighingPage() {
         {/* ---------- ข้อมูลใบรับ ---------- */}
         <Card className="mt-5">
           <CardContent>
-            <div className="grid gap-4 rounded-lg bg-muted p-4 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="grid gap-4 rounded-lg bg-muted p-4 @2xl:grid-cols-2 @4xl:grid-cols-3">
               <Info label="เลขที่ใบสั่งซื้อ" value={sheet.poCode} />
               <Info label="ซัพพลายเออร์" value={sheet.supplierName} />
               <Info label="สินค้า" value={sheet.productName} />
@@ -163,7 +163,7 @@ export default function WeighingPage() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="grid gap-4 sm:grid-cols-3">
+            <div className="grid gap-4 @2xl:grid-cols-3">
               <SummaryTile
                 label="น้ำหนักสินค้าจริง — ชั่งที่ Parich"
                 value={`${formatKg(totals.parichKg)} กก.`}
@@ -510,7 +510,7 @@ export default function WeighingPage() {
         </div>
 
         <Separator className="mt-8" />
-        <div className="mt-4 grid gap-4 sm:grid-cols-2">
+        <div className="mt-4 grid gap-4 @2xl:grid-cols-2">
           <div className="rounded-lg border border-dashed border-border p-4">
             <p className="text-sm font-medium">ผู้ชั่ง</p>
             <p className="mt-1 text-sm text-muted-foreground">

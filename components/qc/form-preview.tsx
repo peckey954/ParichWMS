@@ -55,7 +55,7 @@ export function FormPreview({ template }: { template: QcTemplate }) {
 
       <Card>
         <CardContent>
-          <div className="grid gap-4 rounded-lg bg-muted p-4 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid gap-4 rounded-lg bg-muted p-4 @2xl:grid-cols-2 @4xl:grid-cols-3">
             {template.headerFields.map((f) => (
               <HeaderFieldPreview key={f.id} field={f} />
             ))}
@@ -165,7 +165,7 @@ export function FormPreview({ template }: { template: QcTemplate }) {
               )}
             </Label>
           </div>
-          <RadioGroup className="grid gap-3 sm:grid-cols-3">
+          <RadioGroup className="grid gap-3 @2xl:grid-cols-3">
             {template.failActions.map((a) => (
               <Label
                 key={a.id}
@@ -182,7 +182,7 @@ export function FormPreview({ template }: { template: QcTemplate }) {
 
       {/* ---------- ลงชื่อ ---------- */}
       <Separator />
-      <div className="grid gap-4 sm:grid-cols-3">
+      <div className="grid gap-4 @2xl:grid-cols-3">
         {template.signature.inspector && (
           <SignatureSlot label="ผู้ตรวจสอบ" hint="ลงชื่ออัตโนมัติจากผู้ใช้ที่ล็อกอิน" />
         )}

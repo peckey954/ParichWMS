@@ -64,7 +64,7 @@ export function CostRowDrawer({
 
   return (
     <Drawer open={open} onOpenChange={onOpenChange}>
-      <DrawerContent>
+      <DrawerContent className="@container">
         <DrawerHeader className="text-left">
           <DrawerTitle>{row.sku}</DrawerTitle>
           <DrawerDescription>
@@ -99,7 +99,7 @@ export function CostRowDrawer({
                     )}
                   </div>
 
-                  <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                  <div className="mt-3 grid gap-3 @md:grid-cols-2">
                     {fields.map((f) => (
                       <div key={f.key} className="space-y-1.5">
                         <Label htmlFor={`f-${f.key}`} className="text-sm">

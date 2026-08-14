@@ -70,7 +70,7 @@ function LotHeading({
 /** กล่องสรุปยอด พื้นส้มอ่อน จอแคบเรียงลงมา จอกว้างเรียงเป็นคอลัมน์ */
 function SummaryBox({ children }: { children: React.ReactNode }) {
   return (
-    <dl className="grid grid-cols-2 gap-x-6 gap-y-4 rounded-lg bg-brand px-4 py-3 sm:grid-cols-3">
+    <dl className="grid grid-cols-2 gap-x-6 gap-y-4 rounded-lg bg-brand px-4 py-3 @md:grid-cols-3">
       {children}
     </dl>
   );
@@ -240,7 +240,7 @@ export function MoveLotDialog({
       }}
     >
       <DialogTrigger asChild>{children}</DialogTrigger>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent className="@container sm:max-w-lg">
         <LotHeading lot={lot} productName={productName} />
 
         <h3 className="text-lg font-semibold">ย้ายสต็อก</h3>
@@ -359,7 +359,7 @@ export function AdjustLotDialog({
       }}
     >
       <DialogTrigger asChild>{children}</DialogTrigger>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent className="@container sm:max-w-lg">
         <LotHeading lot={lot} productName={productName} />
 
         <h3 className="text-lg font-semibold">ปรับปรุงสต็อก</h3>

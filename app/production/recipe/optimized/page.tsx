@@ -133,7 +133,7 @@ export default function OptimizedFormulaPage() {
       </div>
 
       {/* ---------- สรุปหัวเรื่อง ---------- */}
-      <div className="mt-4 grid gap-3 sm:grid-cols-3">
+      <div className="mt-4 grid gap-3 @2xl:grid-cols-3">
         <Stat label="สูตรที่คำนวณ" value={`${all.length} สูตร`} />
         <Stat label="ต้นทุนเฉลี่ยต่อถุง" value={`${num(avgCost)} บาท`} />
         <Stat
