@@ -65,12 +65,17 @@ export function CostRowDrawer({
   return (
     <Drawer open={open} onOpenChange={onOpenChange}>
       <DrawerContent className="@container">
-        <DrawerHeader className="text-left">
-          <DrawerTitle>{row.sku}</DrawerTitle>
-          <DrawerDescription>
-            บรรจุ {row.size} กก. ·{" "}
-            {blanks > 0 ? `ยังว่าง ${blanks} ช่อง` : "กรอกครบทุกช่องแล้ว"}
-          </DrawerDescription>
+        {/* ชื่องานเป็นหัว ชื่อสูตรตามลงมา เหตุผลเดียวกับกล่องย้าย/ปรับปรุงสต็อก
+            DrawerTitle คือชื่อที่โปรแกรมอ่านหน้าจอประกาศ ต้องบอกว่ากำลังทำอะไร */}
+        <DrawerHeader className="gap-2 text-left">
+          <DrawerTitle>แก้ไขต้นทุน</DrawerTitle>
+          <div>
+            <p className="font-medium text-foreground">{row.sku}</p>
+            <DrawerDescription className="mt-0.5">
+              บรรจุ {row.size} กก. ·{" "}
+              {blanks > 0 ? `ยังว่าง ${blanks} ช่อง` : "กรอกครบทุกช่องแล้ว"}
+            </DrawerDescription>
+          </div>
         </DrawerHeader>
 
         <div className="overflow-y-auto px-4">

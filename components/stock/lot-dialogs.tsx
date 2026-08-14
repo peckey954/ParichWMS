@@ -41,28 +41,42 @@ const ACTOR = "อลิสา พรสุขสิริ";
 
 /* ------------------------------------------------------------------
    กล่องย้ายสต็อก และกล่องปรับปรุงสต็อก
-   หัวกล่องเหมือนกันทั้งคู่ ต่างกันที่ตัวเลขสรุปกับช่องกรอก
+
+   ชื่องานเป็นหัวกล่อง ไม่ใช่ชื่อสินค้า เพราะสองกล่องนี้เปิดจากปุ่มที่อยู่
+   ติดกันในแถวเดียวกัน ถ้าหัวเป็นชื่อสินค้าจะเหมือนกันเป๊ะทั้งคู่
+   กดพลาดแล้วไม่มีอะไรบอกว่าเปิดอันไหนอยู่
+   และ DialogTitle คือชื่อที่โปรแกรมอ่านหน้าจอประกาศตอนเปิดกล่อง
+   มันต้องบอกว่า "กำลังจะทำอะไร" ไม่ใช่ "ทำกับอะไร"
 ------------------------------------------------------------------ */
 
-/** หัวกล่อง — โซน ชื่อสินค้า และบรรทัดล็อต */
+/** หัวกล่อง — ชื่องาน แล้วตามด้วยล็อตที่กำลังทำอยู่ */
 function LotHeading({
+  title,
   lot,
   productName,
 }: {
+  title: string;
   lot: Lot;
   productName: string;
 }) {
   return (
-    <DialogHeader className="gap-1 text-left">
-      <DialogTitle className="flex flex-wrap items-center gap-3">
-        <span className="rounded-md bg-secondary px-2.5 py-0.5 text-sm font-semibold text-primary">
+    <DialogHeader className="gap-3 text-left">
+      <DialogTitle className="text-lg">{title}</DialogTitle>
+
+      {/* ชิปโซนเป็นคอลัมน์ซ้ายคงที่ ไม่ใช่ flex-wrap
+          ของเดิมพอชื่อสินค้ายาวเกินบรรทัด ชิปจะถูกดันไปลอยอยู่บรรทัดบนคนเดียว
+          แบบนี้ชิปเกาะกับชื่อสินค้าเสมอ ชื่อยาวแค่ไหนก็ตัดบรรทัดใต้ตัวเอง */}
+      <div className="flex items-start gap-3">
+        <span className="mt-0.5 shrink-0 rounded-md bg-secondary px-2.5 py-0.5 text-sm font-semibold text-primary">
           {lot.zone}
         </span>
-        <span className="text-lg">{productName}</span>
-      </DialogTitle>
-      <p className="text-sm text-muted-foreground">
-        {lot.code} · รับ {lot.receivedAt} ({lot.ageDays} วัน)
-      </p>
+        <div className="min-w-0 flex-1">
+          <p className="font-medium">{productName}</p>
+          <p className="mt-0.5 text-sm text-muted-foreground">
+            {lot.code} · รับ {lot.receivedAt} ({lot.ageDays} วัน)
+          </p>
+        </div>
+      </div>
     </DialogHeader>
   );
 }
@@ -241,9 +255,7 @@ export function MoveLotDialog({
     >
       <DialogTrigger asChild>{children}</DialogTrigger>
       <DialogContent className="@container sm:max-w-lg">
-        <LotHeading lot={lot} productName={productName} />
-
-        <h3 className="text-lg font-semibold">ย้ายสต็อก</h3>
+        <LotHeading title="ย้ายสต็อก" lot={lot} productName={productName} />
 
         <SummaryBox>
           <SummaryItem label={`ปริมาณในคลัง (${unit})`}>
@@ -360,9 +372,7 @@ export function AdjustLotDialog({
     >
       <DialogTrigger asChild>{children}</DialogTrigger>
       <DialogContent className="@container sm:max-w-lg">
-        <LotHeading lot={lot} productName={productName} />
-
-        <h3 className="text-lg font-semibold">ปรับปรุงสต็อก</h3>
+        <LotHeading title="ปรับปรุงสต็อก" lot={lot} productName={productName} />
 
         <SummaryBox>
           <SummaryItem label={`ปริมาณในคลัง (${unit})`}>
