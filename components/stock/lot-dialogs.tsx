@@ -66,12 +66,15 @@ function LotHeading({
       <div>
         {/* ชิปโซนเป็นคอลัมน์ซ้ายคงที่ ไม่ใช่ flex-wrap
             ของเดิมพอชื่อสินค้ายาวเกินบรรทัด ชิปจะถูกดันไปลอยอยู่บรรทัดบนคนเดียว
-            แบบนี้ชิปเกาะกับชื่อสินค้าเสมอ ชื่อยาวแค่ไหนก็ตัดบรรทัดใต้ตัวเอง */}
-        <div className="flex items-start gap-3">
-          <span className="mt-0.5 shrink-0 rounded-md bg-secondary px-2.5 py-0.5 text-sm font-semibold text-primary">
+            แบบนี้ชิปเกาะกับชื่อสินค้าเสมอ หัวกล่องสูงเท่าเดิมทุกสินค้า
+            ชื่อยาวเกินตัดท้ายเป็น … ชื่อเต็มยังชี้ดูได้จาก title */}
+        <div className="flex items-center gap-3">
+          <span className="shrink-0 rounded-md bg-secondary px-2.5 py-0.5 text-sm font-semibold text-primary">
             {lot.zone}
           </span>
-          <p className="min-w-0 flex-1 font-medium">{productName}</p>
+          <p className="min-w-0 flex-1 truncate font-medium" title={productName}>
+            {productName}
+          </p>
         </div>
 
         {/* บรรทัดล็อตอยู่นอกคอลัมน์ของชื่อสินค้า จึงเริ่มชิดขอบซ้ายเท่าชิปโซน
