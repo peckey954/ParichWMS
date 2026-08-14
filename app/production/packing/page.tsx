@@ -5,7 +5,7 @@ import {
   ArrowUpFromLineIcon,
   BrushCleaningIcon,
   DownloadIcon,
-  SparklesIcon,
+  LightbulbIcon,
 } from "lucide-react";
 import {
   Breadcrumb,
@@ -65,8 +65,8 @@ export default function PackingListPage() {
       {
         id: "suggest",
         label: "แนะนำวัตถุดิบที่ใช้วันนี้",
-        // ประกาย = ระบบคำนวณมาแนะนำให้ ไม่ใช่หลอดไฟที่อ่านเป็น "เคล็ดลับ"
-        icon: SparklesIcon,
+        // หลอดไฟ = ข้อเสนอแนะ อ่านง่ายและไม่ติดภาพ AI แบบไอคอนประกาย
+        icon: LightbulbIcon,
         primary: true,
         onSelect: () => soon("แนะนำวัตถุดิบที่ใช้วันนี้"),
       },
