@@ -23,6 +23,7 @@ import {
   PackingToolbar,
   type TabAction,
 } from "@/components/production/packing-toolbar";
+import { SuggestMaterialsDialog } from "@/components/production/suggest-materials-dialog";
 import {
   CWIP_PRODUCTS,
   DONE_ORDERS,
@@ -47,6 +48,7 @@ type Tab = "waiting" | "cwip" | "done";
 export default function PackingListPage() {
   const [tab, setTab] = React.useState<Tab>("waiting");
   const [query, setQuery] = React.useState("");
+  const [suggestOpen, setSuggestOpen] = React.useState(false);
 
   const waiting = WAITING_ORDERS.filter((o) => matchesOrder(o, query));
   const done = DONE_ORDERS.filter((o) => matchesOrder(o, query));
@@ -68,7 +70,7 @@ export default function PackingListPage() {
         // หลอดไฟ = ข้อเสนอแนะ อ่านง่ายและไม่ติดภาพ AI แบบไอคอนประกาย
         icon: LightbulbIcon,
         primary: true,
-        onSelect: () => soon("แนะนำวัตถุดิบที่ใช้วันนี้"),
+        onSelect: () => setSuggestOpen(true),
       },
     ],
     cwip: [
@@ -170,6 +172,8 @@ export default function PackingListPage() {
           <PackingOrders orders={done} emptyTitle="ไม่พบใบผลิตที่ผลิตแล้ว" />
         )}
       </div>
+
+      <SuggestMaterialsDialog open={suggestOpen} onOpenChange={setSuggestOpen} />
     </main>
   );
 }

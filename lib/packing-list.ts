@@ -198,6 +198,43 @@ export function matchesCwip(p: CwipProduct, q: string) {
 }
 
 // ---------------------------------------------------------------
+// วัตถุดิบที่แนะนำให้ใช้วันนี้
+//
+// ระบบคำนวณจากใบผลิตที่ค้างอยู่ แล้วบอกว่าควรเบิกอะไรออกมาเท่าไร
+// ดูอย่างเดียว แก้ไม่ได้ — เป็นตัวช่วยตัดสินใจก่อนไปเบิกจริง
+// ---------------------------------------------------------------
+
+/** วันที่ของรายการแนะนำ ตรึงไว้ ไม่ใช้เวลาปัจจุบันตอนเรนเดอร์ */
+export const SUGGEST_DATE = "5/14/2026";
+
+export type SuggestedMaterial = {
+  id: string;
+  name: string;
+  /** ยอดที่มีอยู่ในคลัง WIP */
+  stock: number;
+  /** ยอดที่ควรเบิกไปใช้วันนี้ */
+  suggest: number;
+  unit: string;
+};
+
+export const SUGGESTED_MATERIALS: SuggestedMaterial[] = [
+  { id: "sg-1", name: "21-0-0 ฟูเจี้ยน ผง", stock: 200, suggest: 20, unit: "ตัน" },
+  { id: "sg-2", name: "0-0-60 เม็ดแดง", stock: 200, suggest: 20, unit: "ตัน" },
+  { id: "sg-3", name: "แมกนีเซียม", stock: 200, suggest: 20, unit: "ตัน" },
+  { id: "sg-4", name: "DAP 18-46-0", stock: 148, suggest: 35, unit: "ตัน" },
+  { id: "sg-5", name: "46-0-0 ยูเรีย เม็ดโฟม", stock: 92, suggest: 40, unit: "ตัน" },
+  { id: "sg-6", name: "Ammonium Sulphate", stock: 310, suggest: 60, unit: "ตัน" },
+  // ของไม่พอ ต้องเห็นตั้งแต่ในกล่องนี้ ไม่ใช่ไปรู้ตอนเบิกไม่ออก
+  { id: "sg-7", name: "โบรอน", stock: 4, suggest: 12, unit: "ตัน" },
+  { id: "sg-8", name: "MOP เม็ดขาว", stock: 175, suggest: 25, unit: "ตัน" },
+  { id: "sg-9", name: "กระสอบพิมพ์ 15-15-15", stock: 8200, suggest: 1600, unit: "ใบ" },
+  { id: "sg-10", name: "สติกเกอร์ QR", stock: 14, suggest: 6, unit: "ม้วน" },
+];
+
+/** เบิกไม่พอ — ยอดในคลังน้อยกว่ายอดที่แนะนำ */
+export const isShort = (m: SuggestedMaterial) => m.stock < m.suggest;
+
+// ---------------------------------------------------------------
 // ตัวช่วยแสดงผล
 // ---------------------------------------------------------------
 
