@@ -63,19 +63,22 @@ function LotHeading({
     <DialogHeader className="gap-3 text-left">
       <DialogTitle className="text-lg">{title}</DialogTitle>
 
-      {/* ชิปโซนเป็นคอลัมน์ซ้ายคงที่ ไม่ใช่ flex-wrap
-          ของเดิมพอชื่อสินค้ายาวเกินบรรทัด ชิปจะถูกดันไปลอยอยู่บรรทัดบนคนเดียว
-          แบบนี้ชิปเกาะกับชื่อสินค้าเสมอ ชื่อยาวแค่ไหนก็ตัดบรรทัดใต้ตัวเอง */}
-      <div className="flex items-start gap-3">
-        <span className="mt-0.5 shrink-0 rounded-md bg-secondary px-2.5 py-0.5 text-sm font-semibold text-primary">
-          {lot.zone}
-        </span>
-        <div className="min-w-0 flex-1">
-          <p className="font-medium">{productName}</p>
-          <p className="mt-0.5 text-sm text-muted-foreground">
-            {lot.code} · รับ {lot.receivedAt} ({lot.ageDays} วัน)
-          </p>
+      <div>
+        {/* ชิปโซนเป็นคอลัมน์ซ้ายคงที่ ไม่ใช่ flex-wrap
+            ของเดิมพอชื่อสินค้ายาวเกินบรรทัด ชิปจะถูกดันไปลอยอยู่บรรทัดบนคนเดียว
+            แบบนี้ชิปเกาะกับชื่อสินค้าเสมอ ชื่อยาวแค่ไหนก็ตัดบรรทัดใต้ตัวเอง */}
+        <div className="flex items-start gap-3">
+          <span className="mt-0.5 shrink-0 rounded-md bg-secondary px-2.5 py-0.5 text-sm font-semibold text-primary">
+            {lot.zone}
+          </span>
+          <p className="min-w-0 flex-1 font-medium">{productName}</p>
         </div>
+
+        {/* บรรทัดล็อตอยู่นอกคอลัมน์ของชื่อสินค้า จึงเริ่มชิดขอบซ้ายเท่าชิปโซน
+            ไม่ถูกดันเข้าไปตามความกว้างของชิป */}
+        <p className="mt-1 text-sm text-muted-foreground">
+          {lot.code} · รับ {lot.receivedAt} ({lot.ageDays} วัน)
+        </p>
       </div>
     </DialogHeader>
   );
