@@ -47,6 +47,7 @@ import {
   ToggleGroupItem,
 } from "@peckey954/ui/components/ui/toggle-group";
 import { cn } from "@peckey954/ui/lib/utils";
+import { toast } from "sonner";
 import { useDevicePreview, useScrollState } from "@/components/device-preview";
 import { HistoryList } from "@/components/stock/history-list";
 import { StockLogProvider, useStockLog } from "@/components/stock/stock-log";
@@ -280,32 +281,17 @@ function GeneralStockView() {
             </BreadcrumbList>
           </Breadcrumb>
 
-          {/* ---------- หัวเรื่อง + ปุ่มเฉพาะแท็บ ----------
-               ปุ่มพวกนี้ทำงานกับข้อมูลของแท็บสต็อกเท่านั้น พอไปแท็บอื่น
-               ซึ่งเป็นเอกสารคนละชนิดจึงต้องหายไป ไม่ใช่ปุ่มประจำหน้า */}
-          <div className="mt-2 flex items-start justify-between gap-3 sm:mt-3">
-            <div className="min-w-0">
-              <h1 className="text-2xl font-semibold tracking-tight">
-                สต็อกทั่วไป
-              </h1>
-              <p className="mt-1 text-sm text-muted-foreground">
-                จัดการสต็อกทั่วไป
-              </p>
-            </div>
-
-            {tab === "stock" && (
-              <div className="flex shrink-0 items-center gap-2">
-                {/* ส่งออกเป็นงานทำครั้งเดียวจบ ไม่ต้องเอื้อมถึงตอนไล่ดูรายการ
-                    จึงอยู่บนหัวเรื่องพอ ส่วนปุ่มซ่อน/แสดงย้ายไปอยู่แถบติดบน */}
-                <Button
-                  variant="outline-primary"
-                  size="icon"
-                  aria-label="ส่งออก CSV"
-                >
-                  <DownloadIcon />
-                </Button>
-              </div>
-            )}
+          {/* ---------- หัวเรื่อง ----------
+               ไม่มีปุ่มตรงนี้ ปุ่มที่ใช้ได้เฉพาะบางแท็บอยู่ใต้แถบแท็บ
+               ตำแหน่งข้างชื่อหน้าสื่อว่าใช้ได้ทั้งหน้า พอความจริงไม่ตรง
+               หัวเรื่องจะกระตุกทุกครั้งที่สลับแท็บเพราะปุ่มโผล่มาแล้วหายไป */}
+          <div className="mt-2 min-w-0 sm:mt-3">
+            <h1 className="text-2xl font-semibold tracking-tight">
+              สต็อกทั่วไป
+            </h1>
+            <p className="mt-1 text-sm text-muted-foreground">
+              จัดการสต็อกทั่วไป
+            </p>
           </div>
 
           <Tabs
@@ -578,6 +564,26 @@ function GeneralStockView() {
                 {allShown ? <EyeIcon /> : <EyeOffIcon />}
               </Button>
             )}
+
+            {/* ส่งออกได้เฉพาะรายการของแท็บสต็อก จึงอยู่ในแถบของแท็บนี้
+                ไม่ใช่ข้างชื่อหน้า — ไม่งั้นหัวเรื่องจะกระตุกตอนสลับแท็บ
+                วางริมสุดเพราะเป็นงานทำครั้งเดียวจบ ไม่ได้ใช้ระหว่างไล่ดูรายการ
+                เหมือนปุ่มอื่นในแถวนี้ */}
+            <Button
+              variant="outline"
+              size="icon"
+              aria-label="ส่งออก CSV"
+              className="shrink-0"
+              onClick={() =>
+                toast.info("ส่งออก CSV", {
+                  description: isHistory
+                    ? "ประวัติการทำรายการ"
+                    : CATEGORY_LABEL[cat as CategoryId],
+                })
+              }
+            >
+              <DownloadIcon />
+            </Button>
           </div>
           </StickyBar>
 
