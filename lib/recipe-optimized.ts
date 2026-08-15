@@ -115,6 +115,21 @@ export function computeOptimized(
   });
 }
 
+/**
+ * ธาตุอาหารที่ได้จริงของแต่ละสูตร คีย์ด้วย id ของสูตร
+ *
+ * หน้าสูตรประจำสัปดาห์ต้องโชว์คอลัมน์ธาตุอาหารด้วย แต่ไม่เก็บเป็นข้อมูลซ้ำ
+ * เพราะมันคำนวณจากน้ำหนักวัตถุดิบที่มีอยู่แล้ว เก็บสองที่เมื่อไรก็เพี้ยนเมื่อนั้น
+ */
+export function nutritionByRecipe(
+  recipes = RECIPES,
+  materials = RAW_MATERIALS
+): Map<string, Record<NutrientKey, number>> {
+  return new Map(
+    computeOptimized(recipes, materials).map((r) => [r.id, r.nutrition])
+  );
+}
+
 export const failedRows = (rows: OptimizedRow[]) =>
   rows.filter((r) => r.error > ERROR_TOLERANCE);
 

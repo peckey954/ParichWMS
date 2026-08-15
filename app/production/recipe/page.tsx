@@ -17,11 +17,22 @@ import {
   InputGroupAddon,
   InputGroupInput,
 } from "@peckey954/ui/components/ui/input-group";
+import {
+  ToggleGroup,
+  ToggleGroupItem,
+} from "@peckey954/ui/components/ui/toggle-group";
 import { RecipeTable } from "@/components/production/recipe-table";
-import { RECIPES, RECIPE_UPDATED_AT, matchesRecipe } from "@/lib/recipe";
+import {
+  RECIPES,
+  RECIPE_UPDATED_AT,
+  RECIPE_VIEWS,
+  matchesRecipe,
+  type RecipeView,
+} from "@/lib/recipe";
 
 export default function WeeklyRecipePage() {
   const [query, setQuery] = React.useState("");
+  const [view, setView] = React.useState<RecipeView>("material");
   const visible = RECIPES.filter((r) => matchesRecipe(r, query));
 
   return (
@@ -81,8 +92,33 @@ export default function WeeklyRecipePage() {
         </Button>
       </div>
 
-      <div className="mt-4">
-        <RecipeTable rows={visible} />
+      {/* ---------- เลือกชุดข้อมูลที่จะดู ----------
+           ข้อมูลเต็มมี 20 คอลัมน์ ไม่มีใครใช้พร้อมกัน
+           สลับที่ระดับหน้า ไม่ใช่พับ/กางทีละแถว เพราะคนคิดแบบ
+           "วันนี้ฉันดูน้ำหนัก" ไม่ใช่ "แถวนี้ดูน้ำหนัก แถวหน้าดูธาตุอาหาร" */}
+      <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-2">
+        <ToggleGroup
+          type="single"
+          variant="outline"
+          value={view}
+          onValueChange={(v) => v && setView(v as RecipeView)}
+        >
+          {RECIPE_VIEWS.map((v) => (
+            <ToggleGroupItem key={v.id} value={v.id} className="px-4">
+              {/* จอแคบใช้ชื่อย่อ ปุ่มจะได้ไม่ล้นออกนอกจอ */}
+              <span className="@3xl:hidden">{v.short}</span>
+              <span className="hidden @3xl:inline">{v.label}</span>
+            </ToggleGroupItem>
+          ))}
+        </ToggleGroup>
+
+        <p className="text-sm text-muted-foreground">
+          {visible.length} สูตร · ตัวเลขคำนวณมาแล้ว แก้ที่หน้าตั้งค่า
+        </p>
+      </div>
+
+      <div className="mt-3">
+        <RecipeTable rows={visible} view={view} />
       </div>
 
       <div className="mt-6">

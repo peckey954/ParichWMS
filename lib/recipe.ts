@@ -34,7 +34,23 @@ export type Recipe = {
   ammoniumSulfate?: number;
   mg?: number;
   br?: number;
+  /** ข้อสังเกตของสูตรนี้ ส่วนใหญ่ไม่มี จึงแสดงเฉพาะสูตรที่มีจริง */
+  note?: string;
 };
+
+/**
+ * ชุดข้อมูลที่เลือกดูได้
+ *
+ * ตารางเต็มมี 20 คอลัมน์ ซึ่งไม่มีใครต้องใช้พร้อมกัน
+ * คนหน้าไลน์ต้องการน้ำหนักวัตถุดิบ ส่วนเปอร์เซ็นต์ธาตุอาหารไว้ตรวจทาน
+ * จึงให้สลับชุดที่ระดับหน้า ไม่ใช่พับ/กางทีละแถว
+ */
+export type RecipeView = "material" | "nutrition";
+
+export const RECIPE_VIEWS: { id: RecipeView; label: string; short: string }[] = [
+  { id: "material", label: "น้ำหนักวัตถุดิบ", short: "วัตถุดิบ" },
+  { id: "nutrition", label: "ธาตุอาหารที่ได้", short: "ธาตุอาหาร" },
+];
 
 /** คอลัมน์วัตถุดิบ ใช้สร้างทั้งหัวตารางและช่องข้อมูล จะได้ไม่หลุดกัน */
 export const MATERIAL_COLUMNS: { key: keyof Recipe; label: string }[] = [
@@ -74,14 +90,14 @@ export const RECIPES: Recipe[] = [
   { id: "r21", group: "bulkPlain", sku: "25-8-18 No filler", size: 50, coatNitro: false, coatPower: false, urea: 22.7, dap: 9.2, mop: 15.3, ammoniumSulfate: 2.7, mg: 0.1, br: 0 },
   { id: "r22", group: "bulkPlain", sku: "30-0-0 No Filler (No coat)", size: 50, coatNitro: false, coatPower: false, urea: 19.3, dap: 0, mop: 0, ammoniumSulfate: 30.6, mg: 0.1, br: 0 },
   { id: "r23", group: "bulkPlain", sku: "16-16-8 + 1Mg No Filler", size: 50, coatNitro: true, coatPower: false, coatedUrea: 1.2, dap: 18, mop: 7, ammoniumSulfate: 21.3, mg: 2.5, br: 0 },
-  { id: "r24", group: "bulkPlain", sku: "16-12-8", size: 50, coatNitro: false, coatPower: false, urea: 0, dap: 13.6, mop: 7, ammoniumSulfate: 27.9, mg: 1.5, br: 0 },
+  { id: "r24", group: "bulkPlain", sku: "16-12-8", size: 50, coatNitro: false, coatPower: false, urea: 0, dap: 13.6, mop: 7, ammoniumSulfate: 27.9, mg: 1.5, br: 0, note: "มีค่ากระสอบเพิ่มจากลายพิมพ์พิเศษ" },
   { id: "r25", group: "bulkPlain", sku: "14-7-30 + 1Mg +0.2B No Filler", size: 50, coatNitro: false, coatPower: false, urea: 11.7, dap: 8.1, mop: 25.3, ammoniumSulfate: 1.6, mg: 2.5, br: 0.8 },
   { id: "r26", group: "bulkPlain", sku: "14-28-8 + 0.8Mg + 0.5B No Filler", size: 25, coatNitro: false, coatPower: false, urea: 0.6, dap: 15.6, mop: 3.5, ammoniumSulfate: 2.4, mg: 2, br: 0.9 },
   { id: "r27", group: "bulkPlain", sku: "15-10-30 + 0.1Mg + 0.2S", size: 50, coatNitro: true, coatPower: false, coatedUrea: 11.7, dap: 11.4, mop: 25.3, ammoniumSulfate: 1.1, mg: 0.5, br: 0 },
 
   // ---------- Bulk กระสอบกราเวียร์ ----------
   { id: "r28", group: "bulkGravure", sku: "10-0-30+TE No Filler", size: 25, coatNitro: false, coatPower: true, urea: 0, dap: 0, mop: 12.5, ammoniumSulfate: 12.2, mg: 0.3, br: 0 },
-  { id: "r29", group: "bulkGravure", sku: "8-24-24 + 0.5Mg + 0.3B No Filler", size: 50, coatNitro: false, coatPower: true, urea: 0, dap: 26.8, mop: 20.3, ammoniumSulfate: 0, mg: 1.8, br: 1.1 },
+  { id: "r29", group: "bulkGravure", sku: "8-24-24 + 0.5Mg + 0.3B No Filler", size: 50, coatNitro: false, coatPower: true, urea: 0, dap: 26.8, mop: 20.3, ammoniumSulfate: 0, mg: 1.8, br: 1.1, note: "ธาตุอาหารเกินเกณฑ์ ตรวจซ้ำก่อนผลิต" },
   { id: "r30", group: "bulkGravure", sku: "13-6-27 + 1Mg + 0.3B No Filler", size: 50, coatNitro: true, coatPower: true, coatedUrea: 7.8, dap: 7, mop: 22.8, ammoniumSulfate: 8.8, mg: 2.5, br: 1.1 },
   { id: "r31", group: "bulkGravure", sku: "13-5-33 + 1Mg + 0.3B No Filler", size: 50, coatNitro: true, coatPower: true, coatedUrea: 11.8, dap: 5.9, mop: 27.8, ammoniumSulfate: 0.8, mg: 2.6, br: 1.1 },
   { id: "r32", group: "bulkGravure", sku: "15-5-20 + 1Mg No Filler", size: 50, coatNitro: true, coatPower: true, coatedUrea: 6.1, dap: 5.9, mop: 17, ammoniumSulfate: 18.5, mg: 2.5, br: 0 },
