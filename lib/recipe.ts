@@ -100,7 +100,7 @@ export const RECIPES: Recipe[] = [
 
   // ---------- Bulk กระสอบกราเวียร์ ----------
   { id: "r28", group: "bulkGravure", sku: "10-0-30+TE No Filler", size: 25, coatNitro: false, coatPower: true, urea: 0, dap: 0, mop: 12.5, ammoniumSulfate: 12.2, mg: 0.3, br: 0 },
-  { id: "r29", group: "bulkGravure", sku: "8-24-24 + 0.5Mg + 0.3B No Filler", size: 50, coatNitro: false, coatPower: true, urea: 0, dap: 26.8, mop: 20.3, ammoniumSulfate: 0, mg: 1.8, br: 1.1, note: "ธาตุอาหารเกินเกณฑ์ ตรวจซ้ำก่อนผลิต" },
+  { id: "r29", group: "bulkGravure", sku: "8-24-24 + 0.5Mg + 0.3B No Filler", size: 50, coatNitro: false, coatPower: true, urea: 0, dap: 26.8, mop: 20.3, ammoniumSulfate: 0, mg: 1.8, br: 1.1, note: "ใช้กระสอบกราเวียร์ ต้องสั่งล่วงหน้า" },
   { id: "r30", group: "bulkGravure", sku: "13-6-27 + 1Mg + 0.3B No Filler", size: 50, coatNitro: true, coatPower: true, coatedUrea: 7.8, dap: 7, mop: 22.8, ammoniumSulfate: 8.8, mg: 2.5, br: 1.1 },
   { id: "r31", group: "bulkGravure", sku: "13-5-33 + 1Mg + 0.3B No Filler", size: 50, coatNitro: true, coatPower: true, coatedUrea: 11.8, dap: 5.9, mop: 27.8, ammoniumSulfate: 0.8, mg: 2.6, br: 1.1 },
   { id: "r32", group: "bulkGravure", sku: "15-5-20 + 1Mg No Filler", size: 50, coatNitro: true, coatPower: true, coatedUrea: 6.1, dap: 5.9, mop: 17, ammoniumSulfate: 18.5, mg: 2.5, br: 0 },

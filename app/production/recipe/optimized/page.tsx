@@ -9,7 +9,6 @@ import {
   Settings2Icon,
   TriangleAlertIcon,
 } from "lucide-react";
-import { Badge } from "@peckey954/ui/components/ui/badge";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -46,11 +45,9 @@ import { toast } from "sonner";
 import { useRecipeRun } from "@/components/production/recipe-run";
 import { RECIPE_GROUP_LABEL } from "@/lib/recipe";
 import {
-  ERROR_TOLERANCE,
   MATERIALS,
   NUTRIENTS,
   computeOptimized,
-  failedRows,
   matchesOptimized,
   type OptimizedRow,
 } from "@/lib/recipe-optimized";
@@ -91,7 +88,6 @@ export default function OptimizedFormulaPage() {
   const rows = all.filter((r) => matchesOptimized(r, query));
   const { pages, safe, slice } = paginate(rows, page, PAGE_SIZE);
 
-  const failed = failedRows(all);
   const avgCost =
     all.length > 0 ? all.reduce((s, r) => s + r.totalCost, 0) / all.length : 0;
 
@@ -185,26 +181,10 @@ export default function OptimizedFormulaPage() {
       )}
 
       {/* ---------- สรุปหัวเรื่อง ---------- */}
-      <div className="mt-4 grid gap-3 @2xl:grid-cols-3">
+      <div className="mt-4 grid gap-3 @2xl:grid-cols-2">
         <Stat label="สูตรที่คำนวณ" value={`${all.length} สูตร`} />
         <Stat label="ต้นทุนเฉลี่ยต่อถุง" value={`${num(avgCost)} บาท`} />
-        <Stat
-          label="สูตรที่ไม่เข้าเป้า"
-          value={`${failed.length} สูตร`}
-          tone={failed.length > 0 ? "danger" : "success"}
-        />
       </div>
-
-      {failed.length > 0 && (
-        <div className="mt-3 flex items-start gap-2 rounded-xl border border-danger-border bg-danger px-4 py-3 text-sm">
-          <TriangleAlertIcon className="mt-0.5 size-4 shrink-0 text-danger-strong" />
-          <p>
-            มี {failed.length} สูตรที่ธาตุอาหารต่างจากตัวเลขในชื่อสูตรเกิน{" "}
-            {ERROR_TOLERANCE} — ดูคอลัมน์ผลต่างท้ายตาราง
-            แล้วกลับไปตรวจค่าธาตุอาหารของวัตถุดิบ
-          </p>
-        </div>
-      )}
 
       {/* ---------- เลือกมุมมอง + ค้นหา ----------
            ใช้ชิปกลมแบบเดียวกับหน้าสูตรประจำสัปดาห์
@@ -305,7 +285,6 @@ export default function OptimizedFormulaPage() {
                       </TableHead>
                     ))}
 
-                  <TableHead className="text-right">ผลต่าง</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -328,11 +307,6 @@ export default function OptimizedFormulaPage() {
         )}
       </div>
 
-      <p className="mt-3 text-sm text-muted-foreground">
-        ผลต่าง = ค่าธาตุอาหารที่คำนวณได้ เทียบกับตัวเลข N-P-K ในชื่อสูตร
-        ยิ่งใกล้ 0 ยิ่งตรงเป้า
-      </p>
-
       <div className="mt-6 flex flex-wrap gap-3">
         <Button asChild variant="outline-primary">
           <Link href="/production/recipe/setup">กลับไปแก้ข้อมูลตั้งต้น</Link>
@@ -348,9 +322,8 @@ export default function OptimizedFormulaPage() {
 /**
  * การ์ดสำหรับจอแคบ
  *
- * หน้านี้ตอบคำถามว่า "สูตรนี้คุ้มไหม และตรงเป้าไหม"
- * ต้นทุนต่อถุงกับผลต่างจึงขึ้นก่อนเป็นแถบสรุป แยกจากตัวเลขรายวัตถุดิบ
- * ที่เป็นข้อมูลประกอบ ไม่ใช่คำตอบ
+ * หน้านี้ตอบคำถามว่าสูตรนี้ต้นทุนเท่าไร ต้นทุนต่อถุงจึงขึ้นก่อน
+ * แยกจากตัวเลขรายวัตถุดิบที่เป็นข้อมูลประกอบ ไม่ใช่คำตอบ
  */
 function RowCard({
   row: r,
@@ -363,8 +336,6 @@ function RowCard({
   showPercent: boolean;
   showNutrition: boolean;
 }) {
-  const off = r.error > ERROR_TOLERANCE;
-
   const cells: { label: string; value: string }[] = [
     ...(showWeight
       ? MATERIALS.map((m) => ({
@@ -399,37 +370,15 @@ function RowCard({
         </p>
       </div>
 
-      {/* สองตัวนี้คือคำตอบของหน้า จึงเด่นกว่าตัวเลขรายวัตถุดิบข้างล่าง */}
-      <div className="mt-3 grid grid-cols-2 gap-3">
-        <div>
-          <p className="text-sm text-muted-foreground">ต้นทุน/ถุง</p>
-          <p className="mt-0.5 font-semibold tabular-nums">
-            {num(r.totalCost)}
-            <span className="ml-1 text-sm font-normal text-muted-foreground">
-              บาท
-            </span>
-          </p>
-        </div>
-        <div>
-          <p className="text-sm text-muted-foreground">ผลต่างจากเป้า</p>
-          <p
-            className={cn(
-              "mt-0.5 font-semibold tabular-nums",
-              off ? "text-danger-strong" : "text-muted-foreground"
-            )}
-          >
-            {num(r.error)}
-            {off && (
-              <Badge
-                tone="danger"
-                appearance="soft"
-                className="ml-2 align-middle"
-              >
-                ไม่เข้าเป้า
-              </Badge>
-            )}
-          </p>
-        </div>
+      {/* ต้นทุนคือคำตอบของหน้า จึงเด่นกว่าตัวเลขรายวัตถุดิบข้างล่าง */}
+      <div className="mt-3">
+        <p className="text-sm text-muted-foreground">ต้นทุน/ถุง</p>
+        <p className="mt-0.5 font-semibold tabular-nums">
+          {num(r.totalCost)}
+          <span className="ml-1 text-sm font-normal text-muted-foreground">
+            บาท
+          </span>
+        </p>
       </div>
 
       <dl className="mt-3 space-y-1.5 text-sm">
@@ -455,7 +404,6 @@ function Row({
   showPercent: boolean;
   showNutrition: boolean;
 }) {
-  const off = r.error > ERROR_TOLERANCE;
   return (
     <TableRow>
       <TableCell className={cn(COL_FIRST, "whitespace-nowrap")}>
@@ -490,47 +438,15 @@ function Row({
             {num(r.nutrition[n.key], 3)}
           </TableCell>
         ))}
-
-      <TableCell className="text-right">
-        {off ? (
-          <Badge
-            tone="danger"
-            appearance="soft"
-            className="[--bdg-border:transparent] [--bdg-text:var(--danger-strong)] font-semibold tabular-nums"
-          >
-            {num(r.error)}
-          </Badge>
-        ) : (
-          <span className="tabular-nums text-muted-foreground">
-            {num(r.error)}
-          </span>
-        )}
-      </TableCell>
     </TableRow>
   );
 }
 
-function Stat({
-  label,
-  value,
-  tone,
-}: {
-  label: string;
-  value: string;
-  tone?: "danger" | "success";
-}) {
+function Stat({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-xl border border-border bg-card px-4 py-3">
       <p className="text-sm text-muted-foreground">{label}</p>
-      <p
-        className={cn(
-          "mt-1 text-xl font-semibold tabular-nums",
-          tone === "danger" && "text-danger-strong",
-          tone === "success" && "text-success-solid"
-        )}
-      >
-        {value}
-      </p>
+      <p className="mt-1 text-xl font-semibold tabular-nums">{value}</p>
     </div>
   );
 }

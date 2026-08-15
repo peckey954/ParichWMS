@@ -8,7 +8,6 @@
 //   สัดส่วน (%)      = น้ำหนักวัตถุดิบ ÷ ขนาดบรรจุ × 100
 //   ธาตุอาหารที่ได้   = Σ (สัดส่วนวัตถุดิบ × %ธาตุอาหารของวัตถุดิบนั้น) ÷ 100
 //   ต้นทุนต่อถุง      = Σ (น้ำหนัก กก. ÷ 1000 × ราคาต่อตัน)
-//   ผลต่างจากเป้า     = ค่าที่ได้จริง เทียบกับตัวเลข N-P-K ในชื่อสูตร
 // ============================================================
 
 import { RECIPES, type Recipe, type RecipeGroupId } from "./recipe";
@@ -42,19 +41,7 @@ export type OptimizedRow = {
   percent: Record<string, number>;
   /** ธาตุอาหารที่ได้จริง (%) */
   nutrition: Record<NutrientKey, number>;
-  /** ผลต่างจากตัวเลขในชื่อสูตร ยิ่งใกล้ 0 ยิ่งตรงเป้า */
-  error: number;
 };
-
-/** เกินเท่านี้ถือว่าคำนวณไม่เข้าเป้า ต้องกลับไปดูข้อมูลตั้งต้น */
-export const ERROR_TOLERANCE = 0.5;
-
-/** ดึงเลข N-P-K จากหน้าชื่อสูตร เช่น "20-8-8 + 1Mg" → 20 / 8 / 8 */
-function targetNpk(sku: string): [number, number, number] | null {
-  const m = sku.match(/^\s*(\d+)-(\d+)-(\d+)/);
-  if (!m) return null;
-  return [Number(m[1]), Number(m[2]), Number(m[3])];
-}
 
 const weightOf = (r: Recipe, key: string) =>
   key === "urea"
@@ -92,15 +79,6 @@ export function computeOptimized(
       })
     ) as Record<NutrientKey, number>;
 
-    const target = targetNpk(r.sku);
-    const error = target
-      ? Math.max(
-          Math.abs(nutrition.n - target[0]),
-          Math.abs(nutrition.p - target[1]),
-          Math.abs(nutrition.k - target[2])
-        )
-      : 0;
-
     return {
       id: r.id,
       group: r.group,
@@ -110,7 +88,6 @@ export function computeOptimized(
       weight,
       percent,
       nutrition,
-      error,
     };
   });
 }
@@ -129,9 +106,6 @@ export function nutritionByRecipe(
     computeOptimized(recipes, materials).map((r) => [r.id, r.nutrition])
   );
 }
-
-export const failedRows = (rows: OptimizedRow[]) =>
-  rows.filter((r) => r.error > ERROR_TOLERANCE);
 
 export function matchesOptimized(r: OptimizedRow, q: string): boolean {
   const s = q.trim().toLowerCase();
