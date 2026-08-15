@@ -35,6 +35,7 @@ import {
 } from "@peckey954/ui/components/ui/table";
 import { cn } from "@peckey954/ui/lib/utils";
 import { toast } from "sonner";
+import { useRecipeRun } from "@/components/production/recipe-run";
 import {
   COL_FIRST,
   HEAD_FIRST,
@@ -65,32 +66,44 @@ import {
 
 export function InputSetup() {
   const router = useRouter();
+  const { markInput, markRun } = useRecipeRun();
   const [rows, setRows] = React.useState<RawMaterialDraft[]>(RAW_MATERIALS);
   const [lastRun, setLastRun] = React.useState<string | null>(null);
   const seq = React.useRef(0);
 
-  const patch = (id: string, next: Partial<RawMaterialDraft>) =>
-    setRows((prev) => prev.map((r) => (r.id === id ? { ...r, ...next } : r)));
+  // แก้ตรงไหนก็ตาม ผลคำนวณที่หน้าสูตรที่เหมาะสมเก่าไปทันที
+  const touch = () => markInput();
 
-  const setNutrient = (id: string, key: NutrientKey, v: string) =>
+  const patch = (id: string, next: Partial<RawMaterialDraft>) => (
+    touch(),
+    setRows((prev) => prev.map((r) => (r.id === id ? { ...r, ...next } : r)))
+  );
+
+  const setNutrient = (id: string, key: NutrientKey, v: string) => (
+    touch(),
     setRows((prev) =>
       prev.map((r) =>
         r.id === id ? { ...r, nutrients: { ...r.nutrients, [key]: v } } : r
       )
-    );
+    )
+  );
 
   const addRow = () => {
+    touch();
     seq.current += 1;
     setRows((prev) => [...prev, emptyMaterial(`new-${seq.current}`)]);
   };
 
-  const removeRow = (id: string) =>
+  const removeRow = (id: string) => {
+    touch();
     setRows((prev) => prev.filter((r) => r.id !== id));
+  };
 
   const invalid = invalidMaterials(rows);
   const totalCost = rows.reduce((sum, r) => sum + toNumber(r.cost), 0);
 
   const run = () => {
+    markRun();
     const d = new Date();
     const p = (n: number) => String(n).padStart(2, "0");
     setLastRun(

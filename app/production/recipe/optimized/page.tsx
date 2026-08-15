@@ -2,7 +2,13 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { DownloadIcon, SearchIcon, TriangleAlertIcon } from "lucide-react";
+import {
+  DownloadIcon,
+  PlayIcon,
+  SearchIcon,
+  Settings2Icon,
+  TriangleAlertIcon,
+} from "lucide-react";
 import { Badge } from "@peckey954/ui/components/ui/badge";
 import {
   Breadcrumb,
@@ -40,6 +46,8 @@ import {
   TablePager,
   paginate,
 } from "@/components/stock/doc-parts";
+import { toast } from "sonner";
+import { useRecipeRun } from "@/components/production/recipe-run";
 import { RECIPE_GROUP_LABEL } from "@/lib/recipe";
 import {
   ERROR_TOLERANCE,
@@ -78,6 +86,7 @@ const num = (v: number, d = 2) =>
   v.toLocaleString("th-TH", { minimumFractionDigits: d, maximumFractionDigits: d });
 
 export default function OptimizedFormulaPage() {
+  const { runAt, stale, markRun } = useRecipeRun();
   const [view, setView] = React.useState<View>("weight");
   const [query, setQuery] = React.useState("");
   const [page, setPage] = React.useState(1);
@@ -93,6 +102,14 @@ export default function OptimizedFormulaPage() {
   const showWeight = view === "weight" || view === "all";
   const showPercent = view === "percent" || view === "all";
   const showNutrition = view === "nutrition" || view === "all";
+
+  /** คำนวณสดทุกครั้งอยู่แล้ว ปุ่มนี้จึงแค่ประทับเวลาใหม่และเคลียร์คำเตือน */
+  const recalc = () => {
+    markRun();
+    toast.success("คำนวณสูตรใหม่แล้ว", {
+      description: `ใช้ต้นทุนและค่าธาตุอาหารล่าสุด ${all.length} สูตร`,
+    });
+  };
 
   return (
     <main className="mx-auto w-full max-w-7xl px-4 py-3 sm:px-6 sm:py-5">
@@ -110,27 +127,66 @@ export default function OptimizedFormulaPage() {
           <BreadcrumbSeparator />
           <BreadcrumbItem>
             <BreadcrumbPage className="text-primary">
-              ผลการคำนวณ
+              สูตรที่เหมาะสม
             </BreadcrumbPage>
           </BreadcrumbItem>
         </BreadcrumbList>
       </Breadcrumb>
 
-      <div className="mt-2 flex flex-wrap items-start justify-between gap-3 sm:mt-3">
+      <div className="mt-2 flex items-start justify-between gap-3 sm:mt-3">
         <div className="min-w-0">
           <h1 className="text-2xl font-semibold tracking-tight">
-            ผลการคำนวณสูตร
+            สูตรที่เหมาะสม
           </h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            คำนวณจากต้นทุนและค่าธาตุอาหารล่าสุด · ดูได้อย่างเดียว
-            แก้ที่หน้าตั้งค่าแล้วกด RUN ใหม่
+            ผลการ Optimized Formula จากต้นทุนและค่าธาตุอาหารล่าสุด ·
+            คำนวณล่าสุด {runAt}
           </p>
         </div>
-        <Button variant="outline-primary">
-          <DownloadIcon />
-          ส่งออก CSV
-        </Button>
+
+        {/* ทางเข้าหน้าแก้ข้อมูลอยู่ในนี้ ไม่ใช่ที่หน้าสูตรประจำสัปดาห์
+            คนต้องเห็นผลก่อนว่าตอนนี้เป็นยังไง แล้วค่อยตัดสินใจว่าจะแก้อะไร
+            ส่งออก CSV เหลือแต่ไอคอนบนจอแคบ โหลดไฟล์ลงมือถือแล้วใช้ต่อยาก */}
+        <div className="flex shrink-0 items-center gap-2">
+          <Button
+            variant="outline"
+            size="icon"
+            aria-label="ส่งออก CSV"
+            className="@3xl:hidden"
+          >
+            <DownloadIcon />
+          </Button>
+          <Button variant="outline" className="hidden @3xl:inline-flex">
+            <DownloadIcon />
+            ส่งออก CSV
+          </Button>
+
+          <Button asChild variant="outline-primary">
+            <Link href="/production/recipe/setup">
+              <Settings2Icon className="hidden @3xl:inline" />
+              ตั้งค่าข้อมูล
+            </Link>
+          </Button>
+        </div>
       </div>
+
+      {/* ---------- เตือนว่าผลที่เห็นเก่าไปแล้ว ----------
+           กับดักที่ใหญ่ที่สุดของหน้านี้ — มีคนแก้ต้นทุนแล้วไม่ได้กด RUN
+           ตัวเลขที่เห็นจะเป็นของเก่าโดยไม่มีอะไรบอก
+           แล้วคนจะตัดสินใจจากต้นทุนที่ไม่ตรงกับความจริง */}
+      {stale && (
+        <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border border-chip-yellow-foreground/40 bg-chip-yellow px-4 py-3 text-sm">
+          <TriangleAlertIcon className="size-4 shrink-0" />
+          <p className="min-w-0 flex-1">
+            ข้อมูลตั้งต้นถูกแก้หลังคำนวณครั้งล่าสุด
+            ตัวเลขที่เห็นยังไม่รวมสิ่งที่เพิ่งแก้
+          </p>
+          <Button size="sm" onClick={recalc}>
+            <PlayIcon />
+            คำนวณใหม่
+          </Button>
+        </div>
+      )}
 
       {/* ---------- สรุปหัวเรื่อง ---------- */}
       <div className="mt-4 grid gap-3 @2xl:grid-cols-3">

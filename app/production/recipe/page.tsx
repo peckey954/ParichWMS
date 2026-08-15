@@ -62,13 +62,15 @@ export default function WeeklyRecipePage() {
           </p>
         </div>
 
-        {/* ตัวเลขในตารางเป็นผลลัพธ์ที่คำนวณมาแล้ว แก้ที่นี่ไม่ได้
-            ต้องเข้าไปแก้ต้นทางในหน้าตั้งค่าแล้วสั่งคำนวณใหม่ */}
+        {/* พาไปหน้าผลคำนวณก่อน ไม่ใช่หน้าแก้ข้อมูล
+            คนเปิดมาเพื่อ "ดู" บ่อยกว่ามาแก้ และหน้าแก้มีช่องกรอกห้าร้อยกว่าช่อง
+            กดพลาดเข้าไปแล้วเผลอพิมพ์ทับได้ ส่วนหน้าผลลัพธ์ดูอย่างเดียว ไม่เสียหาย
+            ชื่อปุ่มบอกสิ่งที่จะได้ ไม่ใช่ "ตั้งค่า" ซึ่งสัญญาว่าจะได้หน้าแก้ไข */}
         <Button asChild variant="outline-primary" className="shrink-0">
-          <Link href="/production/recipe/setup">
+          <Link href="/production/recipe/optimized">
             <Settings2Icon className="hidden @3xl:inline" />
-            <span className="@3xl:hidden">ตั้งค่าสูตร</span>
-            <span className="hidden @3xl:inline">ตั้งค่าสูตรที่เหมาะสม</span>
+            <span className="@3xl:hidden">สูตรที่เหมาะสม</span>
+            <span className="hidden @3xl:inline">ดูสูตรที่เหมาะสม</span>
           </Link>
         </Button>
       </div>

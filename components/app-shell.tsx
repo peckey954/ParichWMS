@@ -23,6 +23,7 @@ import {
   DevicePreviewToggle,
 } from "@/components/device-preview";
 import { LightTooltip } from "@/components/light-tooltip";
+import { RecipeRunProvider } from "@/components/production/recipe-run";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { ModuleIcon } from "@/components/modules/module-icon";
 import { PendingBadge } from "@/components/modules/pending-badge";
@@ -36,7 +37,11 @@ import {
 export function AppShell({ children }: { children: React.ReactNode }) {
   return (
     <DevicePreviewProvider>
-      <Shell>{children}</Shell>
+      {/* สถานะการคำนวณสูตรอยู่ที่นี่ เพราะต้องข้ามหน้าได้
+          หน้าตั้งค่าแก้ข้อมูล แล้วหน้าผลลัพธ์ต้องรู้ว่าผลที่แสดงอยู่เก่าไปแล้ว */}
+      <RecipeRunProvider>
+        <Shell>{children}</Shell>
+      </RecipeRunProvider>
     </DevicePreviewProvider>
   );
 }

@@ -26,6 +26,7 @@ import {
 } from "@peckey954/ui/components/ui/select";
 import { cn } from "@peckey954/ui/lib/utils";
 import { toast } from "sonner";
+import { useRecipeRun } from "@/components/production/recipe-run";
 import { RECIPE_GROUP_LABEL } from "@/lib/recipe";
 import {
   COST_FIELDS,
@@ -59,20 +60,25 @@ import { CostTable } from "./cost-table";
 const GROUP_ORDER: FieldGroup[] = ["cost", "rate", "budget", "price"];
 
 export function CostSetup() {
+  // แก้ต้นทุนแล้วผลคำนวณที่หน้าสูตรที่เหมาะสมเก่าไปทันที
+  const { markInput } = useRecipeRun();
   const [rows, setRows] = React.useState<CostRow[]>(COST_ROWS);
   const [query, setQuery] = React.useState("");
   const [openId, setOpenId] = React.useState<string | null>(null);
 
-  const patch = (id: string, key: FieldKey, value: string) =>
+  const patch = (id: string, key: FieldKey, value: string) => (
+    markInput(),
     setRows((prev) =>
       prev.map((r) => (r.id === id ? { ...r, [key]: value } : r))
-    );
+    )
+  );
 
   const visible = rows.filter((r) => matchesCost(r, query));
 
   /** เติมค่าเดียวกันให้ทุกสูตรที่กำลังแสดงอยู่ ไม่ใช่ทุกสูตรในระบบ
       ถ้ากรองอยู่แล้วเติมทั้งหมด จะไปทับสูตรที่มองไม่เห็นโดยไม่รู้ตัว */
   const fillDown = (key: FieldKey, value: string) => {
+    markInput();
     const ids = new Set(visible.map((r) => r.id));
     setRows((prev) =>
       prev.map((r) => (ids.has(r.id) ? { ...r, [key]: value } : r))
