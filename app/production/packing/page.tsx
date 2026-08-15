@@ -24,6 +24,11 @@ import {
   type PackingAction,
 } from "@/components/production/packing-actions";
 import { PackingToolbar } from "@/components/production/packing-toolbar";
+import {
+  BackToTop,
+  StickyToolbar,
+  useStickyToolbar,
+} from "@/components/sticky-toolbar";
 import { SuggestMaterialsDialog } from "@/components/production/suggest-materials-dialog";
 import {
   CWIP_PRODUCTS,
@@ -50,6 +55,8 @@ export default function PackingListPage() {
   const [tab, setTab] = React.useState<Tab>("waiting");
   const [query, setQuery] = React.useState("");
   const [suggestOpen, setSuggestOpen] = React.useState(false);
+  // เลื่อนลงซ่อนแถบค้นหา เลื่อนขึ้นเอากลับมา แบบเดียวกับหน้าสต็อกทั่วไป
+  const { hidden, showTop, scrollToTop, barRef } = useStickyToolbar();
 
   const waiting = WAITING_ORDERS.filter((o) => matchesOrder(o, query));
   const done = DONE_ORDERS.filter((o) => matchesOrder(o, query));
@@ -148,15 +155,20 @@ export default function PackingListPage() {
         </TabsList>
       </Tabs>
 
-      <div className="mt-3">
-        <PackingToolbar
-          query={query}
-          onQuery={setQuery}
-          placeholder={PLACEHOLDER[tab]}
-          actions={TAB_ACTIONS[tab]}
-          onFilter={() => soon("ตัวกรอง")}
-        />
-      </div>
+      {/* ติดบนและซ่อนตัวเองตอนเลื่อนลง เหมือนหน้าสต็อกทั่วไป
+          แท็บ "ผลิตแล้ว" มี 46 ใบ ถ้าค้นหาอยู่บนสุดอย่างเดียว
+          เลื่อนลงไปแล้วต้องลากกลับขึ้นทั้งหน้าเพื่อพิมพ์คำค้น */}
+      <StickyToolbar hidden={hidden} barRef={barRef}>
+        <div className="pt-2">
+          <PackingToolbar
+            query={query}
+            onQuery={setQuery}
+            placeholder={PLACEHOLDER[tab]}
+            actions={TAB_ACTIONS[tab]}
+            onFilter={() => soon("ตัวกรอง")}
+          />
+        </div>
+      </StickyToolbar>
 
       <div className="mt-3">
         {tab === "waiting" && (
@@ -169,6 +181,8 @@ export default function PackingListPage() {
       </div>
 
       <SuggestMaterialsDialog open={suggestOpen} onOpenChange={setSuggestOpen} />
+
+      <BackToTop show={showTop} onClick={scrollToTop} />
     </main>
   );
 }

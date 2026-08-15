@@ -2,7 +2,6 @@
 
 import * as React from "react";
 import {
-  ArrowUpIcon,
   DownloadIcon,
   EyeIcon,
   EyeOffIcon,
@@ -49,6 +48,7 @@ import {
 import { cn } from "@peckey954/ui/lib/utils";
 import { toast } from "sonner";
 import { useDevicePreview, useScrollState } from "@/components/device-preview";
+import { BackToTop, StickyToolbar } from "@/components/sticky-toolbar";
 import { HistoryList } from "@/components/stock/history-list";
 import { StockLogProvider, useStockLog } from "@/components/stock/stock-log";
 import { InboundList } from "@/components/stock/inbound-list";
@@ -68,46 +68,6 @@ import {
   matchesQuery,
   type CategoryId,
 } from "@/lib/general-stock";
-
-/**
- * แถบเครื่องมือที่ติดบนตอนเลื่อน
- *
- * เลื่อนลง = ซ่อนไปข้างบน ไม่มีอะไรบังเวลาไล่ดูของ
- * เลื่อนขึ้น = โผล่กลับมาทันที เพราะการเลื่อนขึ้นแปลว่ากำลังหาอะไรอยู่
- *
- * พื้นหลังเป็นสีเดียวกับพื้นที่เนื้อหา ไม่มีเส้นคั่นใต้แถบ
- * ในโหมดจำลอง กรอบเป็นตัวเลื่อนเอง จึงยึดที่ขอบบนกรอบ (top-0)
- * โหมดเต็มจอ หน้าเว็บเป็นตัวเลื่อน ต้องเว้นให้หัวเรื่องที่ติดบนอยู่ (top-14)
- */
-function StickyBar({
-  framed,
-  hidden,
-  barRef,
-  children,
-}: {
-  framed: boolean;
-  hidden: boolean;
-  barRef?: React.RefObject<HTMLDivElement | null>;
-  children: React.ReactNode;
-}) {
-  return (
-    <div
-      ref={barRef}
-      className={cn(
-        "sticky z-30 -mx-4 mt-3 bg-surface px-4 pb-3 sm:-mx-6 sm:mt-4 sm:px-6",
-        "transition-transform duration-200",
-        framed ? "top-0" : "top-14",
-        hidden && "-translate-y-[calc(100%+1rem)]"
-      )}
-      aria-hidden={hidden}
-      // ตอนซ่อน แถบยังอยู่ในหน้าแต่ถูกดันขึ้นไปนอกจอ
-      // ถ้าไม่ปิดการโฟกัส คนกด Tab จะหลุดเข้าไปในของที่มองไม่เห็น
-      inert={hidden}
-    >
-      {children}
-    </div>
-  );
-}
 
 /** ชิปแถวบน — ประเภทสินค้าทั้งหมด บวกมุมมองประวัติต่อท้าย */
 const CHIPS: { id: CategoryId | "history"; label: string }[] = [
@@ -318,7 +278,7 @@ function GeneralStockView() {
                รายการยาว ถ้าปุ่มอยู่บนสุดอย่างเดียวต้องเลื่อนกลับไปกด
                จึงยกสองอย่างที่ใช้ระหว่างไล่ดู (สลับประเภท + ซ่อน/แสดง) มาติดบนไว้
                ลบขอบซ้ายขวาออกด้วย -mx เพื่อให้พื้นหลังเต็มความกว้างตอนติด */}
-          <StickyBar framed={framed} hidden={hidden} barRef={stickyRef}>
+          <StickyToolbar hidden={hidden} barRef={stickyRef}>
           <div className="flex items-center gap-2 pt-2">
             <div
               ref={chipRowRef}
@@ -585,7 +545,7 @@ function GeneralStockView() {
               <DownloadIcon />
             </Button>
           </div>
-          </StickyBar>
+          </StickyToolbar>
 
           {/* ---------- รายการสินค้า / ประวัติ ---------- */}
           <div ref={listRef} className="mt-4 space-y-4">
@@ -657,7 +617,7 @@ function GeneralStockView() {
                ไม่มีชิปประเภท ไม่มีเรียงตาม ไม่มีปุ่มส่งออก เพราะไม่เกี่ยวกัน */}
           {tab === "inbound" && (
             <>
-              <StickyBar framed={framed} hidden={hidden} barRef={stickyRef}>
+              <StickyToolbar hidden={hidden} barRef={stickyRef}>
                 <div className="flex items-center gap-2 pt-2">
                   <InputGroup className="min-w-0 flex-1 bg-card">
                     <InputGroupAddon align="inline-start">
@@ -678,7 +638,7 @@ function GeneralStockView() {
                     <ListFilterIcon />
                   </Button>
                 </div>
-              </StickyBar>
+              </StickyToolbar>
 
               <div className="mt-4">
                 <InboundList docs={inboundVisible} />
@@ -689,7 +649,7 @@ function GeneralStockView() {
           {/* ---------- แท็บรอจ่าย/คืน — ใบขอเบิกกับใบขอคืนอยู่ตารางเดียวกัน ---------- */}
           {tab === "issue" && (
             <>
-              <StickyBar framed={framed} hidden={hidden} barRef={stickyRef}>
+              <StickyToolbar hidden={hidden} barRef={stickyRef}>
                 {/* ทิศทางของเอกสาร เลือกได้ทีละอัน เลื่อนแนวนอนเอาบนจอแคบ */}
                 <div
                   role="tablist"
@@ -741,7 +701,7 @@ function GeneralStockView() {
                     <ListFilterIcon />
                   </Button>
                 </div>
-              </StickyBar>
+              </StickyToolbar>
 
               <div className="mt-4">
                 <IssueList docs={issueVisible} />
@@ -749,23 +709,7 @@ function GeneralStockView() {
             </>
           )}
 
-          {/* ---------- ปุ่มกลับขึ้นบนสุด ----------
-               sticky ไม่ใช่ fixed เพราะตัวที่เลื่อนอาจเป็นกรอบจำลอง ไม่ใช่หน้าต่าง
-               ถ้าใช้ fixed ปุ่มจะไปเกาะขอบจอ ไม่ใช่ขอบกรอบ
-               h-0 ไม่ให้กินที่ในหน้า ปุ่มจึงลอยทับเนื้อหาแทนที่จะดันของลง */}
-          <div className="pointer-events-none sticky bottom-6 z-30 flex h-0 items-end justify-end">
-            <Button
-              size="icon"
-              aria-label="กลับขึ้นบนสุด"
-              onClick={scrollToTop}
-              className={cn(
-                "pointer-events-auto -translate-y-full rounded-full shadow-lg transition-opacity duration-200",
-                showTop ? "opacity-100" : "pointer-events-none opacity-0"
-              )}
-            >
-              <ArrowUpIcon />
-            </Button>
-          </div>
+          <BackToTop show={showTop} onClick={scrollToTop} />
         </div>
       </div>
     </main>

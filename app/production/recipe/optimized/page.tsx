@@ -42,6 +42,11 @@ import {
   paginate,
 } from "@/components/stock/doc-parts";
 import { toast } from "sonner";
+import {
+  BackToTop,
+  StickyToolbar,
+  useStickyToolbar,
+} from "@/components/sticky-toolbar";
 import { useRecipeRun } from "@/components/production/recipe-run";
 import { RECIPE_GROUP_LABEL } from "@/lib/recipe";
 import {
@@ -83,6 +88,8 @@ export default function OptimizedFormulaPage() {
   const [view, setView] = React.useState<View>("weight");
   const [query, setQuery] = React.useState("");
   const [page, setPage] = React.useState(1);
+  // เลื่อนลงซ่อนแถบชิป+ค้นหา เลื่อนขึ้นเอากลับมา แบบเดียวกับหน้าสต็อกทั่วไป
+  const { hidden, showTop, scrollToTop, barRef } = useStickyToolbar();
 
   const all = React.useMemo(() => computeOptimized(), []);
   const rows = all.filter((r) => matchesOptimized(r, query));
@@ -188,51 +195,56 @@ export default function OptimizedFormulaPage() {
 
       {/* ---------- เลือกมุมมอง + ค้นหา ----------
            ใช้ชิปกลมแบบเดียวกับหน้าสูตรประจำสัปดาห์
-           จอแคบใช้ชื่อย่อ ปุ่มสี่อันจึงลงจอได้โดยไม่ต้องเลื่อนแนวนอน */}
-      <div className="mt-4 flex flex-wrap items-center gap-2">
-        <div
-          role="radiogroup"
-          aria-label="ชุดข้อมูลที่แสดง"
-          className="flex flex-wrap gap-2"
-        >
-          {VIEWS.map((v) => {
-            const on = view === v.id;
-            return (
-              <button
-                key={v.id}
-                type="button"
-                role="radio"
-                aria-checked={on}
-                onClick={() => setView(v.id)}
-                className={cn(
-                  "shrink-0 rounded-full border px-3 py-1 text-sm whitespace-nowrap transition-colors",
-                  "focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none",
-                  on
-                    ? "border-primary bg-brand font-medium text-primary"
-                    : "border-border text-foreground hover:bg-accent-hover"
-                )}
-              >
-                <span className="@3xl:hidden">{v.short}</span>
-                <span className="hidden @3xl:inline">{v.label}</span>
-              </button>
-            );
-          })}
-        </div>
+           จอแคบใช้ชื่อย่อ ปุ่มสี่อันจึงลงจอได้โดยไม่ต้องเลื่อนแนวนอน
 
-        <InputGroup className="w-full bg-card sm:w-auto sm:min-w-48 sm:flex-1">
-          <InputGroupAddon align="inline-start">
-            <SearchIcon />
-          </InputGroupAddon>
-          <InputGroupInput
-            placeholder="ค้นหา..."
-            value={query}
-            onChange={(e) => {
-              setQuery(e.target.value);
-              setPage(1);
-            }}
-          />
-        </InputGroup>
-      </div>
+           ติดบนและซ่อนตัวเองตอนเลื่อนลง เหมือนหน้าสต็อกทั่วไป
+           สลับมุมมองได้จากตรงไหนของตารางก็ได้ ไม่ต้องเลื่อนกลับขึ้นบนสุด */}
+      <StickyToolbar hidden={hidden} barRef={barRef}>
+        <div className="flex flex-wrap items-center gap-2 pt-2">
+          <div
+            role="radiogroup"
+            aria-label="ชุดข้อมูลที่แสดง"
+            className="flex flex-wrap gap-2"
+          >
+            {VIEWS.map((v) => {
+              const on = view === v.id;
+              return (
+                <button
+                  key={v.id}
+                  type="button"
+                  role="radio"
+                  aria-checked={on}
+                  onClick={() => setView(v.id)}
+                  className={cn(
+                    "shrink-0 rounded-full border px-3 py-1 text-sm whitespace-nowrap transition-colors",
+                    "focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none",
+                    on
+                      ? "border-primary bg-brand font-medium text-primary"
+                      : "border-border text-foreground hover:bg-accent-hover"
+                  )}
+                >
+                  <span className="@3xl:hidden">{v.short}</span>
+                  <span className="hidden @3xl:inline">{v.label}</span>
+                </button>
+              );
+            })}
+          </div>
+
+          <InputGroup className="w-full bg-card sm:w-auto sm:min-w-48 sm:flex-1">
+            <InputGroupAddon align="inline-start">
+              <SearchIcon />
+            </InputGroupAddon>
+            <InputGroupInput
+              placeholder="ค้นหา..."
+              value={query}
+              onChange={(e) => {
+                setQuery(e.target.value);
+                setPage(1);
+              }}
+            />
+          </InputGroup>
+        </div>
+      </StickyToolbar>
 
       <div className="mt-4">
         {rows.length === 0 ? (
@@ -315,6 +327,8 @@ export default function OptimizedFormulaPage() {
           <Link href="/production/recipe">ดูสูตรประจำสัปดาห์</Link>
         </Button>
       </div>
+
+      <BackToTop show={showTop} onClick={scrollToTop} />
     </main>
   );
 }
