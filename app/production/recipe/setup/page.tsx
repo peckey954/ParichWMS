@@ -42,7 +42,7 @@ const TABS: {
 }[] = [
   {
     id: "input",
-    label: "Input ข้อมูล",
+    label: "ตั้งค่าข้อมูล",
     icon: SlidersHorizontalIcon,
     purpose:
       "ต้นทุนและค่าธาตุอาหารของวัตถุดิบ กด RUN แล้วระบบจะคำนวณสูตรที่คุ้มที่สุดให้",

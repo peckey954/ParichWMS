@@ -2,29 +2,9 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import {
-  ChevronDownIcon,
-  FlaskConicalIcon,
-  PlayIcon,
-  PlusIcon,
-  TrashIcon,
-  TriangleAlertIcon,
-  WalletIcon,
-} from "lucide-react";
-import { Badge } from "@peckey954/ui/components/ui/badge";
+import { PlayIcon, PlusIcon, TrashIcon, TriangleAlertIcon } from "lucide-react";
 import { Button } from "@peckey954/ui/components/ui/button";
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@peckey954/ui/components/ui/collapsible";
 import { Input } from "@peckey954/ui/components/ui/input";
-import {
-  InputGroup,
-  InputGroupAddon,
-  InputGroupInput,
-} from "@peckey954/ui/components/ui/input-group";
-import { Label } from "@peckey954/ui/components/ui/label";
 import {
   Table,
   TableBody,
@@ -47,28 +27,50 @@ import {
   RAW_MATERIALS,
   type NutrientKey,
   type RawMaterialDraft,
+  displayNumber,
   emptyMaterial,
   formatBaht,
   invalidMaterials,
-  isCoating,
   toNumber,
 } from "@/lib/recipe-input";
 
 /* ------------------------------------------------------------------
-   แท็บ Input — ข้อมูลตั้งต้นของการคำนวณสูตร
+   แท็บตั้งค่าข้อมูล — ต้นทุนกับธาตุอาหารของวัตถุดิบ
 
-   แยกเป็นสองส่วนตามจังหวะการใช้งาน ไม่ใช่ตามหน้าตาของไฟล์ Excel
-   ต้นทุนอยู่บนสุดและกางไว้ เพราะเป็นงานที่ทำบ่อยที่สุด
-   ธาตุอาหารหุบไว้ เพราะตั้งครั้งเดียวใช้ยาว เปิดเมื่อจะเพิ่ม/แก้วัตถุดิบ
+   ตารางเดียว แถวเดียวคือวัตถุดิบหนึ่งตัว เหมือนไฟล์ต้นทาง
+   เคยแยกเป็นสองส่วน (ต้นทุนกางไว้ ธาตุอาหารหุบไว้) แต่พอต้องเพิ่มวัตถุดิบใหม่
+   ต้องกรอกชื่อที่ส่วนล่าง แล้วเลื่อนกลับขึ้นไปกรอกต้นทุนที่ส่วนบน
+   รวมเป็นตารางเดียวแล้วไล่กรอกทีละแถวจนจบได้เลย
+
+   จอแคบไม่ยุบเป็นการ์ด เลื่อนตารางแนวนอนเอา
+   ตรึงคอลัมน์ชื่อไว้ซ้าย เลื่อนไปไกลแค่ไหนก็ยังรู้ว่ากรอกอยู่แถวไหน
+   การกรอกตัวเลขแบบนี้ต้องเทียบกันข้ามแถวได้ ซึ่งการ์ดทำไม่ได้
 
    คอลัมน์ "ราคา" ในไฟล์เดิมตัดออกแล้ว เพราะซ้ำกับต้นทุน
 ------------------------------------------------------------------ */
+
+/**
+ * ปุ่มลบตรึงขวาเฉพาะจอกว้าง
+ *
+ * จอ 390px กรอบตารางกว้างจริง 322px คอลัมน์ชื่อที่ตรึงซ้ายกินไป 176px
+ * ตรึงขวาอีกข้างเหลือที่เลื่อนไม่ถึง 100px ช่องต้นทุนโดนบังจนอ่านเลขไม่ครบ
+ * จอแคบจึงปล่อยปุ่มลบไหลไปอยู่ท้ายสุดของแถว เลื่อนไปหาเอา
+ *
+ * เขียนคลาสเต็มทุกตัว เพราะ Tailwind สแกนหาสตริงตรง ๆ ในซอร์ส
+ * ต่อคลาสจากตัวแปรแล้วมันจะไม่ generate ให้
+ */
+const COL_TRASH =
+  "@3xl:sticky @3xl:right-0 @3xl:z-10 @3xl:border-l @3xl:border-border @3xl:bg-card";
+const HEAD_TRASH =
+  "w-12 @3xl:right-0 @3xl:z-30! @3xl:border-l @3xl:border-border";
 
 export function InputSetup() {
   const router = useRouter();
   const { markInput, markRun } = useRecipeRun();
   const [rows, setRows] = React.useState<RawMaterialDraft[]>(RAW_MATERIALS);
   const [lastRun, setLastRun] = React.useState<string | null>(null);
+  // ช่องที่เคอร์เซอร์อยู่ตอนนี้ — ช่องนั้นโชว์ค่าดิบ ที่เหลือโชว์แบบมีลูกน้ำ
+  const [editing, setEditing] = React.useState<string | null>(null);
   const seq = React.useRef(0);
 
   // แก้ตรงไหนก็ตาม ผลคำนวณที่หน้าสูตรที่เหมาะสมเก่าไปทันที
@@ -88,10 +90,15 @@ export function InputSetup() {
     )
   );
 
+  /**
+   * แถวใหม่ขึ้นบนสุด ไม่ใช่ต่อท้าย
+   * ตารางตรึงความสูงไว้ 60vh ถ้าต่อท้ายแล้วแถวใหม่จะไปโผล่นอกจอ
+   * กดปุ่มแล้วไม่เห็นอะไรเกิดขึ้น เลยดูเหมือนปุ่มเสีย
+   */
   const addRow = () => {
     touch();
     seq.current += 1;
-    setRows((prev) => [...prev, emptyMaterial(`new-${seq.current}`)]);
+    setRows((prev) => [emptyMaterial(`new-${seq.current}`), ...prev]);
   };
 
   const removeRow = (id: string) => {
@@ -101,6 +108,10 @@ export function InputSetup() {
 
   const invalid = invalidMaterials(rows);
   const totalCost = rows.reduce((sum, r) => sum + toNumber(r.cost), 0);
+
+  /** ค่าที่โชว์ในช่อง — ช่องที่กำลังพิมพ์อยู่ไม่ถูกจัดรูปแบบ */
+  const shown = (key: string, raw: string) =>
+    editing === key ? raw : displayNumber(raw);
 
   const run = () => {
     markRun();
@@ -118,83 +129,34 @@ export function InputSetup() {
 
   return (
     <div className="space-y-4">
-      {/* ---------- ต้นทุน — งานที่ทำบ่อย อยู่บนสุดและกางไว้เสมอ ---------- */}
       <section className="rounded-xl border border-border bg-card p-4 sm:p-5">
-        <SectionHead
-          icon={WalletIcon}
-          title="ต้นทุนวัตถุดิบ"
-          note="ราคาต่อตัน — ส่วนนี้แก้บ่อย จึงกางไว้ตลอด"
-        >
-          <Badge tone="neutral" appearance="soft">
-            {rows.length} รายการ
-          </Badge>
-        </SectionHead>
+        {/* ---------- หัวข้อ + ปุ่มเพิ่มวัตถุดิบ ----------
+             ปุ่มอยู่แถวเดียวกับหัวข้อ ไม่ใช่ใต้ตาราง
+             ตารางสูงถึง 60vh ปุ่มที่อยู่ใต้ตารางจะไกลเกินกว่าจะเห็น */}
+        <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-2">
+          <div className="min-w-0">
+            <p className="font-semibold">
+              ตั้งค่าข้อมูล
+              <span className="ml-2 text-sm font-normal text-muted-foreground">
+                ({rows.length} รายการ)
+              </span>
+            </p>
+            <p className="mt-0.5 text-sm text-muted-foreground">
+              ธาตุอาหารไม่บังคับกรอก ค่าจะเป็น 0.00
+            </p>
+          </div>
 
-        <div className="mt-4 grid gap-3 @2xl:grid-cols-2 @5xl:grid-cols-3">
-          {rows.map((r) => (
-            <div key={r.id} className="space-y-1.5">
-              <Label
-                htmlFor={`cost-${r.id}`}
-                className="flex items-center gap-2 text-sm"
-              >
-                <span className="truncate">{r.name || "วัตถุดิบใหม่"}</span>
-                {isCoating(r) && r.name.trim() !== "" && (
-                  <Badge tone="neutral" appearance="soft" className="shrink-0">
-                    สารเคลือบ
-                  </Badge>
-                )}
-              </Label>
-              <InputGroup className="bg-card">
-                <InputGroupInput
-                  id={`cost-${r.id}`}
-                  inputMode="decimal"
-                  placeholder="0"
-                  value={r.cost}
-                  onChange={(e) => patch(r.id, { cost: e.target.value })}
-                  className="text-right tabular-nums"
-                />
-                <InputGroupAddon align="inline-end">บาท/ตัน</InputGroupAddon>
-              </InputGroup>
-            </div>
-          ))}
+          <Button variant="outline-primary" className="shrink-0" onClick={addRow}>
+            <PlusIcon />
+            เพิ่มวัตถุดิบ
+          </Button>
         </div>
 
-        <p className="mt-4 text-sm text-muted-foreground">
-          รวมต้นทุนที่กรอกไว้{" "}
-          <span className="font-semibold text-foreground tabular-nums">
-            {formatBaht(totalCost)}
-          </span>{" "}
-          บาท · เพิ่มหรือลบวัตถุดิบได้ที่หัวข้อค่าธาตุอาหารด้านล่าง
+        <p className="mt-3 text-sm text-muted-foreground @3xl:hidden">
+          เลื่อนตารางแนวนอนเพื่อดูช่องที่เหลือ ชื่อวัตถุดิบตรึงไว้ให้
         </p>
-      </section>
 
-      {/* ---------- ธาตุอาหาร — ตั้งครั้งเดียวใช้ยาว หุบไว้ก่อน ---------- */}
-      <Collapsible className="rounded-xl border border-border bg-card">
-        <CollapsibleTrigger asChild>
-          <button
-            type="button"
-            className="group flex w-full items-center gap-3 p-4 text-left sm:p-5"
-          >
-            <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-brand text-primary">
-              <FlaskConicalIcon className="size-5" strokeWidth={1.5} />
-            </span>
-            <span className="min-w-0 flex-1">
-              <span className="block font-semibold">ค่าธาตุอาหาร</span>
-              <span className="block text-sm text-muted-foreground">
-                เปอร์เซ็นต์ธาตุอาหารของวัตถุดิบแต่ละตัว — ตั้งครั้งเดียวใช้ยาว
-              </span>
-            </span>
-            <ChevronDownIcon className="size-5 shrink-0 text-muted-foreground transition-transform group-data-[state=open]:rotate-180" />
-          </button>
-        </CollapsibleTrigger>
-
-        <CollapsibleContent className="px-4 pb-4 sm:px-5 sm:pb-5">
-          {/* จอแคบเลื่อนตารางแนวนอนเอา ไม่ยุบเป็นการ์ด
-              เพราะการกรอกตัวเลขเทียบกันข้ามแถวต้องเห็นเป็นตาราง */}
-          <p className="mb-3 text-sm text-muted-foreground @3xl:hidden">
-            เลื่อนตารางแนวนอนเพื่อดูธาตุอาหารครบทุกช่อง
-          </p>
-
+        <div className="mt-3">
           <TableFrame>
             <Table>
               <TableHeader className={STICKY_HEAD}>
@@ -202,61 +164,83 @@ export function InputSetup() {
                   <TableHead className={cn(HEAD_FIRST, "min-w-44")}>
                     วัตถุดิบ
                   </TableHead>
+                  <TableHead className="text-right">ต้นทุน (บาท/ตัน)</TableHead>
                   {NUTRIENTS.map((n) => (
                     <TableHead key={n.key} className="text-right">
                       {n.label} (%)
                     </TableHead>
                   ))}
-                  <TableHead className="w-12" />
+                  <TableHead className={HEAD_TRASH} />
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {rows.map((r) => (
-                  <TableRow key={r.id}>
-                    <TableCell className={COL_FIRST}>
-                      <Input
-                        aria-label="ชื่อวัตถุดิบ"
-                        placeholder="ชื่อวัตถุดิบ"
-                        value={r.name}
-                        onChange={(e) => patch(r.id, { name: e.target.value })}
-                      />
-                    </TableCell>
-                    {NUTRIENTS.map((n) => (
-                      <TableCell key={n.key}>
+                {rows.map((r) => {
+                  const label = r.name.trim() || "วัตถุดิบใหม่";
+                  return (
+                    <TableRow key={r.id}>
+                      <TableCell className={COL_FIRST}>
                         <Input
-                          aria-label={`${r.name || "วัตถุดิบใหม่"} ${n.label}`}
-                          inputMode="decimal"
-                          placeholder="0"
-                          value={r.nutrients[n.key]}
-                          onChange={(e) =>
-                            setNutrient(r.id, n.key, e.target.value)
-                          }
-                          className="w-20 text-right tabular-nums"
+                          aria-label="ชื่อวัตถุดิบ"
+                          placeholder="ระบุวัตถุดิบ"
+                          value={r.name}
+                          onChange={(e) => patch(r.id, { name: e.target.value })}
                         />
                       </TableCell>
-                    ))}
-                    <TableCell>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        aria-label={`ลบ ${r.name || "วัตถุดิบใหม่"}`}
-                        onClick={() => removeRow(r.id)}
-                      >
-                        <TrashIcon />
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
+
+                      <TableCell>
+                        <Input
+                          aria-label={`${label} ต้นทุนต่อตัน`}
+                          inputMode="decimal"
+                          placeholder="0.00"
+                          value={shown(`cost-${r.id}`, r.cost)}
+                          onFocus={() => setEditing(`cost-${r.id}`)}
+                          onBlur={() => setEditing(null)}
+                          onChange={(e) => patch(r.id, { cost: e.target.value })}
+                          className="w-28 text-right tabular-nums"
+                        />
+                      </TableCell>
+
+                      {NUTRIENTS.map((n) => (
+                        <TableCell key={n.key}>
+                          <Input
+                            aria-label={`${label} ${n.label}`}
+                            inputMode="decimal"
+                            placeholder="0.00"
+                            value={r.nutrients[n.key]}
+                            onChange={(e) =>
+                              setNutrient(r.id, n.key, e.target.value)
+                            }
+                            className="w-20 text-right tabular-nums"
+                          />
+                        </TableCell>
+                      ))}
+
+                      <TableCell className={COL_TRASH}>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          aria-label={`ลบ ${label}`}
+                          onClick={() => removeRow(r.id)}
+                        >
+                          <TrashIcon />
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
               </TableBody>
             </Table>
           </TableFrame>
+        </div>
 
-          <Button variant="outline-primary" className="mt-3" onClick={addRow}>
-            <PlusIcon />
-            เพิ่มวัตถุดิบ
-          </Button>
-        </CollapsibleContent>
-      </Collapsible>
+        <p className="mt-3 text-sm text-muted-foreground">
+          รวมต้นทุนที่กรอกไว้{" "}
+          <span className="font-semibold text-foreground tabular-nums">
+            {formatBaht(totalCost)}
+          </span>{" "}
+          บาท
+        </p>
+      </section>
 
       {/* ---------- สั่งคำนวณ ---------- */}
       <section className="rounded-xl border border-border bg-card p-4 sm:p-5">
@@ -283,31 +267,6 @@ export function InputSetup() {
           </Button>
         </div>
       </section>
-    </div>
-  );
-}
-
-function SectionHead({
-  icon: Icon,
-  title,
-  note,
-  children,
-}: {
-  icon: React.ComponentType<{ className?: string; strokeWidth?: number }>;
-  title: string;
-  note: string;
-  children?: React.ReactNode;
-}) {
-  return (
-    <div className="flex items-start gap-3">
-      <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-brand text-primary">
-        <Icon className="size-5" strokeWidth={1.5} />
-      </span>
-      <div className="min-w-0 flex-1">
-        <p className="font-semibold">{title}</p>
-        <p className="mt-0.5 text-sm text-muted-foreground">{note}</p>
-      </div>
-      {children}
     </div>
   );
 }
