@@ -45,11 +45,14 @@ export type Recipe = {
  * คนหน้าไลน์ต้องการน้ำหนักวัตถุดิบ ส่วนเปอร์เซ็นต์ธาตุอาหารไว้ตรวจทาน
  * จึงให้สลับชุดที่ระดับหน้า ไม่ใช่พับ/กางทีละแถว
  */
-export type RecipeView = "material" | "nutrition";
+export type RecipeView = "material" | "nutrition" | "all";
 
 export const RECIPE_VIEWS: { id: RecipeView; label: string; short: string }[] = [
   { id: "material", label: "น้ำหนักวัตถุดิบ", short: "วัตถุดิบ" },
   { id: "nutrition", label: "ธาตุอาหารที่ได้", short: "ธาตุอาหาร" },
+  // จอกว้างมีที่พอสำหรับ 20 คอลัมน์ ใครอยากเทียบน้ำหนักกับเปอร์เซ็นต์
+  // พร้อมกันก็เลือกอันนี้ ไม่ต้องสลับไปมา
+  { id: "all", label: "ทั้งหมด", short: "ทั้งหมด" },
 ];
 
 /** คอลัมน์วัตถุดิบ ใช้สร้างทั้งหัวตารางและช่องข้อมูล จะได้ไม่หลุดกัน */

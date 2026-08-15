@@ -101,18 +101,22 @@ export function RecipeTable({
   }
 
   /** ค่าดิบของแถว ยังไม่แปลงเป็น element เพื่อให้กรองค่าว่างได้ตรง ๆ */
-  const cells = (r: Recipe): Cell[] =>
-    view === "material"
-      ? MATERIAL_COLUMNS.map((c) => ({
-          label: c.label,
-          value: r[c.key] as number | undefined,
-          digits: 2,
-        }))
-      : NUTRIENTS.map((n) => ({
-          label: `${n.label} (%)`,
-          value: nutrition.get(r.id)?.[n.key as NutrientKey],
-          digits: 3,
-        }));
+  const cells = (r: Recipe): Cell[] => {
+    const material = MATERIAL_COLUMNS.map((c) => ({
+      label: c.label,
+      value: r[c.key] as number | undefined,
+      digits: 2,
+    }));
+    const nutrients = NUTRIENTS.map((n) => ({
+      label: `${n.label} (%)`,
+      value: nutrition.get(r.id)?.[n.key as NutrientKey],
+      digits: 3,
+    }));
+
+    if (view === "material") return material;
+    if (view === "nutrition") return nutrients;
+    return [...material, ...nutrients];
+  };
 
   return (
     <>
@@ -151,15 +155,14 @@ export function RecipeTable({
                 <TableHead className="text-center whitespace-nowrap">
                   เคลือบ Power
                 </TableHead>
-                {(view === "material"
-                  ? MATERIAL_COLUMNS.map((c) => c.label)
-                  : NUTRIENTS.map((n) => `${n.label} (%)`)
-                ).map((label) => (
+                {/* หัวคอลัมน์อ่านจากแถวแรก จะได้ตรงกับช่องข้อมูลเสมอ
+                    ไม่ต้องเขียนเงื่อนไขชุดคอลัมน์ซ้ำสองที่ */}
+                {cells(slice[0]).map((c) => (
                   <TableHead
-                    key={label}
+                    key={c.label}
                     className="text-right whitespace-nowrap"
                   >
-                    {label}
+                    {c.label}
                   </TableHead>
                 ))}
                 <TableHead className="whitespace-nowrap">หมายเหตุ</TableHead>
