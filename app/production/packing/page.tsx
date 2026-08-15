@@ -2,10 +2,10 @@
 
 import * as React from "react";
 import {
-  ArrowUpFromLineIcon,
   BrushCleaningIcon,
   DownloadIcon,
   LightbulbIcon,
+  WarehouseIcon,
 } from "lucide-react";
 import {
   Breadcrumb,
@@ -20,9 +20,10 @@ import { toast } from "sonner";
 import { PackingCwip } from "@/components/production/packing-cwip";
 import { PackingOrders } from "@/components/production/packing-orders";
 import {
-  PackingToolbar,
-  type TabAction,
-} from "@/components/production/packing-toolbar";
+  ActionButtons,
+  type PackingAction,
+} from "@/components/production/packing-actions";
+import { PackingToolbar } from "@/components/production/packing-toolbar";
 import { SuggestMaterialsDialog } from "@/components/production/suggest-materials-dialog";
 import {
   CWIP_PRODUCTS,
@@ -57,53 +58,44 @@ export default function PackingListPage() {
   const soon = (what: string) => toast.info(what, { description: "ยังไม่ได้ต่อกับหลังบ้าน" });
 
   /*
-   * ปุ่มของแต่ละแท็บ
-   *
-   * ส่งออก CSV ตั้ง desktopOnly ไว้ — โหลดไฟล์ลงมือถือแล้วเปิดต่อไม่สะดวก
-   * ไม่ใช่ทุกคำสั่งต้องมีครบทุกขนาดจอ
+   * ปุ่มระดับหน้า — กดได้ทุกแท็บ จึงอยู่ข้างชื่อหน้าได้
+   * อยู่ที่เดิมตลอด ไม่โผล่มาแล้วหายไป หัวหน้าจึงไม่กระตุกตอนสลับแท็บ
    */
-  const ACTIONS: Record<Tab, TabAction[]> = {
-    waiting: [
-      {
-        id: "suggest",
-        label: "แนะนำวัตถุดิบที่ใช้วันนี้",
-        // หลอดไฟ = ข้อเสนอแนะ อ่านง่ายและไม่ติดภาพ AI แบบไอคอนประกาย
-        icon: LightbulbIcon,
-        primary: true,
-        onSelect: () => setSuggestOpen(true),
-      },
-    ],
+  const PAGE_ACTIONS: PackingAction[] = [
+    {
+      id: "sweep",
+      label: "รายงานกวาดพื้น",
+      icon: BrushCleaningIcon,
+      onSelect: () => soon("รายงานกวาดพื้น"),
+    },
+    {
+      id: "issue",
+      label: "เบิกจากคลัง",
+      icon: WarehouseIcon,
+      onSelect: () => soon("เบิกจากคลัง"),
+    },
+    {
+      id: "suggest",
+      label: "แนะนำวัตถุดิบที่ใช้วันนี้",
+      // หลอดไฟ = ข้อเสนอแนะ อ่านง่ายและไม่ติดภาพ AI แบบไอคอนประกาย
+      icon: LightbulbIcon,
+      primary: true,
+      onSelect: () => setSuggestOpen(true),
+    },
+  ];
+
+  /** ปุ่มที่ใช้ได้เฉพาะแท็บนั้น อยู่ใต้แถบแท็บ — ส่งออกได้เฉพาะรายการสต็อก */
+  const TAB_ACTIONS: Record<Tab, PackingAction[]> = {
+    waiting: [],
     cwip: [
       {
         id: "csv",
         label: "ส่งออก CSV",
         icon: DownloadIcon,
-        desktopOnly: true,
-        onSelect: () => soon("ส่งออก CSV"),
-      },
-      {
-        id: "sweep",
-        label: "รายงานกวาดพื้น",
-        icon: BrushCleaningIcon,
-        onSelect: () => soon("รายงานกวาดพื้น"),
-      },
-      {
-        id: "issue",
-        label: "เบิกจากคลัง",
-        icon: ArrowUpFromLineIcon,
-        primary: true,
-        onSelect: () => soon("เบิกจากคลัง"),
-      },
-    ],
-    done: [
-      {
-        id: "csv",
-        label: "ส่งออก CSV",
-        icon: DownloadIcon,
-        desktopOnly: true,
         onSelect: () => soon("ส่งออก CSV"),
       },
     ],
+    done: [],
   };
 
   const PLACEHOLDER: Record<Tab, string> = {
@@ -128,11 +120,14 @@ export default function PackingListPage() {
         </BreadcrumbList>
       </Breadcrumb>
 
-      <div className="mt-2 sm:mt-3">
-        <h1 className="text-2xl font-semibold tracking-tight">ผลิตแบ่งบรรจุ</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          ผลิตสินค้า ไลน์กลาง แบ่งบรรจุ
-        </p>
+      <div className="mt-2 flex items-start justify-between gap-3 sm:mt-3">
+        <div className="min-w-0">
+          <h1 className="text-2xl font-semibold tracking-tight">ผลิตแบ่งบรรจุ</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            ผลิตสินค้า ไลน์กลาง แบ่งบรรจุ
+          </p>
+        </div>
+        <ActionButtons actions={PAGE_ACTIONS} />
       </div>
 
       <Tabs
@@ -158,7 +153,7 @@ export default function PackingListPage() {
           query={query}
           onQuery={setQuery}
           placeholder={PLACEHOLDER[tab]}
-          actions={ACTIONS[tab]}
+          actions={TAB_ACTIONS[tab]}
           onFilter={() => soon("ตัวกรอง")}
         />
       </div>
