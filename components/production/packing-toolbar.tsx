@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { SearchIcon, SlidersHorizontalIcon } from "lucide-react";
+import { ListFilterIcon, SearchIcon } from "lucide-react";
 import { Button } from "@peckey954/ui/components/ui/button";
 import {
   InputGroup,
@@ -46,6 +46,8 @@ export function PackingToolbar({
         </InputGroup>
       </div>
 
+      {/* ใช้ไอคอนเดียวกับปุ่มตัวกรองที่หน้าสต็อกและหน้าสูตร
+          ปุ่มทำงานเหมือนกันต้องหน้าตาเหมือนกัน ไม่งั้นคนต้องเรียนรู้ใหม่ทุกหน้า */}
       <Button
         variant="outline-primary"
         size="icon"
@@ -53,7 +55,7 @@ export function PackingToolbar({
         className="shrink-0"
         onClick={onFilter}
       >
-        <SlidersHorizontalIcon />
+        <ListFilterIcon />
       </Button>
 
       <ActionButtons actions={actions} />
