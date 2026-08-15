@@ -32,10 +32,6 @@ import {
   TableHeader,
   TableRow,
 } from "@peckey954/ui/components/ui/table";
-import {
-  ToggleGroup,
-  ToggleGroupItem,
-} from "@peckey954/ui/components/ui/toggle-group";
 import { cn } from "@peckey954/ui/lib/utils";
 import {
   COL_FIRST,
@@ -73,11 +69,11 @@ import {
 
 type View = "weight" | "percent" | "nutrition" | "all";
 
-const VIEWS: { id: View; label: string }[] = [
-  { id: "weight", label: "น้ำหนักวัตถุดิบ" },
-  { id: "percent", label: "สัดส่วนวัตถุดิบ" },
-  { id: "nutrition", label: "ธาตุอาหารที่ได้" },
-  { id: "all", label: "ทั้งหมด" },
+const VIEWS: { id: View; label: string; short: string }[] = [
+  { id: "weight", label: "น้ำหนักวัตถุดิบ", short: "น้ำหนัก" },
+  { id: "percent", label: "สัดส่วนวัตถุดิบ", short: "สัดส่วน" },
+  { id: "nutrition", label: "ธาตุอาหารที่ได้", short: "ธาตุอาหาร" },
+  { id: "all", label: "ทั้งหมด", short: "ทั้งหมด" },
 ];
 
 const PAGE_SIZE = 12;
@@ -210,29 +206,37 @@ export default function OptimizedFormulaPage() {
         </div>
       )}
 
-      {/* ---------- เลือกมุมมอง + ค้นหา ---------- */}
+      {/* ---------- เลือกมุมมอง + ค้นหา ----------
+           ใช้ชิปกลมแบบเดียวกับหน้าสูตรประจำสัปดาห์
+           จอแคบใช้ชื่อย่อ ปุ่มสี่อันจึงลงจอได้โดยไม่ต้องเลื่อนแนวนอน */}
       <div className="mt-4 flex flex-wrap items-center gap-2">
-        {/* จอแคบให้เลื่อนแนวนอนเอา ปุ่มสี่อันย่อไม่ได้ ถ้าปล่อยไว้หน้าจะกว้างเกินจอ */}
         <div
-          className={cn(
-            "-mx-4 max-w-full overflow-x-auto px-4 sm:mx-0 sm:px-0",
-            "[scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-          )}
+          role="radiogroup"
+          aria-label="ชุดข้อมูลที่แสดง"
+          className="flex flex-wrap gap-2"
         >
-          <ToggleGroup
-            type="single"
-            variant="outline"
-            size="sm"
-            value={view}
-            onValueChange={(v) => v && setView(v as View)}
-            className="w-max"
-          >
-            {VIEWS.map((v) => (
-              <ToggleGroupItem key={v.id} value={v.id} className="shrink-0">
-                {v.label}
-              </ToggleGroupItem>
-            ))}
-          </ToggleGroup>
+          {VIEWS.map((v) => {
+            const on = view === v.id;
+            return (
+              <button
+                key={v.id}
+                type="button"
+                role="radio"
+                aria-checked={on}
+                onClick={() => setView(v.id)}
+                className={cn(
+                  "shrink-0 rounded-full border px-3 py-1 text-sm whitespace-nowrap transition-colors",
+                  "focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none",
+                  on
+                    ? "border-primary bg-brand font-medium text-primary"
+                    : "border-border text-foreground hover:bg-accent-hover"
+                )}
+              >
+                <span className="@3xl:hidden">{v.short}</span>
+                <span className="hidden @3xl:inline">{v.label}</span>
+              </button>
+            );
+          })}
         </div>
 
         <InputGroup className="w-full bg-card sm:w-auto sm:min-w-48 sm:flex-1">
@@ -254,6 +258,25 @@ export default function OptimizedFormulaPage() {
         {rows.length === 0 ? (
           <EmptyDocs title="ไม่พบสูตร" hint="ลองใช้คำค้นสั้นลง" />
         ) : (
+          <>
+          {/* ---------- จอแคบ: การ์ด ----------
+               24 คอลัมน์บีบลงจอ 390px แล้วหัวตารางโดนตัดกลางคำ
+               เลื่อนไปทางขวาก็ไม่รู้แล้วว่าเลขไหนของคอลัมน์อะไร
+               การ์ดวางป้ายกำกับคู่กับค่าเสมอ ไม่มีทางอ่านผิดคอลัมน์ */}
+          <div className="space-y-3 @3xl:hidden">
+            {slice.map((r) => (
+              <RowCard
+                key={r.id}
+                row={r}
+                showWeight={showWeight}
+                showPercent={showPercent}
+                showNutrition={showNutrition}
+              />
+            ))}
+            <TablePager page={safe} pages={pages} onChange={setPage} />
+          </div>
+
+          <div className="hidden @3xl:block">
           <TableFrame>
             <Table>
               <TableHeader className={STICKY_HEAD}>
@@ -300,6 +323,8 @@ export default function OptimizedFormulaPage() {
 
             <TablePager page={safe} pages={pages} onChange={setPage} />
           </TableFrame>
+          </div>
+          </>
         )}
       </div>
 
@@ -317,6 +342,105 @@ export default function OptimizedFormulaPage() {
         </Button>
       </div>
     </main>
+  );
+}
+
+/**
+ * การ์ดสำหรับจอแคบ
+ *
+ * หน้านี้ตอบคำถามว่า "สูตรนี้คุ้มไหม และตรงเป้าไหม"
+ * ต้นทุนต่อถุงกับผลต่างจึงขึ้นก่อนเป็นแถบสรุป แยกจากตัวเลขรายวัตถุดิบ
+ * ที่เป็นข้อมูลประกอบ ไม่ใช่คำตอบ
+ */
+function RowCard({
+  row: r,
+  showWeight,
+  showPercent,
+  showNutrition,
+}: {
+  row: OptimizedRow;
+  showWeight: boolean;
+  showPercent: boolean;
+  showNutrition: boolean;
+}) {
+  const off = r.error > ERROR_TOLERANCE;
+
+  const cells: { label: string; value: string }[] = [
+    ...(showWeight
+      ? MATERIALS.map((m) => ({
+          label: `${m.label} (KG)`,
+          value: num(r.weight[m.key]),
+        }))
+      : []),
+    ...(showPercent
+      ? MATERIALS.map((m) => ({
+          label: `${m.label} (%)`,
+          value: num(r.percent[m.key]),
+        }))
+      : []),
+    ...(showNutrition
+      ? NUTRIENTS.map((n) => ({
+          label: `${n.label} จริง`,
+          value: num(r.nutrition[n.key], 3),
+        }))
+      : []),
+  ];
+
+  return (
+    <div className="rounded-xl border border-border bg-card p-4">
+      <div className="rounded-lg bg-brand px-3 py-2.5">
+        <p className="font-semibold">{r.sku}</p>
+        <p className="mt-0.5 flex flex-wrap items-center gap-x-2 text-sm">
+          <span>{RECIPE_GROUP_LABEL[r.group]}</span>
+          <span className="text-border" aria-hidden>
+            |
+          </span>
+          <span className="tabular-nums">{r.size} Kg</span>
+        </p>
+      </div>
+
+      {/* สองตัวนี้คือคำตอบของหน้า จึงเด่นกว่าตัวเลขรายวัตถุดิบข้างล่าง */}
+      <div className="mt-3 grid grid-cols-2 gap-3">
+        <div>
+          <p className="text-sm text-muted-foreground">ต้นทุน/ถุง</p>
+          <p className="mt-0.5 font-semibold tabular-nums">
+            {num(r.totalCost)}
+            <span className="ml-1 text-sm font-normal text-muted-foreground">
+              บาท
+            </span>
+          </p>
+        </div>
+        <div>
+          <p className="text-sm text-muted-foreground">ผลต่างจากเป้า</p>
+          <p
+            className={cn(
+              "mt-0.5 font-semibold tabular-nums",
+              off ? "text-danger-strong" : "text-muted-foreground"
+            )}
+          >
+            {num(r.error)}
+            {off && (
+              <Badge
+                tone="danger"
+                appearance="soft"
+                className="ml-2 align-middle"
+              >
+                ไม่เข้าเป้า
+              </Badge>
+            )}
+          </p>
+        </div>
+      </div>
+
+      <dl className="mt-3 space-y-1.5 text-sm">
+        {cells.map((c) => (
+          <div key={c.label} className="flex items-baseline justify-between gap-3">
+            <dt className="text-muted-foreground">{c.label}:</dt>
+            <dd className="font-semibold tabular-nums">{c.value}</dd>
+          </div>
+        ))}
+      </dl>
+    </div>
   );
 }
 
