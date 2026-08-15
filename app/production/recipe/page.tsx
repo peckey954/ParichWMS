@@ -12,15 +12,12 @@ import {
   BreadcrumbSeparator,
 } from "@peckey954/ui/components/ui/breadcrumb";
 import { Button } from "@peckey954/ui/components/ui/button";
+import { cn } from "@peckey954/ui/lib/utils";
 import {
   InputGroup,
   InputGroupAddon,
   InputGroupInput,
 } from "@peckey954/ui/components/ui/input-group";
-import {
-  ToggleGroup,
-  ToggleGroupItem,
-} from "@peckey954/ui/components/ui/toggle-group";
 import { RecipeTable } from "@/components/production/recipe-table";
 import {
   RECIPES,
@@ -51,22 +48,27 @@ export default function WeeklyRecipePage() {
         </BreadcrumbList>
       </Breadcrumb>
 
-      <div className="mt-2 flex flex-wrap items-start justify-between gap-3 sm:mt-3">
+      {/* ไม่ใช้ flex-wrap ปุ่มจะได้อยู่แถวเดียวกับชื่อหน้าเสมอ ไม่ตกลงไปข้างล่าง
+          ชื่อหน้าใช้ชื่อสั้นบนจอแคบอยู่แล้ว จึงไม่เบียดกัน */}
+      <div className="mt-2 flex items-start justify-between gap-3 sm:mt-3">
         <div className="min-w-0">
+          {/* จอแคบใช้ชื่อสั้น ชื่อเต็มยาวจนดันปุ่มตกบรรทัด */}
           <h1 className="text-2xl font-semibold tracking-tight">
-            สูตรการผลิตประจำสัปดาห์
+            <span className="@3xl:hidden">สูตรการผลิต</span>
+            <span className="hidden @3xl:inline">สูตรการผลิตประจำสัปดาห์</span>
           </h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            แนะนำสูตรการผลิต อัปเดตล่าสุด {RECIPE_UPDATED_AT}
+            แนะนำสูตรการผลิตประจำสัปดาห์ อัปเดตล่าสุด {RECIPE_UPDATED_AT}
           </p>
         </div>
 
         {/* ตัวเลขในตารางเป็นผลลัพธ์ที่คำนวณมาแล้ว แก้ที่นี่ไม่ได้
             ต้องเข้าไปแก้ต้นทางในหน้าตั้งค่าแล้วสั่งคำนวณใหม่ */}
-        <Button asChild variant="outline-primary">
+        <Button asChild variant="outline-primary" className="shrink-0">
           <Link href="/production/recipe/setup">
-            <Settings2Icon />
-            ตั้งค่าสูตร
+            <Settings2Icon className="hidden @3xl:inline" />
+            <span className="@3xl:hidden">ตั้งค่าสูตร</span>
+            <span className="hidden @3xl:inline">ตั้งค่าสูตรที่เหมาะสม</span>
           </Link>
         </Button>
       </div>
@@ -95,26 +97,37 @@ export default function WeeklyRecipePage() {
       {/* ---------- เลือกชุดข้อมูลที่จะดู ----------
            ข้อมูลเต็มมี 20 คอลัมน์ ไม่มีใครใช้พร้อมกัน
            สลับที่ระดับหน้า ไม่ใช่พับ/กางทีละแถว เพราะคนคิดแบบ
-           "วันนี้ฉันดูน้ำหนัก" ไม่ใช่ "แถวนี้ดูน้ำหนัก แถวหน้าดูธาตุอาหาร" */}
-      <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-2">
-        <ToggleGroup
-          type="single"
-          variant="outline"
-          value={view}
-          onValueChange={(v) => v && setView(v as RecipeView)}
-        >
-          {RECIPE_VIEWS.map((v) => (
-            <ToggleGroupItem key={v.id} value={v.id} className="px-4">
-              {/* จอแคบใช้ชื่อย่อ ปุ่มจะได้ไม่ล้นออกนอกจอ */}
-              <span className="@3xl:hidden">{v.short}</span>
-              <span className="hidden @3xl:inline">{v.label}</span>
-            </ToggleGroupItem>
-          ))}
-        </ToggleGroup>
+           "วันนี้ฉันดูน้ำหนัก" ไม่ใช่ "แถวนี้ดูน้ำหนัก แถวหน้าดูธาตุอาหาร"
 
+           ใช้ชิปกลมแบบเดียวกับชิปประเภทสินค้าในหน้าสต็อก
+           จอแคบป้ายกำกับขึ้นบรรทัดของตัวเอง ชิปจะได้ไม่ถูกบีบ */}
+      <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-2">
         <p className="text-sm text-muted-foreground">
-          {visible.length} สูตร · ตัวเลขคำนวณมาแล้ว แก้ที่หน้าตั้งค่า
+          การดูข้อมูลทั้งหมด ({visible.length} สูตร):
         </p>
+        <div role="radiogroup" aria-label="ชุดข้อมูลที่แสดง" className="flex flex-wrap gap-2">
+          {RECIPE_VIEWS.map((v) => {
+            const on = view === v.id;
+            return (
+              <button
+                key={v.id}
+                type="button"
+                role="radio"
+                aria-checked={on}
+                onClick={() => setView(v.id)}
+                className={cn(
+                  "shrink-0 rounded-full border px-3 py-1 text-sm whitespace-nowrap transition-colors",
+                  "focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none",
+                  on
+                    ? "border-primary bg-brand font-medium text-primary"
+                    : "border-border text-foreground hover:bg-accent-hover"
+                )}
+              >
+                {v.short}
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       <div className="mt-3">

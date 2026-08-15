@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { CheckIcon } from "lucide-react";
+import { CircleCheckIcon } from "lucide-react";
 import { Badge } from "@peckey954/ui/components/ui/badge";
 import {
   Table,
@@ -53,19 +53,17 @@ function Num({ v, digits = 2 }: { v?: number; digits?: number }) {
 
 /**
  * ช่องเคลือบ
- * ข้อมูลจริงดูได้อย่างเดียว จึงเป็นไอคอนถูก ไม่ใช่ checkbox
+ *
+ * ข้อมูลจริงดูได้อย่างเดียว จึงเป็นไอคอนถูกในวงกลม ไม่ใช่ checkbox
  * checkbox สื่อว่ากดเปลี่ยนได้ ซึ่งไม่จริงสำหรับหน้านี้
+ * ไม่เคลือบเว้นว่าง ไม่ใส่ขีด เพราะทั้งคอลัมน์จะรกด้วยขีดที่ไม่ได้บอกอะไร
+ * คนที่ใช้เสียงอ่านยังได้ยินครบผ่าน sr-only
  */
 function CoatMark({ on, label }: { on: boolean; label: string }) {
-  return on ? (
-    <span className="flex items-center justify-center" title={label}>
-      <CheckIcon className="size-4 text-success-strong" strokeWidth={2.5} />
-      <span className="sr-only">{label}</span>
-    </span>
-  ) : (
-    <span className="block text-center text-muted-foreground">
-      <span aria-hidden>-</span>
-      <span className="sr-only">ไม่{label}</span>
+  return (
+    <span className="flex items-center justify-center" title={on ? label : undefined}>
+      {on && <CircleCheckIcon className="size-5 text-primary" strokeWidth={1.75} />}
+      <span className="sr-only">{on ? label : `ไม่${label}`}</span>
     </span>
   );
 }
@@ -123,16 +121,8 @@ export function RecipeTable({
       {/* ---------- จอแคบ: การ์ด ---------- */}
       <div className="@3xl:hidden">
         <div className="space-y-3">
-          {slice.map((r, i) => (
-            <React.Fragment key={r.id}>
-              {/* หัวคั่นกลุ่ม ดีกว่าใส่ชื่อกลุ่มซ้ำในทุกการ์ด */}
-              {(i === 0 || slice[i - 1].group !== r.group) && (
-                <p className="pt-1 text-sm font-medium text-muted-foreground">
-                  {RECIPE_GROUP_LABEL[r.group]}
-                </p>
-              )}
-              <RecipeCard recipe={r} cells={cells(r)} />
-            </React.Fragment>
+          {slice.map((r) => (
+            <RecipeCard key={r.id} recipe={r} cells={cells(r)} />
           ))}
         </div>
         <TablePager page={safe} pages={pages} onChange={setPage} />
@@ -229,28 +219,34 @@ function RecipeCard({
 
   return (
     <div className="rounded-xl border border-border bg-card p-4">
-      <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-        <span className="font-semibold">{r.sku}</span>
-        <span className="text-sm text-muted-foreground tabular-nums">
-          {r.size} Kg
-        </span>
+      {/* หัวการ์ดเป็นกล่องส้มอ่อน รวมชื่อสูตร กลุ่ม และขนาดบรรจุไว้ด้วยกัน
+          กลุ่มอยู่ในการ์ดแล้ว จึงไม่ต้องมีหัวคั่นกลุ่มนอกการ์ดอีก */}
+      <div className="rounded-lg bg-brand px-3 py-2.5">
+        <p className="font-semibold">{r.sku}</p>
+        <p className="mt-0.5 flex flex-wrap items-center gap-x-2 text-sm">
+          <span>{RECIPE_GROUP_LABEL[r.group]}</span>
+          <span className="text-border" aria-hidden>
+            |
+          </span>
+          <span className="tabular-nums">{r.size} Kg</span>
+        </p>
       </div>
 
-      <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
+      <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
         <span className="flex items-center gap-1.5">
+          เคลือบ Nitro:
           <CoatMark on={r.coatNitro} label="เคลือบ Nitro" />
-          เคลือบ Nitro
         </span>
         <span className="flex items-center gap-1.5">
+          เคลือบ Power:
           <CoatMark on={r.coatPower} label="เคลือบ Power" />
-          เคลือบ Power
         </span>
       </div>
 
-      <dl className="mt-3 space-y-1.5 rounded-lg bg-brand px-3 py-2.5 text-sm">
+      <dl className="mt-2 space-y-1.5 text-sm">
         {shown.map((c) => (
           <div key={c.label} className="flex items-baseline justify-between gap-3">
-            <dt className="text-muted-foreground">{c.label}</dt>
+            <dt className="text-muted-foreground">{c.label}:</dt>
             <dd className="font-semibold">
               <Num v={c.value} digits={c.digits} />
             </dd>
