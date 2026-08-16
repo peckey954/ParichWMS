@@ -137,7 +137,7 @@ export default function ProductionOrderPage() {
                 เนื้อหาซ้ายอยู่ในคอลัมน์ของตัวเอง ห่อกี่บรรทัดก็ไม่ดันปุ่มขวับ */}
             <button
               type="button"
-              className="group flex w-full items-start justify-between gap-3 p-4 text-left"
+              className="group flex w-full items-start justify-between gap-3 px-4 pt-4 pb-3 text-left"
             >
               <span className="flex min-w-0 flex-1 flex-col gap-y-1">
                 <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
@@ -167,10 +167,14 @@ export default function ProductionOrderPage() {
             </button>
           </CollapsibleTrigger>
 
-          <CollapsibleContent className="space-y-4 px-4 pb-4">
-            {/* พื้นส้มอ่อน — ยอดสั่งผลิตคือตัวเลขอ้างอิงที่ต้องเทียบตลอดทั้งหน้า
-                สองคอลัมน์เสมอแม้จอแคบ เพราะเป็นตัวเลขคู่ที่ต้องเทียบกัน
-                แยกคนละบรรทัดแล้วเทียบยาก ต้องเลื่อนสายตาขึ้นลง */}
+          {/* อยู่นอกส่วนที่หุบ — ยอดสั่งผลิตคือตัวเลขอ้างอิงที่ต้องเทียบตลอดทั้งหน้า
+              การ์ดหุบไว้เป็นค่าเริ่มต้น ถ้าเก็บสองตัวนี้ไว้ข้างในด้วย
+              เปิดหน้ามาจะไม่รู้ว่าต้องผลิตเท่าไร ต้องกางการ์ดก่อนทุกครั้ง
+              ที่หุบได้คือชื่อคนสั่ง/คนแก้ ซึ่งดูครั้งเดียวก็พอ
+
+              สองคอลัมน์เสมอแม้จอแคบ เพราะเป็นตัวเลขคู่ที่ต้องเทียบกัน
+              แยกคนละบรรทัดแล้วเทียบยาก ต้องเลื่อนสายตาขึ้นลง */}
+          <div className="px-4 pb-4">
             <div className="grid grid-cols-2 gap-4 rounded-lg bg-brand p-4">
               <div>
                 <p className="text-sm text-muted-foreground">สั่งผลิต (ตัน)</p>
@@ -187,7 +191,9 @@ export default function ProductionOrderPage() {
                 </p>
               </div>
             </div>
+          </div>
 
+          <CollapsibleContent className="px-4 pb-4">
             <div className="grid grid-cols-2 gap-3 text-sm">
               <p>
                 <span className="block text-muted-foreground">ผู้สั่งผลิต:</span>
