@@ -3,10 +3,10 @@
 import * as React from "react";
 import { RotateCcwIcon } from "lucide-react";
 import { Button } from "@peckey954/ui/components/ui/button";
-import { Checkbox } from "@peckey954/ui/components/ui/checkbox";
 import { Label } from "@peckey954/ui/components/ui/label";
 import { MultiSelect } from "@peckey954/ui/components/ui/multi-select";
 import { Separator } from "@peckey954/ui/components/ui/separator";
+import { CheckChip } from "@/components/check-chip";
 import { SortControl, type SortOption } from "@/components/sort-control";
 import { CWIP_VIEW_DEFAULT, type CwipView } from "./packing-cwip";
 import {
@@ -89,23 +89,24 @@ export function CwipFilter({
         <Separator className="my-4" />
 
         {/* ---------- แสดงในรายการ ---------- */}
+        {/* เรียงแนวนอน ตัดบรรทัดเอง ประหยัดความสูงกว่าเรียงลงทีละแถว */}
         <Label className="text-sm">แสดงในรายการ</Label>
-        <div className="mt-1 space-y-0.5">
-          <CheckRow
+        <div className="mt-2 flex flex-wrap gap-2">
+          <CheckChip
             id="cwip-chips"
-            label="ป้ายแสดงข้อมูล"
+            label="ป้ายข้อมูล"
             checked={draft.showChips}
             onChange={(v) => set({ showChips: v })}
           />
-          <CheckRow
+          <CheckChip
             id="cwip-actions"
-            label="ปุ่มคืนกลับคลังปรับปรุง"
+            label="คืนกลับคลัง/ปรับปรุง"
             checked={draft.showActions}
             onChange={(v) => set({ showActions: v })}
           />
-          <CheckRow
+          <CheckChip
             id="cwip-lots"
-            label="รายการล็อตสินค้า"
+            label="Lot สินค้า"
             checked={draft.showLots}
             onChange={(v) => set({ showLots: v })}
           />
@@ -184,41 +185,6 @@ export function CwipFilter({
         </Button>
       </div>
     </div>
-  );
-}
-
-/**
- * แถวติ๊กที่กดได้ทั้งแถว
- *
- * เป้ากดสูง 44px กว้างเต็มกล่อง ไม่ใช่แค่กล่องติ๊ก 16px
- * นิ้วโป้งแตะกว้างราว 45px กดเป้าเล็กกว่านั้นก็ไปโดนแถวข้าง ๆ ตลอด
- *
- * ไม่มีไอคอน — สี่บรรทัดนี้อ่านจบใน 2 วินาทีอยู่แล้ว
- * ไอคอนไม่ได้ช่วยแยกอะไร มีแต่ทำให้ข้อความเยื้องออกไปจากกล่องติ๊ก
- */
-function CheckRow({
-  id,
-  label,
-  checked,
-  onChange,
-}: {
-  id: string;
-  label: string;
-  checked: boolean;
-  onChange: (v: boolean) => void;
-}) {
-  return (
-    <Label
-      htmlFor={id}
-      className="-mx-2 flex min-h-11 items-center gap-3 rounded-md px-2 font-normal transition-colors hover:bg-accent-hover"
-    >
-      <Checkbox
-        id={id}
-        checked={checked}
-        onCheckedChange={(v) => onChange(v === true)}
-      />
-      {label}
-    </Label>
   );
 }
 

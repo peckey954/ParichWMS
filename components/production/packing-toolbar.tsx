@@ -102,9 +102,12 @@ export function PackingToolbar({
               ไม่งั้นกล่องทั้งใบจะเลื่อน แล้วปุ่มล้างค่าที่ตรึงไว้ก็เลื่อนตามไปด้วย */}
           {/* ไม่มีคำอธิบายใต้หัวข้อ — aria-describedby ต้องเป็น undefined ชัด ๆ
               ไม่งั้น Radix เตือนว่าหา DialogDescription ไม่เจอ */}
+          {/* ปุ่มกากบาทของ DS ใช้ focus: ซึ่งติดตอนคลิกเมาส์ด้วย
+              กดปิดแล้วเลยมีกรอบส้มค้างไว้ทั้งที่ไม่ได้ใช้คีย์บอร์ด
+              ปิดวงแหวนของ focus แล้วคืนให้เฉพาะ focus-visible ซึ่งขึ้นเฉพาะตอนกด Tab */}
           <DialogContent
             aria-describedby={undefined}
-            className="flex max-h-[85svh] flex-col gap-0 overflow-hidden! p-0 sm:max-w-md"
+            className="flex max-h-[85svh] flex-col gap-0 overflow-hidden! p-0 sm:max-w-md [&_[data-slot=dialog-close]]:focus:ring-0 [&_[data-slot=dialog-close]]:focus:ring-offset-0 [&_[data-slot=dialog-close]]:focus-visible:ring-2 [&_[data-slot=dialog-close]]:focus-visible:ring-ring [&_[data-slot=dialog-close]]:focus-visible:ring-offset-2"
           >
             <DialogHeader className="px-4 pt-4 text-left">
               <DialogTitle>{TITLE}</DialogTitle>

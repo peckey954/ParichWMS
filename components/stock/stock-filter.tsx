@@ -3,10 +3,10 @@
 import * as React from "react";
 import { RotateCcwIcon } from "lucide-react";
 import { Button } from "@peckey954/ui/components/ui/button";
-import { Checkbox } from "@peckey954/ui/components/ui/checkbox";
 import { Label } from "@peckey954/ui/components/ui/label";
 import { MultiSelect } from "@peckey954/ui/components/ui/multi-select";
 import { Separator } from "@peckey954/ui/components/ui/separator";
+import { CheckChip } from "@/components/check-chip";
 import { SortControl, type SortOption } from "@/components/sort-control";
 import {
   STOCK_PRODUCT_NAMES,
@@ -98,33 +98,35 @@ export function StockFilter({
         />
         <Separator className="my-4" />
 
-        {/* ---------- แสดงในรายการ ---------- */}
+        {/* ---------- แสดงในรายการ ----------
+             เรียงแนวนอน ตัดบรรทัดเอง สี่อันลงได้ในหนึ่งถึงสองบรรทัด
+             แทนสี่แถวเรียงลงซึ่งกินความสูงในกล่องไปเปล่า ๆ */}
         <Label className="text-sm">แสดงในรายการ</Label>
-        <div className="mt-1 space-y-0.5">
-          <CheckRow
+        <div className="mt-2 flex flex-wrap gap-2">
+          <CheckChip
             id="stock-chips"
-            label="ป้ายแสดงข้อมูล"
+            label="ป้ายข้อมูล"
             checked={draft.showChips}
             onChange={(v) => set({ showChips: v })}
           />
-          <CheckRow
+          <CheckChip
             id="stock-actions"
-            label="ปุ่มย้ายปรับปรุง"
+            label="ย้าย/ปรับปรุง"
             checked={draft.showActions}
             onChange={(v) => set({ showActions: v })}
           />
           {/* โหมดโซนกับ FIFO รายการคือล็อตอยู่แล้ว ไม่มีอะไรให้หุบ */}
           {draft.sort === "product" && (
-            <CheckRow
+            <CheckChip
               id="stock-lots"
-              label="รายการล็อตสินค้า"
+              label="Lot สินค้า"
               checked={draft.showLots}
               onChange={(v) => set({ showLots: v })}
             />
           )}
-          <CheckRow
+          <CheckChip
             id="stock-low"
-            label="เฉพาะสต็อกต่ำ"
+            label="สต็อกต่ำ"
             checked={draft.lowOnly}
             onChange={(v) => set({ lowOnly: v })}
           />
@@ -180,33 +182,6 @@ export function StockFilter({
         </Button>
       </div>
     </div>
-  );
-}
-
-/** เป้ากดสูง 44px กว้างเต็มกล่อง ไม่ใช่แค่กล่องติ๊ก 16px */
-function CheckRow({
-  id,
-  label,
-  checked,
-  onChange,
-}: {
-  id: string;
-  label: string;
-  checked: boolean;
-  onChange: (v: boolean) => void;
-}) {
-  return (
-    <Label
-      htmlFor={id}
-      className="-mx-2 flex min-h-11 items-center gap-3 rounded-md px-2 font-normal transition-colors hover:bg-accent-hover"
-    >
-      <Checkbox
-        id={id}
-        checked={checked}
-        onCheckedChange={(v) => onChange(v === true)}
-      />
-      {label}
-    </Label>
   );
 }
 
