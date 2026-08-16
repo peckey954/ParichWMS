@@ -402,3 +402,63 @@ export function matchesMove(m: CwipMove, q: string) {
 /** ยอดที่โชว์บนชิป — นับจากข้อมูลจริง ไม่ใช่เลขที่พิมพ์ไว้ตายตัว */
 export const cwipLowCount = (products: CwipProduct[]) =>
   products.filter((p) => p.low).length;
+
+// ---------------------------------------------------------------
+// ตัวกรองของแท็บสต็อก CWIP
+// ---------------------------------------------------------------
+
+export type CwipSort = "product" | "zone" | "fifo";
+
+/** ประเภทกับโซนดึงจากข้อมูลจริง ไม่ใช่รายการที่พิมพ์ไว้ตายตัว
+    เพิ่มสินค้าประเภทใหม่เมื่อไร ตัวเลือกในตัวกรองก็มีให้เองทันที */
+export const CWIP_KINDS = [...new Set(CWIP_PRODUCTS.map((p) => p.kind))];
+
+export const CWIP_ZONES = [
+  ...new Set(CWIP_PRODUCTS.flatMap((p) => p.lots.map((l) => l.zone))),
+].sort();
+
+/**
+ * กรองและเรียงสินค้า CWIP
+ *
+ * โซนกรองที่ระดับล็อต ไม่ใช่ระดับสินค้า — เลือกโซน A แล้วต้องเห็นเฉพาะ
+ * ล็อตที่อยู่โซน A ของสินค้านั้น ไม่ใช่เห็นทุกล็อตเพราะบังเอิญมีล็อตหนึ่งอยู่ A
+ * ไม่งั้นยอดรวมที่โชว์จะไม่ตรงกับสิ่งที่เห็นในรายการ
+ */
+export function filterCwip(
+  products: CwipProduct[],
+  opts: {
+    query: string;
+    lowOnly: boolean;
+    incomingOnly: boolean;
+    kinds: string[];
+    zones: string[];
+    sort: CwipSort;
+  }
+): CwipProduct[] {
+  const rows = products
+    .filter((p) => matchesCwip(p, opts.query))
+    .filter((p) => !opts.lowOnly || p.low)
+    .filter((p) => !opts.incomingOnly || p.incoming !== undefined)
+    .filter((p) => opts.kinds.length === 0 || opts.kinds.includes(p.kind))
+    .map((p) =>
+      opts.zones.length === 0
+        ? p
+        : { ...p, lots: p.lots.filter((l) => opts.zones.includes(l.zone)) }
+    )
+    .filter((p) => p.lots.length > 0);
+
+  const sorted = [...rows];
+  if (opts.sort === "zone") {
+    sorted.sort((a, b) =>
+      (a.lots[0]?.zone ?? "").localeCompare(b.lots[0]?.zone ?? "")
+    );
+  } else if (opts.sort === "fifo") {
+    // ของที่ค้างไลน์นานที่สุดขึ้นก่อน เพราะเป็นตัวที่ต้องรีบใช้
+    const oldest = (p: CwipProduct) =>
+      Math.max(...p.lots.map((l) => l.ageDays), 0);
+    sorted.sort((a, b) => oldest(b) - oldest(a));
+  } else {
+    sorted.sort((a, b) => a.name.localeCompare(b.name, "th"));
+  }
+  return sorted;
+}

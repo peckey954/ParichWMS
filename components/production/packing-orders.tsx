@@ -2,13 +2,13 @@
 
 import * as React from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { ChevronDownIcon } from "lucide-react";
 import { Badge } from "@peckey954/ui/components/ui/badge";
 import {
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuRadioGroup,
-  DropdownMenuRadioItem,
+  DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@peckey954/ui/components/ui/dropdown-menu";
 import { Separator } from "@peckey954/ui/components/ui/separator";
@@ -98,27 +98,27 @@ function StageControl({
           aria-label={`เปลี่ยนสถานะใบผลิต ${code}`}
           // การ์ดทั้งใบมีลิงก์คลุมอยู่ กันไม่ให้การกดปุ่มนี้ลากไปเปิดหน้าใบผลิต
           onClick={(e) => e.preventDefault()}
-          className={cn(
-            "flex items-center gap-1 rounded-md px-1 py-0.5 transition-colors",
-            "hover:bg-accent-hover",
-            "focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none"
-          )}
+          // ไม่มีกรอบ ไม่มีพื้นตอนชี้หรือกด — กดแล้วเมนูโผล่ก็คือคำตอบอยู่แล้ว
+          // ลูกศรข้างป้ายบอกว่ากดได้ ไม่ต้องมีกล่องมาบอกซ้ำ
+          className="flex items-center gap-1 outline-none"
         >
           <StageChip stage={stage} />
           <ChevronDownIcon className="size-4 text-muted-foreground" />
         </button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end">
-        <DropdownMenuRadioGroup
-          value={stage}
-          onValueChange={(v) => onChange(v as OrderStage)}
-        >
-          {EDITABLE.map((s) => (
-            <DropdownMenuRadioItem key={s} value={s}>
-              {STAGE_LABEL[s]}
-            </DropdownMenuRadioItem>
-          ))}
-        </DropdownMenuRadioGroup>
+      {/* ตัวเลือกเป็นป้ายสีเดียวกับที่จะไปโผล่ในแถว เห็นผลลัพธ์ก่อนกด
+          ไม่มีจุดหน้ารายการ เพราะป้ายที่อยู่บนปุ่มบอกอยู่แล้วว่าตอนนี้เป็นอะไร
+          จุดซ้ำอีกทีคือหมึกที่ไม่ได้เพิ่มความหมาย แถมเบียดป้ายให้เยื้องออกไป */}
+      <DropdownMenuContent align="end" className="min-w-40 p-1">
+        {EDITABLE.map((s) => (
+          <DropdownMenuItem
+            key={s}
+            onSelect={() => onChange(s)}
+            className="justify-start px-2 py-1.5"
+          >
+            <StageChip stage={s} />
+          </DropdownMenuItem>
+        ))}
       </DropdownMenuContent>
     </DropdownMenu>
   );
@@ -134,6 +134,7 @@ export function PackingOrders({
   /** ส่งมาเฉพาะแท็บที่แก้สถานะได้ ไม่ส่ง = ป้ายอ่านอย่างเดียว */
   onStage?: (id: string, stage: OrderStage) => void;
 }) {
+  const router = useRouter();
   const [page, setPage] = React.useState(1);
 
   // เปลี่ยนชุดข้อมูลแล้วกลับหน้าแรก ปรับตอนเรนเดอร์ ไม่ใช้ effect
@@ -196,7 +197,14 @@ export function PackingOrders({
             </TableHeader>
             <TableBody>
               {slice.map((o) => (
-                <TableRow key={o.id}>
+                <TableRow
+                  key={o.id}
+                  // ทั้งแถวกดได้ ไม่ใช่เฉพาะตัวอักษรเลขที่ใบ
+                  // เป้าเล็กแค่คำเดียวในแถวสูง 50px คือกดพลาดตลอด
+                  // ยังเป็น <a> จริงอยู่ในเซลล์แรก เปิดแท็บใหม่/คัดลอกลิงก์ได้เหมือนเดิม
+                  onClick={() => router.push(`/production/packing/${o.id}`)}
+                  className="cursor-pointer"
+                >
                   <TableCell className={COL_FIRST}>
                     <Link
                       href={`/production/packing/${o.id}`}
@@ -230,7 +238,10 @@ export function PackingOrders({
                   <TableCell className="text-right tabular-nums">
                     {formatTon(o.storedTon)}
                   </TableCell>
-                  <TableCell className={COL_LAST}>
+                  <TableCell
+                    className={COL_LAST}
+                    onClick={(e) => e.stopPropagation()}
+                  >
                     <StageControl
                       stage={o.stage}
                       code={o.code}
@@ -282,11 +293,9 @@ function OrderCard({
     // เพราะในการ์ดมีปุ่มเปลี่ยนสถานะอยู่ ปุ่มซ้อนในลิงก์เป็น HTML ที่ผิด
     // และกดแล้วจะลากไปเปิดหน้าใบผลิตแทนที่จะเปิดเมนู
     <div
-      className={cn(
-        "relative rounded-xl border border-border bg-card p-4",
-        "transition-colors hover:bg-accent",
-        "focus-within:ring-[3px] focus-within:ring-ring/50"
-      )}
+      // ไม่มีพื้นเปลี่ยนสีตอนชี้ ไม่มีกรอบตอนโฟกัส
+      // บนมือถือไม่มีเมาส์ให้ชี้อยู่แล้ว เหลือแต่สีค้างหลังกดซึ่งดูเหมือนการ์ดเสีย
+      className="relative rounded-xl border border-border bg-card p-4"
     >
       <div className="flex items-baseline justify-between gap-3">
         <Link

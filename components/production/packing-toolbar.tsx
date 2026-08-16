@@ -30,6 +30,7 @@ export function PackingToolbar({
   actions,
   filter,
   filterActive,
+  filterCount,
   onFilter,
 }: {
   query: string;
@@ -40,6 +41,8 @@ export function PackingToolbar({
   filter?: React.ReactNode;
   /** มีตัวกรองทำงานอยู่ไหม ใช้ตัดสินว่าจะขึ้นจุดบนปุ่มหรือเปล่า */
   filterActive?: boolean;
+  /** จำนวนเงื่อนไขที่กรองของออกอยู่ — มากกว่า 0 จะโชว์เป็นตัวเลขแทนจุด */
+  filterCount?: number;
   onFilter?: () => void;
 }) {
   // ใช้ไอคอนเดียวกับปุ่มตัวกรองที่หน้าสต็อกและหน้าสูตร
@@ -54,8 +57,16 @@ export function PackingToolbar({
       onClick={filter ? undefined : onFilter}
     >
       <ListFilterIcon />
-      {filterActive && (
-        <span className="absolute top-1 right-1 size-2 rounded-full bg-primary" />
+      {/* บอกจำนวนเงื่อนไขที่กรองอยู่ ไม่ใช่แค่ว่ามีหรือไม่มี
+          กรองไว้ห้าอย่างแล้วลืม จะได้รู้ว่าที่หาไม่เจอเพราะกรองไว้เยอะ ไม่ใช่ของหมด */}
+      {filterCount ? (
+        <span className="absolute -top-1.5 -right-1.5 flex size-4.5 items-center justify-center rounded-full bg-primary text-[10px] font-semibold text-primary-foreground tabular-nums">
+          {filterCount}
+        </span>
+      ) : (
+        filterActive && (
+          <span className="absolute top-1 right-1 size-2 rounded-full bg-primary" />
+        )
       )}
     </Button>
   );

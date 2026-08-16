@@ -166,7 +166,12 @@ export function TableFrame({ children }: { children: React.ReactNode }) {
       className={cn(
         "overflow-hidden rounded-xl border border-border bg-card",
         "[&_[data-slot=table-container]]:max-h-[60vh]",
-        "[&_[data-slot=table-container]]:overflow-auto"
+        "[&_[data-slot=table-container]]:overflow-auto",
+        // ระยะในเซลล์ของ DS คือ px-2 (8px) ซึ่งแน่นเกินไปสำหรับตารางข้อมูลยาว ๆ
+        // ตัวเลขสองคอลัมน์ที่ติดกันจะอ่านต่อกันเป็นก้อนเดียว แยกไม่ออกว่าจบตรงไหน
+        // ขยับเป็น 16px และเพิ่มความสูงแถว ให้แต่ละค่ามีที่หายใจของตัวเอง
+        "[&_th]:h-12 [&_th]:px-4",
+        "[&_td]:px-4 [&_td]:py-3"
       )}
     >
       {children}
@@ -177,12 +182,21 @@ export function TableFrame({ children }: { children: React.ReactNode }) {
 /** หัวตารางตรึงไว้ด้านบนตอนเลื่อนขึ้นลง */
 export const STICKY_HEAD = "[&_th]:sticky [&_th]:top-0 [&_th]:z-20 [&_th]:bg-card";
 
-/** คอลัมน์แรกตรึงซ้าย คอลัมน์สุดท้ายตรึงขวา เลื่อนแนวนอนได้เฉพาะตรงกลาง */
-export const COL_FIRST = "sticky left-0 z-10 border-r border-border bg-card";
-export const COL_LAST = "sticky right-0 z-10 border-l border-border bg-card";
+/**
+ * คอลัมน์แรกตรึงซ้าย คอลัมน์สุดท้ายตรึงขวา เลื่อนแนวนอนได้เฉพาะตรงกลาง
+ *
+ * มีเงาทิ้งเข้าไปด้านใน บอกว่าเนื้อหากำลังเลื่อนลอดอยู่ข้างใต้คอลัมน์นี้
+ * เส้นขอบอย่างเดียวไม่พอ คนอ่านเป็น "ตารางจบตรงนี้" แล้วไม่คิดจะเลื่อนต่อ
+ */
+export const COL_FIRST =
+  "sticky left-0 z-10 border-r border-border bg-card shadow-[var(--sticky-shadow-r)]";
+export const COL_LAST =
+  "sticky right-0 z-10 border-l border-border bg-card shadow-[var(--sticky-shadow-l)]";
 /** เซลล์หัวที่เป็นคอลัมน์ตรึงด้วย ต้องอยู่เหนือทั้งสองชั้น */
-export const HEAD_FIRST = "left-0 z-30! border-r border-border";
-export const HEAD_LAST = "right-0 z-30! border-l border-border";
+export const HEAD_FIRST =
+  "left-0 z-30! border-r border-border shadow-[var(--sticky-shadow-r)]";
+export const HEAD_LAST =
+  "right-0 z-30! border-l border-border shadow-[var(--sticky-shadow-l)]";
 
 /**
  * แบ่งหน้า — ใช้ Button ของ DS ไม่ใช่ Pagination

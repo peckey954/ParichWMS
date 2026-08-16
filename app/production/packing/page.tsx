@@ -22,7 +22,11 @@ import {
   PackingCwip,
   type CwipView,
 } from "@/components/production/packing-cwip";
-import { CwipFilter, isCwipDefault } from "@/components/production/cwip-filter";
+import {
+  CwipFilter,
+  cwipActiveCount,
+  isCwipDefault,
+} from "@/components/production/cwip-filter";
 import { PackingOrders } from "@/components/production/packing-orders";
 import {
   CwipHistoryList,
@@ -47,7 +51,7 @@ import {
   DONE_ORDERS,
   WAITING_ORDERS,
   cwipLowCount,
-  matchesCwip,
+  filterCwip,
   matchesMove,
   matchesOrder,
   matchesRequest,
@@ -95,10 +99,14 @@ export default function PackingListPage() {
   const done = DONE_ORDERS.filter((o) => matchesOrder(o, query));
 
   // ชิปสต็อกต่ำกับติ๊กในตัวกรองสั่งของเดียวกัน กดที่ไหนก็ได้ผลเหมือนกัน
-  const lowOnly = cwipChip === "low" || cwipView.lowOnly;
-  const cwip = CWIP_PRODUCTS.filter(
-    (p) => matchesCwip(p, query) && (!lowOnly || p.low)
-  );
+  const cwip = filterCwip(CWIP_PRODUCTS, {
+    query,
+    lowOnly: cwipChip === "low" || cwipView.lowOnly,
+    incomingOnly: cwipView.incomingOnly,
+    kinds: cwipView.kinds,
+    zones: cwipView.zones,
+    sort: cwipView.sort,
+  });
   const inbound = CWIP_INBOUND.filter((d) => matchesRequest(d, query));
   const returns = CWIP_RETURNS.filter((d) => matchesRequest(d, query));
   const history = CWIP_HISTORY.filter((m) => matchesMove(m, query));
@@ -226,6 +234,11 @@ export default function PackingListPage() {
             }
             filterActive={
               tab === "cwip" && isStockView && !isCwipDefault(cwipView)
+            }
+            filterCount={
+              tab === "cwip" && isStockView
+                ? cwipActiveCount(cwipView)
+                : undefined
             }
             onFilter={() => soon("ตัวกรอง")}
           />
