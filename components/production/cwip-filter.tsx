@@ -7,7 +7,6 @@ import { Checkbox } from "@peckey954/ui/components/ui/checkbox";
 import { Label } from "@peckey954/ui/components/ui/label";
 import { MultiSelect } from "@peckey954/ui/components/ui/multi-select";
 import { Separator } from "@peckey954/ui/components/ui/separator";
-import { useNarrowScreen } from "@/components/device-preview";
 import { SortControl, type SortOption } from "@/components/sort-control";
 import { CWIP_VIEW_DEFAULT, type CwipView } from "./packing-cwip";
 import {
@@ -71,9 +70,6 @@ export function CwipFilter({
   const set = (next: Partial<CwipView>) =>
     setDraft((prev) => ({ ...prev, ...next }));
 
-  // จอกว้างการเรียงอยู่นอกกล่องแล้ว มีในนี้อีกก็ซ้ำ
-  const narrow = useNarrowScreen();
-
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       {/* หัวข้อมาจากกล่องที่ครอบอยู่ เพราะ Popover กับ Dialog
@@ -81,19 +77,16 @@ export function CwipFilter({
 
       {/* เลื่อนเฉพาะตรงนี้ หัวข้อกับแถวปุ่มอยู่นอกกรอบที่เลื่อน */}
       <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
-        {/* ตัวควบคุมมีคำว่า "เรียงตาม:" ในตัวแล้ว ไม่ต้องมี Label ซ้ำอีก */}
-        {narrow && (
-          <>
-            <SortControl
-              options={CWIP_SORTS}
-              value={draft.sort}
-              dir={draft.dir}
-              onChange={(sort, dir) => set({ sort, dir })}
-              className="flex-wrap"
-            />
-            <Separator className="my-4" />
-          </>
-        )}
+        {/* อยู่ในกล่องทุกขนาดจอ เปิดกล่องแล้วเห็นทันทีว่าตอนนี้เรียงด้วยโหมดไหน
+            ตัวควบคุมมีคำว่า "เรียงตาม:" ในตัวแล้ว ไม่ต้องมี Label ซ้ำอีก */}
+        <SortControl
+          options={CWIP_SORTS}
+          value={draft.sort}
+          dir={draft.dir}
+          onChange={(sort, dir) => set({ sort, dir })}
+          className="flex-wrap"
+        />
+        <Separator className="my-4" />
 
         {/* ---------- แสดงในรายการ ---------- */}
         <Label className="text-sm">แสดงในรายการ</Label>

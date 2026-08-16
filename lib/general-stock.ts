@@ -1331,6 +1331,3 @@ export const STOCK_ZONES = [
 export const STOCK_PRODUCT_NAMES = [
   ...new Set(PRODUCTS.map((p) => p.name)),
 ].sort((a, b) => a.localeCompare(b, "th"));
-
-/** สภาพล็อตที่มีจริง สำหรับตัวเลือกในตัวกรอง */
-export const STOCK_CONDITIONS = CONDITION_LABEL;

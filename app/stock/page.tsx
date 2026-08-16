@@ -42,13 +42,11 @@ import { IssueList } from "@/components/stock/issue-list";
 import { ProductCard } from "@/components/stock/stock-parts";
 import { FifoList, ZoneGroups } from "@/components/stock/lot-list";
 import {
-  STOCK_SORTS,
   STOCK_VIEW_DEFAULT,
   StockFilter,
   isStockDefault,
   type StockView,
 } from "@/components/stock/stock-filter";
-import { SortControl } from "@/components/sort-control";
 import {
   CATEGORIES,
   CATEGORY_LABEL,
@@ -124,7 +122,7 @@ function GeneralStockView() {
   /**
    * ค้นหาทำงานอยู่ในประเภทที่เปิดอยู่เท่านั้น
    *
-   * โซนกับสภาพล็อตกรองที่ระดับล็อต ไม่ใช่ระดับสินค้า
+   * โซนกรองที่ระดับล็อต ไม่ใช่ระดับสินค้า
    * เลือกโซน A-1 แล้วต้องเห็นเฉพาะล็อตที่อยู่ A-1 ไม่ใช่เห็นทุกล็อตของสินค้านั้น
    * ไม่งั้นยอดรวมที่โชว์จะไม่ตรงกับสิ่งที่เห็นในรายการ
    */
@@ -138,14 +136,9 @@ function GeneralStockView() {
           (p) => view.products.length === 0 || view.products.includes(p.name)
         )
         .map((p) => {
-          const lots = p.lots.filter(
-            (l) =>
-              (view.zones.length === 0 || view.zones.includes(l.zone)) &&
-              (view.conditions.length === 0 ||
-                (l.condition !== undefined &&
-                  view.conditions.includes(l.condition)))
-          );
-          return lots.length === p.lots.length ? p : { ...p, lots };
+          if (view.zones.length === 0) return p;
+          const lots = p.lots.filter((l) => view.zones.includes(l.zone));
+          return { ...p, lots };
         })
         .filter((p) => p.lots.length > 0);
 
@@ -357,18 +350,6 @@ function GeneralStockView() {
               )}
             </div>
 
-            {/* จอกว้างมีที่เหลือท้ายแถว เอาการเรียงออกมาไว้ข้างนอกเลย
-                ไม่ต้องเปิดกล่องเพื่อสลับของที่กดบ่อยที่สุด
-                จอแคบไม่มีที่ ตัวนี้ไปอยู่ในกล่องตัวกรองแทน */}
-            {!isHistory && (
-              <SortControl
-                options={STOCK_SORTS}
-                value={view.sort}
-                dir={view.dir}
-                onChange={(sort, dir) => setView((v) => ({ ...v, sort, dir }))}
-                className="hidden @3xl:flex"
-              />
-            )}
           </div>
 
           {/* ---------- ค้นหา + ปุ่ม — อยู่ในแถบติดบนเดียวกับชิป ----------

@@ -7,13 +7,10 @@ import { Checkbox } from "@peckey954/ui/components/ui/checkbox";
 import { Label } from "@peckey954/ui/components/ui/label";
 import { MultiSelect } from "@peckey954/ui/components/ui/multi-select";
 import { Separator } from "@peckey954/ui/components/ui/separator";
-import { useNarrowScreen } from "@/components/device-preview";
 import { SortControl, type SortOption } from "@/components/sort-control";
 import {
-  CONDITION_LABEL,
   STOCK_PRODUCT_NAMES,
   STOCK_ZONES,
-  type LotCondition,
   type SortDir,
   type StockSort,
 } from "@/lib/general-stock";
@@ -33,7 +30,6 @@ export type StockView = {
   /** ว่าง = เอาทั้งหมด ไม่ใช่ไม่เอาอะไรเลย */
   zones: string[];
   products: string[];
-  conditions: LotCondition[];
   sort: StockSort;
   dir: SortDir;
 };
@@ -45,7 +41,6 @@ export const STOCK_VIEW_DEFAULT: StockView = {
   lowOnly: false,
   zones: [],
   products: [],
-  conditions: [],
   sort: "product",
   dir: "asc",
 };
@@ -58,8 +53,7 @@ export const isStockDefault = (v: StockView) =>
   v.sort === STOCK_VIEW_DEFAULT.sort &&
   v.dir === STOCK_VIEW_DEFAULT.dir &&
   v.zones.length === 0 &&
-  v.products.length === 0 &&
-  v.conditions.length === 0;
+  v.products.length === 0;
 
 
 /**
@@ -77,10 +71,6 @@ export const STOCK_SORTS: SortOption<StockSort>[] = [
 const asOptions = (values: string[]) =>
   values.map((v) => ({ value: v, label: v }));
 
-const CONDITION_OPTIONS = (
-  Object.keys(CONDITION_LABEL) as LotCondition[]
-).map((k) => ({ value: k, label: CONDITION_LABEL[k] }));
-
 export function StockFilter({
   view,
   onApply,
@@ -94,26 +84,19 @@ export function StockFilter({
   const set = (next: Partial<StockView>) =>
     setDraft((prev) => ({ ...prev, ...next }));
 
-  // จอกว้างการเรียงอยู่นอกกล่องแล้ว มีในนี้อีกก็ซ้ำ
-  // จอแคบไม่มีที่ในแถบเครื่องมือ จึงเก็บไว้ในนี้
-  const narrow = useNarrowScreen();
-
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
-        {/* ตัวควบคุมมีคำว่า "เรียงตาม:" ในตัวแล้ว ไม่ต้องมี Label ซ้ำอีก */}
-        {narrow && (
-          <>
-            <SortControl
-              options={STOCK_SORTS}
-              value={draft.sort}
-              dir={draft.dir}
-              onChange={(sort, dir) => set({ sort, dir })}
-              className="flex-wrap"
-            />
-            <Separator className="my-4" />
-          </>
-        )}
+        {/* อยู่ในกล่องทุกขนาดจอ เปิดกล่องแล้วเห็นทันทีว่าตอนนี้เรียงด้วยโหมดไหน
+            ตัวควบคุมมีคำว่า "เรียงตาม:" ในตัวแล้ว ไม่ต้องมี Label ซ้ำอีก */}
+        <SortControl
+          options={STOCK_SORTS}
+          value={draft.sort}
+          dir={draft.dir}
+          onChange={(sort, dir) => set({ sort, dir })}
+          className="flex-wrap"
+        />
+        <Separator className="my-4" />
 
         {/* ---------- แสดงในรายการ ---------- */}
         <Label className="text-sm">แสดงในรายการ</Label>
@@ -174,19 +157,6 @@ export function StockFilter({
               placeholder="ทุกสินค้า"
               searchPlaceholder="ค้นหาสินค้า"
               maxChips={1}
-              className="min-h-10 bg-card"
-            />
-          </Field>
-
-          <Field id="stock-conditions" label="สภาพล็อต">
-            <MultiSelect
-              id="stock-conditions"
-              options={CONDITION_OPTIONS}
-              value={draft.conditions}
-              onValueChange={(v) => set({ conditions: v as LotCondition[] })}
-              placeholder="ทุกสภาพ"
-              searchPlaceholder="ค้นหาสภาพล็อต"
-              maxChips={2}
               className="min-h-10 bg-card"
             />
           </Field>

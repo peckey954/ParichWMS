@@ -22,12 +22,7 @@ import {
   PackingCwip,
   type CwipView,
 } from "@/components/production/packing-cwip";
-import {
-  CWIP_SORTS,
-  CwipFilter,
-  isCwipDefault,
-} from "@/components/production/cwip-filter";
-import { SortControl } from "@/components/sort-control";
+import { CwipFilter, isCwipDefault } from "@/components/production/cwip-filter";
 import { CwipActiveFilters } from "@/components/production/cwip-active-filters";
 import { PackingOrders } from "@/components/production/packing-orders";
 import {
@@ -270,20 +265,6 @@ export default function PackingListPage() {
                 );
               })}
 
-              {/* จอกว้างมีที่เหลือท้ายแถว เอาการเรียงออกมาไว้ข้างนอก
-                  ไม่ต้องเปิดกล่องเพื่อสลับของที่กดบ่อยที่สุด
-                  จอแคบไม่มีที่ ตัวนี้ไปอยู่ในกล่องตัวกรองแทน */}
-              {isStockView && (
-                <SortControl
-                  options={CWIP_SORTS}
-                  value={cwipView.sort}
-                  dir={cwipView.dir}
-                  onChange={(sort, dir) =>
-                    setCwipView((v) => ({ ...v, sort, dir }))
-                  }
-                  className="ml-auto hidden @3xl:flex"
-                />
-              )}
             </div>
           )}
 
