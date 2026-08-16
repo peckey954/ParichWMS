@@ -45,7 +45,7 @@ import {
   STOCK_SORTS,
   STOCK_VIEW_DEFAULT,
   StockFilter,
-  stockActiveCount,
+  isStockDefault,
   type StockView,
 } from "@/components/stock/stock-filter";
 import { SortControl } from "@/components/sort-control";
@@ -113,7 +113,8 @@ function GeneralStockView() {
   const [issueQuery, setIssueQuery] = React.useState("");
   const [issueKind, setIssueKind] = React.useState<IssueKind>("all");
 
-  const activeCount = stockActiveCount(view);
+  // จุดบนปุ่มขึ้นเมื่อมีอะไรต่างจากค่าเริ่มต้น ไม่ว่าจะเป็นติ๊ก การเรียง หรือดรอปดาวน์
+  const filterActive = !isStockDefault(view);
   const lowOnly = view.lowOnly;
 
   // จำนวนบนชิปเป็นยอดจริงของแต่ละประเภท ไม่เปลี่ยนตามคำค้น
@@ -402,10 +403,10 @@ function GeneralStockView() {
                   className="relative shrink-0"
                 >
                   <ListFilterIcon />
-                  {activeCount > 0 && (
-                    <span className="absolute -top-1.5 -right-1.5 flex size-4.5 items-center justify-center rounded-full bg-primary text-[10px] font-semibold text-primary-foreground tabular-nums">
-                      {activeCount}
-                    </span>
+                  {/* จุดบอกว่ามีอะไรถูกเปลี่ยนไว้ ไม่บอกว่ากี่อย่าง
+                      ขนาดกับตำแหน่งตามคอมโพเนนต์ในไฟล์ออกแบบ */}
+                  {filterActive && (
+                    <span className="absolute top-1 right-1 size-2 rounded-full bg-primary" />
                   )}
                 </Button>
               </DialogTrigger>

@@ -32,7 +32,6 @@ export function PackingToolbar({
   actions,
   filter,
   filterActive,
-  filterCount,
   filterOpen,
   onFilterOpenChange,
   onFilter,
@@ -43,10 +42,8 @@ export function PackingToolbar({
   actions: PackingAction[];
   /** เนื้อในของตัวกรอง ถ้าแท็บนั้นมีของให้กรอง — ไม่ส่งมาก็เป็นปุ่มเปล่า */
   filter?: React.ReactNode;
-  /** มีตัวกรองทำงานอยู่ไหม ใช้ตัดสินว่าจะขึ้นจุดบนปุ่มหรือเปล่า */
+  /** มีอะไรถูกเปลี่ยนจากค่าเริ่มต้นไหม — ไม่ว่าจะเป็นติ๊ก การเรียง หรือดรอปดาวน์ */
   filterActive?: boolean;
-  /** จำนวนเงื่อนไขที่กรองของออกอยู่ — มากกว่า 0 จะโชว์เป็นตัวเลขแทนจุด */
-  filterCount?: number;
   /** สั่งเปิด/ปิดจากข้างนอกได้ แถวสรุปตัวกรองกด "+2" แล้วต้องเปิดกล่องนี้ */
   filterOpen?: boolean;
   onFilterOpenChange?: (v: boolean) => void;
@@ -65,16 +62,12 @@ export function PackingToolbar({
       onClick={filter ? undefined : onFilter}
     >
       <ListFilterIcon />
-      {/* บอกจำนวนเงื่อนไขที่กรองอยู่ ไม่ใช่แค่ว่ามีหรือไม่มี
-          กรองไว้ห้าอย่างแล้วลืม จะได้รู้ว่าที่หาไม่เจอเพราะกรองไว้เยอะ ไม่ใช่ของหมด */}
-      {filterCount ? (
-        <span className="absolute -top-1.5 -right-1.5 flex size-4.5 items-center justify-center rounded-full bg-primary text-[10px] font-semibold text-primary-foreground tabular-nums">
-          {filterCount}
-        </span>
-      ) : (
-        filterActive && (
-          <span className="absolute top-1 right-1 size-2 rounded-full bg-primary" />
-        )
+      {/* จุดบอกว่ามีอะไรถูกเปลี่ยนไว้ ไม่บอกว่ากี่อย่าง
+          ตัวเลขทำให้ต้องนิยามว่าอะไรนับอะไรไม่นับ ซึ่งคนอ่านไม่มีทางรู้
+          สิ่งที่ต้องรู้จริง ๆ มีแค่ "ที่เห็นอยู่ไม่ใช่ของทั้งหมด" เท่านั้น
+          ขนาดกับตำแหน่งตามคอมโพเนนต์ในไฟล์ออกแบบ — วงกลม 8px ห่างขอบ 4px */}
+      {filterActive && (
+        <span className="absolute top-1 right-1 size-2 rounded-full bg-primary" />
       )}
     </Button>
   );

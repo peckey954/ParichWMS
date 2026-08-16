@@ -25,7 +25,6 @@ import {
 import {
   CWIP_SORTS,
   CwipFilter,
-  cwipActiveCount,
   isCwipDefault,
 } from "@/components/production/cwip-filter";
 import { SortControl } from "@/components/sort-control";
@@ -308,11 +307,6 @@ export default function PackingListPage() {
             }
             filterActive={
               tab === "cwip" && isStockView && !isCwipDefault(cwipView)
-            }
-            filterCount={
-              tab === "cwip" && isStockView
-                ? cwipActiveCount(cwipView)
-                : undefined
             }
             filterOpen={filterOpen}
             onFilterOpenChange={setFilterOpen}

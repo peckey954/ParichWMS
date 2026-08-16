@@ -46,11 +46,6 @@ export const isCwipDefault = (v: CwipView) =>
   v.zones.length === 0 &&
   v.products.length === 0;
 
-/** จำนวนเงื่อนไขที่กรองของออกจริง ๆ — การเรียงกับการแสดงผลไม่นับ */
-export const cwipActiveCount = (v: CwipView) =>
-  (v.kinds.length > 0 ? 1 : 0) +
-  (v.zones.length > 0 ? 1 : 0) +
-  (v.products.length > 0 ? 1 : 0);
 
 /** ป้ายทิศทางต่างกันตามสิ่งที่เรียง — FIFO กลับทิศแล้วมันคือ LIFO */
 export const CWIP_SORTS: SortOption<CwipSort>[] = [

@@ -61,12 +61,6 @@ export const isStockDefault = (v: StockView) =>
   v.products.length === 0 &&
   v.conditions.length === 0;
 
-/** จำนวนเงื่อนไขที่กรองของออกจริง ๆ — การเรียงกับการแสดงผลไม่นับ */
-export const stockActiveCount = (v: StockView) =>
-  (v.lowOnly ? 1 : 0) +
-  (v.zones.length > 0 ? 1 : 0) +
-  (v.products.length > 0 ? 1 : 0) +
-  (v.conditions.length > 0 ? 1 : 0);
 
 /**
  * ป้ายของทิศทางเปลี่ยนตามสิ่งที่เรียง ไม่ใช่ "น้อยไปมาก" ลอย ๆ
