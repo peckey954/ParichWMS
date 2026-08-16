@@ -200,27 +200,51 @@ export function useScrollState({ hideAfter = 160, topAfter = 700 } = {}) {
    *
    * ตั้ง ignoreNextRef ไว้เสมอ ไม่ว่าจะเลื่อนขึ้นหรือลง เพราะกระโดดครั้งเดียว
    * แถบต้องโผล่แน่ ๆ ไม่ต้องพึ่งให้ทิศเลื่อนมาตัดสินแทน
+   *
+   * เผื่อไว้เหมือนแท็บใหญ่ — สลับชิปแล้ว React ยังไม่ทันวาดก้อนใหม่เสร็จ
+   * (key={chip} ถอด/สร้างก้อนใหม่ทั้งก้อน) เบราว์เซอร์บางตัวรีโฟลว์ช้ากว่านั้น
+   * แล้วดันตำแหน่งเอง ดักฟัง scroll ต่ออีกพักหนึ่ง เจอหลุดจากจุดหมายเมื่อไหร่
+   * ดึงกลับทันที ไม่ปล่อยให้ไหลไปไกลกว่าการ์ดแรกที่ตั้งใจไว้
+   *
+   * คำนวณตำแหน่งเป้าหมาย (wanted) จาก el แค่ครั้งเดียวตอนกระโดด แล้วดึงกลับ
+   * ด้วยตัวเลขนั้นตรง ๆ ไม่วัดจาก el ซ้ำ — key={chip} ถอด el ตัวเดิมทิ้งไปแล้ว
+   * ตอนดักฟัง drift รอบหลัง ๆ วัดใหม่จะได้กล่องว่างเปล่า (0,0,0,0) แล้วคำนวณ
+   * ตำแหน่งผิดเป็น 0 ซึ่งคือบั๊ก "เด้งไปบนสุด" ที่ตั้งใจแก้พอดี
    */
   const scrollIntoTop = React.useCallback(
     (el: HTMLElement, offset = 0) => {
-      ignoreNextRef.current = true;
-      // เผื่อกรณีเป้าหมายอยู่ตำแหน่งเดิมพอดี ไม่มี scroll event เกิดขึ้นเลย
-      // ค่านี้ต้องไม่ค้าง ไม่งั้นจะไปกินการเลื่อนจริงครั้งถัดไปของผู้ใช้ฟรี ๆ
-      window.setTimeout(() => {
-        ignoreNextRef.current = false;
-      }, 100);
       const frame = framed ? frameRef.current : null;
-      if (frame) {
-        const top =
-          el.getBoundingClientRect().top -
+      const target: HTMLElement | Window = frame ?? window;
+      const read = () => (frame ? frame.scrollTop : window.scrollY);
+
+      const top = frame
+        ? el.getBoundingClientRect().top -
           frame.getBoundingClientRect().top +
           frame.scrollTop -
-          offset;
-        frame.scrollTo({ top: Math.max(0, top) });
-      } else {
-        const top = el.getBoundingClientRect().top + window.scrollY - offset;
-        window.scrollTo({ top: Math.max(0, top) });
-      }
+          offset
+        : el.getBoundingClientRect().top + window.scrollY - offset;
+      const wanted = Math.max(0, top);
+
+      const jump = () => {
+        ignoreNextRef.current = true;
+        // เผื่อกรณีเป้าหมายอยู่ตำแหน่งเดิมพอดี ไม่มี scroll event เกิดขึ้นเลย
+        // ค่านี้ต้องไม่ค้าง ไม่งั้นจะไปกินการเลื่อนจริงครั้งถัดไปของผู้ใช้ฟรี ๆ
+        window.setTimeout(() => {
+          ignoreNextRef.current = false;
+        }, 100);
+        if (frame) frame.scrollTo({ top: wanted });
+        else window.scrollTo({ top: wanted });
+      };
+
+      jump();
+
+      const onDrift = () => {
+        if (read() !== wanted) jump();
+      };
+      target.addEventListener("scroll", onDrift, { passive: true });
+      window.setTimeout(() => {
+        target.removeEventListener("scroll", onDrift);
+      }, 500);
     },
     [framed, frameRef]
   );
