@@ -10,6 +10,7 @@ import { SortControl, type SortOption } from "@/components/sort-control";
 import { CWIP_VIEW_DEFAULT, type CwipView } from "./packing-cwip";
 import {
   CWIP_KINDS,
+  CWIP_LOT_CODES,
   CWIP_PRODUCT_NAMES,
   CWIP_ZONES,
   type CwipSort,
@@ -42,6 +43,7 @@ export const isCwipDefault = (v: CwipView) =>
   v.dir === CWIP_VIEW_DEFAULT.dir &&
   v.kinds.length === 0 &&
   v.zones.length === 0 &&
+  v.lots.length === 0 &&
   v.products.length === 0;
 
 
@@ -121,18 +123,38 @@ export function CwipFilter({
           />
         </Section>
 
-        <Section title="โซน" htmlFor="cwip-zones">
-          <MultiSelect
-            id="cwip-zones"
-            options={asOptions(CWIP_ZONES)}
-            value={draft.zones}
-            onValueChange={(zones) => set({ zones })}
-            placeholder="เลือกโซน"
-            searchPlaceholder="ค้นหาโซน"
-            maxChips={2}
-            className="min-h-10 bg-card"
-          />
-        </Section>
+        {/* โผล่ตามโหมดที่เรียงอยู่ — เรียงตามโซนก็เลือกโซนได้ เรียง FIFO ก็เลือกล็อตได้ */}
+        {draft.sort === "zone" && (
+          <Section title="โซน" htmlFor="cwip-zones">
+            <MultiSelect
+              id="cwip-zones"
+              options={asOptions(CWIP_ZONES)}
+              value={draft.zones}
+              onValueChange={(zones) => set({ zones })}
+              placeholder="เลือกโซน"
+              searchPlaceholder="ค้นหาโซน"
+              maxChips={2}
+              className="min-h-10 bg-card"
+            />
+          </Section>
+        )}
+
+        {/* ชื่อต่างจากชิป "Lot สินค้า" ข้างบน อันนั้นคือเปิด/ปิดการแสดงล็อตในรายการ
+            อันนี้คือเลือกว่าจะเอาล็อตไหนบ้าง สองอย่างคนละเรื่องกัน */}
+        {draft.sort === "fifo" && (
+          <Section title="เลขล็อต" htmlFor="cwip-lots-pick">
+            <MultiSelect
+              id="cwip-lots-pick"
+              options={asOptions(CWIP_LOT_CODES)}
+              value={draft.lots}
+              onValueChange={(lots) => set({ lots })}
+              placeholder="เลือก Lot"
+              searchPlaceholder="ค้นหา Lot"
+              maxChips={2}
+              className="min-h-10 bg-card"
+            />
+          </Section>
+        )}
 
         <Section title="สินค้า" htmlFor="cwip-products">
           <MultiSelect

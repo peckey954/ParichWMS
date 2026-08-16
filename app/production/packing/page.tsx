@@ -34,6 +34,7 @@ import {
   type PackingAction,
 } from "@/components/production/packing-actions";
 import { PackingToolbar } from "@/components/production/packing-toolbar";
+import { useDevicePreview } from "@/components/device-preview";
 import {
   BackToTop,
   StickyToolbar,
@@ -86,7 +87,30 @@ export default function PackingListPage() {
   // สถานะที่คนคุมไลน์กดเปลี่ยนเอง เก็บทับของเดิมเฉพาะใบที่ถูกแก้
   const [stages, setStages] = React.useState<Record<string, OrderStage>>({});
   // แถบค้นหา+ชิปล็อกติดบนตลอด แบบเดียวกับหน้าสต็อกทั่วไป
-  const { showTop, scrollToTop, barRef } = useStickyToolbar();
+  const { showTop, scrollToTop, scrollIntoTop, barRef } = useStickyToolbar();
+  const { framed } = useDevicePreview();
+
+  /**
+   * สลับแท็บหรือชิป CWIP แล้วต้องเห็นรายการแรกทันที เหมือนหน้าสต็อกทั่วไป
+   * ทุกแท็บ/ชิปใช้ก้อนรายการเดียวกัน (listRef ด้านล่าง) ทีละก้อนเท่านั้น
+   * จึงเลื่อนใน effect หลัง render ข้ามรอบแรกไว้ ไม่งั้นหน้าเด้งเองตอนเพิ่งโหลด
+   */
+  const listRef = React.useRef<HTMLDivElement>(null);
+  const scrollListToTop = React.useCallback(() => {
+    const list = listRef.current;
+    if (!list) return;
+    const bar = barRef.current?.offsetHeight ?? 0;
+    scrollIntoTop(list, bar + (framed ? 0 : 56));
+  }, [barRef, framed, scrollIntoTop]);
+
+  const mountedRef = React.useRef(false);
+  React.useEffect(() => {
+    if (!mountedRef.current) {
+      mountedRef.current = true;
+      return;
+    }
+    scrollListToTop();
+  }, [tab, cwipChip, scrollListToTop]);
 
   const withStage = (o: (typeof WAITING_ORDERS)[number]) =>
     stages[o.id] ? { ...o, stage: stages[o.id] } : o;
@@ -102,6 +126,7 @@ export default function PackingListPage() {
     lowOnly: cwipChip === "low",
     kinds: cwipView.kinds,
     zones: cwipView.zones,
+    lots: cwipView.lots,
     products: cwipView.products,
     sort: cwipView.sort,
     dir: cwipView.dir,
@@ -307,7 +332,7 @@ export default function PackingListPage() {
         </div>
       </StickyToolbar>
 
-      <div className="mt-3">
+      <div ref={listRef} className="mt-3">
         {tab === "waiting" && (
           <PackingOrders
             orders={waiting}

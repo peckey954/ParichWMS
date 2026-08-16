@@ -34,6 +34,8 @@ export type CwipView = {
   /** ว่าง = เอาทั้งหมด ไม่ใช่ไม่เอาอะไรเลย */
   kinds: string[];
   zones: string[];
+  /** เลขล็อต — เลือกได้ตอนเรียงแบบ FIFO ซึ่งรายการเป็นล็อตอยู่แล้ว */
+  lots: string[];
   products: string[];
   sort: CwipSort;
   dir: SortDir;
@@ -45,6 +47,7 @@ export const CWIP_VIEW_DEFAULT: CwipView = {
   showLots: true,
   kinds: [],
   zones: [],
+  lots: [],
   products: [],
   sort: "product",
   dir: "asc",

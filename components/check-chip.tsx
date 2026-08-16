@@ -11,7 +11,7 @@ import { cn } from "@peckey954/ui/lib/utils";
    เรียงต่อกันในแนวนอน ตัดบรรทัดเอง สี่อันลงได้ในหนึ่งถึงสองบรรทัด
    แทนที่จะเป็นสี่แถวเรียงลง ซึ่งกินความสูงในกล่องไปเปล่า ๆ
 
-   แยกกันเป็นอัน ๆ ต่างจากการเรียงข้อมูลที่เป็นปุ่มติดกันเป็นก้อน
+   ทรงกลมและแยกกันเป็นอัน ๆ ต่างจากการเรียงข้อมูลที่เป็นปุ่มเหลี่ยมติดกันเป็นก้อน
    ติดกัน = เลือกได้อันเดียว แยกกัน = เลือกได้หลายอัน รูปทรงบอกไปแล้ว
 
    ตัวหนังสือดำเสมอ ไม่มีพื้นสีตอนเลือก เพราะกล่องติ๊กบอกสถานะอยู่แล้ว
@@ -37,7 +37,7 @@ export function CheckChip({
     <Label
       htmlFor={id}
       className={cn(
-        "flex min-h-10 shrink-0 items-center gap-2 rounded-lg border px-3",
+        "flex min-h-10 shrink-0 items-center gap-2 rounded-full border px-4",
         "text-sm font-normal whitespace-nowrap text-foreground transition-colors",
         "hover:bg-accent-hover",
         checked ? "border-primary" : "border-border"

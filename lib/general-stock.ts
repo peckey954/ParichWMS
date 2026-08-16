@@ -1327,6 +1327,11 @@ export const STOCK_ZONES = [
   ...new Set(PRODUCTS.flatMap((p) => p.lots.map((l) => l.zone))),
 ].sort();
 
+/** เลขล็อตทั้งหมด ไม่ซ้ำ — ตัวเลือกจะโผล่เฉพาะตอนเรียงแบบ FIFO */
+export const STOCK_LOT_CODES = [
+  ...new Set(PRODUCTS.flatMap((p) => p.lots.map((l) => l.code))),
+].sort();
+
 /** ชื่อสินค้าทั้งหมด ไม่ซ้ำ สำหรับตัวเลือกในตัวกรอง */
 export const STOCK_PRODUCT_NAMES = [
   ...new Set(PRODUCTS.map((p) => p.name)),

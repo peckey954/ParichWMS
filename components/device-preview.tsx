@@ -124,20 +124,23 @@ export function DevicePreviewProvider({
  * ต้องรู้ก่อนว่าใครเป็นตัวเลื่อน — ตอนจำลองอุปกรณ์คือกรอบ ตอนเต็มจอคือหน้าต่าง
  * ไม่งั้นดักฟังผิดตัวแล้วจะไม่เกิดอะไรขึ้นเลยในโหมดจำลอง
  *
- * แถบค้นหา+ชิปล็อกอยู่บนตลอด (sticky เฉย ๆ) ไม่ซ่อนตอนเลื่อนแล้ว
- * เคยลองซ่อนตอนเลื่อนลงมาก่อน แต่บนมือถือจริงมันชนกับแถบที่อยู่บนสุดของเบราว์เซอร์เอง
- * (ที่โผล่/หุบตามการเลื่อนเหมือนกัน) ทำให้ดูเหมือนจอกระตุกเด้งกลับ
- * เหลือไว้แค่ showTop = เลื่อนลงมาไกลแล้ว ควรมีปุ่มกลับขึ้นบนสุด
+ * หลักที่ควรเป็น (แบบเดียวกับแถบที่อยู่บนสุดของเบราว์เซอร์เอง / แอปทั่วไป):
+ * เลื่อนลงอ่าน (นิ้วสไลด์ขึ้น) = ซ่อนแถบให้เห็นเนื้อหาเต็ม ๆ
+ * เลื่อนขึ้นหา (นิ้วสไลด์ลง) = เอาแถบกลับมาทันที ไม่ต้องเลื่อนกลับสุดก่อน
+ *
+ * hidden  = กำลังเลื่อนลงเกิน hideAfter แล้ว ใช้ซ่อนแถบเครื่องมือ
+ * showTop = เลื่อนลงมาไกลแล้ว ควรมีปุ่มกลับขึ้นบนสุด
  */
-export function useScrollState({ topAfter = 700 } = {}) {
+export function useScrollState({ hideAfter = 160, topAfter = 700 } = {}) {
   const { framed, frameRef } = useDevicePreview();
-  const [showTop, setShowTop] = React.useState(false);
+  const [state, setState] = React.useState({ hidden: false, showTop: false });
 
   React.useEffect(() => {
     const el = framed ? frameRef.current : null;
     const target: HTMLElement | Window = el ?? window;
     const read = () => (el ? el.scrollTop : window.scrollY);
 
+    let last = read();
     let ticking = false;
 
     const onScroll = () => {
@@ -145,20 +148,38 @@ export function useScrollState({ topAfter = 700 } = {}) {
       ticking = true;
       requestAnimationFrame(() => {
         ticking = false;
-        setShowTop(read() > topAfter);
+        const y = read();
+        const dy = y - last;
+        // ขยับน้อยกว่านี้ถือว่าเป็นการสั่น ไม่นับเป็นการเปลี่ยนทิศ
+        const moved = Math.abs(dy) > 6;
+        if (moved) last = y;
+
+        setState((prev) => {
+          const hidden = moved ? dy > 0 && y > hideAfter : prev.hidden;
+          const showTop = y > topAfter;
+          return prev.hidden === hidden && prev.showTop === showTop
+            ? prev
+            : { hidden, showTop };
+        });
       });
     };
 
     target.addEventListener("scroll", onScroll, { passive: true });
     return () => target.removeEventListener("scroll", onScroll);
-  }, [framed, frameRef, topAfter]);
+  }, [framed, frameRef, hideAfter, topAfter]);
 
   const scrollToTop = React.useCallback(() => {
     const el = framed ? frameRef.current : null;
     (el ?? window).scrollTo({ top: 0, behavior: "smooth" });
   }, [framed, frameRef]);
 
-  /** เลื่อนให้หัวของ el มาอยู่ใต้ขอบบน โดยเว้นระยะ offset ให้แถบที่ติดบน */
+  /**
+   * เลื่อนให้หัวของ el มาอยู่ใต้ขอบบน โดยเว้นระยะ offset ให้แถบที่ติดบน
+   *
+   * ไม่ใช้ smooth — สลับแท็บ/ชิปมักกระโดดข้ามระยะไกล (เผลอเลื่อนลึกไว้ก่อนสลับ)
+   * เลื่อนแบบ smooth จะเห็นเนื้อหาเดิมไหลผ่านตาไปเรื่อย ๆ เหมือนลากมาตั้งแต่บนสุด
+   * เปลี่ยนเป็นกระโดดตรงให้เห็นการ์ดแรกของชุดใหม่ทันที
+   */
   const scrollIntoTop = React.useCallback(
     (el: HTMLElement, offset = 0) => {
       const frame = framed ? frameRef.current : null;
@@ -168,16 +189,16 @@ export function useScrollState({ topAfter = 700 } = {}) {
           frame.getBoundingClientRect().top +
           frame.scrollTop -
           offset;
-        frame.scrollTo({ top: Math.max(0, top), behavior: "smooth" });
+        frame.scrollTo({ top: Math.max(0, top) });
       } else {
         const top = el.getBoundingClientRect().top + window.scrollY - offset;
-        window.scrollTo({ top: Math.max(0, top), behavior: "smooth" });
+        window.scrollTo({ top: Math.max(0, top) });
       }
     },
     [framed, frameRef]
   );
 
-  return { showTop, scrollToTop, scrollIntoTop };
+  return { ...state, scrollToTop, scrollIntoTop };
 }
 
 /** ปุ่มไอคอนสามอันบนหัวเรื่อง */

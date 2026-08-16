@@ -432,6 +432,7 @@ export function filterCwip(
     lowOnly: boolean;
     kinds: string[];
     zones: string[];
+    lots: string[];
     products: string[];
     sort: CwipSort;
     dir: SortDir;
@@ -444,11 +445,16 @@ export function filterCwip(
     .filter(
       (p) => opts.products.length === 0 || opts.products.includes(p.name)
     )
-    .map((p) =>
-      opts.zones.length === 0
-        ? p
-        : { ...p, lots: p.lots.filter((l) => opts.zones.includes(l.zone)) }
-    )
+    .map((p) => {
+      // โซนกับเลขล็อตกรองที่ระดับล็อต ยอดรวมจะได้ตรงกับสิ่งที่เห็นในรายการ
+      if (opts.zones.length === 0 && opts.lots.length === 0) return p;
+      const lots = p.lots.filter(
+        (l) =>
+          (opts.zones.length === 0 || opts.zones.includes(l.zone)) &&
+          (opts.lots.length === 0 || opts.lots.includes(l.code))
+      );
+      return { ...p, lots };
+    })
     .filter((p) => p.lots.length > 0);
 
   // ทิศทางกลับด้านด้วยการคูณ -1 ที่ผลเปรียบเทียบ ไม่ต้องเขียนเงื่อนไขซ้ำสองชุด
@@ -469,6 +475,11 @@ export function filterCwip(
   }
   return sorted;
 }
+
+/** เลขล็อตใน CWIP — ตัวเลือกจะโผล่เฉพาะตอนเรียงแบบ FIFO */
+export const CWIP_LOT_CODES = [
+  ...new Set(CWIP_PRODUCTS.flatMap((p) => p.lots.map((l) => l.code))),
+].sort();
 
 /** ชื่อสินค้าใน CWIP สำหรับตัวเลือกในตัวกรอง — ดึงจากข้อมูลจริง */
 export const CWIP_PRODUCT_NAMES = CWIP_PRODUCTS.map((p) => p.name).sort((a, b) =>

@@ -8,6 +8,7 @@ import { MultiSelect } from "@peckey954/ui/components/ui/multi-select";
 import { CheckChip } from "@/components/check-chip";
 import { SortControl, type SortOption } from "@/components/sort-control";
 import {
+  STOCK_LOT_CODES,
   STOCK_PRODUCT_NAMES,
   STOCK_ZONES,
   type SortDir,
@@ -28,6 +29,8 @@ export type StockView = {
   lowOnly: boolean;
   /** ว่าง = เอาทั้งหมด ไม่ใช่ไม่เอาอะไรเลย */
   zones: string[];
+  /** เลขล็อต — เลือกได้ตอนเรียงแบบ FIFO ซึ่งรายการเป็นล็อตอยู่แล้ว */
+  lots: string[];
   products: string[];
   sort: StockSort;
   dir: SortDir;
@@ -39,6 +42,7 @@ export const STOCK_VIEW_DEFAULT: StockView = {
   showLots: true,
   lowOnly: false,
   zones: [],
+  lots: [],
   products: [],
   sort: "product",
   dir: "asc",
@@ -52,6 +56,7 @@ export const isStockDefault = (v: StockView) =>
   v.sort === STOCK_VIEW_DEFAULT.sort &&
   v.dir === STOCK_VIEW_DEFAULT.dir &&
   v.zones.length === 0 &&
+  v.lots.length === 0 &&
   v.products.length === 0;
 
 
@@ -127,18 +132,39 @@ export function StockFilter({
           </div>
         </Section>
 
-        <Section title="โซน" htmlFor="stock-zones">
-          <MultiSelect
-            id="stock-zones"
-            options={asOptions(STOCK_ZONES)}
-            value={draft.zones}
-            onValueChange={(zones) => set({ zones })}
-            placeholder="เลือกโซน"
-            searchPlaceholder="ค้นหาโซน"
-            maxChips={2}
-            className="min-h-10 bg-card"
-          />
-        </Section>
+        {/* โผล่ตามโหมดที่เรียงอยู่ — เรียงตามโซนก็เลือกโซนได้ เรียง FIFO ก็เลือกล็อตได้
+            เรียงตามสินค้าแล้วไม่ต้องมีสองอันนี้ เพราะรายการยังจัดกลุ่มตามสินค้าอยู่ */}
+        {draft.sort === "zone" && (
+          <Section title="โซน" htmlFor="stock-zones">
+            <MultiSelect
+              id="stock-zones"
+              options={asOptions(STOCK_ZONES)}
+              value={draft.zones}
+              onValueChange={(zones) => set({ zones })}
+              placeholder="เลือกโซน"
+              searchPlaceholder="ค้นหาโซน"
+              maxChips={2}
+              className="min-h-10 bg-card"
+            />
+          </Section>
+        )}
+
+        {/* ชื่อต่างจากชิป "Lot สินค้า" ข้างบน อันนั้นคือเปิด/ปิดการแสดงล็อตในรายการ
+            อันนี้คือเลือกว่าจะเอาล็อตไหนบ้าง สองอย่างคนละเรื่องกัน */}
+        {draft.sort === "fifo" && (
+          <Section title="เลขล็อต" htmlFor="stock-lots-pick">
+            <MultiSelect
+              id="stock-lots-pick"
+              options={asOptions(STOCK_LOT_CODES)}
+              value={draft.lots}
+              onValueChange={(lots) => set({ lots })}
+              placeholder="เลือก Lot"
+              searchPlaceholder="ค้นหา Lot"
+              maxChips={2}
+              className="min-h-10 bg-card"
+            />
+          </Section>
+        )}
 
         <Section title="สินค้า" htmlFor="stock-products">
           <MultiSelect

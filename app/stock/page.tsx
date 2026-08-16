@@ -136,8 +136,12 @@ function GeneralStockView() {
           (p) => view.products.length === 0 || view.products.includes(p.name)
         )
         .map((p) => {
-          if (view.zones.length === 0) return p;
-          const lots = p.lots.filter((l) => view.zones.includes(l.zone));
+          if (view.zones.length === 0 && view.lots.length === 0) return p;
+          const lots = p.lots.filter(
+            (l) =>
+              (view.zones.length === 0 || view.zones.includes(l.zone)) &&
+              (view.lots.length === 0 || view.lots.includes(l.code))
+          );
           return { ...p, lots };
         })
         .filter((p) => p.lots.length > 0);
@@ -188,20 +192,44 @@ function GeneralStockView() {
   const listRef = React.useRef<HTMLDivElement>(null);
 
   /**
-   * เปลี่ยนประเภทแล้วต้องได้เห็นสินค้าชิ้นแรกทันที
-   * ถ้าปล่อยไว้เฉย ๆ คนที่เลื่อนลงมาลึกแล้วกดสลับประเภท จะเจอกลางรายการใหม่
-   * ซึ่งไม่มีความหมายอะไรเลย
+   * เปลี่ยนประเภท/แท็บ/มุมมองแล้วต้องได้เห็นรายการแรกทันที
+   * ถ้าปล่อยไว้เฉย ๆ คนที่เลื่อนลงมาลึกแล้วกดสลับ จะเจอกลางรายการใหม่ที่ไม่เกี่ยวกันเลย
+   * (หรือพื้นที่ว่าง ถ้ารายการใหม่สั้นกว่าตำแหน่งที่เลื่อนอยู่)
    *
-   * เลื่อนแค่พอให้หัวรายการมาอยู่ใต้แถบเครื่องมือ ไม่ได้เด้งขึ้นบนสุด
+   * เลื่อนแค่พอให้หัวรายการมาอยู่ใต้แถบเครื่องมือ ไม่ได้เด้งขึ้นบนสุดทั้งหน้า
    * แถบเครื่องมือจึงยังติดขอบอยู่ที่เดิม ไม่กระโดด
    */
-  const changeCat = (next: CategoryId | "history") => {
-    setCat(next);
+  const scrollListToTop = React.useCallback(() => {
     const list = listRef.current;
     if (!list) return;
     const bar = stickyRef.current?.offsetHeight ?? 0;
     scrollIntoTop(list, bar + (framed ? 0 : 56));
+  }, [framed, scrollIntoTop]);
+
+  const changeCat = (next: CategoryId | "history") => {
+    setCat(next);
+    scrollListToTop();
   };
+
+  const changeIssueKind = (next: IssueKind) => {
+    setIssueKind(next);
+    scrollListToTop();
+  };
+
+  /**
+   * สลับแท็บ (สต็อก / รอรับเข้า / รอจ่าย-คืน) เปลี่ยนก้อน DOM ทั้งก้อน
+   * listRef ยังไม่ได้ชี้ไปที่รายการของแท็บใหม่จนกว่า React จะ render เสร็จ
+   * จึงเลื่อนใน effect หลัง render แทนที่จะเลื่อนทันทีตอนกดแบบ changeCat/changeIssueKind
+   * ข้ามรอบแรกไว้ ไม่งั้นหน้าเด้งเองตอนเพิ่งโหลด
+   */
+  const mountedRef = React.useRef(false);
+  React.useEffect(() => {
+    if (!mountedRef.current) {
+      mountedRef.current = true;
+      return;
+    }
+    scrollListToTop();
+  }, [tab, scrollListToTop]);
 
   React.useEffect(() => {
     const row = chipRowRef.current;
@@ -550,7 +578,7 @@ function GeneralStockView() {
                 </div>
               </StickyToolbar>
 
-              <div className="mt-4">
+              <div ref={listRef} className="mt-4">
                 <InboundList docs={inboundVisible} />
               </div>
             </>
@@ -577,7 +605,7 @@ function GeneralStockView() {
                         type="button"
                         role="tab"
                         aria-selected={on}
-                        onClick={() => setIssueKind(k.id)}
+                        onClick={() => changeIssueKind(k.id)}
                         className={cn(
                           "shrink-0 rounded-full border px-3 py-1 text-sm whitespace-nowrap transition-colors",
                           on
@@ -613,7 +641,7 @@ function GeneralStockView() {
                 </div>
               </StickyToolbar>
 
-              <div className="mt-4">
+              <div ref={listRef} className="mt-4">
                 <IssueList docs={issueVisible} />
               </div>
             </>
