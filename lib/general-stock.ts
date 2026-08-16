@@ -1246,3 +1246,91 @@ export const countDiff = (lot: Lot, counted: number) =>
 
 /** จำนวนชิ้นทั้งหมดของล็อต ใช้เป็นเพดานของช่องกรอก */
 export const lotPieces = (lot: Lot) => lot.pieces ?? Math.round(lot.qty);
+
+// ---------------------------------------------------------------
+// ตัวกรองและการจัดกลุ่มของหน้าสต็อกทั่วไป
+//
+// การเรียงที่นี่ไม่ได้เปลี่ยนแค่ลำดับ แต่เปลี่ยน "หน่วยของรายการ" ไปเลย
+//   สินค้า — กลุ่มตามสินค้า ล็อตอยู่ข้างใน ใช้ตอนถามว่าของชิ้นนี้เหลือเท่าไร
+//   โซน   — กลุ่มตามโซน ใช้ตอนยืนอยู่หน้าชั้นแล้วถามว่าตรงนี้มีอะไรบ้าง
+//   FIFO  — ไม่จัดกลุ่ม ไล่ล็อตเรียงตามอายุ ใช้ตอนเคลียร์ของเก่า
+//
+// สามคำถามนี้คนละคำถามกัน จึงต้องเป็นคนละหน้าตา ไม่ใช่ตารางเดิมสลับลำดับ
+// ---------------------------------------------------------------
+
+export type StockSort = "product" | "zone" | "fifo";
+export type SortDir = "asc" | "desc";
+
+/** ล็อตที่พกข้อมูลสินค้าติดมาด้วย — ใช้ตอนที่รายการไม่ได้จัดกลุ่มตามสินค้า */
+export type FlatLot = {
+  lot: Lot;
+  product: Product;
+};
+
+export function flatLots(products: Product[]): FlatLot[] {
+  return products.flatMap((p) => p.lots.map((lot) => ({ lot, product: p })));
+}
+
+/** กลุ่มของรายการ — หัวกลุ่มเป็นสินค้าหรือโซนก็ได้ แล้วแต่โหมดที่เลือก */
+export type LotGroup = {
+  id: string;
+  /** รหัสโซน แสดงเป็นป้ายหน้าหัวกลุ่ม — ไม่มี = หัวกลุ่มเป็นสินค้า */
+  zone?: string;
+  title: string;
+  rows: FlatLot[];
+};
+
+export function groupByZone(products: Product[], dir: SortDir): LotGroup[] {
+  const map = new Map<string, FlatLot[]>();
+  for (const row of flatLots(products)) {
+    const list = map.get(row.lot.zone);
+    if (list) list.push(row);
+    else map.set(row.lot.zone, [row]);
+  }
+
+  const zones = [...map.keys()].sort((a, b) =>
+    dir === "asc" ? a.localeCompare(b) : b.localeCompare(a)
+  );
+
+  return zones.map((zone) => ({
+    id: zone,
+    zone,
+    title: `โซน ${zone}`,
+    rows: map.get(zone)!,
+  }));
+}
+
+/**
+ * เรียงล็อตตามอายุ ไม่จัดกลุ่ม
+ *
+ * เก่าสุดขึ้นก่อนคือ FIFO ของจริง — ของที่ค้างนานที่สุดต้องถูกใช้ก่อน
+ * สลับทิศแล้วมันคือ LIFO ไม่ใช่ FIFO อีกต่อไป ป้ายบนปุ่มจึงต้องเปลี่ยนตาม
+ */
+export function sortFifo(products: Product[], dir: SortDir): FlatLot[] {
+  return flatLots(products).sort((a, b) =>
+    dir === "asc"
+      ? b.lot.ageDays - a.lot.ageDays
+      : a.lot.ageDays - b.lot.ageDays
+  );
+}
+
+export function sortProducts(products: Product[], dir: SortDir): Product[] {
+  return [...products].sort((a, b) =>
+    dir === "asc"
+      ? a.name.localeCompare(b.name, "th")
+      : b.name.localeCompare(a.name, "th")
+  );
+}
+
+/** ทุกโซนที่มีของอยู่จริง สำหรับตัวเลือกในตัวกรอง */
+export const STOCK_ZONES = [
+  ...new Set(PRODUCTS.flatMap((p) => p.lots.map((l) => l.zone))),
+].sort();
+
+/** ชื่อสินค้าทั้งหมด ไม่ซ้ำ สำหรับตัวเลือกในตัวกรอง */
+export const STOCK_PRODUCT_NAMES = [
+  ...new Set(PRODUCTS.map((p) => p.name)),
+].sort((a, b) => a.localeCompare(b, "th"));
+
+/** สภาพล็อตที่มีจริง สำหรับตัวเลือกในตัวกรอง */
+export const STOCK_CONDITIONS = CONDITION_LABEL;

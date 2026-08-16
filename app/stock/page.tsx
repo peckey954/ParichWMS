@@ -4,13 +4,9 @@ import * as React from "react";
 import {
   DownloadIcon,
   ListFilterIcon,
-  ListIcon,
-  RotateCcwIcon,
   SearchIcon,
-  SlidersHorizontalIcon,
   SquareCheckBigIcon,
   SquareIcon,
-  TagIcon,
 } from "lucide-react";
 import { Badge } from "@peckey954/ui/components/ui/badge";
 import {
@@ -22,27 +18,20 @@ import {
   BreadcrumbSeparator,
 } from "@peckey954/ui/components/ui/breadcrumb";
 import { Button } from "@peckey954/ui/components/ui/button";
-import { Checkbox } from "@peckey954/ui/components/ui/checkbox";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@peckey954/ui/components/ui/dialog";
 import {
   InputGroup,
   InputGroupAddon,
   InputGroupInput,
 } from "@peckey954/ui/components/ui/input-group";
-import { Label } from "@peckey954/ui/components/ui/label";
-import { Separator } from "@peckey954/ui/components/ui/separator";
-import {
-  Popover,
-  PopoverContent,
-  PopoverDescription,
-  PopoverHeader,
-  PopoverTitle,
-  PopoverTrigger,
-} from "@peckey954/ui/components/ui/popover";
 import { Tabs, TabsList, TabsTrigger } from "@peckey954/ui/components/ui/tabs";
-import {
-  ToggleGroup,
-  ToggleGroupItem,
-} from "@peckey954/ui/components/ui/toggle-group";
 import { cn } from "@peckey954/ui/lib/utils";
 import { toast } from "sonner";
 import { useDevicePreview, useScrollState } from "@/components/device-preview";
@@ -52,6 +41,13 @@ import { StockLogProvider, useStockLog } from "@/components/stock/stock-log";
 import { InboundList } from "@/components/stock/inbound-list";
 import { IssueList } from "@/components/stock/issue-list";
 import { ProductCard } from "@/components/stock/stock-parts";
+import { FifoList, ZoneGroups } from "@/components/stock/lot-list";
+import {
+  STOCK_VIEW_DEFAULT,
+  StockFilter,
+  stockActiveCount,
+  type StockView,
+} from "@/components/stock/stock-filter";
 import {
   CATEGORIES,
   CATEGORY_LABEL,
@@ -59,11 +55,14 @@ import {
   ISSUE_DOCS,
   PRODUCTS,
   countByCategory,
+  groupByZone,
   isReturn,
   matchesHistory,
   matchesInbound,
   matchesIssue,
   matchesQuery,
+  sortFifo,
+  sortProducts,
   type CategoryId,
 } from "@/lib/general-stock";
 
@@ -104,42 +103,54 @@ function GeneralStockView() {
   // เพราะผู้ใช้คิดว่ามันคือ "อีกอย่างที่เลือกดูได้" เหมือนกัน
   const [cat, setCat] = React.useState<CategoryId | "history">("sack");
   const isHistory = cat === "history";
-  const [lowOnly, setLowOnly] = React.useState(false);
-  const [sort, setSort] = React.useState("product");
   const [query, setQuery] = React.useState("");
-  const [showChips, setShowChips] = React.useState(true);
-  const [showActions, setShowActions] = React.useState(true);
-  // เปิด/ปิดรายการล็อตพร้อมกันทั้งหน้า อยู่ในตัวกรองอย่างเดียว
-  // ไม่มีปุ่มแยกรายใบ เพราะรายการยาวมาก กดทีละใบไม่ไหว
-  const [showLots, setShowLots] = React.useState(true);
+  // ทุกอย่างที่ตัวกรองเป็นเจ้าของอยู่ในก้อนเดียว แก้ในกล่องแล้วกดตกลงทีเดียวจบ
+  const [view, setView] = React.useState<StockView>(STOCK_VIEW_DEFAULT);
+  const [filterOpen, setFilterOpen] = React.useState(false);
   const [tab, setTab] = React.useState<"stock" | "inbound" | "issue">("stock");
   const [inboundQuery, setInboundQuery] = React.useState("");
   const [issueQuery, setIssueQuery] = React.useState("");
   const [issueKind, setIssueKind] = React.useState<IssueKind>("all");
 
-  // ค่าที่ popover เป็นเจ้าของ — ล้างได้ทีเดียวจบ
-  // ไม่ล้างประเภทสินค้ากับคำค้น เพราะสองอย่างนั้นเป็นการนำทาง ไม่ใช่ตัวกรอง
-  const isDefault =
-    !lowOnly && sort === "product" && showChips && showActions && showLots;
-  const resetFilters = () => {
-    setLowOnly(false);
-    setSort("product");
-    setShowChips(true);
-    setShowActions(true);
-    setShowLots(true);
-  };
+  const activeCount = stockActiveCount(view);
+  const lowOnly = view.lowOnly;
 
   // จำนวนบนชิปเป็นยอดจริงของแต่ละประเภท ไม่เปลี่ยนตามคำค้น
   // เพราะเป็นป้ายบอกทาง ไม่ใช่ตัวนับผลลัพธ์
   const counts = countByCategory(PRODUCTS);
 
-  // ค้นหาทำงานอยู่ในประเภทที่เปิดอยู่เท่านั้น
+  /**
+   * ค้นหาทำงานอยู่ในประเภทที่เปิดอยู่เท่านั้น
+   *
+   * โซนกับสภาพล็อตกรองที่ระดับล็อต ไม่ใช่ระดับสินค้า
+   * เลือกโซน A-1 แล้วต้องเห็นเฉพาะล็อตที่อยู่ A-1 ไม่ใช่เห็นทุกล็อตของสินค้านั้น
+   * ไม่งั้นยอดรวมที่โชว์จะไม่ตรงกับสิ่งที่เห็นในรายการ
+   */
   const visible = isHistory
     ? []
     : PRODUCTS.filter(
         (p) =>
           p.category === cat && matchesQuery(p, query) && (!lowOnly || p.low)
-      );
+      )
+        .filter(
+          (p) => view.products.length === 0 || view.products.includes(p.name)
+        )
+        .map((p) => {
+          const lots = p.lots.filter(
+            (l) =>
+              (view.zones.length === 0 || view.zones.includes(l.zone)) &&
+              (view.conditions.length === 0 ||
+                (l.condition !== undefined &&
+                  view.conditions.includes(l.condition)))
+          );
+          return lots.length === p.lots.length ? p : { ...p, lots };
+        })
+        .filter((p) => p.lots.length > 0);
+
+  // สามโหมดนี้เปลี่ยนหน่วยของรายการ ไม่ได้เปลี่ยนแค่ลำดับ
+  const byProduct = sortProducts(visible, view.dir);
+  const zoneGroups = groupByZone(visible, view.dir);
+  const fifoRows = sortFifo(visible, view.dir);
 
   const historyVisible = logRows.filter((r) => matchesHistory(r, query));
 
@@ -322,7 +333,9 @@ function GeneralStockView() {
                   <button
                     type="button"
                     role="checkbox"
-                    onClick={() => setLowOnly((v) => !v)}
+                    onClick={() =>
+                      setView((v) => ({ ...v, lowOnly: !v.lowOnly }))
+                    }
                     aria-checked={lowOnly}
                     className={cn(
                       "flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1 text-sm whitespace-nowrap transition-colors",
@@ -363,10 +376,11 @@ function GeneralStockView() {
               />
             </InputGroup>
 
-            {/* ตัวเลือกการแสดงผลเก็บไว้ในนี้ ไม่ต้องกินแถวข้างนอก
-                มีจุดบอกเมื่อมีการซ่อนอะไรอยู่ จะได้ไม่ลืมว่าเคยปิดไว้ */}
-            <Popover>
-              <PopoverTrigger asChild>
+            {/* ตัวกรองเป็นกล่องกลางจอ ชุดเดียวกับหน้าสต็อก CWIP
+                แก้ในกล่องก่อน กดตกลงถึงมีผล กากบาทกับ Esc คือยกเลิก
+                เลขบนปุ่มบอกว่ากรองอยู่กี่เงื่อนไข ไม่ใช่แค่ว่ามีหรือไม่มี */}
+            <Dialog open={filterOpen} onOpenChange={setFilterOpen}>
+              <DialogTrigger asChild>
                 <Button
                   variant="outline-primary"
                   size="icon"
@@ -374,131 +388,29 @@ function GeneralStockView() {
                   className="relative shrink-0"
                 >
                   <ListFilterIcon />
-                  {!isDefault && (
-                    <span className="absolute top-1 right-1 size-2 rounded-full bg-primary" />
+                  {activeCount > 0 && (
+                    <span className="absolute -top-1.5 -right-1.5 flex size-4.5 items-center justify-center rounded-full bg-primary text-[10px] font-semibold text-primary-foreground tabular-nums">
+                      {activeCount}
+                    </span>
                   )}
                 </Button>
-              </PopoverTrigger>
-              <PopoverContent align="end" className="w-72">
-                <PopoverHeader>
-                  <PopoverTitle>ตัวกรองและการแสดงผล</PopoverTitle>
-                  <PopoverDescription>
-                    เก็บของที่ตั้งครั้งเดียวจบไว้ในนี้ หน้าหลักจะได้ไม่รก
-                  </PopoverDescription>
-                </PopoverHeader>
-
-                <div className="mt-4 space-y-2">
-                  <Label className="text-sm">เรียงตาม</Label>
-                  <ToggleGroup
-                    type="single"
-                    variant="outline"
-                    size="sm"
-                    value={sort}
-                    onValueChange={(v) => v && setSort(v)}
-                    className="w-full"
-                  >
-                    <ToggleGroupItem value="product" className="flex-1">
-                      สินค้า
-                    </ToggleGroupItem>
-                    <ToggleGroupItem value="zone" className="flex-1">
-                      โซน
-                    </ToggleGroupItem>
-                    <ToggleGroupItem value="fifo" className="flex-1">
-                      FIFO
-                    </ToggleGroupItem>
-                  </ToggleGroup>
-                </div>
-
-                <Separator className="my-4" />
-
-                <div className="space-y-3">
-                  <Label className="text-sm">แสดงในรายการ</Label>
-
-                  {/* ผูกค่าเดียวกับชิปสต็อกต่ำด้านบน กดที่ไหนอีกที่ก็ขยับตาม */}
-                  <Label
-                    htmlFor="filter-low"
-                    className={cn(
-                      "flex items-center gap-3 font-normal",
-                      isHistory && "opacity-50"
-                    )}
-                  >
-                    {/* ประวัติเป็นรายการเหตุการณ์ ไม่มียอดคงเหลือให้วัดว่าต่ำหรือไม่
-                        จึงปิดไว้แทนที่จะเอาออก คนจะได้เห็นว่ามีตัวเลือกนี้อยู่ */}
-                    <Checkbox
-                      id="filter-low"
-                      checked={lowOnly && !isHistory}
-                      disabled={isHistory}
-                      onCheckedChange={(v) => setLowOnly(v === true)}
-                    />
-                    เฉพาะสต็อกต่ำ
-                  </Label>
-
-                  <Label
-                    htmlFor="show-chips"
-                    className="flex items-center gap-3 font-normal"
-                  >
-                    <Checkbox
-                      id="show-chips"
-                      checked={showChips}
-                      onCheckedChange={(v) => setShowChips(v === true)}
-                    />
-                    <span className="flex items-center gap-2">
-                      <TagIcon className="size-4" />
-                      ป้ายในรายการ
-                    </span>
-                  </Label>
-
-                  <Label
-                    htmlFor="show-actions"
-                    className="flex items-center gap-3 font-normal"
-                  >
-                    <Checkbox
-                      id="show-actions"
-                      checked={showActions}
-                      onCheckedChange={(v) => setShowActions(v === true)}
-                    />
-                    <span className="flex items-center gap-2">
-                      <SlidersHorizontalIcon className="size-4" />
-                      ปุ่มย้าย / ปรับปรุง
-                    </span>
-                  </Label>
-
-                  {/* หุบ/กางรายการล็อตทั้งหน้าจากที่นี่ที่เดียว
-                      ปิดแล้วเหลือแต่หัวสินค้า ไล่ดูภาพรวมได้เร็วขึ้นมาก */}
-                  <Label
-                    htmlFor="show-lots"
-                    className={cn(
-                      "flex items-center gap-3 font-normal",
-                      isHistory && "opacity-50"
-                    )}
-                  >
-                    <Checkbox
-                      id="show-lots"
-                      checked={showLots && !isHistory}
-                      disabled={isHistory}
-                      onCheckedChange={(v) => setShowLots(v === true)}
-                    />
-                    <span className="flex items-center gap-2">
-                      <ListIcon className="size-4" />
-                      รายการล็อตในสินค้า
-                    </span>
-                  </Label>
-                </div>
-
-                {/* ปิดไว้ตอนทุกอย่างเป็นค่าเริ่มต้นอยู่แล้ว จะได้รู้ว่ามีอะไรให้ล้างไหม */}
-                <Separator className="my-4" />
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="w-full"
-                  disabled={isDefault}
-                  onClick={resetFilters}
-                >
-                  <RotateCcwIcon />
-                  ล้างค่า
-                </Button>
-              </PopoverContent>
-            </Popover>
+              </DialogTrigger>
+              <DialogContent className="flex max-h-[85svh] flex-col gap-0 overflow-hidden! p-0 sm:max-w-md">
+                <DialogHeader className="px-4 pt-4 text-left">
+                  <DialogTitle>ตัวกรองและการแสดงผล</DialogTitle>
+                  <DialogDescription>
+                    เลือกได้หลายอย่างพร้อมกัน ไม่เลือกเลยคือดูทั้งหมด
+                  </DialogDescription>
+                </DialogHeader>
+                <StockFilter
+                  view={view}
+                  onApply={(next) => {
+                    setView(next);
+                    setFilterOpen(false);
+                  }}
+                />
+              </DialogContent>
+            </Dialog>
 
             {/* ส่งออกได้เฉพาะรายการของแท็บสต็อก จึงอยู่ในแถบของแท็บนี้
                 ไม่ใช่ข้างชื่อหน้า — ไม่งั้นหัวเรื่องจะกระตุกตอนสลับแท็บ
@@ -527,16 +439,37 @@ function GeneralStockView() {
           <div ref={listRef} className="mt-4 space-y-4">
             {isHistory && <HistoryList rows={historyVisible} />}
 
+            {/* หน่วยของรายการเปลี่ยนตามโหมดที่เลือก ไม่ใช่ตารางเดิมสลับลำดับ
+                สินค้า = การ์ดสินค้า ล็อตอยู่ข้างใน
+                โซน   = กลุ่มตามโซน หัวกลุ่มบอกว่าโซนนี้มีอะไรบ้าง
+                FIFO  = ไล่ล็อตรวดเดียว ไม่มีหัวกลุ่ม */}
             {!isHistory &&
-              visible.map((p) => (
+              view.sort === "product" &&
+              byProduct.map((p) => (
                 <ProductCard
                   key={p.id}
                   product={p}
-                  showLots={showLots}
-                  showChips={showChips}
-                  showActions={showActions}
+                  showLots={view.showLots}
+                  showChips={view.showChips}
+                  showActions={view.showActions}
                 />
               ))}
+
+            {!isHistory && view.sort === "zone" && (
+              <ZoneGroups
+                groups={zoneGroups}
+                showChips={view.showChips}
+                showActions={view.showActions}
+              />
+            )}
+
+            {!isHistory && view.sort === "fifo" && fifoRows.length > 0 && (
+              <FifoList
+                rows={fifoRows}
+                showChips={view.showChips}
+                showActions={view.showActions}
+              />
+            )}
 
             {!isHistory && visible.length === 0 && (
               <div className="rounded-xl border border-dashed border-border px-6 py-14 text-center">

@@ -133,35 +133,41 @@ export default function ProductionOrderPage() {
              งานจริงของหน้านี้อยู่ข้างล่าง พับเก็บแล้วจอแคบจะถึงงานเร็วขึ้นมาก */}
         <Collapsible defaultOpen className="mt-5 rounded-xl border border-border bg-card">
           <CollapsibleTrigger asChild>
+            {/* items-start กันปุ่มหุบไหลตามเนื้อหาที่ห่อบรรทัด — ปักไว้ชิดขวาบนเสมอ
+                เนื้อหาซ้ายอยู่ในคอลัมน์ของตัวเอง ห่อกี่บรรทัดก็ไม่ดันปุ่มขวับ */}
             <button
               type="button"
-              className="group flex w-full flex-wrap items-center justify-between gap-x-3 gap-y-2 p-4 text-left"
+              className="group flex w-full items-start justify-between gap-3 p-4 text-left"
             >
-              <span className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
-                <span className="font-medium">{order.formula}</span>
-                <span className="hidden text-border @2xl:inline" aria-hidden>
-                  |
+              <span className="flex min-w-0 flex-1 flex-col gap-y-1">
+                <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                  <span className="font-medium">{order.formula}</span>
+                  <span className="hidden text-border @2xl:inline" aria-hidden>
+                    |
+                  </span>
+                  <span className="text-sm">{order.packing}</span>
+                  <span className="text-border" aria-hidden>
+                    |
+                  </span>
+                  <span className="text-sm">{order.bagSize}</span>
                 </span>
-                <span className="text-sm">{order.packing}</span>
-                <span className="text-border" aria-hidden>
-                  |
+                <span className="flex flex-wrap items-center gap-3 text-sm">
+                  <span className="font-medium">{order.line}</span>
+                  <span>
+                    <span className="text-muted-foreground">รอบ: </span>
+                    {order.round}
+                  </span>
                 </span>
-                <span className="text-sm">{order.bagSize}</span>
               </span>
-              <span className="flex items-center gap-3 text-sm">
-                <span className="font-medium">{order.line}</span>
-                <span>
-                  <span className="text-muted-foreground">รอบ: </span>
-                  {order.round}
-                </span>
-                <ChevronDownIcon className="size-5 shrink-0 text-muted-foreground transition-transform group-data-[state=open]:rotate-180" />
-              </span>
+              <ChevronDownIcon className="mt-0.5 size-5 shrink-0 text-muted-foreground transition-transform group-data-[state=open]:rotate-180" />
             </button>
           </CollapsibleTrigger>
 
           <CollapsibleContent className="space-y-4 px-4 pb-4">
-            {/* พื้นส้มอ่อน — ยอดสั่งผลิตคือตัวเลขอ้างอิงที่ต้องเทียบตลอดทั้งหน้า */}
-            <div className="grid gap-4 rounded-lg bg-brand p-4 @2xl:grid-cols-2">
+            {/* พื้นส้มอ่อน — ยอดสั่งผลิตคือตัวเลขอ้างอิงที่ต้องเทียบตลอดทั้งหน้า
+                สองคอลัมน์เสมอแม้จอแคบ เพราะเป็นตัวเลขคู่ที่ต้องเทียบกัน
+                แยกคนละบรรทัดแล้วเทียบยาก ต้องเลื่อนสายตาขึ้นลง */}
+            <div className="grid grid-cols-2 gap-4 rounded-lg bg-brand p-4">
               <div>
                 <p className="text-sm text-muted-foreground">สั่งผลิต (ตัน)</p>
                 <p className="mt-1 text-lg font-semibold tabular-nums">
@@ -178,7 +184,7 @@ export default function ProductionOrderPage() {
               </div>
             </div>
 
-            <div className="grid gap-3 text-sm @2xl:grid-cols-2">
+            <div className="grid grid-cols-2 gap-3 text-sm">
               <p>
                 <span className="block text-muted-foreground">ผู้สั่งผลิต:</span>
                 <span className="font-medium">{order.requesterName}</span>
@@ -491,13 +497,15 @@ function CardLine({
   return (
     <div className="flex items-baseline justify-between gap-3">
       <dt className="text-muted-foreground">{label}:</dt>
-      <dd className="text-right">
-        <span className="font-semibold tabular-nums">{value}</span>
+      {/* note มาก่อนตัวเลขบนบรรทัดเดียวกัน อ่านเป็น "0.8 ตัน/ชิ้น 200"
+          ต่อบรรทัดเดิมไม่ได้ทำให้อ่านยาก เพราะ note สั้นและเป็นหน่วยกำกับ ไม่ใช่ประโยค */}
+      <dd className="flex items-baseline justify-end gap-1.5 text-right">
         {note && (
-          <span className="block text-xs font-normal text-muted-foreground">
+          <span className="text-xs whitespace-nowrap text-muted-foreground">
             {note}
           </span>
         )}
+        <span className="font-semibold tabular-nums">{value}</span>
       </dd>
     </div>
   );

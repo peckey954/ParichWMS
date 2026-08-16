@@ -1,13 +1,7 @@
 "use client";
 
 import * as React from "react";
-import {
-  ListIcon,
-  RotateCcwIcon,
-  SlidersHorizontalIcon,
-  TagIcon,
-  TriangleAlertIcon,
-} from "lucide-react";
+import { RotateCcwIcon } from "lucide-react";
 import { Button } from "@peckey954/ui/components/ui/button";
 import { Checkbox } from "@peckey954/ui/components/ui/checkbox";
 import { Label } from "@peckey954/ui/components/ui/label";
@@ -114,29 +108,25 @@ export function CwipFilter({
         <div className="mt-1 space-y-0.5">
           <CheckRow
             id="cwip-chips"
-            icon={TagIcon}
-            label="ป้ายในรายการ"
+            label="ป้ายแสดงข้อมูล"
             checked={draft.showChips}
             onChange={(v) => set({ showChips: v })}
           />
           <CheckRow
             id="cwip-actions"
-            icon={SlidersHorizontalIcon}
-            label="ปุ่มคืนกลับคลัง / ปรับปรุง"
+            label="ปุ่มคืนกลับคลังปรับปรุง"
             checked={draft.showActions}
             onChange={(v) => set({ showActions: v })}
           />
           <CheckRow
             id="cwip-lots"
-            icon={ListIcon}
-            label="รายการล็อตในสินค้า"
+            label="รายการล็อตสินค้า"
             checked={draft.showLots}
             onChange={(v) => set({ showLots: v })}
           />
           {/* ผูกค่าเดียวกับชิปสต็อกต่ำด้านบน กดที่ไหนอีกที่ก็ขยับตาม */}
           <CheckRow
             id="cwip-low"
-            icon={TriangleAlertIcon}
             label="เฉพาะสต็อกต่ำ"
             checked={draft.lowOnly}
             onChange={(v) => set({ lowOnly: v })}
@@ -221,16 +211,17 @@ export function CwipFilter({
  *
  * เป้ากดสูง 44px กว้างเต็มกล่อง ไม่ใช่แค่กล่องติ๊ก 16px
  * นิ้วโป้งแตะกว้างราว 45px กดเป้าเล็กกว่านั้นก็ไปโดนแถวข้าง ๆ ตลอด
+ *
+ * ไม่มีไอคอน — สี่บรรทัดนี้อ่านจบใน 2 วินาทีอยู่แล้ว
+ * ไอคอนไม่ได้ช่วยแยกอะไร มีแต่ทำให้ข้อความเยื้องออกไปจากกล่องติ๊ก
  */
 function CheckRow({
   id,
-  icon: Icon,
   label,
   checked,
   onChange,
 }: {
   id: string;
-  icon: React.ComponentType<{ className?: string }>;
   label: string;
   checked: boolean;
   onChange: (v: boolean) => void;
@@ -245,10 +236,7 @@ function CheckRow({
         checked={checked}
         onCheckedChange={(v) => onChange(v === true)}
       />
-      <span className="flex items-center gap-2">
-        <Icon className="size-4" />
-        {label}
-      </span>
+      {label}
     </Label>
   );
 }

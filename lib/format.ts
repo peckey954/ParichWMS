@@ -22,3 +22,8 @@ export function formatDateTime(iso: string) {
     { hour12: false }
   )}`;
 }
+
+/** วันที่อย่างเดียว ไม่มีเวลา — ใช้กับวันที่รับล็อตเข้าคลัง */
+export function formatDate(iso: string) {
+  return new Date(iso).toLocaleDateString(DATE_LOCALE);
+}

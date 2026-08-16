@@ -104,45 +104,123 @@ export const SEED_ORDER: ProductionOrder = {
   ],
 };
 
-/** วัตถุดิบที่เลือกเพิ่มเข้าใบผลิตได้ */
-export const ADDABLE_MATERIALS: Omit<MaterialLine, "useQty" | "sweepTon">[] = [
+/** ล็อตหนึ่งก้อนของวัตถุดิบที่เลือกเพิ่มได้ — ใช้เลือกได้หลายล็อตพร้อมกันในกล่องเพิ่มสินค้า */
+export type LotOption = {
+  code: string;
+  /** โซนที่เก็บในคลัง เช่น A-9M */
+  zone: string;
+  /** วันที่รับเข้า แบบ ISO — แสดงผลผ่าน formatDate */
+  receivedAt: string;
+  ageDays: number;
+  pieces: number;
+  ton: number;
+  /** เหลือน้อย — ตัวเลขในแถวขึ้นแดงเตือนก่อนเลือก */
+  low?: boolean;
+};
+
+/** วัตถุดิบที่เลือกเพิ่มเข้าใบผลิตได้ จัดกลุ่มด้วยประเภทสินค้า */
+export type AddableMaterial = {
+  id: string;
+  category: string;
+  name: string;
+  sub?: string;
+  suggestQty: number;
+  suggestDigits: number;
+  suggestUnit: string;
+  tonPerUnit: number | null;
+  sweepable: boolean;
+  lotOptions: LotOption[];
+};
+
+export const ADDABLE_MATERIALS: AddableMaterial[] = [
   {
     id: "m-46-0-0",
+    category: "วัตถุดิบแม่ปุ๋ย",
     name: "46-0-0",
     sub: "ยูเรีย เม็ด",
     suggestQty: 12,
     suggestDigits: 2,
     suggestUnit: "ตัน",
-    lots: LOTS,
-    lot: LOTS[1],
-    stockQty: 40,
     tonPerUnit: 0.5,
     sweepable: true,
+    lotOptions: [
+      {
+        code: "PO260116/01-04",
+        zone: "A-9M",
+        receivedAt: "2026-05-14",
+        ageDays: 44,
+        pieces: 500,
+        ton: 80,
+      },
+      {
+        code: "PO260116/05-08",
+        zone: "A-9M",
+        receivedAt: "2026-05-14",
+        ageDays: 44,
+        pieces: 13,
+        ton: 2,
+        low: true,
+      },
+      {
+        code: "PO260117/01-02",
+        zone: "B-3L",
+        receivedAt: "2026-05-20",
+        ageDays: 38,
+        pieces: 13,
+        ton: 2,
+        low: true,
+      },
+    ],
   },
   {
     id: "m-0-0-60",
+    category: "วัตถุดิบแม่ปุ๋ย",
     name: "0-0-60",
     sub: "โพแทสเซียมคลอไรด์",
     suggestQty: 8,
     suggestDigits: 2,
     suggestUnit: "ตัน",
-    lots: LOTS,
-    lot: LOTS[2],
-    stockQty: 25,
     tonPerUnit: 0.8,
     sweepable: true,
+    lotOptions: [
+      {
+        code: "PO260115/02-05",
+        zone: "A-4K",
+        receivedAt: "2026-05-10",
+        ageDays: 48,
+        pieces: 31,
+        ton: 25,
+      },
+      {
+        code: "PO260115/06-07",
+        zone: "A-4K",
+        receivedAt: "2026-05-22",
+        ageDays: 36,
+        pieces: 5,
+        ton: 4,
+        low: true,
+      },
+    ],
   },
   {
     id: "m-thread",
+    category: "วัสดุสิ้นเปลือง",
     name: "ด้ายเย็บกระสอบ",
     suggestQty: 2,
     suggestDigits: 0,
     suggestUnit: "ม้วน",
-    lots: LOTS,
-    lot: LOTS[0],
-    stockQty: 60,
     tonPerUnit: null,
     sweepable: false,
+    lotOptions: [
+      {
+        code: "PO260114/03-01",
+        zone: "C-1S",
+        receivedAt: "2026-04-28",
+        ageDays: 60,
+        pieces: 60,
+        ton: 0,
+      },
+    ],
   },
 ];
 
