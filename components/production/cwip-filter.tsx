@@ -40,7 +40,6 @@ export const isCwipDefault = (v: CwipView) =>
   v.showChips === CWIP_VIEW_DEFAULT.showChips &&
   v.showActions === CWIP_VIEW_DEFAULT.showActions &&
   v.showLots === CWIP_VIEW_DEFAULT.showLots &&
-  v.lowOnly === CWIP_VIEW_DEFAULT.lowOnly &&
   v.sort === CWIP_VIEW_DEFAULT.sort &&
   v.dir === CWIP_VIEW_DEFAULT.dir &&
   v.kinds.length === 0 &&
@@ -49,7 +48,6 @@ export const isCwipDefault = (v: CwipView) =>
 
 /** จำนวนเงื่อนไขที่กรองของออกจริง ๆ — การเรียงกับการแสดงผลไม่นับ */
 export const cwipActiveCount = (v: CwipView) =>
-  (v.lowOnly ? 1 : 0) +
   (v.kinds.length > 0 ? 1 : 0) +
   (v.zones.length > 0 ? 1 : 0) +
   (v.products.length > 0 ? 1 : 0);
@@ -123,13 +121,9 @@ export function CwipFilter({
             checked={draft.showLots}
             onChange={(v) => set({ showLots: v })}
           />
-          {/* ผูกค่าเดียวกับชิปสต็อกต่ำด้านบน กดที่ไหนอีกที่ก็ขยับตาม */}
-          <CheckRow
-            id="cwip-low"
-            label="เฉพาะสต็อกต่ำ"
-            checked={draft.lowOnly}
-            onChange={(v) => set({ lowOnly: v })}
-          />
+          {/* ไม่มีเฉพาะสต็อกต่ำในนี้ — ชิปแถวบนมี "สต็อกต่ำ (3)" อยู่แล้ว
+              ของอย่างเดียวกันอยู่สองที่ คนจะไม่รู้ว่าอันไหนคุมอันไหน
+              และตอนติ๊กในนี้แล้วชิปข้างบนไม่ขยับตาม จะดูเหมือนระบบเพี้ยน */}
         </div>
 
         <Separator className="my-4" />

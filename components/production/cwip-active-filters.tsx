@@ -3,7 +3,7 @@
 import * as React from "react";
 import { RotateCcwIcon, XIcon } from "lucide-react";
 import { cn } from "@peckey954/ui/lib/utils";
-import { CWIP_VIEW_DEFAULT, type CwipView } from "./packing-cwip";
+import { type CwipView } from "./packing-cwip";
 
 /* ------------------------------------------------------------------
    แถวบอกว่ากรองอะไรอยู่
@@ -51,10 +51,6 @@ function tokensOf(view: CwipView): Token[] {
     });
   }
 
-  if (view.lowOnly) {
-    t.push({ key: "low", label: "เฉพาะสต็อกต่ำ", clear: { lowOnly: false } });
-  }
-
   if (view.products.length > 0) {
     t.push({
       key: "products",
@@ -96,7 +92,6 @@ export function CwipActiveFilters({
       kinds: [],
       zones: [],
       products: [],
-      lowOnly: CWIP_VIEW_DEFAULT.lowOnly,
     });
 
   return (

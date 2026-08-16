@@ -102,10 +102,10 @@ export default function PackingListPage() {
   );
   const done = DONE_ORDERS.filter((o) => matchesOrder(o, query));
 
-  // ชิปสต็อกต่ำกับติ๊กในตัวกรองสั่งของเดียวกัน กดที่ไหนก็ได้ผลเหมือนกัน
+  // สต็อกต่ำมาจากชิปแถวบนอย่างเดียว ไม่มีติ๊กซ้ำในกล่องตัวกรอง
   const cwip = filterCwip(CWIP_PRODUCTS, {
     query,
-    lowOnly: cwipChip === "low" || cwipView.lowOnly,
+    lowOnly: cwipChip === "low",
     kinds: cwipView.kinds,
     zones: cwipView.zones,
     products: cwipView.products,
