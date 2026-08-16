@@ -88,8 +88,22 @@ export function useStickyToolbar(options?: {
   hideAfter?: number;
   topAfter?: number;
 }) {
-  const { hidden, showTop, scrollToTop, scrollIntoTop } =
-    useScrollState(options);
+  const {
+    hidden,
+    showTop,
+    scrollToTop,
+    scrollIntoTop,
+    armScrollGuard,
+    releaseScrollGuard,
+  } = useScrollState(options);
   const barRef = React.useRef<HTMLDivElement>(null);
-  return { hidden, showTop, scrollToTop, scrollIntoTop, barRef };
+  return {
+    hidden,
+    showTop,
+    scrollToTop,
+    scrollIntoTop,
+    armScrollGuard,
+    releaseScrollGuard,
+    barRef,
+  };
 }

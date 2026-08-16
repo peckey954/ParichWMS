@@ -225,7 +225,63 @@ export function useScrollState({ hideAfter = 160, topAfter = 700 } = {}) {
     [framed, frameRef]
   );
 
-  return { ...state, scrollToTop, scrollIntoTop };
+  /**
+   * กันแท็บใหญ่ (ไม่ได้ล็อกติดจอ กดได้ก็ต่อเมื่ออยู่ใกล้บนสุดอยู่แล้ว) เลื่อนจอ
+   * เอง — ควรแค่เปลี่ยนข้อมูล ไม่มีอะไรขยับ
+   *
+   * armScrollGuard จับตำแหน่งไว้ตอน pointerdown (ต้องเป็น capture phase ผูกไว้
+   * ที่ตัวห่อ ให้ทำงานก่อน handler ของปุ่มแท็บเอง)
+   *
+   * ตัวที่แอบเลื่อนไม่ใช่แค่โฟกัสของปุ่มตอนกด (เกิดทันที) แต่รวมถึงตอนเบราว์เซอร์
+   * รีโฟลว์เพราะเนื้อหาแท็บใหม่สูงไม่เท่าเดิม (มาช้ากว่านั้นอีก บางทีหลายสิบ ms
+   * หลัง render เสร็จ) แก้ครั้งเดียวคร่อมเฟรมถัดไปไม่พอ ต้องดักฟัง scroll ต่อไป
+   * อีกพักหนึ่ง เจอหลุดจากตำแหน่งที่จับไว้เมื่อไหร่ดึงกลับทันที
+   *
+   * ตั้ง ignoreNextRef คู่กับทุกครั้งที่ดึงกลับ ไม่งั้นการดึงกลับเองจะถูกแถบ
+   * ชิป+ค้นหาอ่านผิดว่าเป็นการเลื่อนลงอ่านของผู้ใช้แล้วซ่อนตัวไปฟรี ๆ
+   */
+  const scrollGuardRef = React.useRef<number | null>(null);
+
+  const armScrollGuard = React.useCallback(() => {
+    const el = framed ? frameRef.current : null;
+    scrollGuardRef.current = el ? el.scrollTop : window.scrollY;
+  }, [framed, frameRef]);
+
+  const releaseScrollGuard = React.useCallback(() => {
+    const before = scrollGuardRef.current;
+    if (before === null) return;
+    scrollGuardRef.current = null;
+
+    const el = framed ? frameRef.current : null;
+    const target: HTMLElement | Window = el ?? window;
+    const read = () => (el ? el.scrollTop : window.scrollY);
+    const restore = () => {
+      ignoreNextRef.current = true;
+      window.setTimeout(() => {
+        ignoreNextRef.current = false;
+      }, 100);
+      if (el) el.scrollTo({ top: before });
+      else window.scrollTo({ top: before });
+    };
+
+    restore();
+
+    const onDrift = () => {
+      if (read() !== before) restore();
+    };
+    target.addEventListener("scroll", onDrift, { passive: true });
+    window.setTimeout(() => {
+      target.removeEventListener("scroll", onDrift);
+    }, 500);
+  }, [framed, frameRef]);
+
+  return {
+    ...state,
+    scrollToTop,
+    scrollIntoTop,
+    armScrollGuard,
+    releaseScrollGuard,
+  };
 }
 
 /** ปุ่มไอคอนสามอันบนหัวเรื่อง */

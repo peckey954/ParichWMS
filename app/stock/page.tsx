@@ -95,7 +95,14 @@ function GeneralStockView() {
   // ประวัติมาจาก context เพราะการย้าย/ปรับปรุงจะเพิ่มรายการใหม่เข้ามาระหว่างใช้งาน
   const { rows: logRows } = useStockLog();
   // เลื่อนลงซ่อนแถบเครื่องมือ เลื่อนขึ้นเอากลับมา และโผล่ปุ่มกลับขึ้นบนสุดเมื่อลงมาไกล
-  const { hidden, showTop, scrollToTop, scrollIntoTop } = useScrollState();
+  const {
+    hidden,
+    showTop,
+    scrollToTop,
+    scrollIntoTop,
+    armScrollGuard,
+    releaseScrollGuard,
+  } = useScrollState();
   // ของจริงแยกประเภทกันเด็ดขาด ไม่มีมุมมอง "ทั้งหมด"
   // ชิปจึงเป็นการนำทาง (เลือกอยู่เสมอหนึ่งอัน) ไม่ใช่ตัวกรองที่ปิดได้
   // "history" เป็นมุมมองพิเศษ ไม่ใช่ประเภทสินค้า แต่อยู่แถวชิปเดียวกัน
@@ -265,7 +272,14 @@ function GeneralStockView() {
 
           <Tabs
             value={tab}
-            onValueChange={(v) => setTab(v as typeof tab)}
+            // แท็บใหญ่ไม่ควรเลื่อนจอเลยตอนสลับ แต่บางเบราว์เซอร์เลื่อนตามโฟกัส
+            // ของปุ่มที่เพิ่งกดเอง — จับตำแหน่งไว้ก่อนตั้งแต่ pointerdown (ก่อน
+            // เบราว์เซอร์จะขยับ) แล้วดึงกลับหลังเปลี่ยนแท็บเสร็จ
+            onPointerDownCapture={armScrollGuard}
+            onValueChange={(v) => {
+              setTab(v as typeof tab);
+              releaseScrollGuard();
+            }}
             className="mt-4 sm:mt-5"
           >
             <TabsList className="w-full">

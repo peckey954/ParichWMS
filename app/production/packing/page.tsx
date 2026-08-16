@@ -87,8 +87,15 @@ export default function PackingListPage() {
   // สถานะที่คนคุมไลน์กดเปลี่ยนเอง เก็บทับของเดิมเฉพาะใบที่ถูกแก้
   const [stages, setStages] = React.useState<Record<string, OrderStage>>({});
   // เลื่อนลงซ่อนแถบค้นหา เลื่อนขึ้นเอากลับมา แบบเดียวกับหน้าสต็อกทั่วไป
-  const { hidden, showTop, scrollToTop, scrollIntoTop, barRef } =
-    useStickyToolbar();
+  const {
+    hidden,
+    showTop,
+    scrollToTop,
+    scrollIntoTop,
+    armScrollGuard,
+    releaseScrollGuard,
+    barRef,
+  } = useStickyToolbar();
   const { framed } = useDevicePreview();
 
   /**
@@ -235,7 +242,14 @@ export default function PackingListPage() {
 
       <Tabs
         value={tab}
-        onValueChange={(v) => setTab(v as Tab)}
+        // แท็บใหญ่ไม่ควรเลื่อนจอเลยตอนสลับ แต่บางเบราว์เซอร์เลื่อนตามโฟกัส
+        // ของปุ่มที่เพิ่งกดเอง — จับตำแหน่งไว้ก่อนตั้งแต่ pointerdown (ก่อน
+        // เบราว์เซอร์จะขยับ) แล้วดึงกลับหลังเปลี่ยนแท็บเสร็จ
+        onPointerDownCapture={armScrollGuard}
+        onValueChange={(v) => {
+          setTab(v as Tab);
+          releaseScrollGuard();
+        }}
         className="mt-4 sm:mt-5"
       >
         <TabsList className="w-full">
