@@ -172,7 +172,17 @@ export function TableFrame({ children }: { children: React.ReactNode }) {
         // ขยับเป็น 16px ทุกด้าน — h-auto แทน h-12 เดิม เพราะหัวคอลัมน์ที่ตัดสองบรรทัด
         // (เช่น "ปริมาณคงเหลือ\nในคลัง") โดนบีบแน่นในกล่องสูงคงที่ ระยะ 16px ต้องได้จริงทุกด้าน
         "[&_th]:h-auto [&_th]:py-4 [&_th]:px-4",
-        "[&_td]:px-4 [&_td]:py-3"
+        "[&_td]:px-4 [&_td]:py-3",
+        // border-collapse: collapse (ค่าเริ่มต้นของ Preflight) ทำให้เส้นขอบเป็นของ "กริดร่วม"
+        // ของตาราง ไม่ใช่ของเซลล์เอง — พอเซลล์ไหน position: sticky แล้วขยับตำแหน่งตอนเลื่อน
+        // เส้นขอบไม่ขยับตาม เลยดูเหมือนเส้นหายไปตอนเลื่อน ต้องสลับเป็น separate
+        // ให้เส้นขอบเป็นของเซลล์เองจริง ๆ ถึงจะเลื่อนติดไปกับเซลล์ที่ตรึงไว้ได้
+        // แต่ separate ไม่วาดเส้นขอบที่ตั้งไว้ระดับแถว (tr) จึงย้ายเส้นคั่นแถวไปที่ th/td แทน
+        "[&_table]:border-separate [&_table]:border-spacing-0",
+        "[&_tr]:border-b-0",
+        "[&_th]:border-b [&_th]:border-border",
+        "[&_td]:border-b [&_td]:border-border",
+        "[&_tbody_tr:last-child_td]:border-b-0"
       )}
     >
       {children}
