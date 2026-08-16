@@ -151,8 +151,10 @@ function LotActions({
   unit: string;
 }) {
   const cls = "flex-1 @3xl:w-24 @3xl:flex-none";
+  // ระยะห่างอยู่ที่ตัวปุ่มเอง ไม่ใช่ที่ gap ของกล่องแม่
+  // ถ้าอยู่ที่แม่ พอปิดปุ่มแล้ว gap ยังเหลือค้างเป็นช่องว่างเปล่า 12px ใต้ข้อความ
   return (
-    <div className="flex w-full gap-2 @3xl:w-auto">
+    <div className="mt-3 flex w-full gap-2 @3xl:mt-0 @3xl:w-auto">
       <MoveLotDialog lot={lot} productName={productName} unit={unit}>
         <Button variant="outline-primary" size="sm" className={cls}>
           ย้าย
@@ -195,7 +197,7 @@ function LotRow({
     <div className="border-t border-border p-4">
       {/* จอกว้าง: ข้อมูล | ปุ่ม | ยอด อยู่แถวเดียว จัดกึ่งกลางแนวตั้ง
           จอแคบ: ยอดขึ้นไปอยู่ขวาของหัวแถว แล้วปุ่มลงมาเต็มความกว้างข้างล่าง */}
-      <div className="flex flex-col gap-3 @3xl:flex-row @3xl:items-center @3xl:justify-between">
+      <div className="flex flex-col @3xl:flex-row @3xl:items-center @3xl:justify-between @3xl:gap-3">
         <div className="min-w-0 flex-1">
           <div className="flex items-start justify-between gap-3">
             <div className="flex min-w-0 flex-wrap items-center gap-2">

@@ -161,7 +161,7 @@ function LotRow({
           จอแคบ: ยอดขึ้นไปอยู่ขวาของบรรทัดโซน แล้วปุ่มลงมาเต็มความกว้างข้างล่าง
           ยอดต้องอยู่มุมบนขวาเสมอ ไม่ใช่ไหลไปอยู่ใต้ปุ่ม
           เพราะคนกวาดตาหาตัวเลขที่ขอบขวาของหัวแถว ไม่ได้ไล่อ่านจากล่างขึ้นบน */}
-      <div className="flex flex-col gap-3 @2xl:flex-row @2xl:items-center @2xl:justify-between">
+      <div className="flex flex-col @2xl:flex-row @2xl:items-center @2xl:justify-between @2xl:gap-3">
         <div className="min-w-0 flex-1">
           <div className="flex items-start justify-between gap-3">
             <div className="flex min-w-0 flex-wrap items-center gap-2">
@@ -182,9 +182,11 @@ function LotRow({
         </div>
 
         <div className="flex shrink-0 items-center gap-3">
-          {/* ปุ่มอยู่ที่ล็อต จอแคบเรียงเต็มความกว้างให้กดง่ายด้วยนิ้วโป้ง */}
+          {/* ปุ่มอยู่ที่ล็อต จอแคบเรียงเต็มความกว้างให้กดง่ายด้วยนิ้วโป้ง
+              ระยะห่างอยู่ที่ตัวปุ่มเอง ไม่ใช่ที่ gap ของกล่องแม่
+              ถ้าอยู่ที่แม่ พอปิดปุ่มแล้ว gap ยังเหลือค้างเป็นช่องว่างเปล่า 12px */}
           {showActions && (
-            <div className="flex w-full items-center gap-2 @2xl:w-auto">
+            <div className="mt-3 flex w-full items-center gap-2 @2xl:mt-0 @2xl:w-auto">
               <Button
                 variant="outline-primary"
                 className="flex-1 @2xl:w-28 @2xl:flex-none"

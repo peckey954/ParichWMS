@@ -2,7 +2,6 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { ChevronRightIcon } from "lucide-react";
 import { Badge } from "@peckey954/ui/components/ui/badge";
 import { Separator } from "@peckey954/ui/components/ui/separator";
 import {
@@ -176,7 +175,25 @@ export function PackingOrders({
   );
 }
 
+/**
+ * การ์ดใบผลิตสำหรับจอแคบ
+ *
+ * สูตรกับรอบ/หมวด อยู่ในกล่องพื้นส้ม แยกจากตัวเลขข้างล่างอย่างชัดเจน
+ * เพราะสองส่วนนี้ตอบคนละคำถาม — "ใบนี้ผลิตอะไร" กับ "ไปถึงไหนแล้ว"
+ * แบบเดียวกับการ์ดในหน้าสูตรประจำสัปดาห์ ระบบเดียวกันต้องอ่านเหมือนกัน
+ *
+ * ป้ายสถานะอยู่มุมล่างขวา ไม่มีคำว่า "สถานะ:" นำหน้า
+ * ตัวป้ายบอกอยู่แล้วว่าคืออะไร คำนำหน้าเป็นหมึกที่ไม่ได้เพิ่มความหมาย
+ */
 function OrderCard({ order: o }: { order: PackingOrder }) {
+  const rows: { label: string; value: string; danger?: boolean }[] = [
+    { label: "บรรจุภัณฑ์", value: o.packing },
+    { label: "สั่งผลิต (ตัน)", value: formatTon(o.orderedTon) },
+    { label: "ผลิตแล้ว (ตัน)", value: formatTon(o.producedTon) },
+    { label: "ไม่ผ่าน QC (ตัน)", value: formatTon(o.failedTon), danger: true },
+    { label: "เข้าคลัง (ตัน)", value: formatTon(o.storedTon) },
+  ];
+
   return (
     <Link
       href={`/production/packing/${o.id}`}
@@ -186,56 +203,44 @@ function OrderCard({ order: o }: { order: PackingOrder }) {
         "focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none"
       )}
     >
-      <div className="flex items-start gap-3">
-        <div className="min-w-0 flex-1">
-          <p className="flex flex-wrap items-baseline justify-between gap-2">
-            <span className="font-semibold">{o.code}</span>
-            <span className="text-sm text-muted-foreground">{o.createdAt}</span>
-          </p>
-          <p className="mt-1 truncate text-sm">{o.formula}</p>
-          <p className="mt-0.5 text-sm text-muted-foreground">
-            {o.kind} · {o.packing} · รอบ {o.round}
-          </p>
-        </div>
-        <ChevronRightIcon className="mt-1 size-4 shrink-0 text-muted-foreground" />
+      <div className="flex items-baseline justify-between gap-3">
+        <span className="font-semibold">{o.code}</span>
+        <span className="shrink-0 text-sm text-muted-foreground">
+          {o.createdAt}
+        </span>
       </div>
 
-      <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-1.5 text-sm">
-        <Cell label="สั่งผลิต" value={formatTon(o.orderedTon)} />
-        <Cell label="ผลิตแล้ว" value={formatTon(o.producedTon)} />
-        <Cell label="ไม่ผ่าน QC" value={formatTon(o.failedTon)} danger />
-        <Cell label="เข้าคลัง" value={formatTon(o.storedTon)} />
+      <div className="mt-3 rounded-lg bg-brand px-3 py-2.5">
+        <p className="font-medium">{o.formula}</p>
+        <p className="mt-0.5 flex flex-wrap items-center gap-x-3 text-sm">
+          <span>รอบ{o.round}</span>
+          <span>{o.kind}</span>
+        </p>
+      </div>
+
+      <dl className="mt-3 space-y-1.5 text-sm">
+        {rows.map((r) => (
+          <div
+            key={r.label}
+            className="flex items-baseline justify-between gap-3"
+          >
+            <dt className="text-muted-foreground">{r.label}:</dt>
+            <dd
+              className={cn(
+                "font-semibold tabular-nums",
+                r.danger && r.value !== "-" && "text-danger-strong"
+              )}
+            >
+              {r.value}
+            </dd>
+          </div>
+        ))}
       </dl>
 
       <Separator className="mt-3" />
-      <div className="mt-3 flex items-baseline justify-between gap-3 text-sm">
-        <span className="text-muted-foreground">สถานะ:</span>
+      <div className="mt-3 flex justify-end">
         <StageChip stage={o.stage} />
       </div>
     </Link>
-  );
-}
-
-function Cell({
-  label,
-  value,
-  danger,
-}: {
-  label: string;
-  value: string;
-  danger?: boolean;
-}) {
-  return (
-    <div className="flex items-baseline justify-between gap-2">
-      <dt className="text-muted-foreground">{label}</dt>
-      <dd
-        className={cn(
-          "font-semibold tabular-nums",
-          danger && value !== "-" && "text-danger-strong"
-        )}
-      >
-        {value}
-      </dd>
-    </div>
   );
 }

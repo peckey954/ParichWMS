@@ -4,7 +4,7 @@ import * as React from "react";
 import {
   BrushCleaningIcon,
   DownloadIcon,
-  LightbulbIcon,
+  ListTodoIcon,
   WarehouseIcon,
 } from "lucide-react";
 import {
@@ -91,8 +91,8 @@ export default function PackingListPage() {
     {
       id: "suggest",
       label: "แนะนำวัตถุดิบที่ใช้วันนี้",
-      // หลอดไฟ = ข้อเสนอแนะ อ่านง่ายและไม่ติดภาพ AI แบบไอคอนประกาย
-      icon: LightbulbIcon,
+      // รายการมีติ๊ก = สิ่งที่ต้องไปหยิบทีละอย่าง ตรงกับสิ่งที่กล่องนี้บอก
+      icon: ListTodoIcon,
       primary: true,
       onSelect: () => setSuggestOpen(true),
     },

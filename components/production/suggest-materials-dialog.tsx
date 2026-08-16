@@ -1,8 +1,6 @@
 "use client";
 
 import * as React from "react";
-import { TriangleAlertIcon } from "lucide-react";
-import { Badge } from "@peckey954/ui/components/ui/badge";
 import { Button } from "@peckey954/ui/components/ui/button";
 import {
   Dialog,
@@ -13,19 +11,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@peckey954/ui/components/ui/dialog";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@peckey954/ui/components/ui/table";
 import { cn } from "@peckey954/ui/lib/utils";
 import {
   SUGGESTED_MATERIALS,
   SUGGEST_DATE,
   formatQty,
+  formatTon,
   isShort,
   type SuggestedMaterial,
 } from "@/lib/packing-list";
@@ -33,18 +24,13 @@ import {
 /* ------------------------------------------------------------------
    แนะนำวัตถุดิบใช้ผลิตวันนี้ — ดูอย่างเดียว
 
-   จอกว้าง — ตาราง 3 คอลัมน์ เทียบยอดในคลังกับยอดที่แนะนำข้ามแถวได้
-   จอแคบ  — รายการ ชื่อขึ้นก่อน ยอดที่แนะนำเป็นตัวใหญ่ทางขวา
-            ยอดในคลังลงไปเป็นบรรทัดรองใต้ชื่อ
-
-   เหตุผลที่จอแคบไม่ใช้ตาราง — สามคอลัมน์นี้มีตัวเลขพร้อมหน่วยสองชุด
-   บีบลงจอ 390px แล้วเลขจะตกบรรทัดจนอ่านไม่ออกว่าเลขไหนของคอลัมน์ไหน
+   รายการเดียวใช้ทุกขนาดจอ ไม่แยกตารางกับการ์ด
+   สามคอลัมน์นี้บีบลงจอ 390px แล้วเลขตกบรรทัดจนไม่รู้ว่าเลขไหนของคอลัมน์ไหน
    สิ่งที่คนต้องรู้จริง ๆ คือ "เบิกอะไร เท่าไร" ยอดในคลังเป็นข้อมูลประกอบ
-   จึงลดชั้นลงไปได้โดยไม่เสียความหมาย
+   จึงลดลงไปเป็นบรรทัดรองใต้ชื่อได้โดยไม่เสียความหมาย
 
-   ⚠️ container query บน DialogContent วัดจาก content box ไม่ใช่ความกว้างกล่อง
-   กล่องกว้าง 672 แต่มี padding ข้างละ 24 เหลือ 624 ที่เอาไปเทียบจริง
-   ใช้ @2xl (672) จึงไม่มีวันติดแม้บนจอกว้าง ต้องใช้ @xl (576)
+   ของไม่พอไม่มีป้ายบอก ใช้ตัวหนังสือแดงที่บรรทัดยอดในคลังแทน
+   เพราะจุดที่ต้องสะดุดตาคือ "ตัวเลขนี้น้อยไป" ไม่ใช่ป้ายที่อยู่คนละที่กับตัวเลข
 ------------------------------------------------------------------ */
 
 export function SuggestMaterialsDialog({
@@ -55,76 +41,36 @@ export function SuggestMaterialsDialog({
   onOpenChange: (v: boolean) => void;
 }) {
   const rows = SUGGESTED_MATERIALS;
-  const short = rows.filter(isShort);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="@container sm:max-w-2xl">
+      <DialogContent className="sm:max-w-lg">
         <DialogHeader className="text-left">
           <DialogTitle>แนะนำวัตถุดิบใช้ผลิตวันนี้</DialogTitle>
-          <DialogDescription>
-            {SUGGEST_DATE} · คำนวณจากใบผลิตที่ค้างอยู่ {rows.length} รายการ
-          </DialogDescription>
+          <DialogDescription>{SUGGEST_DATE}</DialogDescription>
         </DialogHeader>
 
-        {/* ของไม่พอต้องรู้ตั้งแต่ตรงนี้ ไม่ใช่ไปรู้ตอนเบิกไม่ออกที่หน้าคลัง */}
-        {short.length > 0 && (
-          <p className="flex items-start gap-2 rounded-lg bg-chip-yellow p-3 text-sm">
-            <TriangleAlertIcon className="mt-0.5 size-4 shrink-0" />
-            <span>
-              มี <span className="font-semibold">{short.length} รายการ</span>{" "}
-              ที่ของในคลังน้อยกว่ายอดที่แนะนำ ต้องสั่งเพิ่มหรือปรับแผนก่อน
-            </span>
-          </p>
-        )}
+        <div className="max-h-[55vh] overflow-y-auto rounded-xl border border-border">
+          {/* หัวข้อติดบนตอนเลื่อน คำว่า "แนะนำ" คือป้ายกำกับคอลัมน์ขวา
+              ถ้าเลื่อนแล้วหลุดไป ตัวเลขทางขวาจะกลายเป็นเลขลอย ๆ ไม่มีชื่อ */}
+          <div className="sticky top-0 z-10 flex items-end justify-between gap-3 border-b border-border bg-card px-4 py-3">
+            <p className="min-w-0 font-semibold">
+              วัตถุดิบคลัง WIP
+              <span className="block text-sm font-normal text-muted-foreground">
+                ({rows.length} รายการ)
+              </span>
+            </p>
+            <p className="shrink-0 text-sm text-muted-foreground">แนะนำ</p>
+          </div>
 
-        {/* ---------- จอแคบ: รายการ ---------- */}
-        <div className="max-h-[52vh] overflow-y-auto rounded-lg border border-border @xl:hidden">
           {rows.map((m, i) => (
-            <MaterialRow
-              key={m.id}
-              material={m}
-              last={i === rows.length - 1}
-            />
+            <MaterialRow key={m.id} material={m} last={i === rows.length - 1} />
           ))}
-        </div>
-
-        {/* ---------- จอกว้าง: ตาราง ---------- */}
-        <div className="hidden max-h-[52vh] overflow-y-auto rounded-lg border border-border @xl:block">
-          <Table>
-            <TableHeader className="[&_th]:sticky [&_th]:top-0 [&_th]:z-10 [&_th]:bg-card">
-              <TableRow>
-                <TableHead>วัตถุดิบ</TableHead>
-                <TableHead className="text-right whitespace-nowrap">
-                  ทั้งหมดในคลัง WIP
-                </TableHead>
-                <TableHead className="text-right">แนะนำ</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {rows.map((m) => (
-                <TableRow key={m.id}>
-                  <TableCell className="font-medium">{m.name}</TableCell>
-                  <TableCell
-                    className={cn(
-                      "text-right whitespace-nowrap tabular-nums",
-                      isShort(m) && "text-danger-strong"
-                    )}
-                  >
-                    {formatQty(m.stock)} {m.unit}
-                  </TableCell>
-                  <TableCell className="text-right font-semibold whitespace-nowrap tabular-nums">
-                    {formatQty(m.suggest)} {m.unit}
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
         </div>
 
         <DialogFooter>
           <DialogClose asChild>
-            <Button variant="outline-primary" className="w-full sm:w-32">
+            <Button variant="outline-primary" className="w-full">
               ย้อนกลับ
             </Button>
           </DialogClose>
@@ -146,7 +92,7 @@ function MaterialRow({
   return (
     <div
       className={cn(
-        "flex items-center gap-3 px-4 py-3",
+        "flex items-start gap-3 px-4 py-3",
         !last && "border-b border-border"
       )}
     >
@@ -154,7 +100,6 @@ function MaterialRow({
         <p className="truncate font-medium" title={m.name}>
           {m.name}
         </p>
-        {/* ยอดในคลังเป็นข้อมูลประกอบ อยู่บรรทัดรอง แต่ถ้าไม่พอต้องสะดุดตา */}
         <p
           className={cn(
             "mt-0.5 text-sm tabular-nums",
@@ -165,24 +110,12 @@ function MaterialRow({
         </p>
       </div>
 
-      <div className="shrink-0 text-right">
-        <p className="font-semibold tabular-nums">
-          {formatQty(m.suggest)}
-          <span className="ml-1 text-sm font-normal text-muted-foreground">
-            {m.unit}
-          </span>
-        </p>
-        {shortfall ? (
-          <Badge
-            appearance="soft"
-            className="[--bdg-border:transparent] [--bdg-surface:var(--chip-red)] [--bdg-text:var(--chip-red-foreground)] mt-0.5 font-semibold"
-          >
-            ของไม่พอ
-          </Badge>
-        ) : (
-          <p className="text-sm text-muted-foreground">แนะนำ</p>
-        )}
-      </div>
+      <p className="shrink-0 text-right tabular-nums">
+        <span className="font-semibold">{formatTon(m.suggest)}</span>
+        <span className="ml-1 text-sm font-normal text-muted-foreground">
+          {m.unit}
+        </span>
+      </p>
     </div>
   );
 }
