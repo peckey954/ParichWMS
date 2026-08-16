@@ -126,25 +126,21 @@ function GeneralStockView() {
    * เลือกโซน A-1 แล้วต้องเห็นเฉพาะล็อตที่อยู่ A-1 ไม่ใช่เห็นทุกล็อตของสินค้านั้น
    * ไม่งั้นยอดรวมที่โชว์จะไม่ตรงกับสิ่งที่เห็นในรายการ
    */
+  // ประเภทมาจากดรอปดาวน์ถ้าเลือกไว้ ไม่งั้นใช้ชิปที่เปิดอยู่
+  // ดรอปดาวน์เลือกได้หลายประเภท ส่วนชิปเลือกได้ทีละอัน จึงให้ดรอปดาวน์ชนะ
+  const cats: CategoryId[] =
+    view.kinds.length > 0 ? view.kinds : [cat as CategoryId];
+
   const visible = isHistory
     ? []
     : PRODUCTS.filter(
         (p) =>
-          p.category === cat && matchesQuery(p, query) && (!lowOnly || p.low)
-      )
-        .filter(
-          (p) => view.products.length === 0 || view.products.includes(p.name)
-        )
-        .map((p) => {
-          if (view.zones.length === 0 && view.lots.length === 0) return p;
-          const lots = p.lots.filter(
-            (l) =>
-              (view.zones.length === 0 || view.zones.includes(l.zone)) &&
-              (view.lots.length === 0 || view.lots.includes(l.code))
-          );
-          return { ...p, lots };
-        })
-        .filter((p) => p.lots.length > 0);
+          cats.includes(p.category) &&
+          matchesQuery(p, query) &&
+          (!lowOnly || p.low)
+      ).filter(
+        (p) => view.products.length === 0 || view.products.includes(p.name)
+      );
 
   // สามโหมดนี้เปลี่ยนหน่วยของรายการ ไม่ได้เปลี่ยนแค่ลำดับ
   const byProduct = sortProducts(visible, view.dir);

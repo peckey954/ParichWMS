@@ -126,8 +126,6 @@ export default function PackingListPage() {
     query,
     lowOnly: cwipChip === "low",
     kinds: cwipView.kinds,
-    zones: cwipView.zones,
-    lots: cwipView.lots,
     products: cwipView.products,
     sort: cwipView.sort,
     dir: cwipView.dir,

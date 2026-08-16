@@ -410,29 +410,17 @@ export const cwipLowCount = (products: CwipProduct[]) =>
 export type CwipSort = "product" | "zone" | "fifo";
 export type SortDir = "asc" | "desc";
 
-/** ประเภทกับโซนดึงจากข้อมูลจริง ไม่ใช่รายการที่พิมพ์ไว้ตายตัว
+/** ประเภทดึงจากข้อมูลจริง ไม่ใช่รายการที่พิมพ์ไว้ตายตัว
     เพิ่มสินค้าประเภทใหม่เมื่อไร ตัวเลือกในตัวกรองก็มีให้เองทันที */
 export const CWIP_KINDS = [...new Set(CWIP_PRODUCTS.map((p) => p.kind))];
 
-export const CWIP_ZONES = [
-  ...new Set(CWIP_PRODUCTS.flatMap((p) => p.lots.map((l) => l.zone))),
-].sort();
-
-/**
- * กรองและเรียงสินค้า CWIP
- *
- * โซนกรองที่ระดับล็อต ไม่ใช่ระดับสินค้า — เลือกโซน A แล้วต้องเห็นเฉพาะ
- * ล็อตที่อยู่โซน A ของสินค้านั้น ไม่ใช่เห็นทุกล็อตเพราะบังเอิญมีล็อตหนึ่งอยู่ A
- * ไม่งั้นยอดรวมที่โชว์จะไม่ตรงกับสิ่งที่เห็นในรายการ
- */
+/** กรองและเรียงสินค้า CWIP */
 export function filterCwip(
   products: CwipProduct[],
   opts: {
     query: string;
     lowOnly: boolean;
     kinds: string[];
-    zones: string[];
-    lots: string[];
     products: string[];
     sort: CwipSort;
     dir: SortDir;
@@ -445,16 +433,6 @@ export function filterCwip(
     .filter(
       (p) => opts.products.length === 0 || opts.products.includes(p.name)
     )
-    .map((p) => {
-      // โซนกับเลขล็อตกรองที่ระดับล็อต ยอดรวมจะได้ตรงกับสิ่งที่เห็นในรายการ
-      if (opts.zones.length === 0 && opts.lots.length === 0) return p;
-      const lots = p.lots.filter(
-        (l) =>
-          (opts.zones.length === 0 || opts.zones.includes(l.zone)) &&
-          (opts.lots.length === 0 || opts.lots.includes(l.code))
-      );
-      return { ...p, lots };
-    })
     .filter((p) => p.lots.length > 0);
 
   // ทิศทางกลับด้านด้วยการคูณ -1 ที่ผลเปรียบเทียบ ไม่ต้องเขียนเงื่อนไขซ้ำสองชุด
@@ -475,11 +453,6 @@ export function filterCwip(
   }
   return sorted;
 }
-
-/** เลขล็อตใน CWIP — ตัวเลือกจะโผล่เฉพาะตอนเรียงแบบ FIFO */
-export const CWIP_LOT_CODES = [
-  ...new Set(CWIP_PRODUCTS.flatMap((p) => p.lots.map((l) => l.code))),
-].sort();
 
 /** ชื่อสินค้าใน CWIP สำหรับตัวเลือกในตัวกรอง — ดึงจากข้อมูลจริง */
 export const CWIP_PRODUCT_NAMES = CWIP_PRODUCTS.map((p) => p.name).sort((a, b) =>

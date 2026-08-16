@@ -40,17 +40,6 @@ function tokensOf(view: CwipView): Token[] {
     });
   }
 
-  if (view.zones.length > 0) {
-    t.push({
-      key: "zones",
-      label:
-        view.zones.length === 1
-          ? `โซน: ${view.zones[0]}`
-          : `โซน (${view.zones.length})`,
-      clear: { zones: [] },
-    });
-  }
-
   if (view.products.length > 0) {
     t.push({
       key: "products",
@@ -90,7 +79,6 @@ export function CwipActiveFilters({
     onChange({
       ...view,
       kinds: [],
-      zones: [],
       products: [],
     });
 
