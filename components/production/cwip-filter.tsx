@@ -77,12 +77,8 @@ export function CwipFilter({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <div className="px-4 pt-4">
-        <p className="font-medium">ตัวกรองและการแสดงผล</p>
-        <p className="mt-1 text-sm text-muted-foreground">
-          เลือกได้หลายอย่างพร้อมกัน ไม่เลือกเลยคือดูทั้งหมด
-        </p>
-      </div>
+      {/* หัวข้อมาจากกล่องที่ครอบอยู่ เพราะ Popover กับ Dialog
+          ต้องใช้คอมโพเนนต์หัวข้อของตัวเอง ไม่งั้น screen reader อ่านไม่เจอ */}
 
       {/* เลื่อนเฉพาะตรงนี้ หัวข้อกับปุ่มล้างค่าอยู่นอกกรอบที่เลื่อน */}
       <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">

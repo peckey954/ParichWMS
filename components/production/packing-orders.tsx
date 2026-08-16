@@ -129,11 +129,14 @@ export function PackingOrders({
   orders,
   emptyTitle,
   onStage,
+  showStage = true,
 }: {
   orders: PackingOrder[];
   emptyTitle: string;
   /** ส่งมาเฉพาะแท็บที่แก้สถานะได้ ไม่ส่ง = ป้ายอ่านอย่างเดียว */
   onStage?: (id: string, stage: OrderStage) => void;
+  /** แท็บผลิตแล้วทุกใบจบที่ "ผลิตแล้ว" เหมือนกันหมด คอลัมน์สถานะจึงไม่มีอะไรให้บอกเพิ่ม */
+  showStage?: boolean;
 }) {
   const router = useRouter();
   const [page, setPage] = React.useState(1);
@@ -162,6 +165,7 @@ export function PackingOrders({
               key={o.id}
               order={o}
               onStage={onStage && ((stage) => onStage(o.id, stage))}
+              showStage={showStage}
             />
           ))}
         </div>
@@ -193,7 +197,9 @@ export function PackingOrders({
                 <TableHead className="text-right whitespace-nowrap">
                   เข้าคลัง (ตัน)
                 </TableHead>
-                <TableHead className={HEAD_LAST}>สถานะ</TableHead>
+                {showStage && (
+                  <TableHead className={HEAD_LAST}>สถานะ</TableHead>
+                )}
               </TableRow>
             </TableHeader>
             <TableBody>

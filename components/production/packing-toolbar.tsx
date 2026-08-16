@@ -9,10 +9,22 @@ import {
   InputGroupInput,
 } from "@peckey954/ui/components/ui/input-group";
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@peckey954/ui/components/ui/dialog";
+import {
   Popover,
   PopoverContent,
+  PopoverDescription,
+  PopoverHeader,
+  PopoverTitle,
   PopoverTrigger,
 } from "@peckey954/ui/components/ui/popover";
+import { useNarrowScreen } from "@/components/device-preview";
 import { ActionButtons, type PackingAction } from "./packing-actions";
 
 /* ------------------------------------------------------------------
@@ -50,6 +62,17 @@ export function PackingToolbar({
   onFilterOpenChange?: (v: boolean) => void;
   onFilter?: () => void;
 }) {
+  // จอแคบเปิดเป็น modal กลางจอ ไม่ใช่ popover ห้อยใต้ปุ่ม
+  // Popover ของ Radix ไม่ล็อกการเลื่อนของหน้าข้างหลัง เลื่อนสุดกล่องแล้วมันไหล
+  // ไปเลื่อนหน้าต่อ ซึ่งบนมือถือแยกไม่ออกว่าอะไรกำลังเลื่อนอยู่
+  // Dialog ล็อกให้ และมีฉากหลังทึบบอกว่าตอนนี้ทำได้แค่ในกล่องนี้
+  //
+  // จอกว้างยังเป็น popover เพราะเปิดค้างแล้วยังเห็นรายการอัปเดตตามที่ติ๊กได้
+  // ถ้าเป็น modal จะกลายเป็นตั้งค่าให้เสร็จก่อนแล้วค่อยดูผล ซึ่งช้ากว่า
+  const narrow = useNarrowScreen();
+
+  const TITLE = "ตัวกรองและการแสดงผล";
+  const DESC = "เลือกได้หลายอย่างพร้อมกัน ไม่เลือกเลยคือดูทั้งหมด";
   // ใช้ไอคอนเดียวกับปุ่มตัวกรองที่หน้าสต็อกและหน้าสูตร
   // ปุ่มทำงานเหมือนกันต้องหน้าตาเหมือนกัน ไม่งั้นคนต้องเรียนรู้ใหม่ทุกหน้า
   // จุดมุมขวาบนบอกว่ามีของถูกซ่อนอยู่ จะได้ไม่ลืมว่าเคยปิดไว้
@@ -91,7 +114,20 @@ export function PackingToolbar({
         </InputGroup>
       </div>
 
-      {filter ? (
+      {filter && narrow ? (
+        <Dialog open={filterOpen} onOpenChange={onFilterOpenChange}>
+          <DialogTrigger asChild>{trigger}</DialogTrigger>
+          {/* overflow-hidden ทับกฎของโหมดจำลองอุปกรณ์ที่ตั้ง overflow-y:auto ไว้
+              ไม่งั้นกล่องทั้งใบจะเลื่อน แล้วปุ่มล้างค่าที่ตรึงไว้ก็เลื่อนตามไปด้วย */}
+          <DialogContent className="flex max-h-[85svh] flex-col gap-0 overflow-hidden! p-0 sm:max-w-md">
+            <DialogHeader className="px-4 pt-4 text-left">
+              <DialogTitle>{TITLE}</DialogTitle>
+              <DialogDescription>{DESC}</DialogDescription>
+            </DialogHeader>
+            {filter}
+          </DialogContent>
+        </Dialog>
+      ) : filter ? (
         <Popover open={filterOpen} onOpenChange={onFilterOpenChange}>
           <PopoverTrigger asChild>{trigger}</PopoverTrigger>
           {/* ความสูงจำกัดด้วยที่ว่างจริงที่ Radix วัดให้ ไม่ใช่ vh
@@ -103,6 +139,10 @@ export function PackingToolbar({
             collisionPadding={12}
             className="flex max-h-(--radix-popover-content-available-height) w-80 flex-col p-0"
           >
+            <PopoverHeader className="px-4 pt-4">
+              <PopoverTitle>{TITLE}</PopoverTitle>
+              <PopoverDescription>{DESC}</PopoverDescription>
+            </PopoverHeader>
             {filter}
           </PopoverContent>
         </Popover>

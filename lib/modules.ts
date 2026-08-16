@@ -116,6 +116,15 @@ export const MODULES: ModuleItem[] = [
   { id: "qc-post", group: "qc", label: "ตรวจหลังผลิต", code: "FM-QC-02-04", icon: "packageCheck" },
   { id: "qc-warehouse", group: "qc", label: "ตรวจคลังสินค้า", code: "FM-ST-01-02", icon: "search" },
   { id: "qc-complaint", group: "qc", label: "ร้องเรียนลูกค้า", code: "FM-PD-01-03", icon: "complaint", pending: 2 },
+  {
+    id: "qc-template",
+    group: "qc",
+    label: "ตั้งค่าเทมเพลตฟอร์ม QC",
+    shortLabel: "เทมเพลต QC",
+    code: "FM-QC-02-03",
+    icon: "clipboardCheck",
+    href: "/qc/setup",
+  },
 
   // ---------- บัญชี ----------
   {
