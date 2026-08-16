@@ -1,7 +1,13 @@
 "use client";
 
 import * as React from "react";
-import { ListIcon, RotateCcwIcon, SlidersHorizontalIcon, TagIcon } from "lucide-react";
+import {
+  ListIcon,
+  RotateCcwIcon,
+  SlidersHorizontalIcon,
+  TagIcon,
+  TriangleAlertIcon,
+} from "lucide-react";
 import { Button } from "@peckey954/ui/components/ui/button";
 import { Checkbox } from "@peckey954/ui/components/ui/checkbox";
 import { Label } from "@peckey954/ui/components/ui/label";
@@ -27,7 +33,8 @@ import { CWIP_VIEW_DEFAULT, type CwipView } from "./packing-cwip";
 export const isCwipDefault = (v: CwipView) =>
   v.showChips === CWIP_VIEW_DEFAULT.showChips &&
   v.showActions === CWIP_VIEW_DEFAULT.showActions &&
-  v.showLots === CWIP_VIEW_DEFAULT.showLots;
+  v.showLots === CWIP_VIEW_DEFAULT.showLots &&
+  v.lowOnly === CWIP_VIEW_DEFAULT.lowOnly;
 
 export function CwipFilter({
   view,
@@ -47,7 +54,29 @@ export function CwipFilter({
         </PopoverDescription>
       </PopoverHeader>
 
+      {/* ผูกค่าเดียวกับชิปสต็อกต่ำด้านบน กดที่ไหนอีกที่ก็ขยับตาม
+          เหมือนหน้าสต็อกทั่วไป คนที่ชินกับที่นั่นจะหาเจอที่นี่ด้วย */}
       <div className="mt-4 space-y-3">
+        <Label className="text-sm">ตัวกรอง</Label>
+        <Label
+          htmlFor="cwip-low"
+          className="flex items-center gap-3 font-normal"
+        >
+          <Checkbox
+            id="cwip-low"
+            checked={view.lowOnly}
+            onCheckedChange={(v) => set({ lowOnly: v === true })}
+          />
+          <span className="flex items-center gap-2">
+            <TriangleAlertIcon className="size-4" />
+            เฉพาะสต็อกต่ำ
+          </span>
+        </Label>
+      </div>
+
+      <Separator className="my-4" />
+
+      <div className="space-y-3">
         <Label className="text-sm">แสดงในรายการ</Label>
 
         <Label

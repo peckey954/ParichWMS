@@ -29,12 +29,15 @@ export type CwipView = {
   showChips: boolean;
   showActions: boolean;
   showLots: boolean;
+  /** กรองเหลือเฉพาะสินค้าที่สต็อกต่ำ — ทำงานร่วมกับชิปสต็อกต่ำด้านบน */
+  lowOnly: boolean;
 };
 
 export const CWIP_VIEW_DEFAULT: CwipView = {
   showChips: true,
   showActions: true,
   showLots: true,
+  lowOnly: false,
 };
 
 export function PackingCwip({

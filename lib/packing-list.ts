@@ -243,3 +243,162 @@ export const formatTon = (n?: number) =>
 
 export const formatQty = (n: number) =>
   n.toLocaleString("th-TH", { maximumFractionDigits: 2 });
+
+// ---------------------------------------------------------------
+// มุมมองอื่นของแท็บสต็อก CWIP
+//
+// สามชุดนี้เป็น "เอกสาร" ไม่ใช่ยอดคงเหลือ จึงเป็นตารางไม่ใช่การ์ดสินค้า
+//   รอรับเข้า      = ใบขอเบิกจากคลังที่ยังไม่ได้รับของเข้าไลน์
+//   รอคืนกลับคลัง  = ใบขอคืนที่ยังไม่ได้ส่งกลับ
+//   ประวัติ        = ทุกการเคลื่อนไหวของ CWIP ที่จบไปแล้ว
+// ---------------------------------------------------------------
+
+const STAFF = ["อลิสา พรสุขสิริ", "ณัฐพงษ์ วิริยะกุล", "ชนิดา แก้วประเสริฐ"];
+const GOODS_KINDS = ["กระสอบ", "ของใช้ในไลน์ผลิต", "คลังสินค้า", "วัตถุดิบปุ๋ย"];
+const GOODS: { name: string; sub: string }[] = [
+  { name: "21-0-0", sub: "ฟูเจียน ผง" },
+  { name: "0-0-60", sub: "เม็ดแดง" },
+  { name: "46-0-0", sub: "เม็ดโฟม" },
+  { name: "8-24-24", sub: "+0.5Mg No filler" },
+];
+
+/** ใบขอเบิก / ใบขอคืน — โครงเดียวกัน ต่างกันแค่คำเรียกในหัวตาราง */
+export type CwipRequest = {
+  id: string;
+  code: string;
+  createdAt: string;
+  /** ประเภทสินค้า */
+  kind: string;
+  name: string;
+  sub: string;
+  /** ตัน — undefined = ใบนี้ยังไม่ได้ระบุ แสดงเป็นขีด */
+  ton?: number;
+  /** ชิ้น — undefined = ยังไม่ได้ระบุ */
+  qty?: number;
+  staff: string;
+  /** ชื่อคนแก้ไขล่าสุด ไม่มี = ยังไม่เคยถูกแก้ */
+  editedBy?: string;
+};
+
+function makeRequests(prefix: string, seed: number, count: number): CwipRequest[] {
+  const r = seeded(seed);
+  return Array.from({ length: count }, (_, i) => {
+    const g = pick(GOODS, r);
+    // สองใบแรกเป็นใบที่เพิ่งเปิด ยังไม่ได้กรอกยอด — ของจริงมีแบบนี้เสมอ
+    const blank = i < 2;
+    return {
+      id: `${prefix}-${i + 1}`,
+      code: `${prefix}2601${pad(15 - (i % 5))}/0${(i % 4) + 1}`,
+      createdAt: `1/${16 - (i % 6)}/2026 | 10:42:52`,
+      kind: pick(GOODS_KINDS, r),
+      name: g.name,
+      sub: g.sub,
+      ton: blank ? undefined : Math.round((40 + r() * 160) / 10) * 10,
+      qty: blank ? undefined : Math.round(5 + r() * 20),
+      staff: pick(STAFF, r),
+      editedBy: r() > 0.6 ? pick(STAFF, r) : undefined,
+    };
+  });
+}
+
+export const CWIP_INBOUND: CwipRequest[] = makeRequests("REQ", 7100, 14);
+export const CWIP_RETURNS: CwipRequest[] = makeRequests("REQ", 7200, 11);
+
+export function matchesRequest(d: CwipRequest, q: string) {
+  const s = q.trim().toLowerCase();
+  return (
+    s === "" ||
+    [d.code, d.name, d.sub, d.kind, d.staff].some((v) =>
+      v.toLowerCase().includes(s)
+    )
+  );
+}
+
+/** สถานะของรายการในประวัติ — คนละชุดกับสถานะใบผลิต */
+export type CwipMoveKind =
+  | "issue"
+  | "return"
+  | "adjust"
+  | "receive"
+  | "failed";
+
+export const MOVE_LABEL: Record<CwipMoveKind, string> = {
+  issue: "เบิกออก",
+  return: "คืนกลับคลัง",
+  adjust: "ปรับปรุง",
+  receive: "รับเข้า",
+  failed: "รับเข้าไม่สำเร็จ",
+};
+
+export type CwipMove = {
+  id: string;
+  code: string;
+  createdAt: string;
+  lot: string;
+  name: string;
+  sub: string;
+  /** ติดลบ = ของออกจากไลน์ บวก = ของเข้า */
+  delta?: number;
+  ton?: number;
+  note?: string;
+  requestedBy?: string;
+  staff: string;
+  editedBy?: string;
+  kind: CwipMoveKind;
+};
+
+const MOVE_NOTE: Partial<Record<CwipMoveKind, string>> = {
+  return: "คืนสินค้า",
+  adjust: "ของแตกเสียหายระหว่างจัดเก็บ",
+  failed: "ไม่มีของ",
+};
+
+const MOVE_POOL: CwipMoveKind[] = [
+  "issue",
+  "return",
+  "return",
+  "issue",
+  "adjust",
+  "adjust",
+  "issue",
+  "receive",
+  "failed",
+];
+
+export const CWIP_HISTORY: CwipMove[] = Array.from({ length: 42 }, (_, i) => {
+  const r = seeded(7300 + i);
+  const g = pick(GOODS, r);
+  const kind = MOVE_POOL[i % MOVE_POOL.length];
+  const size = Math.round(5 + r() * 60) * (kind === "adjust" ? 1 : 10);
+  const failed = kind === "failed";
+  return {
+    id: `mv-${i + 1}`,
+    code: `${kind === "issue" ? "PD" : "REQ"}2601${pad(15 - (i % 5))}/0${(i % 4) + 1}`,
+    createdAt: `1/${16 - (i % 6)}/2026 | 10:42:52`,
+    lot: failed ? "-" : `PO2601${pad(15 - (i % 5))}/01-04`,
+    name: g.name,
+    sub: g.sub,
+    // ของเข้าเป็นบวก ของออกเป็นลบ ประวัติต้องอ่านทิศทางได้จากเครื่องหมาย
+    delta: failed ? undefined : kind === "receive" || kind === "adjust" ? size : -size,
+    ton: failed ? undefined : 10,
+    note: MOVE_NOTE[kind],
+    requestedBy: r() > 0.35 ? pick(STAFF, r) : undefined,
+    staff: pick(STAFF, r),
+    editedBy: r() > 0.7 ? pick(STAFF, r) : undefined,
+    kind,
+  };
+});
+
+export function matchesMove(m: CwipMove, q: string) {
+  const s = q.trim().toLowerCase();
+  return (
+    s === "" ||
+    [m.code, m.lot, m.name, m.sub, m.staff].some((v) =>
+      v.toLowerCase().includes(s)
+    )
+  );
+}
+
+/** ยอดที่โชว์บนชิป — นับจากข้อมูลจริง ไม่ใช่เลขที่พิมพ์ไว้ตายตัว */
+export const cwipLowCount = (products: CwipProduct[]) =>
+  products.filter((p) => p.low).length;

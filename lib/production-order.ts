@@ -34,6 +34,8 @@ export type ProductionOrder = {
   orderedTon: number;
   plannedTon: number;
   requesterName: string;
+  /** คนที่แก้ยอดสั่งผลิตล่าสุด ไม่มี = ใบนี้ยังไม่เคยถูกแก้ */
+  editedBy?: string;
   actualTon: number;
   note: string;
   materials: MaterialLine[];
