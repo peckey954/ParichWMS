@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   ChevronDownIcon,
   MinusIcon,
@@ -62,6 +63,7 @@ import {
 } from "@/lib/production-order";
 
 export default function ProductionOrderPage() {
+  const router = useRouter();
   const [order, setOrder] = React.useState(SEED_ORDER);
 
   const patchMaterial = (id: string, patch: Partial<MaterialLine>) =>
@@ -80,7 +82,6 @@ export default function ProductionOrderPage() {
     setOrder((o) => ({ ...o, materials: [...o.materials, line] }));
 
   const overStock = order.materials.filter((m) => m.useQty > m.stockQty);
-  const sweepRows = order.materials.filter((m) => m.sweepable);
 
   function handleSave() {
     if (overStock.length > 0) {
@@ -90,6 +91,9 @@ export default function ProductionOrderPage() {
     toast.success(`บันทึกใบผลิต ${order.code} แล้ว`, {
       description: `ปริมาณผลิตได้จริง ${formatTon(order.actualTon)} ตัน`,
     });
+    // กลับไปหน้าที่เข้ามา ไม่ใช่ push ไปหน้ารายการตายตัว
+    // เข้ามาจากแท็บผลิตแล้วก็ต้องกลับไปแท็บนั้น พร้อมคำค้นที่พิมพ์ไว้
+    router.back();
   }
 
   return (
@@ -210,6 +214,7 @@ export default function ProductionOrderPage() {
           </Label>
           <Textarea
             id="note"
+            className="bg-card"
             placeholder="ระบุหมายเหตุ"
             rows={3}
             value={order.note}
@@ -290,56 +295,6 @@ export default function ProductionOrderPage() {
           </Alert>
         )}
 
-        {/* ---------- ปุ๋ยกวาดพื้น ---------- */}
-        {sweepRows.length > 0 && (
-          <>
-            <h2 className="mt-8 text-lg font-semibold">ข้อมูลปุ๋ยกวาดพื้น</h2>
-
-            {/* จอแคบ: การ์ด — สามคอลัมน์นี้มีช่องกรอกอยู่ด้วย
-                บีบลงจอ 390px แล้วช่องกรอกเหลือแคบจนกดยาก */}
-            <div className="mt-4 space-y-3 @3xl:hidden">
-              {sweepRows.map((m) => (
-                <SweepCard
-                  key={m.id}
-                  material={m}
-                  onPatch={(patch) => patchMaterial(m.id, patch)}
-                />
-              ))}
-            </div>
-
-            <Card className="mt-4 hidden py-0 @3xl:block">
-              <CardContent className="px-0">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="pl-4">วัตถุดิบ</TableHead>
-                      <TableHead className="w-48 text-right">
-                        ปริมาณกวาดพื้น
-                        <br />
-                        (ตัน)
-                      </TableHead>
-                      <TableHead className="w-40 pr-4 text-right">
-                        ปริมาณสูญเสีย
-                        <br />
-                        (ตัน)
-                      </TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {sweepRows.map((m) => (
-                      <SweepRow
-                        key={m.id}
-                        material={m}
-                        onPatch={(patch) => patchMaterial(m.id, patch)}
-                      />
-                    ))}
-                  </TableBody>
-                </Table>
-              </CardContent>
-            </Card>
-          </>
-        )}
-
       </main>
 
       {/* ---------- แถบปุ่มล่าง ---------- */}
@@ -382,7 +337,7 @@ function MaterialRow({
       </TableCell>
       <TableCell className="align-top">
         <Select value={m.lot} onValueChange={(lot) => onPatch({ lot })}>
-          <SelectTrigger className="w-full" aria-label={`Lot ของ ${m.name}`}>
+          <SelectTrigger className="w-full bg-card" aria-label={`Lot ของ ${m.name}`}>
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -413,7 +368,7 @@ function MaterialRow({
           {...qtyField}
           aria-invalid={over}
           aria-label={`จำนวนที่ใช้ของ ${m.name}`}
-          className="ml-auto w-24 text-right"
+          className="ml-auto w-24 bg-card text-right"
         />
       </TableCell>
       <TableCell className="pr-4 align-top">
@@ -430,39 +385,6 @@ function MaterialRow({
   );
 }
 
-function SweepRow({
-  material: m,
-  onPatch,
-}: {
-  material: MaterialLine;
-  onPatch: (patch: Partial<MaterialLine>) => void;
-}) {
-  const sweepField = useNumberField(
-    m.sweepTon,
-    (sweepTon) => onPatch({ sweepTon }),
-    2
-  );
-
-  return (
-    <TableRow>
-      <TableCell className="pl-4">
-        <div className="font-medium">{m.name}</div>
-        {m.sub && <div className="text-xs text-muted-foreground">{m.sub}</div>}
-      </TableCell>
-      <TableCell>
-        <Input
-          {...sweepField}
-          aria-label={`ปริมาณกวาดพื้นของ ${m.name}`}
-          className="ml-auto w-32 text-right"
-        />
-      </TableCell>
-      {/* ปุ๋ยที่กวาดพื้นได้ = ส่วนที่หลุดออกจากไลน์ ถือเป็นปริมาณสูญเสียของล็อตนั้น */}
-      <TableCell className="pr-4 text-right whitespace-nowrap">
-        {m.sweepTon > 0 ? formatTon(m.sweepTon) : "-"}
-      </TableCell>
-    </TableRow>
-  );
-}
 
 /**
  * การ์ดวัตถุดิบสำหรับจอแคบ
@@ -507,7 +429,7 @@ function MaterialCard({
       <div className="mt-3 space-y-1.5">
         <Label htmlFor={`lot-${m.id}`}>Lot</Label>
         <Select value={m.lot} onValueChange={(lot) => onPatch({ lot })}>
-          <SelectTrigger id={`lot-${m.id}`} className="w-full">
+          <SelectTrigger id={`lot-${m.id}`} className="w-full bg-card">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -550,7 +472,7 @@ function MaterialCard({
           {...qtyField}
           id={`qty-${m.id}`}
           aria-invalid={over}
-          className="w-28 text-right"
+          className="w-28 bg-card text-right"
         />
       </div>
     </div>
@@ -581,42 +503,6 @@ function CardLine({
   );
 }
 
-/** ปุ๋ยกวาดพื้นสำหรับจอแคบ — ช่องกรอกได้ความกว้างเต็มแทนที่จะโดนบีบในตาราง */
-function SweepCard({
-  material: m,
-  onPatch,
-}: {
-  material: MaterialLine;
-  onPatch: (patch: Partial<MaterialLine>) => void;
-}) {
-  const sweepField = useNumberField(
-    m.sweepTon,
-    (sweepTon) => onPatch({ sweepTon }),
-    2
-  );
-
-  return (
-    <div className="rounded-xl border border-border bg-card p-4">
-      <p className="font-medium">{m.name}</p>
-      {m.sub && <p className="text-sm text-muted-foreground">{m.sub}</p>}
-
-      <div className="mt-3 space-y-1.5">
-        <Label htmlFor={`sweep-${m.id}`}>ปริมาณกวาดพื้น (ตัน)</Label>
-        <Input {...sweepField} id={`sweep-${m.id}`} className="text-right" />
-      </div>
-
-      {/* ปุ๋ยที่กวาดพื้นได้ = ส่วนที่หลุดออกจากไลน์ ถือเป็นปริมาณสูญเสียของล็อตนั้น */}
-      <dl className="mt-3 text-sm">
-        <div className="flex items-baseline justify-between gap-3">
-          <dt className="text-muted-foreground">ปริมาณสูญเสีย (ตัน):</dt>
-          <dd className="font-semibold tabular-nums">
-            {m.sweepTon > 0 ? formatTon(m.sweepTon) : "-"}
-          </dd>
-        </div>
-      </dl>
-    </div>
-  );
-}
 
 function TonStepper({
   id,
@@ -632,7 +518,8 @@ function TonStepper({
     onValueChange(Math.max(0, Number((value + delta).toFixed(2))));
 
   return (
-    <InputGroup>
+    // พื้นขาวตัดกับพื้นเทาของหน้า ไม่งั้นช่องกรอกกลืนไปกับพื้นจนดูเหมือนข้อความเฉย ๆ
+    <InputGroup className="bg-card">
       <InputGroupAddon align="inline-start">
         <InputGroupButton
           size="icon-xs"

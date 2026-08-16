@@ -3,16 +3,31 @@ import { cn } from "@peckey954/ui/lib/utils";
 
 export type OrderStatus = "waiting" | "running" | "done" | "cancelled";
 
-// สีมาจาก tone ของ Badge ทั้งหมด ไม่ตั้ง class สีเอง
-// DS ไม่มี tone "info" — "กำลังผลิต" จึงใช้ brand ซึ่งเป็นสีแบรนด์ สื่อว่ากำลังทำอยู่
-const STATUS: Record<
-  OrderStatus,
-  { label: string; tone: React.ComponentProps<typeof Badge>["tone"] }
-> = {
-  waiting: { label: "รอผลิต", tone: "warning" },
-  running: { label: "กำลังผลิต", tone: "brand" },
-  done: { label: "ผลิตเสร็จ", tone: "success" },
-  cancelled: { label: "ยกเลิก", tone: "neutral" },
+/**
+ * ป้ายสถานะใบผลิต — ใช้สีชุดเดียวกับป้ายในหน้ารายการ
+ *
+ * เดิมหน้านี้ใช้ tone ของ Badge (warning/brand/success) ส่วนหน้ารายการใช้ชิป
+ * ใบเดียวกันจึงเป็นคนละสีระหว่างสองหน้า กดเข้ามาแล้วเหมือนเปลี่ยนสถานะไปเอง
+ *
+ * เขียนคลาสเต็มทุกตัว ห้ามประกอบชื่อด้วย template string
+ */
+const STATUS: Record<OrderStatus, { label: string; chip: string }> = {
+  waiting: {
+    label: "รอผลิต",
+    chip: "[--bdg-surface:var(--chip-yellow)] [--bdg-text:var(--chip-yellow-foreground)]",
+  },
+  running: {
+    label: "กำลังผลิต",
+    chip: "[--bdg-surface:var(--chip-lime)] [--bdg-text:var(--chip-lime-foreground)]",
+  },
+  done: {
+    label: "ผลิตเสร็จ",
+    chip: "[--bdg-surface:var(--chip-blue)] [--bdg-text:var(--chip-blue-foreground)]",
+  },
+  cancelled: {
+    label: "ยกเลิก",
+    chip: "[--bdg-surface:var(--chip-red)] [--bdg-text:var(--chip-red-foreground)]",
+  },
 };
 
 export function StatusBadge({
@@ -24,7 +39,10 @@ export function StatusBadge({
 }) {
   const s = STATUS[status];
   return (
-    <Badge tone={s.tone} appearance="soft" className={cn(className)}>
+    <Badge
+      appearance="soft"
+      className={cn("[--bdg-border:transparent] font-semibold", s.chip, className)}
+    >
       {s.label}
     </Badge>
   );

@@ -52,8 +52,9 @@ const PAGE_SIZE = 12;
 const STAGE_CHIP: Record<OrderStage, string> = {
   waiting:
     "[--bdg-surface:var(--chip-yellow)] [--bdg-text:var(--chip-yellow-foreground)]",
+  // กำลังผลิต = เขียวมะนาว อ่อนกว่าเขียวปกติ แยกจากสถานะอื่นได้ชัดจากระยะไกล
   running:
-    "[--bdg-surface:var(--chip-green)] [--bdg-text:var(--chip-green-foreground)]",
+    "[--bdg-surface:var(--chip-lime)] [--bdg-text:var(--chip-lime-foreground)]",
   qc: "[--bdg-surface:var(--chip-orange)] [--bdg-text:var(--chip-orange-foreground)]",
   done: "[--bdg-surface:var(--chip-blue)] [--bdg-text:var(--chip-blue-foreground)]",
 };

@@ -124,6 +124,10 @@
   --chip-yellow-foreground: #ca8a04;
   --chip-green: #f0fdf4;
   --chip-green-foreground: #16a34a;
+  /* เขียวมะนาว — อ่อนและอมเหลืองกว่าเขียวปกติ ใช้กับสถานะที่กำลังเดินอยู่
+     แยกออกมาเป็นสีของตัวเอง ไม่ไปแก้ --chip-green ที่ของอื่นใช้อยู่ */
+  --chip-lime: #f7fee7;
+  --chip-lime-foreground: #65a30d;
   --chip-red: #fef2f2;
   --chip-red-foreground: #dc2626;
   --chip-pink: #fdf2f8;
@@ -149,6 +153,8 @@
   --chip-yellow-foreground: #facc15;
   --chip-green: #052e16;
   --chip-green-foreground: #4ade80;
+  --chip-lime: #1a2e05;
+  --chip-lime-foreground: #a3e635;
   --chip-red: #450a0a;
   --chip-red-foreground: #f87171;
   --chip-pink: #500724;
@@ -230,6 +236,8 @@
   --color-cat-sky: var(--cat-sky);
   --color-cat-sky-foreground: var(--cat-sky-foreground);
 
+  --color-chip-lime: var(--chip-lime);
+  --color-chip-lime-foreground: var(--chip-lime-foreground);
   --color-chip-yellow: var(--chip-yellow);
   --color-chip-green-foreground: var(--chip-green-foreground);
   --color-chip-yellow-foreground: var(--chip-yellow-foreground);
