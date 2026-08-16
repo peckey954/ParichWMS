@@ -31,6 +31,8 @@ export function PackingToolbar({
   filter,
   filterActive,
   filterCount,
+  filterOpen,
+  onFilterOpenChange,
   onFilter,
 }: {
   query: string;
@@ -43,6 +45,9 @@ export function PackingToolbar({
   filterActive?: boolean;
   /** จำนวนเงื่อนไขที่กรองของออกอยู่ — มากกว่า 0 จะโชว์เป็นตัวเลขแทนจุด */
   filterCount?: number;
+  /** สั่งเปิด/ปิดจากข้างนอกได้ แถวสรุปตัวกรองกด "+2" แล้วต้องเปิดกล่องนี้ */
+  filterOpen?: boolean;
+  onFilterOpenChange?: (v: boolean) => void;
   onFilter?: () => void;
 }) {
   // ใช้ไอคอนเดียวกับปุ่มตัวกรองที่หน้าสต็อกและหน้าสูตร
@@ -87,9 +92,14 @@ export function PackingToolbar({
       </div>
 
       {filter ? (
-        <Popover>
+        <Popover open={filterOpen} onOpenChange={onFilterOpenChange}>
           <PopoverTrigger asChild>{trigger}</PopoverTrigger>
-          <PopoverContent align="end" className="w-72">
+          {/* จำกัดความสูงแล้วเลื่อนข้างใน — ตัวกรองยาวกว่าจอมือถือ
+              ไม่จำกัดไว้ ของที่อยู่ท้ายกล่องจะหลุดออกนอกจอจนกดไม่ถึง */}
+          <PopoverContent
+            align="end"
+            className="max-h-[70vh] w-72 overflow-y-auto"
+          >
             {filter}
           </PopoverContent>
         </Popover>

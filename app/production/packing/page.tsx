@@ -27,6 +27,7 @@ import {
   cwipActiveCount,
   isCwipDefault,
 } from "@/components/production/cwip-filter";
+import { CwipActiveFilters } from "@/components/production/cwip-active-filters";
 import { PackingOrders } from "@/components/production/packing-orders";
 import {
   CwipHistoryList,
@@ -85,6 +86,7 @@ export default function PackingListPage() {
   // สิ่งที่เลือกซ่อน/แสดงได้ในแท็บ CWIP — ตัวกรองเป็นเจ้าของค่าชุดนี้
   const [cwipView, setCwipView] = React.useState<CwipView>(CWIP_VIEW_DEFAULT);
   const [cwipChip, setCwipChip] = React.useState<CwipChip>("stock");
+  const [filterOpen, setFilterOpen] = React.useState(false);
   // สถานะที่คนคุมไลน์กดเปลี่ยนเอง เก็บทับของเดิมเฉพาะใบที่ถูกแก้
   const [stages, setStages] = React.useState<Record<string, OrderStage>>({});
   // เลื่อนลงซ่อนแถบค้นหา เลื่อนขึ้นเอากลับมา แบบเดียวกับหน้าสต็อกทั่วไป
@@ -288,8 +290,20 @@ export default function PackingListPage() {
                 ? cwipActiveCount(cwipView)
                 : undefined
             }
+            filterOpen={filterOpen}
+            onFilterOpenChange={setFilterOpen}
             onFilter={() => soon("ตัวกรอง")}
           />
+
+          {/* บอกว่ากรองอะไรอยู่ อยู่ติดกับรายการเพราะมันอธิบายรายการ
+              ไม่มีอะไรกรองก็ไม่มีแถวนี้ ไม่จองที่ว่างไว้ */}
+          {tab === "cwip" && isStockView && (
+            <CwipActiveFilters
+              view={cwipView}
+              onChange={setCwipView}
+              onOpenFilter={() => setFilterOpen(true)}
+            />
+          )}
 
         </div>
       </StickyToolbar>
