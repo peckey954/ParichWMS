@@ -7,10 +7,8 @@ import { Checkbox } from "@peckey954/ui/components/ui/checkbox";
 import { Label } from "@peckey954/ui/components/ui/label";
 import { MultiSelect } from "@peckey954/ui/components/ui/multi-select";
 import { Separator } from "@peckey954/ui/components/ui/separator";
-import {
-  ToggleGroup,
-  ToggleGroupItem,
-} from "@peckey954/ui/components/ui/toggle-group";
+import { useNarrowScreen } from "@/components/device-preview";
+import { SortControl, type SortOption } from "@/components/sort-control";
 import {
   CONDITION_LABEL,
   STOCK_PRODUCT_NAMES,
@@ -70,23 +68,17 @@ export const stockActiveCount = (v: StockView) =>
   (v.products.length > 0 ? 1 : 0) +
   (v.conditions.length > 0 ? 1 : 0);
 
-const SORTS: { id: StockSort; label: string }[] = [
-  { id: "product", label: "สินค้า" },
-  { id: "zone", label: "โซน" },
-  { id: "fifo", label: "FIFO" },
-];
-
 /**
  * ป้ายของทิศทางเปลี่ยนตามสิ่งที่เรียง ไม่ใช่ "น้อยไปมาก" ลอย ๆ
  *
  * FIFO กลับทิศแล้วมันคือ LIFO ไม่ใช่ FIFO อีกต่อไป
  * เขียนว่า "มากไปน้อย" คนจะไม่รู้ว่าเพิ่งเปลี่ยนหลักการหยิบของทั้งคลัง
  */
-const DIR_LABEL: Record<StockSort, { asc: string; desc: string }> = {
-  product: { asc: "ก → ฮ", desc: "ฮ → ก" },
-  zone: { asc: "A → Z", desc: "Z → A" },
-  fifo: { asc: "เก่าสุดก่อน", desc: "ใหม่สุดก่อน" },
-};
+export const STOCK_SORTS: SortOption<StockSort>[] = [
+  { id: "product", label: "สินค้า", asc: "ก → ฮ", desc: "ฮ → ก" },
+  { id: "zone", label: "โซน", asc: "A → Z", desc: "Z → A" },
+  { id: "fifo", label: "FIFO", asc: "เก่าสุดก่อน", desc: "ใหม่สุดก่อน" },
+];
 
 const asOptions = (values: string[]) =>
   values.map((v) => ({ value: v, label: v }));
@@ -108,47 +100,28 @@ export function StockFilter({
   const set = (next: Partial<StockView>) =>
     setDraft((prev) => ({ ...prev, ...next }));
 
-  const dir = DIR_LABEL[draft.sort];
+  // จอกว้างการเรียงอยู่นอกกล่องแล้ว มีในนี้อีกก็ซ้ำ
+  // จอแคบไม่มีที่ในแถบเครื่องมือ จึงเก็บไว้ในนี้
+  const narrow = useNarrowScreen();
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
-        {/* ---------- 1. เรียงตาม ----------
-             ไม่ได้เปลี่ยนแค่ลำดับ แต่เปลี่ยนหน่วยของรายการไปเลย
-             สินค้า = กลุ่มตามสินค้า · โซน = กลุ่มตามโซน · FIFO = ไล่ล็อตรวด */}
-        <Label className="text-sm">เรียงตาม</Label>
-        <ToggleGroup
-          type="single"
-          variant="outline"
-          value={draft.sort}
-          onValueChange={(v) => v && set({ sort: v as StockSort })}
-          className="mt-2 w-full"
-        >
-          {SORTS.map((s) => (
-            <ToggleGroupItem key={s.id} value={s.id} className="h-10 flex-1">
-              {s.label}
-            </ToggleGroupItem>
-          ))}
-        </ToggleGroup>
+        {narrow && (
+          <>
+            <Label className="text-sm">เรียงตาม</Label>
+            <SortControl
+              options={STOCK_SORTS}
+              value={draft.sort}
+              dir={draft.dir}
+              onChange={(sort, dir) => set({ sort, dir })}
+              className="mt-2 w-full justify-between"
+            />
+            <Separator className="my-4" />
+          </>
+        )}
 
-        <ToggleGroup
-          type="single"
-          variant="outline"
-          value={draft.dir}
-          onValueChange={(v) => v && set({ dir: v as SortDir })}
-          className="mt-2 w-full"
-        >
-          <ToggleGroupItem value="asc" className="h-10 flex-1">
-            {dir.asc}
-          </ToggleGroupItem>
-          <ToggleGroupItem value="desc" className="h-10 flex-1">
-            {dir.desc}
-          </ToggleGroupItem>
-        </ToggleGroup>
-
-        <Separator className="my-4" />
-
-        {/* ---------- 2. แสดงในรายการ ---------- */}
+        {/* ---------- แสดงในรายการ ---------- */}
         <Label className="text-sm">แสดงในรายการ</Label>
         <div className="mt-1 space-y-0.5">
           <CheckRow
@@ -182,7 +155,7 @@ export function StockFilter({
 
         <Separator className="my-4" />
 
-        {/* ---------- 3. กรองข้อมูล ---------- */}
+        {/* ---------- กรองข้อมูล ---------- */}
         <Label className="text-sm">กรองข้อมูล</Label>
         <div className="mt-2 space-y-3">
           <Field id="stock-zones" label="โซน">

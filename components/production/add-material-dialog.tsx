@@ -1,8 +1,16 @@
 "use client";
 
 import * as React from "react";
-import { PlusIcon } from "lucide-react";
+import { ChevronDownIcon, PlusIcon } from "lucide-react";
 import { Button } from "@peckey954/ui/components/ui/button";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@peckey954/ui/components/ui/command";
 import {
   Dialog,
   DialogClose,
@@ -16,6 +24,11 @@ import {
 import { Label } from "@peckey954/ui/components/ui/label";
 import { MultiSelect } from "@peckey954/ui/components/ui/multi-select";
 import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@peckey954/ui/components/ui/popover";
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -24,7 +37,14 @@ import {
 } from "@peckey954/ui/components/ui/select";
 import { cn } from "@peckey954/ui/lib/utils";
 import { formatDate, formatNumber, formatTon } from "@/lib/format";
-import { ADDABLE_MATERIALS, type MaterialLine } from "@/lib/production-order";
+import {
+  ADDABLE_MATERIALS,
+  LOW_STOCK_TON,
+  materialTotalPieces,
+  materialTotalTon,
+  type AddableMaterial,
+  type MaterialLine,
+} from "@/lib/production-order";
 
 /* ------------------------------------------------------------------
    เพิ่มวัตถุดิบ/สินค้าเข้าใบผลิต — เลือกไล่ระดับ ประเภท > สินค้า > ล็อต
@@ -34,6 +54,9 @@ import { ADDABLE_MATERIALS, type MaterialLine } from "@/lib/production-order";
 
    เปลี่ยนประเภท/สินค้าแล้วล้างตัวเลือกที่อยู่ใต้มันทิ้งเสมอ
    ไม่งั้นจะค้าง Lot ของสินค้าเก่าไว้ทั้งที่หน้าจอเปลี่ยนไปแล้ว
+
+   สินค้าเป็นดรอปดาวน์ค้นหาได้ ไม่ใช่ Select ธรรมดา — ของจริงมีเป็นสิบต่อประเภท
+   ไล่กดทีละอันไม่ไหว ต้องพิมพ์ชื่อหาเอา แถมเห็นยอดรวมทั้งหมดต่อแถวก่อนเลือกด้วย
 ------------------------------------------------------------------ */
 
 export function AddMaterialDialog({
@@ -169,23 +192,13 @@ export function AddMaterialDialog({
 
             <div className="space-y-1.5">
               <Label htmlFor="am-material">สินค้า</Label>
-              <Select
+              <ProductCombobox
+                id="am-material"
+                materials={materialsInCategory}
                 value={materialId}
                 onValueChange={handleMaterialChange}
                 disabled={!categoryId}
-              >
-                <SelectTrigger id="am-material" className="w-full bg-card">
-                  <SelectValue placeholder="เลือกสินค้า" />
-                </SelectTrigger>
-                <SelectContent>
-                  {materialsInCategory.map((m) => (
-                    <SelectItem key={m.id} value={m.id}>
-                      {m.name}
-                      {m.sub ? ` ${m.sub}` : ""}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              />
             </div>
 
             <div className="space-y-1.5">
@@ -232,5 +245,132 @@ export function AddMaterialDialog({
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  );
+}
+
+/**
+ * ดรอปดาวน์เลือกสินค้าแบบค้นหาได้ — เลือกได้ทีละตัว ต่างจาก Lot ที่เลือกได้หลายก้อน
+ *
+ * แต่ละแถวโชว์ยอดรวมทุกล็อตของสินค้านั้นไว้ท้ายแถว ให้กะสต็อกได้ก่อนเปิดดู Lot จริง
+ * ยอดต่ำกว่าเกณฑ์ขึ้นแดงเตือนเหมือนที่ทำไว้ในรายการ Lot
+ */
+function ProductCombobox({
+  id,
+  materials,
+  value,
+  onValueChange,
+  disabled,
+}: {
+  id?: string;
+  materials: AddableMaterial[];
+  value?: string;
+  onValueChange: (id: string) => void;
+  disabled?: boolean;
+}) {
+  const [open, setOpen] = React.useState(false);
+  const [search, setSearch] = React.useState("");
+  const selected = materials.find((m) => m.id === value);
+  const listId = React.useId();
+
+  const filtered = React.useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return materials;
+    return materials.filter((m) =>
+      `${m.name} ${m.sub ?? ""}`.toLowerCase().includes(q)
+    );
+  }, [materials, search]);
+
+  return (
+    <Popover
+      open={open}
+      onOpenChange={(next) => {
+        if (disabled && next) return;
+        setOpen(next);
+        if (!next) setSearch("");
+      }}
+    >
+      <PopoverTrigger asChild>
+        <button
+          id={id}
+          type="button"
+          role="combobox"
+          aria-expanded={open}
+          aria-controls={listId}
+          disabled={disabled}
+          data-state={open ? "open" : "closed"}
+          className={cn(
+            "flex h-9 w-full items-center justify-between gap-2 rounded-md border border-input bg-card px-3 py-1.5 text-sm shadow-xs outline-none transition-[color,box-shadow]",
+            "focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50",
+            "data-[state=open]:border-ring data-[state=open]:ring-[3px] data-[state=open]:ring-ring/50",
+            "disabled:cursor-not-allowed disabled:opacity-50"
+          )}
+        >
+          <span
+            className={cn(
+              "truncate text-left",
+              !selected && "text-muted-foreground"
+            )}
+          >
+            {selected ? `${selected.name}${selected.sub ? ` ${selected.sub}` : ""}` : "เลือกสินค้า"}
+          </span>
+          <ChevronDownIcon
+            className={cn(
+              "size-4 shrink-0 text-muted-foreground transition-transform",
+              open && "rotate-180"
+            )}
+          />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent
+        id={listId}
+        align="start"
+        className="w-(--radix-popover-trigger-width) min-w-(--radix-popover-trigger-width) p-0"
+      >
+        <Command shouldFilter={false}>
+          <CommandInput
+            value={search}
+            onValueChange={setSearch}
+            placeholder="ค้นหา"
+          />
+          <CommandList className="max-h-72">
+            <CommandEmpty>ไม่พบรายการที่ค้นหา</CommandEmpty>
+            <CommandGroup>
+              {filtered.map((m) => {
+                const low =
+                  m.tonPerUnit !== null &&
+                  materialTotalTon(m) < LOW_STOCK_TON;
+                return (
+                  <CommandItem
+                    key={m.id}
+                    value={m.id}
+                    onSelect={() => {
+                      onValueChange(m.id);
+                      setOpen(false);
+                      setSearch("");
+                    }}
+                    className="justify-between gap-3"
+                  >
+                    <span className="truncate">
+                      {m.name}
+                      {m.sub ? ` ${m.sub}` : ""}
+                    </span>
+                    <span
+                      className={cn(
+                        "shrink-0 font-medium tabular-nums",
+                        low && "text-danger-strong"
+                      )}
+                    >
+                      {m.tonPerUnit === null
+                        ? `${formatNumber(materialTotalPieces(m))} ${m.suggestUnit}`
+                        : `${formatTon(materialTotalTon(m))} ตัน`}
+                    </span>
+                  </CommandItem>
+                );
+              })}
+            </CommandGroup>
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
   );
 }

@@ -7,10 +7,8 @@ import { Checkbox } from "@peckey954/ui/components/ui/checkbox";
 import { Label } from "@peckey954/ui/components/ui/label";
 import { MultiSelect } from "@peckey954/ui/components/ui/multi-select";
 import { Separator } from "@peckey954/ui/components/ui/separator";
-import {
-  ToggleGroup,
-  ToggleGroupItem,
-} from "@peckey954/ui/components/ui/toggle-group";
+import { useNarrowScreen } from "@/components/device-preview";
+import { SortControl, type SortOption } from "@/components/sort-control";
 import { CWIP_VIEW_DEFAULT, type CwipView } from "./packing-cwip";
 import {
   CWIP_KINDS,
@@ -44,6 +42,7 @@ export const isCwipDefault = (v: CwipView) =>
   v.showLots === CWIP_VIEW_DEFAULT.showLots &&
   v.lowOnly === CWIP_VIEW_DEFAULT.lowOnly &&
   v.sort === CWIP_VIEW_DEFAULT.sort &&
+  v.dir === CWIP_VIEW_DEFAULT.dir &&
   v.kinds.length === 0 &&
   v.zones.length === 0 &&
   v.products.length === 0;
@@ -55,10 +54,11 @@ export const cwipActiveCount = (v: CwipView) =>
   (v.zones.length > 0 ? 1 : 0) +
   (v.products.length > 0 ? 1 : 0);
 
-const SORTS: { id: CwipSort; label: string }[] = [
-  { id: "product", label: "สูตร" },
-  { id: "zone", label: "โซน" },
-  { id: "fifo", label: "FIFO" },
+/** ป้ายทิศทางต่างกันตามสิ่งที่เรียง — FIFO กลับทิศแล้วมันคือ LIFO */
+export const CWIP_SORTS: SortOption<CwipSort>[] = [
+  { id: "product", label: "สูตร", asc: "ก → ฮ", desc: "ฮ → ก" },
+  { id: "zone", label: "โซน", asc: "A → Z", desc: "Z → A" },
+  { id: "fifo", label: "FIFO", asc: "เก่าสุดก่อน", desc: "ใหม่สุดก่อน" },
 ];
 
 const asOptions = (values: string[]) =>
@@ -78,6 +78,9 @@ export function CwipFilter({
   const set = (next: Partial<CwipView>) =>
     setDraft((prev) => ({ ...prev, ...next }));
 
+  // จอกว้างการเรียงอยู่นอกกล่องแล้ว มีในนี้อีกก็ซ้ำ
+  const narrow = useNarrowScreen();
+
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       {/* หัวข้อมาจากกล่องที่ครอบอยู่ เพราะ Popover กับ Dialog
@@ -85,25 +88,21 @@ export function CwipFilter({
 
       {/* เลื่อนเฉพาะตรงนี้ หัวข้อกับแถวปุ่มอยู่นอกกรอบที่เลื่อน */}
       <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
-        {/* ---------- 1. เรียงตาม ---------- */}
-        <Label className="text-sm">เรียงตาม</Label>
-        <ToggleGroup
-          type="single"
-          variant="outline"
-          value={draft.sort}
-          onValueChange={(v) => v && set({ sort: v as CwipSort })}
-          className="mt-2 w-full"
-        >
-          {SORTS.map((s) => (
-            <ToggleGroupItem key={s.id} value={s.id} className="h-10 flex-1">
-              {s.label}
-            </ToggleGroupItem>
-          ))}
-        </ToggleGroup>
+        {narrow && (
+          <>
+            <Label className="text-sm">เรียงตาม</Label>
+            <SortControl
+              options={CWIP_SORTS}
+              value={draft.sort}
+              dir={draft.dir}
+              onChange={(sort, dir) => set({ sort, dir })}
+              className="mt-2 w-full justify-between"
+            />
+            <Separator className="my-4" />
+          </>
+        )}
 
-        <Separator className="my-4" />
-
-        {/* ---------- 2. แสดงในรายการ ---------- */}
+        {/* ---------- แสดงในรายการ ---------- */}
         <Label className="text-sm">แสดงในรายการ</Label>
         <div className="mt-1 space-y-0.5">
           <CheckRow
@@ -135,7 +134,7 @@ export function CwipFilter({
 
         <Separator className="my-4" />
 
-        {/* ---------- 3. กรองข้อมูล ----------
+        {/* ---------- กรองข้อมูล ----------
              ของจริงมีเป็นสิบ ไล่กดทีละอันไม่ไหว ต้องพิมพ์ชื่อหาเอา */}
         <Label className="text-sm">กรองข้อมูล</Label>
         <div className="mt-2 space-y-3">

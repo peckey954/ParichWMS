@@ -132,16 +132,17 @@ export type AddableMaterial = {
   lotOptions: LotOption[];
 };
 
+/** เรียงตามลำดับที่อยากให้ขึ้นในดรอปดาวน์ประเภทสินค้า */
 export const ADDABLE_MATERIALS: AddableMaterial[] = [
   {
     id: "m-46-0-0",
-    category: "วัตถุดิบแม่ปุ๋ย",
+    category: "วัตถุดิบปุ๋ยจัมโบ้",
     name: "46-0-0",
     sub: "ยูเรีย เม็ด",
     suggestQty: 12,
     suggestDigits: 2,
     suggestUnit: "ตัน",
-    tonPerUnit: 0.5,
+    tonPerUnit: 1,
     sweepable: true,
     lotOptions: [
       {
@@ -149,11 +150,41 @@ export const ADDABLE_MATERIALS: AddableMaterial[] = [
         zone: "A-9M",
         receivedAt: "2026-05-14",
         ageDays: 44,
-        pieces: 500,
+        pieces: 80,
         ton: 80,
       },
       {
         code: "PO260116/05-08",
+        zone: "A-9M",
+        receivedAt: "2026-05-14",
+        ageDays: 44,
+        pieces: 2,
+        ton: 2,
+        low: true,
+      },
+    ],
+  },
+  {
+    id: "m-21-0-0-add",
+    category: "วัตถุดิบปุ๋ยกระสอบ",
+    name: "21-0-0",
+    sub: "ฟูเจี้ยน ผง",
+    suggestQty: 20,
+    suggestDigits: 2,
+    suggestUnit: "ตัน",
+    tonPerUnit: 0.8,
+    sweepable: true,
+    lotOptions: [
+      {
+        code: "PO260115/01-04",
+        zone: "A-9M",
+        receivedAt: "2026-05-14",
+        ageDays: 44,
+        pieces: 500,
+        ton: 80,
+      },
+      {
+        code: "PO260115/05-08",
         zone: "A-9M",
         receivedAt: "2026-05-14",
         ageDays: 44,
@@ -162,7 +193,7 @@ export const ADDABLE_MATERIALS: AddableMaterial[] = [
         low: true,
       },
       {
-        code: "PO260117/01-02",
+        code: "PO260115/09-10",
         zone: "B-3L",
         receivedAt: "2026-05-20",
         ageDays: 38,
@@ -173,10 +204,10 @@ export const ADDABLE_MATERIALS: AddableMaterial[] = [
     ],
   },
   {
-    id: "m-0-0-60",
-    category: "วัตถุดิบแม่ปุ๋ย",
+    id: "m-0-0-60-add",
+    category: "วัตถุดิบปุ๋ยกระสอบ",
     name: "0-0-60",
-    sub: "โพแทสเซียมคลอไรด์",
+    sub: "เม็ดแดง",
     suggestQty: 8,
     suggestDigits: 2,
     suggestUnit: "ตัน",
@@ -184,27 +215,105 @@ export const ADDABLE_MATERIALS: AddableMaterial[] = [
     sweepable: true,
     lotOptions: [
       {
-        code: "PO260115/02-05",
+        code: "PO260114/02-05",
         zone: "A-4K",
         receivedAt: "2026-05-10",
         ageDays: 48,
-        pieces: 31,
-        ton: 25,
+        pieces: 500,
+        ton: 80,
       },
+    ],
+  },
+  {
+    id: "m-magnesium",
+    category: "วัตถุดิบปุ๋ยกระสอบ",
+    name: "แมกนีเซียม",
+    suggestQty: 2,
+    suggestDigits: 2,
+    suggestUnit: "ตัน",
+    tonPerUnit: 0.8,
+    sweepable: true,
+    lotOptions: [
       {
-        code: "PO260115/06-07",
-        zone: "A-4K",
-        receivedAt: "2026-05-22",
-        ageDays: 36,
-        pieces: 5,
-        ton: 4,
+        code: "PO260113/07-01",
+        zone: "C-2S",
+        receivedAt: "2026-05-02",
+        ageDays: 56,
+        pieces: 13,
+        ton: 2,
         low: true,
       },
     ],
   },
   {
+    // ต้องไม่ใช่ "m-sack" — id นั้นชนกับวัตถุดิบที่ seed ไว้ในใบผลิตอยู่แล้ว
+    // ชนแล้ว existingIds จะกรองรายการนี้ทิ้ง ประเภท "กระสอบ" เลยหายไปทั้งหมวดจากดรอปดาวน์
+    id: "m-sack-add",
+    category: "กระสอบ",
+    name: "กระสอบ",
+    sub: "50 กก.",
+    suggestQty: 20,
+    suggestDigits: 0,
+    suggestUnit: "ใบ",
+    tonPerUnit: null,
+    sweepable: false,
+    lotOptions: [
+      {
+        code: "PO260112/04-02",
+        zone: "D-1S",
+        receivedAt: "2026-05-01",
+        ageDays: 57,
+        pieces: 2000,
+        ton: 0,
+      },
+    ],
+  },
+  {
+    // เหตุผลเดียวกับ "m-sack-add" — เลี่ยง id ชนกับที่ seed ไว้ในใบผลิต
+    id: "m-sticker-add",
+    category: "สติกเกอร์",
+    name: "สติกเกอร์",
+    sub: "รุ่นมาตรฐาน",
+    suggestQty: 1000,
+    suggestDigits: 0,
+    suggestUnit: "ชิ้น",
+    tonPerUnit: null,
+    sweepable: false,
+    lotOptions: [
+      {
+        code: "PO260112/04-06",
+        zone: "D-1S",
+        receivedAt: "2026-05-01",
+        ageDays: 57,
+        pieces: 5000,
+        ton: 0,
+      },
+    ],
+  },
+  {
+    id: "m-giveaway",
+    category: "ของแจกของแถม",
+    name: "พัดลมมือถือ",
+    sub: "ของแถมโปรโมชั่น",
+    suggestQty: 200,
+    suggestDigits: 0,
+    suggestUnit: "ชิ้น",
+    tonPerUnit: null,
+    sweepable: false,
+    lotOptions: [
+      {
+        code: "PO260110/01-01",
+        zone: "E-1S",
+        receivedAt: "2026-04-20",
+        ageDays: 68,
+        pieces: 300,
+        ton: 0,
+      },
+    ],
+  },
+  {
     id: "m-thread",
-    category: "วัสดุสิ้นเปลือง",
+    category: "ของใช้ในไลน์ผลิต",
     name: "ด้ายเย็บกระสอบ",
     suggestQty: 2,
     suggestDigits: 0,
@@ -222,7 +331,41 @@ export const ADDABLE_MATERIALS: AddableMaterial[] = [
       },
     ],
   },
+  {
+    id: "m-oem",
+    category: "สินค้าสำเร็จรูป OEM",
+    name: "ปุ๋ยสำเร็จรูป OEM",
+    sub: "ตราลูกค้า A",
+    suggestQty: 10,
+    suggestDigits: 2,
+    suggestUnit: "ตัน",
+    tonPerUnit: 1,
+    sweepable: false,
+    lotOptions: [
+      {
+        code: "PO260109/02-03",
+        zone: "F-1S",
+        receivedAt: "2026-04-15",
+        ageDays: 73,
+        pieces: 15,
+        ton: 15,
+      },
+    ],
+  },
 ];
+
+/** ต่ำกว่านี้ถือว่าเหลือน้อย ใช้ไฮไลต์แดงทั้งแถวล็อตและแถวสินค้าในกล่องเพิ่มสินค้า */
+export const LOW_STOCK_TON = 5;
+
+/** ผลรวมของทุกล็อตในสินค้าหนึ่งตัว — ตัน */
+export function materialTotalTon(m: AddableMaterial): number {
+  return m.lotOptions.reduce((sum, l) => sum + l.ton, 0);
+}
+
+/** ผลรวมของทุกล็อตในสินค้าหนึ่งตัว — จำนวนหน่วยนับ */
+export function materialTotalPieces(m: AddableMaterial): number {
+  return m.lotOptions.reduce((sum, l) => sum + l.pieces, 0);
+}
 
 /** ปริมาณที่ใช้ (ตัน) — null เมื่อสินค้านั้นไม่คิดเป็นตัน */
 export function usedTon(m: MaterialLine): number | null {

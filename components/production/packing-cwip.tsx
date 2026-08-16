@@ -13,6 +13,7 @@ import {
   type CwipLot,
   type CwipProduct,
   type CwipSort,
+  type SortDir,
 } from "@/lib/packing-list";
 
 /* ------------------------------------------------------------------
@@ -37,6 +38,7 @@ export type CwipView = {
   zones: string[];
   products: string[];
   sort: CwipSort;
+  dir: SortDir;
 };
 
 export const CWIP_VIEW_DEFAULT: CwipView = {
@@ -48,6 +50,7 @@ export const CWIP_VIEW_DEFAULT: CwipView = {
   zones: [],
   products: [],
   sort: "product",
+  dir: "asc",
 };
 
 export function PackingCwip({

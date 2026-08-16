@@ -408,6 +408,7 @@ export const cwipLowCount = (products: CwipProduct[]) =>
 // ---------------------------------------------------------------
 
 export type CwipSort = "product" | "zone" | "fifo";
+export type SortDir = "asc" | "desc";
 
 /** ประเภทกับโซนดึงจากข้อมูลจริง ไม่ใช่รายการที่พิมพ์ไว้ตายตัว
     เพิ่มสินค้าประเภทใหม่เมื่อไร ตัวเลือกในตัวกรองก็มีให้เองทันที */
@@ -433,6 +434,7 @@ export function filterCwip(
     zones: string[];
     products: string[];
     sort: CwipSort;
+    dir: SortDir;
   }
 ): CwipProduct[] {
   const rows = products
@@ -449,18 +451,21 @@ export function filterCwip(
     )
     .filter((p) => p.lots.length > 0);
 
+  // ทิศทางกลับด้านด้วยการคูณ -1 ที่ผลเปรียบเทียบ ไม่ต้องเขียนเงื่อนไขซ้ำสองชุด
+  const sign = opts.dir === "asc" ? 1 : -1;
   const sorted = [...rows];
   if (opts.sort === "zone") {
-    sorted.sort((a, b) =>
-      (a.lots[0]?.zone ?? "").localeCompare(b.lots[0]?.zone ?? "")
+    sorted.sort(
+      (a, b) =>
+        sign * (a.lots[0]?.zone ?? "").localeCompare(b.lots[0]?.zone ?? "")
     );
   } else if (opts.sort === "fifo") {
-    // ของที่ค้างไลน์นานที่สุดขึ้นก่อน เพราะเป็นตัวที่ต้องรีบใช้
+    // asc ของ FIFO คือเก่าสุดก่อน เพราะเป็นตัวที่ต้องรีบใช้
     const oldest = (p: CwipProduct) =>
       Math.max(...p.lots.map((l) => l.ageDays), 0);
-    sorted.sort((a, b) => oldest(b) - oldest(a));
+    sorted.sort((a, b) => sign * (oldest(b) - oldest(a)));
   } else {
-    sorted.sort((a, b) => a.name.localeCompare(b.name, "th"));
+    sorted.sort((a, b) => sign * a.name.localeCompare(b.name, "th"));
   }
   return sorted;
 }

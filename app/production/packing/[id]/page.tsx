@@ -129,9 +129,9 @@ export default function ProductionOrderPage() {
         </div>
 
         {/* ---------- ข้อมูลสูตร / ยอดสั่งผลิต ----------
-             พับได้ เพราะเป็นข้อมูลที่มาจากใบสั่ง ดูรอบเดียวตอนเปิดหน้าก็พอ
+             พับไว้เป็นค่าเริ่มต้น เพราะเป็นข้อมูลที่มาจากใบสั่ง ดูตอนต้องการก็พอ
              งานจริงของหน้านี้อยู่ข้างล่าง พับเก็บแล้วจอแคบจะถึงงานเร็วขึ้นมาก */}
-        <Collapsible defaultOpen className="mt-5 rounded-xl border border-border bg-card">
+        <Collapsible className="mt-5 rounded-xl border border-border bg-card">
           <CollapsibleTrigger asChild>
             {/* items-start กันปุ่มหุบไหลตามเนื้อหาที่ห่อบรรทัด — ปักไว้ชิดขวาบนเสมอ
                 เนื้อหาซ้ายอยู่ในคอลัมน์ของตัวเอง ห่อกี่บรรทัดก็ไม่ดันปุ่มขวับ */}
@@ -145,11 +145,15 @@ export default function ProductionOrderPage() {
                   <span className="hidden text-border @2xl:inline" aria-hidden>
                     |
                   </span>
-                  <span className="text-sm">{order.packing}</span>
-                  <span className="text-border" aria-hidden>
-                    |
+                  {/* บรรจุภัณฑ์ + ขนาดถุง เป็นกลุ่มเดียว ไม่แยกห่อ — จอแคบไม่พอที่
+                      ก็ตกทั้งคู่ลงบรรทัดใหม่ด้วยกัน ไม่ใช่ "Bulk" ค้างบรรทัดบนแล้ว "50 Kg" หล่นไปคนเดียว */}
+                  <span className="flex items-center gap-x-3 text-sm">
+                    <span>{order.packing}</span>
+                    <span className="text-border" aria-hidden>
+                      |
+                    </span>
+                    <span>{order.bagSize}</span>
                   </span>
-                  <span className="text-sm">{order.bagSize}</span>
                 </span>
                 <span className="flex flex-wrap items-center gap-3 text-sm">
                   <span className="font-medium">{order.line}</span>
