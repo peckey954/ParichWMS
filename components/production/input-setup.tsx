@@ -1,10 +1,14 @@
 "use client";
 
 import * as React from "react";
-import { useRouter } from "next/navigation";
-import { PlayIcon, PlusIcon, TrashIcon, TriangleAlertIcon } from "lucide-react";
+import { PlusIcon, SearchIcon, TrashIcon } from "lucide-react";
 import { Button } from "@peckey954/ui/components/ui/button";
 import { Input } from "@peckey954/ui/components/ui/input";
+import {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupInput,
+} from "@peckey954/ui/components/ui/input-group";
 import {
   Table,
   TableBody,
@@ -14,7 +18,6 @@ import {
   TableRow,
 } from "@peckey954/ui/components/ui/table";
 import { cn } from "@peckey954/ui/lib/utils";
-import { toast } from "sonner";
 import { useRecipeRun } from "@/components/production/recipe-run";
 import {
   COL_FIRST,
@@ -30,7 +33,6 @@ import {
   displayNumber,
   emptyMaterial,
   formatBaht,
-  invalidMaterials,
   toNumber,
 } from "@/lib/recipe-input";
 
@@ -65,10 +67,9 @@ const HEAD_TRASH =
   "w-12 @3xl:right-0 @3xl:z-30! @3xl:border-l @3xl:border-border";
 
 export function InputSetup() {
-  const router = useRouter();
-  const { markInput, markRun } = useRecipeRun();
+  const { markInput } = useRecipeRun();
   const [rows, setRows] = React.useState<RawMaterialDraft[]>(RAW_MATERIALS);
-  const [lastRun, setLastRun] = React.useState<string | null>(null);
+  const [query, setQuery] = React.useState("");
   // ช่องที่เคอร์เซอร์อยู่ตอนนี้ — ช่องนั้นโชว์ค่าดิบ ที่เหลือโชว์แบบมีลูกน้ำ
   const [editing, setEditing] = React.useState<string | null>(null);
   const seq = React.useRef(0);
@@ -99,6 +100,8 @@ export function InputSetup() {
     touch();
     seq.current += 1;
     setRows((prev) => [emptyMaterial(`new-${seq.current}`), ...prev]);
+    // เคลียร์คำค้นไว้ ไม่งั้นแถวที่เพิ่งเพิ่มอาจโดนกรองออกจนดูเหมือนปุ่มเสีย
+    setQuery("");
   };
 
   const removeRow = (id: string) => {
@@ -106,26 +109,14 @@ export function InputSetup() {
     setRows((prev) => prev.filter((r) => r.id !== id));
   };
 
-  const invalid = invalidMaterials(rows);
   const totalCost = rows.reduce((sum, r) => sum + toNumber(r.cost), 0);
+  const visible = rows.filter((r) =>
+    r.name.toLowerCase().includes(query.trim().toLowerCase())
+  );
 
   /** ค่าที่โชว์ในช่อง — ช่องที่กำลังพิมพ์อยู่ไม่ถูกจัดรูปแบบ */
   const shown = (key: string, raw: string) =>
     editing === key ? raw : displayNumber(raw);
-
-  const run = () => {
-    markRun();
-    const d = new Date();
-    const p = (n: number) => String(n).padStart(2, "0");
-    setLastRun(
-      `${d.getMonth() + 1}/${d.getDate()}/${d.getFullYear()} | ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`
-    );
-    toast.success("คำนวณสูตรเสร็จแล้ว", {
-      description: `ใช้วัตถุดิบ ${rows.length} รายการ`,
-    });
-    // พาไปดูผลทันที ไม่ต้องให้ไปหาเองว่าผลอยู่ตรงไหน
-    router.push("/production/recipe/optimized");
-  };
 
   return (
     <div className="space-y-4">
@@ -152,10 +143,35 @@ export function InputSetup() {
           </Button>
         </div>
 
+        <InputGroup className="mt-3 bg-card">
+          <InputGroupAddon align="inline-start">
+            <SearchIcon />
+          </InputGroupAddon>
+          <InputGroupInput
+            placeholder="ค้นหาวัตถุดิบ..."
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+          />
+        </InputGroup>
+
+        {query.trim() !== "" && (
+          <p className="mt-2 text-sm text-muted-foreground">
+            กรองอยู่ {visible.length} จาก {rows.length} รายการ
+          </p>
+        )}
+
         <p className="mt-3 text-sm text-muted-foreground @3xl:hidden">
           เลื่อนตารางแนวนอนเพื่อดูช่องที่เหลือ ชื่อวัตถุดิบตรึงไว้ให้
         </p>
 
+        {visible.length === 0 ? (
+          <div className="mt-3 rounded-lg border border-dashed border-border py-10 text-center">
+            <p className="font-medium">ไม่พบวัตถุดิบที่ค้นหา</p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              ลองใช้คำค้นสั้นลง
+            </p>
+          </div>
+        ) : (
         <div className="mt-3">
           <TableFrame>
             <Table>
@@ -174,7 +190,7 @@ export function InputSetup() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {rows.map((r) => {
+                {visible.map((r) => {
                   const label = r.name.trim() || "วัตถุดิบใหม่";
                   return (
                     <TableRow key={r.id}>
@@ -232,6 +248,7 @@ export function InputSetup() {
             </Table>
           </TableFrame>
         </div>
+        )}
 
         <p className="mt-3 text-sm text-muted-foreground">
           รวมต้นทุนที่กรอกไว้{" "}
@@ -240,32 +257,6 @@ export function InputSetup() {
           </span>{" "}
           บาท
         </p>
-      </section>
-
-      {/* ---------- สั่งคำนวณ ---------- */}
-      <section className="rounded-xl border border-border bg-card p-4 sm:p-5">
-        {invalid.length > 0 && (
-          <p className="mb-3 flex items-start gap-2 text-sm text-danger-strong">
-            <TriangleAlertIcon className="mt-0.5 size-4 shrink-0" />
-            มี {invalid.length} รายการที่ยังไม่มีชื่อหรือยังไม่ได้ใส่ต้นทุน
-            คำนวณไปก็ได้ผลไม่ครบ
-          </p>
-        )}
-
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="min-w-0">
-            <p className="font-medium">คำนวณสูตรใหม่</p>
-            <p className="mt-0.5 text-sm text-muted-foreground">
-              {lastRun
-                ? `คำนวณล่าสุด ${lastRun}`
-                : "คำนวณเสร็จแล้วจะพาไปดูผลทันที และแทนที่ผลชุดเดิมทั้งหมด"}
-            </p>
-          </div>
-          <Button size="lg" onClick={run} disabled={rows.length === 0}>
-            <PlayIcon />
-            RUN
-          </Button>
-        </div>
       </section>
     </div>
   );

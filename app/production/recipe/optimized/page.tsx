@@ -3,7 +3,6 @@
 import * as React from "react";
 import Link from "next/link";
 import {
-  DownloadIcon,
   PlayIcon,
   SearchIcon,
   Settings2Icon,
@@ -95,9 +94,6 @@ export default function OptimizedFormulaPage() {
   const rows = all.filter((r) => matchesOptimized(r, query));
   const { pages, safe, slice } = paginate(rows, page, PAGE_SIZE);
 
-  const avgCost =
-    all.length > 0 ? all.reduce((s, r) => s + r.totalCost, 0) / all.length : 0;
-
   const showWeight = view === "weight" || view === "all";
   const showPercent = view === "percent" || view === "all";
   const showNutrition = view === "nutrition" || view === "all";
@@ -144,29 +140,12 @@ export default function OptimizedFormulaPage() {
         </div>
 
         {/* ทางเข้าหน้าแก้ข้อมูลอยู่ในนี้ ไม่ใช่ที่หน้าสูตรประจำสัปดาห์
-            คนต้องเห็นผลก่อนว่าตอนนี้เป็นยังไง แล้วค่อยตัดสินใจว่าจะแก้อะไร
-            ส่งออก CSV เหลือแต่ไอคอนบนจอแคบ โหลดไฟล์ลงมือถือแล้วใช้ต่อยาก */}
-        <div className="flex shrink-0 items-center gap-2">
-          <Button
-            variant="outline"
-            size="icon"
-            aria-label="ส่งออก CSV"
-            className="@3xl:hidden"
-          >
-            <DownloadIcon />
-          </Button>
-          <Button variant="outline" className="hidden @3xl:inline-flex">
-            <DownloadIcon />
-            ส่งออก CSV
-          </Button>
-
-          <Button asChild variant="outline-primary">
-            <Link href="/production/recipe/setup">
-              <Settings2Icon className="hidden @3xl:inline" />
-              ตั้งค่าข้อมูล
-            </Link>
-          </Button>
-        </div>
+            คนต้องเห็นผลก่อนว่าตอนนี้เป็นยังไง แล้วค่อยตัดสินใจว่าจะแก้อะไร */}
+        <Button asChild variant="outline-primary" size="icon" className="shrink-0">
+          <Link href="/production/recipe/setup" aria-label="ตั้งค่าสูตร">
+            <Settings2Icon />
+          </Link>
+        </Button>
       </div>
 
       {/* ---------- เตือนว่าผลที่เห็นเก่าไปแล้ว ----------
@@ -187,11 +166,10 @@ export default function OptimizedFormulaPage() {
         </div>
       )}
 
-      {/* ---------- สรุปหัวเรื่อง ---------- */}
-      <div className="mt-4 grid gap-3 @2xl:grid-cols-2">
-        <Stat label="สูตรที่คำนวณ" value={`${all.length} สูตร`} />
-        <Stat label="ต้นทุนเฉลี่ยต่อถุง" value={`${num(avgCost)} บาท`} />
-      </div>
+      {/* ---------- จำนวนสูตรทั้งหมด ---------- */}
+      <p className="mt-4 text-sm text-muted-foreground">
+        การดูข้อมูลทั้งหมด ({all.length} สูตร):
+      </p>
 
       {/* ---------- เลือกมุมมอง + ค้นหา ----------
            ใช้ชิปกลมแบบเดียวกับหน้าสูตรประจำสัปดาห์
@@ -200,7 +178,21 @@ export default function OptimizedFormulaPage() {
            ล็อกติดบนตลอด เหมือนหน้าสต็อกทั่วไป
            สลับมุมมองได้จากตรงไหนของตารางก็ได้ ไม่ต้องเลื่อนกลับขึ้นบนสุด */}
       <StickyToolbar hidden={hidden} barRef={barRef}>
-        <div className="flex flex-wrap items-center gap-2 pt-2">
+        <div className="flex flex-col gap-2 pt-2">
+          <InputGroup className="w-full bg-card">
+            <InputGroupAddon align="inline-start">
+              <SearchIcon />
+            </InputGroupAddon>
+            <InputGroupInput
+              placeholder="ค้นหา..."
+              value={query}
+              onChange={(e) => {
+                setQuery(e.target.value);
+                setPage(1);
+              }}
+            />
+          </InputGroup>
+
           <div
             role="radiogroup"
             aria-label="ชุดข้อมูลที่แสดง"
@@ -229,20 +221,6 @@ export default function OptimizedFormulaPage() {
               );
             })}
           </div>
-
-          <InputGroup className="w-full bg-card sm:w-auto sm:min-w-48 sm:flex-1">
-            <InputGroupAddon align="inline-start">
-              <SearchIcon />
-            </InputGroupAddon>
-            <InputGroupInput
-              placeholder="ค้นหา..."
-              value={query}
-              onChange={(e) => {
-                setQuery(e.target.value);
-                setPage(1);
-              }}
-            />
-          </InputGroup>
         </div>
       </StickyToolbar>
 
@@ -317,15 +295,6 @@ export default function OptimizedFormulaPage() {
           </div>
           </>
         )}
-      </div>
-
-      <div className="mt-6 flex flex-wrap gap-3">
-        <Button asChild variant="outline-primary">
-          <Link href="/production/recipe/setup">กลับไปแก้ข้อมูลตั้งต้น</Link>
-        </Button>
-        <Button asChild variant="ghost">
-          <Link href="/production/recipe">ดูสูตรประจำสัปดาห์</Link>
-        </Button>
       </div>
 
       <BackToTop show={showTop} onClick={scrollToTop} />
@@ -453,14 +422,5 @@ function Row({
           </TableCell>
         ))}
     </TableRow>
-  );
-}
-
-function Stat({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-xl border border-border bg-card px-4 py-3">
-      <p className="text-sm text-muted-foreground">{label}</p>
-      <p className="mt-1 text-xl font-semibold tabular-nums">{value}</p>
-    </div>
   );
 }

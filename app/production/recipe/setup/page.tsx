@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   CoinsIcon,
   PackageIcon,
@@ -18,8 +19,10 @@ import {
 import { Button } from "@peckey954/ui/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@peckey954/ui/components/ui/tabs";
 import { cn } from "@peckey954/ui/lib/utils";
+import { toast } from "sonner";
 import { CostSetup } from "@/components/production/cost-setup";
 import { InputSetup } from "@/components/production/input-setup";
+import { useRecipeRun } from "@/components/production/recipe-run";
 
 /* ------------------------------------------------------------------
    ตั้งค่าสูตรการผลิต — วางโครงไว้ก่อน รายละเอียดของแต่ละหน้ารอสรุปทีหลัง
@@ -45,7 +48,7 @@ const TABS: {
     label: "ตั้งค่าข้อมูล",
     icon: SlidersHorizontalIcon,
     purpose:
-      "ต้นทุนและค่าธาตุอาหารของวัตถุดิบ กด RUN แล้วระบบจะคำนวณสูตรที่คุ้มที่สุดให้",
+      "ต้นทุนและค่าธาตุอาหารของวัตถุดิบ กดบันทึกด้านล่างแล้วระบบจะคำนวณสูตรที่คุ้มที่สุดให้",
     planned: [],
   },
   {
@@ -71,11 +74,24 @@ const TABS: {
 ];
 
 export default function RecipeSetupPage() {
+  const router = useRouter();
+  const { markRun } = useRecipeRun();
   const [tab, setTab] = React.useState<SetupTab>("input");
   const active = TABS.find((t) => t.id === tab)!;
 
+  /** ปุ่มบันทึกร่วมของทั้ง 3 แท็บ — กดครั้งเดียว บันทึกทุกอย่างที่แก้ไว้
+      แล้วพาไปดูผลที่หน้าสูตรที่เหมาะสมทันที ไม่ต้องมีปุ่ม RUN แยกทีละแท็บ */
+  const handleSave = () => {
+    markRun();
+    toast.success("บันทึกข้อมูลตั้งค่าสูตรแล้ว", {
+      description: "คำนวณสูตรใหม่จากค่าล่าสุดแล้ว",
+    });
+    router.push("/production/recipe/optimized");
+  };
+
   return (
-    <main className="mx-auto w-full max-w-7xl px-4 py-3 sm:px-6 sm:py-5">
+    <>
+    <main className="mx-auto w-full max-w-7xl px-4 pt-3 pb-24 sm:px-6 sm:pt-5">
       <Breadcrumb>
         <BreadcrumbList>
           <BreadcrumbItem>
@@ -165,12 +181,19 @@ export default function RecipeSetupPage() {
 
       </div>
       )}
+    </main>
 
-      <div className="mt-6">
+    {/* ---------- แถบปุ่มล่าง ----------
+         ตรึงติดล่างจอ ไม่ว่าจะสลับไปแท็บไหนหรือเลื่อนตารางไปไกลแค่ไหน
+         ก็ยังกดบันทึกได้โดยไม่ต้องเลื่อนกลับขึ้นมาหา */}
+    <div className="sticky bottom-0 z-30 border-t border-border bg-background">
+      <div className="mx-auto flex w-full max-w-7xl items-center justify-between gap-3 px-4 py-3 sm:px-6">
         <Button asChild variant="outline-primary">
           <Link href="/production/recipe">ย้อนกลับ</Link>
         </Button>
+        <Button onClick={handleSave}>บันทึก</Button>
       </div>
-    </main>
+    </div>
+    </>
   );
 }

@@ -14,7 +14,6 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@peckey954/ui/components/ui/popover";
-import { Progress } from "@peckey954/ui/components/ui/progress";
 import {
   Select,
   SelectContent,
@@ -32,14 +31,11 @@ import {
   COST_FIELDS,
   COST_ROWS,
   FIELD_GROUP_LABEL,
-  blanksByField,
   computeCost,
   fieldsByGroup,
-  filledCells,
   formatBaht,
   matchesCost,
   rowBlanks,
-  totalCells,
   type CostRow,
   type FieldGroup,
   type FieldKey,
@@ -96,58 +92,8 @@ export function CostSetup() {
     if (next) setOpenId(next.id);
   };
 
-  const done = filledCells(rows);
-  const all = totalCells(rows);
-  const pending = blanksByField(rows);
-
-  const priceRange = React.useMemo(() => {
-    const prices = rows.map((r) => computeCost(r).price);
-    return { min: Math.min(...prices), max: Math.max(...prices) };
-  }, [rows]);
-
-  const save = () =>
-    toast.success("บันทึกค่าต้นทุนแล้ว", {
-      description: `${rows.length} สูตร · กรอกครบ ${done} จาก ${all} ช่อง`,
-    });
-
   return (
     <div className="space-y-4">
-      {/* ---------- ความคืบหน้า ----------
-          561 ช่องไม่มีทางกรอกจบในรอบเดียว ต้องบอกได้ว่าค้างตรงไหน
-          ไม่งั้นคนจะไม่กล้าปิดหน้าไปทำอย่างอื่น */}
-      <section className="rounded-xl border border-border bg-card p-4">
-        <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-          <p className="font-semibold">
-            ความคืบหน้า
-            <span className="ml-2 text-sm font-normal text-muted-foreground">
-              {rows.length} สูตร × {COST_FIELDS.length} ช่อง
-            </span>
-          </p>
-          <p className="text-sm tabular-nums">
-            <span className="text-lg font-semibold">{done}</span>
-            <span className="text-muted-foreground"> / {all} ช่อง</span>
-          </p>
-        </div>
-
-        <Progress value={(done / all) * 100} className="mt-3" />
-
-        {pending.length > 0 ? (
-          <p className="mt-3 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
-            ยังว่าง:
-            {pending.map((f) => (
-              <Badge key={f.key} tone="warning" appearance="soft">
-                {f.label} {f.blank}
-              </Badge>
-            ))}
-          </p>
-        ) : (
-          <p className="mt-3 text-sm text-muted-foreground">
-            กรอกครบทุกช่องแล้ว · ราคาขาย {formatBaht(priceRange.min)}–
-            {formatBaht(priceRange.max)} บาท
-          </p>
-        )}
-      </section>
-
       {/* ---------- แถบเครื่องมือ ---------- */}
       <section className="rounded-xl border border-border bg-card p-4">
         <div className="flex flex-wrap items-center gap-2">
@@ -196,15 +142,6 @@ export function CostSetup() {
           </div>
         </>
       )}
-
-      <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-card p-4">
-        <p className="min-w-0 text-sm text-muted-foreground">
-          แก้แล้วราคาขายขยับทันที กดบันทึกเพื่อส่งค่าไปให้ฝ่ายผลิตและบัญชี
-        </p>
-        <Button size="lg" onClick={save}>
-          บันทึก
-        </Button>
-      </div>
 
       <CostRowDrawer
         row={open}
