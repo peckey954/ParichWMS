@@ -172,16 +172,7 @@ export function TableFrame({ children }: { children: React.ReactNode }) {
         // ขยับเป็น 16px ทุกด้าน — h-auto แทน h-12 เดิม เพราะหัวคอลัมน์ที่ตัดสองบรรทัด
         // (เช่น "ปริมาณคงเหลือ\nในคลัง") โดนบีบแน่นในกล่องสูงคงที่ ระยะ 16px ต้องได้จริงทุกด้าน
         "[&_th]:h-auto [&_th]:py-4 [&_th]:px-4",
-        "[&_td]:px-4 [&_td]:py-3",
-        // border-collapse: collapse (ค่าเริ่มต้นของ Preflight) ทำให้ box-shadow ของเซลล์
-        // ที่ตรึงไว้ (position: sticky) โดนตัดจนไม่ขึ้นเลย — บั๊กเบราว์เซอร์ที่รู้จักกันดี
-        // ต้องสลับเป็น separate ถึงจะเห็นเงา แต่ separate ไม่วาดเส้นขอบที่ตั้งไว้ระดับแถว (tr)
-        // จึงต้องย้ายเส้นคั่นแถวเดิมไปตั้งที่ตัวเซลล์ (th/td) แทนทั้งหมดด้วย
-        "[&_table]:border-separate [&_table]:border-spacing-0",
-        "[&_tr]:border-b-0",
-        "[&_th]:border-b [&_th]:border-border",
-        "[&_td]:border-b [&_td]:border-border",
-        "[&_tbody_tr:last-child_td]:border-b-0"
+        "[&_td]:px-4 [&_td]:py-3"
       )}
     >
       {children}
@@ -189,35 +180,18 @@ export function TableFrame({ children }: { children: React.ReactNode }) {
   );
 }
 
-/** หัวตารางตรึงไว้ด้านบนตอนเลื่อนขึ้นลง
- *  เงาทิ้งลงข้างล่างบอกว่าเนื้อหากำลังเลื่อนลอดอยู่ใต้หัวตาราง
- *  แบบเดียวกับเงาของคอลัมน์ตรึงซ้าย/ขวา — เส้นขอบอย่างเดียวไม่พอ
- *  ต้องแปะเงาไว้ที่ th แต่ละอัน ไม่ใช่ thead เพราะ position:sticky ก็ทำไว้ที่ th เหมือนกัน
- *  (thead ตรึงเองไม่ได้ในบางเบราว์เซอร์ จึงต้องตรึงทีละเซลล์) */
-export const STICKY_HEAD =
-  "[&_th]:sticky [&_th]:top-0 [&_th]:z-20 [&_th]:bg-card [&_th]:shadow-[var(--sticky-shadow-b)]";
+/** หัวตารางตรึงไว้ด้านบนตอนเลื่อนขึ้นลง */
+export const STICKY_HEAD = "[&_th]:sticky [&_th]:top-0 [&_th]:z-20 [&_th]:bg-card";
 
 /**
  * คอลัมน์แรกตรึงซ้าย คอลัมน์สุดท้ายตรึงขวา เลื่อนแนวนอนได้เฉพาะตรงกลาง
- *
- * มีเงาทิ้งเข้าไปด้านใน บอกว่าเนื้อหากำลังเลื่อนลอดอยู่ข้างใต้คอลัมน์นี้
- * เส้นขอบอย่างเดียวไม่พอ คนอ่านเป็น "ตารางจบตรงนี้" แล้วไม่คิดจะเลื่อนต่อ
+ * เส้นขอบบางบอกจุดตรึง — เส้นเดียวกับที่คั่นแถว/คอลัมน์อื่นในตาราง ไม่ใช่เงา
  */
-export const COL_FIRST =
-  "sticky left-0 z-10 border-r border-border bg-card shadow-[var(--sticky-shadow-r)]";
-export const COL_LAST =
-  "sticky right-0 z-10 border-l border-border bg-card shadow-[var(--sticky-shadow-l)]";
-/**
- * เซลล์หัวที่เป็นคอลัมน์ตรึงด้วย ต้องอยู่เหนือทั้งสองชั้น
- *
- * มุมนี้ตรึงทั้งบนและข้าง จึงต้องมีเงาสองทิศพร้อมกัน — รวมไว้ในค่าเดียวด้วย comma
- * แล้วบังคับ !important เพราะ STICKY_HEAD คุม th ทุกตัวด้วย selector ลูกซึ่ง
- * specificity สูงกว่า class เดี่ยวตรงนี้ ไม่บังคับไว้เงาบนจะทับเงาข้างจนหายไป
- */
-export const HEAD_FIRST =
-  "left-0 z-30! border-r border-border shadow-[var(--sticky-shadow-r),var(--sticky-shadow-b)]!";
-export const HEAD_LAST =
-  "right-0 z-30! border-l border-border shadow-[var(--sticky-shadow-l),var(--sticky-shadow-b)]!";
+export const COL_FIRST = "sticky left-0 z-10 border-r border-border bg-card";
+export const COL_LAST = "sticky right-0 z-10 border-l border-border bg-card";
+/** เซลล์หัวที่เป็นคอลัมน์ตรึงด้วย ต้องอยู่เหนือทั้งสองชั้น */
+export const HEAD_FIRST = "left-0 z-30! border-r border-border";
+export const HEAD_LAST = "right-0 z-30! border-l border-border";
 
 /**
  * แบ่งหน้า — ใช้ Button ของ DS ไม่ใช่ Pagination
