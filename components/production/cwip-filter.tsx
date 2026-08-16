@@ -35,7 +35,7 @@ import {
 
    แก้ในกล่องก่อน กดตกลงถึงมีผลกับรายการ
    กล่องบังรายการอยู่แล้ว การให้มีผลทันทีที่ติ๊กจึงไม่ได้ประโยชน์อะไร
-   และทำให้ ย้อนกลับ / กากบาท / Esc มีความหมายจริงว่ายกเลิก ไม่ใช่ปิดเฉย ๆ
+   และทำให้กากบาทกับ Esc มีความหมายจริงว่ายกเลิก ไม่ใช่ปิดเฉย ๆ
 
    หัวข้อกับแถวปุ่มตรึงไว้ เลื่อนเฉพาะเนื้อในตรงกลาง
    ของเดิมกล่องยาวกว่าจอมือถือ ปุ่มเลยหลุดออกไปนอกจอจนกดไม่ถึง
@@ -73,11 +73,10 @@ const asOptions = (values: string[]) =>
 export function CwipFilter({
   view,
   onApply,
-  onClose,
 }: {
   view: CwipView;
+  /** เอาค่าที่แก้ไว้ไปใช้แล้วปิดกล่อง — ยกเลิกใช้กากบาทหรือ Esc */
   onApply: (next: CwipView) => void;
-  onClose: () => void;
 }) {
   // ค่าที่กำลังแก้อยู่ในกล่อง ยังไม่มีผลกับรายการจนกว่าจะกดตกลง
   // Radix ถอดเนื้อในทิ้งตอนปิด ค่าตั้งต้นจึงสดใหม่ทุกครั้งที่เปิด
@@ -90,7 +89,7 @@ export function CwipFilter({
       {/* หัวข้อมาจากกล่องที่ครอบอยู่ เพราะ Popover กับ Dialog
           ต้องใช้คอมโพเนนต์หัวข้อของตัวเอง ไม่งั้น screen reader อ่านไม่เจอ */}
 
-      {/* เลื่อนเฉพาะตรงนี้ หัวข้อกับปุ่มล้างค่าอยู่นอกกรอบที่เลื่อน */}
+      {/* เลื่อนเฉพาะตรงนี้ หัวข้อกับแถวปุ่มอยู่นอกกรอบที่เลื่อน */}
       <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
         {/* ---------- 1. เรียงตาม ---------- */}
         <Label className="text-sm">เรียงตาม</Label>
@@ -192,29 +191,24 @@ export function CwipFilter({
       </div>
 
       {/* ตรึงไว้ล่างสุด เห็นตลอดไม่ว่าเลื่อนไปไหน
-          ตกลงอยู่ขวาสุด เป็นตำแหน่งที่มือกับสายตาไปอยู่เป็นที่สุดท้ายพอดี
-          ไม่ต้องเอื้อมไปกดกากบาทมุมบนซึ่งไกลจากที่มือวางอยู่ */}
-      <div className="flex items-center gap-2 border-t border-border px-4 py-3">
+
+          สองปุ่มแยกไปคนละมุม ไม่วางติดกัน เพราะทำคนละเรื่องกันคนละทิศ
+          ล้างค่าคือรื้อของที่เพิ่งเลือกทิ้ง ตกลงคือเอาไปใช้ กดพลาดสลับกันคือเสียงาน
+          ระยะห่างคือสิ่งที่กันไม่ให้กดพลาด ไม่ใช่สีของปุ่ม
+
+          ตกลงปิดกล่องให้ด้วย ไม่ต้องเอื้อมไปกดกากบาทมุมบนอีกที
+          กากบาทกับ Esc ยังอยู่ สำหรับคนที่เปลี่ยนใจแล้วอยากทิ้งที่เพิ่งเลือก */}
+      <div className="flex items-center justify-between gap-3 border-t border-border px-4 py-3">
         <Button
           variant="ghost"
-          className="h-10 shrink-0 text-primary"
+          className="h-10 text-primary"
           disabled={isCwipDefault(draft)}
           onClick={() => setDraft(CWIP_VIEW_DEFAULT)}
         >
           <RotateCcwIcon />
           ล้างค่า
         </Button>
-        <Button
-          variant="outline"
-          className="ml-auto h-10 flex-1 sm:flex-none sm:w-24"
-          onClick={onClose}
-        >
-          ย้อนกลับ
-        </Button>
-        <Button
-          className="h-10 flex-1 sm:flex-none sm:w-24"
-          onClick={() => onApply(draft)}
-        >
+        <Button className="h-10 w-28" onClick={() => onApply(draft)}>
           ตกลง
         </Button>
       </div>

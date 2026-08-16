@@ -285,7 +285,6 @@ export default function PackingListPage() {
                     setCwipView(next);
                     setFilterOpen(false);
                   }}
-                  onClose={() => setFilterOpen(false)}
                 />
               ) : undefined
             }
