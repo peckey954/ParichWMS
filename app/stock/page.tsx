@@ -212,20 +212,9 @@ function GeneralStockView() {
     scrollListToTop();
   };
 
-  /**
-   * สลับแท็บ (สต็อก / รอรับเข้า / รอจ่าย-คืน) เปลี่ยนก้อน DOM ทั้งก้อน
-   * listRef ยังไม่ได้ชี้ไปที่รายการของแท็บใหม่จนกว่า React จะ render เสร็จ
-   * จึงเลื่อนใน effect หลัง render แทนที่จะเลื่อนทันทีตอนกดแบบ changeCat/changeIssueKind
-   * ข้ามรอบแรกไว้ ไม่งั้นหน้าเด้งเองตอนเพิ่งโหลด
-   */
-  const mountedRef = React.useRef(false);
-  React.useEffect(() => {
-    if (!mountedRef.current) {
-      mountedRef.current = true;
-      return;
-    }
-    scrollListToTop();
-  }, [tab, scrollListToTop]);
+  // แท็บใหญ่ (สต็อก / รอรับเข้า / รอจ่าย-คืน) ไม่ล็อกอยู่ในแถบติดบน อยู่บนสุด
+  // ของหน้าอยู่แล้วตามปกติ กดได้ก็ต่อเมื่อเลื่อนอยู่ใกล้บนสุดพออยู่แล้ว
+  // จึงแค่สลับข้อมูลเฉย ๆ ไม่ต้องมีพิธีเลื่อน/อนิเมชันแบบชิป
 
   React.useEffect(() => {
     const row = chipRowRef.current;

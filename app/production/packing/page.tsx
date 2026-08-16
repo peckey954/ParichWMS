@@ -92,9 +92,13 @@ export default function PackingListPage() {
   const { framed } = useDevicePreview();
 
   /**
-   * สลับแท็บหรือชิป CWIP แล้วต้องเห็นรายการแรกทันที เหมือนหน้าสต็อกทั่วไป
-   * ทุกแท็บ/ชิปใช้ก้อนรายการเดียวกัน (listRef ด้านล่าง) ทีละก้อนเท่านั้น
-   * จึงเลื่อนใน effect หลัง render ข้ามรอบแรกไว้ ไม่งั้นหน้าเด้งเองตอนเพิ่งโหลด
+   * สลับชิป CWIP แล้วต้องเห็นรายการแรกทันที เหมือนหน้าสต็อกทั่วไป
+   * ชิปทุกอันใช้ก้อนรายการเดียวกัน (listRef ด้านล่าง) จึงเลื่อนใน effect
+   * หลัง render ข้ามรอบแรกไว้ ไม่งั้นหน้าเด้งเองตอนเพิ่งโหลด
+   *
+   * แท็บใหญ่ (รอผลิต / สต็อก CWIP / ผลิตแล้ว) ไม่เอาด้วย — ไม่ได้ล็อกอยู่ใน
+   * แถบติดบน อยู่บนสุดของหน้าอยู่แล้วตามปกติ กดได้ก็ต่อเมื่อเลื่อนอยู่ใกล้
+   * บนสุดพออยู่แล้ว จึงแค่สลับข้อมูลเฉย ๆ ไม่ต้องมีพิธีเลื่อน/อนิเมชันแบบชิป
    */
   const listRef = React.useRef<HTMLDivElement>(null);
   const scrollListToTop = React.useCallback(() => {
@@ -111,7 +115,7 @@ export default function PackingListPage() {
       return;
     }
     scrollListToTop();
-  }, [tab, cwipChip, scrollListToTop]);
+  }, [cwipChip, scrollListToTop]);
 
   const withStage = (o: (typeof WAITING_ORDERS)[number]) =>
     stages[o.id] ? { ...o, stage: stages[o.id] } : o;
@@ -331,12 +335,13 @@ export default function PackingListPage() {
         </div>
       </StickyToolbar>
 
-      {/* key รวมแท็บ+ชิป บังคับ React ถอด/สร้างก้อนนี้ใหม่ทุกครั้งที่สลับ
+      {/* key=cwipChip บังคับ React ถอด/สร้างก้อนนี้ใหม่ทุกครั้งที่สลับชิป
           ให้เห็นรายการชุดใหม่ไถลขึ้นมาจริง ๆ ตำแหน่งเลื่อนหน้ากระโดดไปรอ
-          ที่จุดหมายแล้ว (scrollListToTop effect) ที่เห็นไหลจึงเป็นแค่การ์ดเข้าที่ */}
+          ที่จุดหมายแล้ว (scrollListToTop effect) ที่เห็นไหลจึงเป็นแค่การ์ดเข้าที่
+          ไม่รวม tab เพราะแท็บใหญ่ไม่ต้องมีพิธีนี้ (ดูเหตุผลด้านบน) */}
       <div
         ref={listRef}
-        key={`${tab}-${cwipChip}`}
+        key={cwipChip}
         className="mt-3 animate-in slide-in-from-bottom-3 fade-in duration-300"
       >
         {tab === "waiting" && (
