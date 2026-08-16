@@ -160,8 +160,12 @@ export function InputSetup() {
           </p>
         )}
 
-        <p className="mt-3 text-sm text-muted-foreground @3xl:hidden">
-          เลื่อนตารางแนวนอนเพื่อดูช่องที่เหลือ ชื่อวัตถุดิบตรึงไว้ให้
+        <p className="mt-3 text-sm text-muted-foreground">
+          รวมต้นทุนที่กรอกไว้{" "}
+          <span className="font-semibold text-foreground tabular-nums">
+            {formatBaht(totalCost)}
+          </span>{" "}
+          บาท
         </p>
 
         {visible.length === 0 ? (
@@ -249,14 +253,6 @@ export function InputSetup() {
           </TableFrame>
         </div>
         )}
-
-        <p className="mt-3 text-sm text-muted-foreground">
-          รวมต้นทุนที่กรอกไว้{" "}
-          <span className="font-semibold text-foreground tabular-nums">
-            {formatBaht(totalCost)}
-          </span>{" "}
-          บาท
-        </p>
       </section>
     </div>
   );

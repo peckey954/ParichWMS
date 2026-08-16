@@ -2,7 +2,6 @@
 
 import * as React from "react";
 import { ArrowDownToLineIcon, ChevronRightIcon, SearchIcon } from "lucide-react";
-import { Badge } from "@peckey954/ui/components/ui/badge";
 import { Button } from "@peckey954/ui/components/ui/button";
 import {
   InputGroup,
@@ -35,12 +34,11 @@ import {
   fieldsByGroup,
   formatBaht,
   matchesCost,
-  rowBlanks,
   type CostRow,
   type FieldGroup,
   type FieldKey,
 } from "@/lib/recipe-cost";
-import { CostRowDrawer } from "./cost-row-drawer";
+import { CostRowModal } from "./cost-row-modal";
 import { CostTable } from "./cost-table";
 
 /* ------------------------------------------------------------------
@@ -50,7 +48,7 @@ import { CostTable } from "./cost-table";
    คูณจำนวนสูตรแล้วเป็นหลักห้าร้อยช่อง
 
    จอกว้าง — ตารางเต็ม หน้าตาตรงกับไฟล์ Excel ที่สุด
-   จอแคบ  — รายการสูตร กดแล้วดึง drawer ขึ้นมากรอกครบ 17 ช่องในนั้น
+   จอแคบ  — รายการสูตร กดแล้วเปิด modal ขึ้นมากรอกครบ 17 ช่องในนั้น
 ------------------------------------------------------------------ */
 
 const GROUP_ORDER: FieldGroup[] = ["cost", "rate", "budget", "price"];
@@ -143,7 +141,7 @@ export function CostSetup() {
         </>
       )}
 
-      <CostRowDrawer
+      <CostRowModal
         row={open}
         open={openId !== null}
         onOpenChange={(v) => !v && setOpenId(null)}
@@ -235,7 +233,7 @@ function FillDown({
   );
 }
 
-/** รายการสูตรบนจอแคบ กดแล้วเปิด drawer กรอกครบทุกช่องของสูตรนั้น */
+/** รายการสูตรบนจอแคบ กดแล้วเปิด modal กรอกครบทุกช่องของสูตรนั้น */
 function RowList({
   rows,
   onOpen,
@@ -247,7 +245,6 @@ function RowList({
     <div className="overflow-hidden rounded-xl border border-border bg-card">
       {rows.map((row, i) => {
         const r = computeCost(row);
-        const blanks = rowBlanks(row);
         const prev = i > 0 ? rows[i - 1].group : null;
 
         return (
@@ -273,11 +270,6 @@ function RowList({
                   {row.size} กก. · ต้นทุนรวม {formatBaht(r.total)}
                 </span>
               </span>
-              {blanks > 0 && (
-                <Badge tone="warning" appearance="soft" className="shrink-0">
-                  ว่าง {blanks}
-                </Badge>
-              )}
               <span className="shrink-0 text-right">
                 <span className="block font-semibold text-primary tabular-nums">
                   {formatBaht(r.price)}

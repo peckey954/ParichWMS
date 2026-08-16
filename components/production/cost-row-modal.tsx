@@ -1,23 +1,21 @@
 "use client";
 
 import * as React from "react";
-import { Badge } from "@peckey954/ui/components/ui/badge";
 import { Button } from "@peckey954/ui/components/ui/button";
 import {
-  Drawer,
-  DrawerContent,
-  DrawerDescription,
-  DrawerFooter,
-  DrawerHeader,
-  DrawerTitle,
-} from "@peckey954/ui/components/ui/drawer";
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@peckey954/ui/components/ui/dialog";
 import {
   InputGroup,
   InputGroupAddon,
   InputGroupInput,
 } from "@peckey954/ui/components/ui/input-group";
 import { Label } from "@peckey954/ui/components/ui/label";
-import { Separator } from "@peckey954/ui/components/ui/separator";
 import { cn } from "@peckey954/ui/lib/utils";
 import {
   FIELD_GROUP_LABEL,
@@ -32,18 +30,18 @@ import {
 } from "@/lib/recipe-cost";
 
 /* ------------------------------------------------------------------
-   Drawer กรอกค่าของสูตรเดียว — 17 ช่องครบในที่เดียว
+   Modal กรอกค่าของสูตรเดียว — 17 ช่องครบในที่เดียว
 
-   จอแคบใช้ตารางไม่ได้ ก็ให้กดที่สูตรแล้วดึงขึ้นมาจากด้านล่างแทน
-   สูงสุด 80vh ตามค่าของ DS จึงยังเห็นว่ามีอะไรอยู่ข้างหลังและปัดปิดได้
-
-   กล่องสรุปตรึงไว้บนสุดของส่วนที่เลื่อน ไม่ใช่ล่างสุด
-   เพราะ 17 ช่องยาวเกินหนึ่งจอ ถ้าอยู่ล่างจะไม่เห็นผลตอนพิมพ์ช่องแรก ๆ
+   จอแคบใช้ตารางไม่ได้ ก็ให้กดที่สูตรแล้วเปิด modal ขึ้นมาแทน
+   กล่องสรุปตรึงไว้บนสุดของส่วนที่เลื่อน ล็อกไว้แค่ "ต้นทุนรวม" กับ
+   "ราคาขายจริง" สองบรรทัด — ไม่ใช่ทุกขั้นของการคำนวณเหมือนก่อน
+   เพราะที่เหลือเป็นค่าระหว่างทาง ไม่ใช่คำตอบที่คนต้องเห็นตลอดเวลาที่เลื่อน
+   กล่องสรุปเล็กลงจึงเหลือพื้นที่ให้ฟอร์ม 17 ช่องด้านล่างมากขึ้น
 ------------------------------------------------------------------ */
 
 const GROUP_ORDER: FieldGroup[] = ["cost", "rate", "budget", "price"];
 
-export function CostRowDrawer({
+export function CostRowModal({
   row,
   open,
   onOpenChange,
@@ -63,28 +61,22 @@ export function CostRowDrawer({
   const blanks = rowBlanks(row);
 
   return (
-    <Drawer open={open} onOpenChange={onOpenChange}>
-      <DrawerContent className="@container">
-        {/* ชื่องานเป็นหัว ชื่อสูตรตามลงมา เหตุผลเดียวกับกล่องย้าย/ปรับปรุงสต็อก
-            DrawerTitle คือชื่อที่โปรแกรมอ่านหน้าจอประกาศ ต้องบอกว่ากำลังทำอะไร */}
-        <DrawerHeader className="gap-2 text-left">
-          <DrawerTitle>แก้ไขต้นทุน</DrawerTitle>
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="@container flex max-h-[85vh] flex-col sm:max-w-lg">
+        <DialogHeader className="text-left">
+          <DialogTitle>แก้ไขต้นทุน</DialogTitle>
           <div>
             <p className="font-medium text-foreground">{row.sku}</p>
-            <DrawerDescription className="mt-0.5">
+            <DialogDescription className="mt-0.5">
               บรรจุ {row.size} กก. ·{" "}
               {blanks > 0 ? `ยังว่าง ${blanks} ช่อง` : "กรอกครบทุกช่องแล้ว"}
-            </DrawerDescription>
+            </DialogDescription>
           </div>
-        </DrawerHeader>
+        </DialogHeader>
 
-        <div className="overflow-y-auto px-4">
-          {/* ผลลัพธ์ตรึงไว้บนสุด เห็นตัวเลขขยับตลอดขณะไล่กรอกลงไป */}
+        <div className="-mx-6 overflow-y-auto px-6">
+          {/* ล็อกไว้แค่สองบรรทัดที่เป็นคำตอบ ตรึงไว้บนสุด เห็นตลอดขณะเลื่อนกรอก */}
           <div className="sticky top-0 z-10 rounded-xl bg-brand p-4">
-            <Line label="ต้นทุนการผลิต" value={r.production} />
-            <Line label="ต้นทุนก่อน Rebate" value={r.beforeRebate} />
-            <Line label="งบการตลาด" value={r.budgetTotal} />
-            <Separator className="my-2" />
             <Line label="ต้นทุนรวม" value={r.total} strong />
             <Line label="ราคาขายจริง" value={r.price} strong />
           </div>
@@ -92,17 +84,9 @@ export function CostRowDrawer({
           <div className="mt-4 space-y-4 pb-4">
             {GROUP_ORDER.map((g) => {
               const fields = fieldsByGroup(g);
-              const left = fields.filter((f) => isBlank(row[f.key])).length;
               return (
                 <div key={g} className="rounded-xl border border-border p-4">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <p className="font-medium">{FIELD_GROUP_LABEL[g]}</p>
-                    {left > 0 && (
-                      <Badge tone="warning" appearance="soft">
-                        ว่าง {left}
-                      </Badge>
-                    )}
-                  </div>
+                  <p className="font-medium">{FIELD_GROUP_LABEL[g]}</p>
 
                   <div className="mt-3 grid gap-3 @md:grid-cols-2">
                     {fields.map((f) => (
@@ -139,16 +123,16 @@ export function CostRowDrawer({
         </div>
 
         {/* ข้ามสูตรได้จากในนี้เลย ไม่ต้องปิดแล้วเลื่อนหาสูตรถัดไปในรายการ */}
-        <DrawerFooter className="flex-row gap-2">
+        <DialogFooter className="flex-row gap-2 sm:justify-stretch">
           <Button variant="outline" className="flex-1" onClick={() => onStep(-1)}>
             สูตรก่อนหน้า
           </Button>
           <Button variant="outline-primary" className="flex-1" onClick={() => onStep(1)}>
             สูตรถัดไป
           </Button>
-        </DrawerFooter>
-      </DrawerContent>
-    </Drawer>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 
