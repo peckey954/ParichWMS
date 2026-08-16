@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import Link from "next/link";
 import { Button } from "@peckey954/ui/components/ui/button";
 import { Separator } from "@peckey954/ui/components/ui/separator";
 import {
@@ -134,8 +135,8 @@ export function InboundList({ docs }: { docs: InboundDoc[] }) {
                       )}
                     </TableCell>
                     <TableCell className={cn(COL_LAST, "text-right")}>
-                      <Button variant="outline-primary" size="sm">
-                        รับเข้า
+                      <Button asChild variant="outline-primary" size="sm">
+                        <Link href={`/stock/inbound/${d.id}`}>รับเข้า</Link>
                       </Button>
                     </TableCell>
                   </TableRow>
@@ -192,8 +193,8 @@ function InboundCard({ doc }: { doc: InboundDoc }) {
       <Separator className="mt-3" />
 
       <div className="mt-3 flex justify-end">
-        <Button variant="outline-primary" size="sm">
-          รับเข้า
+        <Button asChild variant="outline-primary" size="sm">
+          <Link href={`/stock/inbound/${doc.id}`}>รับเข้า</Link>
         </Button>
       </div>
     </div>

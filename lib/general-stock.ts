@@ -689,6 +689,188 @@ export function matchesInbound(d: InboundDoc, q: string): boolean {
   );
 }
 
+/* ------------------------------------------------------------------
+   ใบรับเข้าสต็อกทั่วไป — หน้ารายละเอียดของแต่ละ InboundDoc
+
+   หนึ่งใบสั่งซื้ออาจมีรถเข้าหลายรอบ และแต่ละรอบพอตรวจ QC แล้ว
+   อาจแตกเป็นหลายผล (รับสภาพ/Repack/ผ่าน/ส่งคืน) แต่ละผลนับแยกกัน
+   จึงเก็บเป็นตาราง "รอบการรับเข้าสินค้า" แทนที่จะมีแค่ยอดเดียว
+------------------------------------------------------------------ */
+
+export type QcResult = "accepted" | "repack" | "passed" | "returned";
+
+export const QC_RESULT_LABEL: Record<QcResult, string> = {
+  accepted: "รับสภาพ",
+  repack: "Repack",
+  passed: "ผ่าน",
+  returned: "ส่งคืน",
+};
+
+export type InboundRoundStatus =
+  | "waitingTruck"
+  | "waitingQc"
+  | "stocked"
+  | "returned";
+
+export const INBOUND_ROUND_STATUS_LABEL: Record<InboundRoundStatus, string> = {
+  waitingTruck: "รอรถขนส่ง",
+  waitingQc: "รอตรวจสอบ QC",
+  stocked: "สินค้าเข้าคลังแล้ว",
+  returned: "ส่งคืน",
+};
+
+/** หนึ่งแถวในตาราง "รอบการรับเข้าสินค้า" — บางช่องยังไม่มีค่าตามสถานะ */
+export type InboundRound = {
+  id: string;
+  receiptCode: string;
+  batchId: string;
+  plate: string;
+  arriveDate: string;
+  containerNo?: string;
+  zone?: string;
+  packing?: string;
+  receivedQty?: number;
+  rejectedQty?: number;
+  qcResult?: QcResult;
+  stockedQty?: number;
+  status: InboundRoundStatus;
+};
+
+export type InboundReceiptMeta = {
+  prCode: string;
+  prqId: string;
+  prMaker: string;
+  prEditor?: string;
+  poMaker: string;
+  poEditor?: string;
+  reason: string;
+  deliveryFrom: string;
+};
+
+export type InboundReceipt = {
+  doc: InboundDoc;
+  meta: InboundReceiptMeta;
+  /** รวมจากทุกรอบที่ตรวจ QC แล้ว — เป็นค่าที่ผูกกับ rounds จริง ไม่ใช่สุ่มแยกต่างหาก */
+  rejectedQty: number;
+  stockedQty: number;
+  rounds: InboundRound[];
+};
+
+const REASON_POOL = [
+  "ผลิต",
+  "สำรองคลัง",
+  "เปลี่ยนทดแทนของชำรุด",
+  "รองรับคำสั่งซื้อพิเศษ",
+];
+
+/** เลขที่ตายตัวจาก id เอกสาร กันไม่ให้เปลี่ยนค่าไปมาระหว่างเซิร์ฟเวอร์กับเบราว์เซอร์ */
+function seedFromId(id: string) {
+  let h = 0;
+  for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) | 0;
+  return Math.abs(h) || 1;
+}
+
+function hex(rnd: () => number, len: number) {
+  let s = "";
+  for (let i = 0; i < len; i++) s += Math.floor(rnd() * 16).toString(16);
+  return s;
+}
+
+function buildInboundReceipt(doc: InboundDoc): InboundReceipt {
+  const rnd = seeded(seedFromId(doc.id));
+
+  const maker = pick(DOC_ACTORS, rnd);
+  const poMaker = rnd() < 0.6 ? maker : pick(DOC_ACTORS, rnd);
+  const meta: InboundReceiptMeta = {
+    prCode: doc.code.replace(/^PO/, "PR"),
+    prqId: hex(rnd, 6),
+    prMaker: maker,
+    prEditor: rnd() < 0.3 ? pick(DOC_ACTORS, rnd) : undefined,
+    poMaker,
+    poEditor: rnd() < 0.3 ? pick(DOC_ACTORS, rnd) : undefined,
+    reason: pick(REASON_POOL, rnd),
+    deliveryFrom: doc.arriveDate,
+  };
+
+  const batchId = `IN-${hex(rnd, 4)}-${hex(rnd, 4)}`;
+  const rounds: InboundRound[] = [
+    {
+      id: `${doc.id}-r0`,
+      receiptCode: doc.code,
+      batchId,
+      plate: doc.truck,
+      arriveDate: doc.arriveDate,
+      packing: doc.packing,
+      status: "waitingTruck",
+    },
+  ];
+
+  let rejectedQty = 0;
+  let stockedQty = 0;
+
+  if (doc.receivedQty > 0) {
+    const zone = pick(ZONES, rnd);
+    const containerNo =
+      rnd() < 0.6 ? `AB-${1000 + Math.floor(rnd() * 9000)}` : undefined;
+
+    rounds.push({
+      id: `${doc.id}-r1`,
+      receiptCode: doc.code,
+      batchId,
+      plate: doc.truck,
+      arriveDate: doc.arriveDate,
+      containerNo,
+      zone,
+      packing: doc.packing,
+      receivedQty: doc.receivedQty,
+      status: "waitingQc",
+    });
+
+    // ตรวจ QC แล้วส่วนใหญ่ — บางใบยังค้างรอตรวจอยู่แค่แถวเดียวด้านบน
+    if (rnd() < 0.75) {
+      const pool: QcResult[] = ["accepted", "passed", "repack", "returned"];
+      const picked = pool.filter(() => rnd() < 0.5);
+      const results: QcResult[] = picked.length > 0 ? picked : ["accepted"];
+
+      let remaining = doc.receivedQty;
+      results.forEach((qc, i) => {
+        const isLast = i === results.length - 1;
+        const portion = isLast
+          ? remaining
+          : Math.max(1, Math.round(remaining * (0.3 + rnd() * 0.4)));
+        remaining -= portion;
+        const isReturned = qc === "returned";
+        if (isReturned) rejectedQty += portion;
+        else stockedQty += portion;
+
+        rounds.push({
+          id: `${doc.id}-r${2 + i}`,
+          receiptCode: doc.code,
+          batchId,
+          plate: doc.truck,
+          arriveDate: doc.arriveDate,
+          containerNo,
+          zone,
+          packing: doc.packing,
+          receivedQty: portion,
+          rejectedQty: isReturned ? portion : undefined,
+          qcResult: qc,
+          stockedQty: isReturned ? undefined : portion,
+          status: isReturned ? "returned" : "stocked",
+        });
+      });
+    }
+  }
+
+  return { doc, meta, rejectedQty, stockedQty, rounds };
+}
+
+export function getInboundReceipt(id: string): InboundReceipt | undefined {
+  const doc = INBOUND_DOCS.find((d) => d.id === id);
+  if (!doc) return undefined;
+  return buildInboundReceipt(doc);
+}
+
 // ---------------------------------------------------------------
 // แท็บรอจ่าย/คืน — ใบขอเบิกและใบขอคืน อยู่ตารางเดียวกัน
 // แยกกันด้วยเครื่องหมายของจำนวน จ่ายออกเป็นลบ รับคืนเป็นบวก
