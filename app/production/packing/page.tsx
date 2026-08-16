@@ -23,7 +23,6 @@ import {
   type CwipView,
 } from "@/components/production/packing-cwip";
 import { CwipFilter, isCwipDefault } from "@/components/production/cwip-filter";
-import { CwipActiveFilters } from "@/components/production/cwip-active-filters";
 import { PackingOrders } from "@/components/production/packing-orders";
 import {
   CwipHistoryList,
@@ -335,16 +334,6 @@ export default function PackingListPage() {
             onFilterOpenChange={setFilterOpen}
             onFilter={() => soon("ตัวกรอง")}
           />
-
-          {/* บอกว่ากรองอะไรอยู่ อยู่ติดกับรายการเพราะมันอธิบายรายการ
-              ไม่มีอะไรกรองก็ไม่มีแถวนี้ ไม่จองที่ว่างไว้ */}
-          {tab === "cwip" && isStockView && (
-            <CwipActiveFilters
-              view={cwipView}
-              onChange={setCwipView}
-              onOpenFilter={() => setFilterOpen(true)}
-            />
-          )}
 
         </div>
       </StickyToolbar>
