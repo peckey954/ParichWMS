@@ -3,8 +3,6 @@
 import * as React from "react";
 import {
   DownloadIcon,
-  EyeIcon,
-  EyeOffIcon,
   ListFilterIcon,
   ListIcon,
   RotateCcwIcon,
@@ -118,14 +116,6 @@ function GeneralStockView() {
   const [inboundQuery, setInboundQuery] = React.useState("");
   const [issueQuery, setIssueQuery] = React.useState("");
   const [issueKind, setIssueKind] = React.useState<IssueKind>("all");
-
-  // ปุ่มรูปตาเป็นสวิตช์ตัวใหญ่ — เปิด/ปิดพร้อมกันทั้งป้ายและปุ่ม
-  // ส่วนใน popover ยังแยกเปิดปิดทีละอย่างได้ ทั้งสองทางเขียนค่าชุดเดียวกันจึงไม่หลุดกัน
-  const allShown = showChips && showActions;
-  const toggleAll = () => {
-    setShowChips(!allShown);
-    setShowActions(!allShown);
-  };
 
   // ค่าที่ popover เป็นเจ้าของ — ล้างได้ทีเดียวจบ
   // ไม่ล้างประเภทสินค้ากับคำค้น เพราะสองอย่างนั้นเป็นการนำทาง ไม่ใช่ตัวกรอง
@@ -510,27 +500,11 @@ function GeneralStockView() {
               </PopoverContent>
             </Popover>
 
-            {/* ปุ่มซ่อน/แสดงมาอยู่ข้างค้นหา อยู่ในแถบติดบนจึงเอื้อมถึงตลอดตอนเลื่อน
-                ประวัติเป็นตาราง ไม่มีป้ายกับปุ่มในแถวให้ซ่อน จึงไม่ต้องมีปุ่มนี้ */}
-            {!isHistory && (
-              <Button
-                variant="outline-primary"
-                size="icon"
-                aria-label={allShown ? "ซ่อนป้ายและปุ่ม" : "แสดงป้ายและปุ่ม"}
-                aria-pressed={!allShown}
-                onClick={toggleAll}
-                className="shrink-0"
-              >
-                {allShown ? <EyeIcon /> : <EyeOffIcon />}
-              </Button>
-            )}
-
             {/* ส่งออกได้เฉพาะรายการของแท็บสต็อก จึงอยู่ในแถบของแท็บนี้
                 ไม่ใช่ข้างชื่อหน้า — ไม่งั้นหัวเรื่องจะกระตุกตอนสลับแท็บ
                 วางริมสุดเพราะเป็นงานทำครั้งเดียวจบ ไม่ได้ใช้ระหว่างไล่ดูรายการ
                 เหมือนปุ่มอื่นในแถวนี้ */}
             <Button
-              variant="outline"
               size="icon"
               aria-label="ส่งออก CSV"
               className="shrink-0"

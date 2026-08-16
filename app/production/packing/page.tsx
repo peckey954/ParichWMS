@@ -17,7 +17,12 @@ import {
 } from "@peckey954/ui/components/ui/breadcrumb";
 import { Tabs, TabsList, TabsTrigger } from "@peckey954/ui/components/ui/tabs";
 import { toast } from "sonner";
-import { PackingCwip } from "@/components/production/packing-cwip";
+import {
+  CWIP_VIEW_DEFAULT,
+  PackingCwip,
+  type CwipView,
+} from "@/components/production/packing-cwip";
+import { CwipFilter, isCwipDefault } from "@/components/production/cwip-filter";
 import { PackingOrders } from "@/components/production/packing-orders";
 import {
   ActionButtons,
@@ -55,6 +60,8 @@ export default function PackingListPage() {
   const [tab, setTab] = React.useState<Tab>("waiting");
   const [query, setQuery] = React.useState("");
   const [suggestOpen, setSuggestOpen] = React.useState(false);
+  // สิ่งที่เลือกซ่อน/แสดงได้ในแท็บ CWIP — ตัวกรองเป็นเจ้าของค่าชุดนี้
+  const [cwipView, setCwipView] = React.useState<CwipView>(CWIP_VIEW_DEFAULT);
   // เลื่อนลงซ่อนแถบค้นหา เลื่อนขึ้นเอากลับมา แบบเดียวกับหน้าสต็อกทั่วไป
   const { hidden, showTop, scrollToTop, barRef } = useStickyToolbar();
 
@@ -165,6 +172,14 @@ export default function PackingListPage() {
             onQuery={setQuery}
             placeholder={PLACEHOLDER[tab]}
             actions={TAB_ACTIONS[tab]}
+            /* มีของให้กรองจริงเฉพาะแท็บ CWIP อีกสองแท็บเป็นตารางใบผลิต
+               ยังไม่ได้ตกลงว่าจะกรองอะไร จึงปล่อยเป็นปุ่มเปล่าไว้ก่อน */
+            filter={
+              tab === "cwip" ? (
+                <CwipFilter view={cwipView} onChange={setCwipView} />
+              ) : undefined
+            }
+            filterActive={tab === "cwip" && !isCwipDefault(cwipView)}
             onFilter={() => soon("ตัวกรอง")}
           />
         </div>
@@ -174,7 +189,7 @@ export default function PackingListPage() {
         {tab === "waiting" && (
           <PackingOrders orders={waiting} emptyTitle="ไม่พบใบผลิตที่รออยู่" />
         )}
-        {tab === "cwip" && <PackingCwip products={cwip} />}
+        {tab === "cwip" && <PackingCwip products={cwip} view={cwipView} />}
         {tab === "done" && (
           <PackingOrders orders={done} emptyTitle="ไม่พบใบผลิตที่ผลิตแล้ว" />
         )}
