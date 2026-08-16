@@ -464,8 +464,16 @@ function GeneralStockView() {
           </div>
           </StickyToolbar>
 
-          {/* ---------- รายการสินค้า / ประวัติ ---------- */}
-          <div ref={listRef} className="mt-4 space-y-4">
+          {/* ---------- รายการสินค้า / ประวัติ ----------
+               key=cat บังคับ React ถอด/สร้างก้อนนี้ใหม่ทุกครั้งที่สลับชิป
+               ให้เห็นรายการชุดใหม่ไถลขึ้นมาจริง ๆ ไม่ใช่แค่เปลี่ยนข้อมูลเฉย ๆ
+               ตำแหน่งเลื่อนหน้ากระโดดไปรอที่จุดหมายแล้ว (scrollListToTop)
+               ที่เห็นไหลจึงเป็นแค่การ์ดเข้าที่ ไม่ใช่หน้าเลื่อนยาว */}
+          <div
+            ref={listRef}
+            key={cat}
+            className="mt-4 animate-in slide-in-from-bottom-3 fade-in space-y-4 duration-300"
+          >
             {isHistory && <HistoryList rows={historyVisible} />}
 
             {/* หน่วยของรายการเปลี่ยนตามโหมดที่เลือก ไม่ใช่ตารางเดิมสลับลำดับ
@@ -578,7 +586,10 @@ function GeneralStockView() {
                 </div>
               </StickyToolbar>
 
-              <div ref={listRef} className="mt-4">
+              <div
+                ref={listRef}
+                className="mt-4 animate-in slide-in-from-bottom-3 fade-in duration-300"
+              >
                 <InboundList docs={inboundVisible} />
               </div>
             </>
@@ -641,7 +652,11 @@ function GeneralStockView() {
                 </div>
               </StickyToolbar>
 
-              <div ref={listRef} className="mt-4">
+              <div
+                ref={listRef}
+                key={issueKind}
+                className="mt-4 animate-in slide-in-from-bottom-3 fade-in duration-300"
+              >
                 <IssueList docs={issueVisible} />
               </div>
             </>

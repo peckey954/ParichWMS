@@ -333,7 +333,14 @@ export default function PackingListPage() {
         </div>
       </StickyToolbar>
 
-      <div ref={listRef} className="mt-3">
+      {/* key รวมแท็บ+ชิป บังคับ React ถอด/สร้างก้อนนี้ใหม่ทุกครั้งที่สลับ
+          ให้เห็นรายการชุดใหม่ไถลขึ้นมาจริง ๆ ตำแหน่งเลื่อนหน้ากระโดดไปรอ
+          ที่จุดหมายแล้ว (scrollListToTop effect) ที่เห็นไหลจึงเป็นแค่การ์ดเข้าที่ */}
+      <div
+        ref={listRef}
+        key={`${tab}-${cwipChip}`}
+        className="mt-3 animate-in slide-in-from-bottom-3 fade-in duration-300"
+      >
         {tab === "waiting" && (
           <PackingOrders
             orders={waiting}

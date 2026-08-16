@@ -134,6 +134,10 @@ export function DevicePreviewProvider({
 export function useScrollState({ hideAfter = 160, topAfter = 700 } = {}) {
   const { framed, frameRef } = useDevicePreview();
   const [state, setState] = React.useState({ hidden: false, showTop: false });
+  // scrollIntoTop เลื่อนหน้าเองโปรแกรมมาติก ไม่ใช่นิ้วผู้ใช้
+  // ถ้าจุดหมายอยู่ต่ำกว่า hideAfter จะถูกอ่านผิดว่า "เลื่อนลงอ่าน" แล้วซ่อนแถบทันที
+  // ทั้งที่กำลังจะโชว์แถบพร้อมรายการชุดใหม่ ตั้งค่านี้ไว้ให้รอบ scroll ถัดไปข้ามการซ่อน
+  const ignoreNextRef = React.useRef(false);
 
   React.useEffect(() => {
     const el = framed ? frameRef.current : null;
@@ -149,6 +153,19 @@ export function useScrollState({ hideAfter = 160, topAfter = 700 } = {}) {
       requestAnimationFrame(() => {
         ticking = false;
         const y = read();
+
+        if (ignoreNextRef.current) {
+          ignoreNextRef.current = false;
+          last = y;
+          setState((prev) => {
+            const showTop = y > topAfter;
+            return prev.hidden === false && prev.showTop === showTop
+              ? prev
+              : { hidden: false, showTop };
+          });
+          return;
+        }
+
         const dy = y - last;
         // ขยับน้อยกว่านี้ถือว่าเป็นการสั่น ไม่นับเป็นการเปลี่ยนทิศ
         const moved = Math.abs(dy) > 6;
@@ -178,10 +195,20 @@ export function useScrollState({ hideAfter = 160, topAfter = 700 } = {}) {
    *
    * ไม่ใช้ smooth — สลับแท็บ/ชิปมักกระโดดข้ามระยะไกล (เผลอเลื่อนลึกไว้ก่อนสลับ)
    * เลื่อนแบบ smooth จะเห็นเนื้อหาเดิมไหลผ่านตาไปเรื่อย ๆ เหมือนลากมาตั้งแต่บนสุด
-   * เปลี่ยนเป็นกระโดดตรงให้เห็นการ์ดแรกของชุดใหม่ทันที
+   * เปลี่ยนเป็นกระโดดตรง แล้วให้รายการชุดใหม่เป็นฝ่ายไถลเข้ามาแทน (ดู animate-in
+   * ที่ตัวรายการ) เห็นการเปลี่ยนแปลงชัดกว่าแต่ไม่ต้องนั่งดูหน้าเลื่อนยาว ๆ
+   *
+   * ตั้ง ignoreNextRef ไว้เสมอ ไม่ว่าจะเลื่อนขึ้นหรือลง เพราะกระโดดครั้งเดียว
+   * แถบต้องโผล่แน่ ๆ ไม่ต้องพึ่งให้ทิศเลื่อนมาตัดสินแทน
    */
   const scrollIntoTop = React.useCallback(
     (el: HTMLElement, offset = 0) => {
+      ignoreNextRef.current = true;
+      // เผื่อกรณีเป้าหมายอยู่ตำแหน่งเดิมพอดี ไม่มี scroll event เกิดขึ้นเลย
+      // ค่านี้ต้องไม่ค้าง ไม่งั้นจะไปกินการเลื่อนจริงครั้งถัดไปของผู้ใช้ฟรี ๆ
+      window.setTimeout(() => {
+        ignoreNextRef.current = false;
+      }, 100);
       const frame = framed ? frameRef.current : null;
       if (frame) {
         const top =
