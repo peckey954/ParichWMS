@@ -16,15 +16,6 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@peckey954/ui/components/ui/dialog";
-import {
-  Popover,
-  PopoverContent,
-  PopoverDescription,
-  PopoverHeader,
-  PopoverTitle,
-  PopoverTrigger,
-} from "@peckey954/ui/components/ui/popover";
-import { useNarrowScreen } from "@/components/device-preview";
 import { ActionButtons, type PackingAction } from "./packing-actions";
 
 /* ------------------------------------------------------------------
@@ -62,15 +53,6 @@ export function PackingToolbar({
   onFilterOpenChange?: (v: boolean) => void;
   onFilter?: () => void;
 }) {
-  // จอแคบเปิดเป็น modal กลางจอ ไม่ใช่ popover ห้อยใต้ปุ่ม
-  // Popover ของ Radix ไม่ล็อกการเลื่อนของหน้าข้างหลัง เลื่อนสุดกล่องแล้วมันไหล
-  // ไปเลื่อนหน้าต่อ ซึ่งบนมือถือแยกไม่ออกว่าอะไรกำลังเลื่อนอยู่
-  // Dialog ล็อกให้ และมีฉากหลังทึบบอกว่าตอนนี้ทำได้แค่ในกล่องนี้
-  //
-  // จอกว้างยังเป็น popover เพราะเปิดค้างแล้วยังเห็นรายการอัปเดตตามที่ติ๊กได้
-  // ถ้าเป็น modal จะกลายเป็นตั้งค่าให้เสร็จก่อนแล้วค่อยดูผล ซึ่งช้ากว่า
-  const narrow = useNarrowScreen();
-
   const TITLE = "ตัวกรองและการแสดงผล";
   const DESC = "เลือกได้หลายอย่างพร้อมกัน ไม่เลือกเลยคือดูทั้งหมด";
   // ใช้ไอคอนเดียวกับปุ่มตัวกรองที่หน้าสต็อกและหน้าสูตร
@@ -114,10 +96,18 @@ export function PackingToolbar({
         </InputGroup>
       </div>
 
-      {filter && narrow ? (
+      {filter ? (
         <Dialog open={filterOpen} onOpenChange={onFilterOpenChange}>
           <DialogTrigger asChild>{trigger}</DialogTrigger>
-          {/* overflow-hidden ทับกฎของโหมดจำลองอุปกรณ์ที่ตั้ง overflow-y:auto ไว้
+          {/* กล่องกลางจอทุกขนาดหน้าจอ ไม่ใช่ popover ห้อยใต้ปุ่ม
+              Popover ของ Radix ไม่ล็อกการเลื่อนของหน้าข้างหลัง เลื่อนสุดกล่อง
+              แล้วมันไหลไปเลื่อนหน้าต่อ ซึ่งแยกไม่ออกว่าอะไรกำลังเลื่อนอยู่
+              และ popover สูงได้แค่ระยะจากปุ่มถึงขอบล่าง ตัวกรองยาวกว่านั้น
+              ส่วนที่เป็นดรอปดาวน์เลยถูกตัดหายไปโดยไม่มีอะไรบอกว่ายังมีต่อ
+
+              กล่องกลางจอได้ความสูงเต็ม มีฉากหลังทึบ และล็อกการเลื่อนให้ด้วย
+
+              overflow-hidden ทับกฎของโหมดจำลองอุปกรณ์ที่ตั้ง overflow-y:auto ไว้
               ไม่งั้นกล่องทั้งใบจะเลื่อน แล้วปุ่มล้างค่าที่ตรึงไว้ก็เลื่อนตามไปด้วย */}
           <DialogContent className="flex max-h-[85svh] flex-col gap-0 overflow-hidden! p-0 sm:max-w-md">
             <DialogHeader className="px-4 pt-4 text-left">
@@ -127,25 +117,6 @@ export function PackingToolbar({
             {filter}
           </DialogContent>
         </Dialog>
-      ) : filter ? (
-        <Popover open={filterOpen} onOpenChange={onFilterOpenChange}>
-          <PopoverTrigger asChild>{trigger}</PopoverTrigger>
-          {/* ความสูงจำกัดด้วยที่ว่างจริงที่ Radix วัดให้ ไม่ใช่ vh
-              กล่องเริ่มใต้ปุ่มซึ่งอยู่กลางจอ ใช้ 70vh แล้วท้ายกล่องยังเลยขอบล่างอยู่ดี
-              ไม่ใส่ padding ที่นี่ — ตัวกรองจัดการเอง เพราะต้องตรึงหัวกับปุ่มล้างค่า
-              แล้วเลื่อนเฉพาะตรงกลาง */}
-          <PopoverContent
-            align="end"
-            collisionPadding={12}
-            className="flex max-h-(--radix-popover-content-available-height) w-80 flex-col p-0"
-          >
-            <PopoverHeader className="px-4 pt-4">
-              <PopoverTitle>{TITLE}</PopoverTitle>
-              <PopoverDescription>{DESC}</PopoverDescription>
-            </PopoverHeader>
-            {filter}
-          </PopoverContent>
-        </Popover>
       ) : (
         trigger
       )}

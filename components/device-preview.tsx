@@ -42,32 +42,6 @@ const DevicePreviewContext = React.createContext<Ctx>({
 
 export const useDevicePreview = () => React.useContext(DevicePreviewContext);
 
-/**
- * จอแคบหรือเปล่า — ใช้กับของที่วาดผ่าน portal (Dialog / Drawer / Sheet)
- *
- * container query ใช้ไม่ได้ เพราะ portal วาดไปไว้ที่ body ไม่ได้อยู่ใน container
- * ตอนจำลองอุปกรณ์ก็ดูจากกรอบที่เลือก ไม่ใช่ความกว้างหน้าต่างจริง
- * ไม่งั้นเปิดโหมดมือถือบนเดสก์ท็อปแล้วจะยังได้พฤติกรรมของจอกว้าง
- *
- * useSyncExternalStore เพื่อให้ค่าฝั่งเซิร์ฟเวอร์เป็น false เสมอ ไม่ชนกับ hydration
- */
-export function useNarrowScreen() {
-  const { framed, device } = useDevicePreview();
-  const wide = React.useSyncExternalStore(
-    subscribeWide,
-    () => window.matchMedia(WIDE).matches,
-    () => true
-  );
-  return framed ? device === "mobile" : !wide;
-}
-
-const WIDE = "(min-width: 768px)";
-
-function subscribeWide(onChange: () => void) {
-  const mq = window.matchMedia(WIDE);
-  mq.addEventListener("change", onChange);
-  return () => mq.removeEventListener("change", onChange);
-}
 
 export function DevicePreviewProvider({
   children,
