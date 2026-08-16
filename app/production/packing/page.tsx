@@ -344,7 +344,11 @@ export default function PackingListPage() {
           <CwipHistoryList rows={history} />
         )}
         {tab === "done" && (
-          <PackingOrders orders={done} emptyTitle="ไม่พบใบผลิตที่ผลิตแล้ว" />
+          <PackingOrders
+            orders={done}
+            emptyTitle="ไม่พบใบผลิตที่ผลิตแล้ว"
+            showStage={false}
+          />
         )}
       </div>
 

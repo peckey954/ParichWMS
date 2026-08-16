@@ -194,7 +194,12 @@ export function PackingOrders({
                 <TableHead className="text-right whitespace-nowrap">
                   ไม่ผ่าน QC (ตัน)
                 </TableHead>
-                <TableHead className="text-right whitespace-nowrap">
+                <TableHead
+                  className={cn(
+                    "text-right whitespace-nowrap",
+                    !showStage && HEAD_LAST
+                  )}
+                >
                   เข้าคลัง (ตัน)
                 </TableHead>
                 {showStage && (
@@ -242,19 +247,26 @@ export function PackingOrders({
                       </span>
                     )}
                   </TableCell>
-                  <TableCell className="text-right tabular-nums">
+                  <TableCell
+                    className={cn(
+                      "text-right tabular-nums",
+                      !showStage && COL_LAST
+                    )}
+                  >
                     {formatTon(o.storedTon)}
                   </TableCell>
-                  <TableCell
-                    className={COL_LAST}
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    <StageControl
-                      stage={o.stage}
-                      code={o.code}
-                      onChange={onStage && ((stage) => onStage(o.id, stage))}
-                    />
-                  </TableCell>
+                  {showStage && (
+                    <TableCell
+                      className={COL_LAST}
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <StageControl
+                        stage={o.stage}
+                        code={o.code}
+                        onChange={onStage && ((stage) => onStage(o.id, stage))}
+                      />
+                    </TableCell>
+                  )}
                 </TableRow>
               ))}
             </TableBody>
@@ -280,9 +292,11 @@ export function PackingOrders({
 function OrderCard({
   order: o,
   onStage,
+  showStage,
 }: {
   order: PackingOrder;
   onStage?: (stage: OrderStage) => void;
+  showStage: boolean;
 }) {
   // ใบที่ยังไม่ได้ผลิต ยอดผลิตแล้ว/ไม่ผ่าน QC/เข้าคลัง เป็นขีดทั้งแถบ
   // ตัดทิ้งไปเลยดีกว่าโชว์ขีดสามบรรทัด ซึ่งไม่ได้บอกอะไรนอกจาก "ยังไม่มี"
@@ -343,11 +357,15 @@ function OrderCard({
         ))}
       </dl>
 
-      <Separator className="mt-3" />
-      {/* z-10 ให้ปุ่มลอยเหนือลิงก์ที่คลุมทั้งใบ ไม่งั้นกดไม่โดน */}
-      <div className="relative z-10 mt-3 flex justify-end">
-        <StageControl stage={o.stage} code={o.code} onChange={onStage} />
-      </div>
+      {showStage && (
+        <>
+          <Separator className="mt-3" />
+          {/* z-10 ให้ปุ่มลอยเหนือลิงก์ที่คลุมทั้งใบ ไม่งั้นกดไม่โดน */}
+          <div className="relative z-10 mt-3 flex justify-end">
+            <StageControl stage={o.stage} code={o.code} onChange={onStage} />
+          </div>
+        </>
+      )}
     </div>
   );
 }
