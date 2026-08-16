@@ -6,6 +6,8 @@ import {
   ChevronUpIcon,
   ChevronsUpDownIcon,
 } from "lucide-react";
+import { Button } from "@peckey954/ui/components/ui/button";
+import { ButtonGroup } from "@peckey954/ui/components/ui/button-group";
 import { cn } from "@peckey954/ui/lib/utils";
 
 /* ------------------------------------------------------------------
@@ -20,9 +22,13 @@ import { cn } from "@peckey954/ui/lib/utils";
      ลูกศรสองหัว = ยังไม่ได้เรียงด้วยอันนี้ กดได้
      ลูกศรหัวเดียว = เรียงอยู่ ชี้ไปทางที่กำลังเรียง
 
-   หน้าตาเป็นชิปแยกกันชุดเดียวกับชิปติ๊กในหัวข้อถัดไป
-   ทั้งกล่องจึงมีภาษาปุ่มเดียว ต่างกันแค่มีกล่องติ๊กหรือไม่มี
-   ซึ่งบอกได้เองว่าอันไหนเลือกได้อันเดียว อันไหนเลือกได้หลายอัน
+   ใช้ ButtonGroup ของ DS สามปุ่มติดกันเป็นก้อนเดียว
+   บอกว่า "เลือกได้อันเดียวจากชุดนี้" อยู่ในตัว ต่างจากชิปติ๊กด้านล่าง
+   ที่แยกกันเป็นอัน ๆ ซึ่งแปลว่าเลือกได้หลายอันพร้อมกัน
+
+   ตัวที่เลือกอยู่ใช้พื้นอ่อนสีแบรนด์ ไม่ใช่เปลี่ยนสีเส้นขอบ
+   เพราะ ButtonGroup ตัดขอบซ้ายของปุ่มที่ไม่ใช่ตัวแรกทิ้ง
+   เปลี่ยนสีขอบแล้วปุ่มกลางจะมีขอบส้มแค่สามด้าน
 
    ชื่อหัวข้ออยู่ข้างนอก ตัวนี้จึงไม่ต้องมีคำว่า "เรียงตาม:" ในตัวอีก
 
@@ -54,11 +60,7 @@ export function SortControl<T extends string>({
   className?: string;
 }) {
   return (
-    <div
-      role="group"
-      aria-label="การเรียงข้อมูล"
-      className={cn("flex flex-wrap items-center gap-2", className)}
-    >
+    <ButtonGroup aria-label="การเรียงข้อมูล" className={className}>
       {options.map((o) => {
         const on = value === o.id;
         const next: SortDir = on && dir === "asc" ? "desc" : "asc";
@@ -69,9 +71,9 @@ export function SortControl<T extends string>({
             : ChevronDownIcon;
 
         return (
-          <button
+          <Button
             key={o.id}
-            type="button"
+            variant="outline"
             aria-pressed={on}
             // บอกว่ากดแล้วจะได้อะไร ไม่ใช่ว่าตอนนี้เป็นอะไร
             title={
@@ -84,19 +86,15 @@ export function SortControl<T extends string>({
             }`}
             onClick={() => onChange(o.id, next)}
             className={cn(
-              "flex min-h-10 shrink-0 items-center gap-2 rounded-lg border px-3",
-              "text-sm whitespace-nowrap transition-colors",
-              "focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none",
-              on
-                ? "border-primary bg-brand font-medium text-primary"
-                : "border-border text-foreground hover:bg-accent-hover"
+              "h-10",
+              on && "bg-brand font-semibold text-primary hover:bg-brand"
             )}
           >
             {o.label}
-            <Icon className="size-4" />
-          </button>
+            <Icon />
+          </Button>
         );
       })}
-    </div>
+    </ButtonGroup>
   );
 }
