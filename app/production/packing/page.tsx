@@ -104,9 +104,9 @@ export default function PackingListPage() {
   const cwip = filterCwip(CWIP_PRODUCTS, {
     query,
     lowOnly: cwipChip === "low" || cwipView.lowOnly,
-    incomingOnly: cwipView.incomingOnly,
     kinds: cwipView.kinds,
     zones: cwipView.zones,
+    products: cwipView.products,
     sort: cwipView.sort,
   });
   const inbound = CWIP_INBOUND.filter((d) => matchesRequest(d, query));

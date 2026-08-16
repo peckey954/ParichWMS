@@ -429,17 +429,19 @@ export function filterCwip(
   opts: {
     query: string;
     lowOnly: boolean;
-    incomingOnly: boolean;
     kinds: string[];
     zones: string[];
+    products: string[];
     sort: CwipSort;
   }
 ): CwipProduct[] {
   const rows = products
     .filter((p) => matchesCwip(p, opts.query))
     .filter((p) => !opts.lowOnly || p.low)
-    .filter((p) => !opts.incomingOnly || p.incoming !== undefined)
     .filter((p) => opts.kinds.length === 0 || opts.kinds.includes(p.kind))
+    .filter(
+      (p) => opts.products.length === 0 || opts.products.includes(p.name)
+    )
     .map((p) =>
       opts.zones.length === 0
         ? p
@@ -462,3 +464,8 @@ export function filterCwip(
   }
   return sorted;
 }
+
+/** ชื่อสินค้าใน CWIP สำหรับตัวเลือกในตัวกรอง — ดึงจากข้อมูลจริง */
+export const CWIP_PRODUCT_NAMES = CWIP_PRODUCTS.map((p) => p.name).sort((a, b) =>
+  a.localeCompare(b, "th")
+);

@@ -32,11 +32,10 @@ export type CwipView = {
   showLots: boolean;
   /** กรองเหลือเฉพาะสินค้าที่สต็อกต่ำ — ทำงานร่วมกับชิปสต็อกต่ำด้านบน */
   lowOnly: boolean;
-  /** เฉพาะสินค้าที่มีของกำลังจะเข้ามาเพิ่ม */
-  incomingOnly: boolean;
   /** ว่าง = เอาทั้งหมด ไม่ใช่ไม่เอาอะไรเลย */
   kinds: string[];
   zones: string[];
+  products: string[];
   sort: CwipSort;
 };
 
@@ -45,9 +44,9 @@ export const CWIP_VIEW_DEFAULT: CwipView = {
   showActions: true,
   showLots: true,
   lowOnly: false,
-  incomingOnly: false,
   kinds: [],
   zones: [],
+  products: [],
   sort: "product",
 };
 

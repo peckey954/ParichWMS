@@ -14,9 +14,10 @@ import { CWIP_VIEW_DEFAULT, type CwipView } from "./packing-cwip";
 
    เลขบนปุ่มตัวกรองบอกว่ากี่เงื่อนไข แต่ไม่บอกว่าอะไร แถวนี้บอก
 
-   หน้าตาไม่ใช่ชิปกลมสีส้ม เพราะเหนือช่องค้นหามีชิปกลมอยู่แล้วห้าอัน
-   หน้าตาเหมือนกันแต่ความหมายตรงข้าม — อันบนคือ "กำลังดูอันนี้"
-   อันนี้คือ "กรองอันนี้ออกอยู่ กด ✕ แล้วหาย" จึงทำเป็นกล่องเทาอ่อนแทน
+   อยู่ในการ์ดมีขอบ ไม่ใช่ป้ายลอย ๆ บนพื้นหน้า
+   เหนือช่องค้นหามีชิปกลมอยู่แล้วห้าอันซึ่งหน้าตาใกล้กันมาก แต่ความหมายตรงข้าม
+   ชิปบน = "กำลังดูอันนี้" ป้ายในนี้ = "กรองอันนี้อยู่ กด ✕ แล้วหาย"
+   กรอบของการ์ดคือสิ่งที่แยกสองอย่างนี้ออกจากกัน ไม่ใช่รูปทรงของป้าย
 
    ป้ายบอกชื่อฟิลด์กับจำนวน ไม่ใช่ค่าทุกตัว
    เลือกโซนไว้หกอันแล้วพิมพ์ชื่อครบทั้งหกจะกินความกว้างเกินช่องค้นหา
@@ -54,11 +55,14 @@ function tokensOf(view: CwipView): Token[] {
     t.push({ key: "low", label: "เฉพาะสต็อกต่ำ", clear: { lowOnly: false } });
   }
 
-  if (view.incomingOnly) {
+  if (view.products.length > 0) {
     t.push({
-      key: "incoming",
-      label: "เฉพาะที่มีของรอรับเข้า",
-      clear: { incomingOnly: false },
+      key: "products",
+      label:
+        view.products.length === 1
+          ? `สินค้า: ${view.products[0]}`
+          : `สินค้า (${view.products.length})`,
+      clear: { products: [] },
     });
   }
 
@@ -91,8 +95,8 @@ export function CwipActiveFilters({
       ...view,
       kinds: [],
       zones: [],
+      products: [],
       lowOnly: CWIP_VIEW_DEFAULT.lowOnly,
-      incomingOnly: CWIP_VIEW_DEFAULT.incomingOnly,
     });
 
   return (
@@ -134,45 +138,52 @@ export function CwipActiveFilters({
         </span>
       </button>
 
-      {/* ---------- จอกว้าง: ป้ายถอดได้ทีละอัน ---------- */}
-      <div className="mt-3 hidden flex-wrap items-center gap-2 @3xl:flex">
-        <span className="text-sm text-muted-foreground">ตัวกรอง:</span>
+      {/* ---------- จอกว้าง: การ์ดป้ายถอดได้ทีละอัน ----------
+           อยู่ในการ์ดมีขอบ ไม่ใช่ป้ายลอย ๆ บนพื้นหน้า
+           กรอบคือสิ่งที่แยกมันออกจากชิปนำทางด้านบนที่หน้าตาใกล้กัน
+           ในกรอบ = เงื่อนไขที่กรองอยู่ นอกกรอบ = อันที่กำลังเลือกดู */}
+      <div className="mt-3 hidden rounded-xl border border-border bg-card px-4 py-3 @3xl:block">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+          <span className="text-sm text-muted-foreground">ตัวกรอง:</span>
 
-        {shown.map((t) => (
-          <span
-            key={t.key}
-            className="flex items-center gap-1.5 rounded-md bg-secondary py-1 pr-1 pl-2.5 text-sm"
-          >
-            {t.label}
-            <button
-              type="button"
-              aria-label={`เอา ${t.label} ออก`}
-              onClick={() => onChange({ ...view, ...t.clear })}
-              className="rounded-sm p-0.5 text-muted-foreground hover:text-foreground"
-            >
-              <XIcon className="size-3.5" />
-            </button>
-          </span>
-        ))}
+          <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+            {shown.map((t) => (
+              <span
+                key={t.key}
+                className="flex items-center gap-1.5 rounded-full border border-border bg-brand py-1 pr-1.5 pl-3 text-sm"
+              >
+                {t.label}
+                <button
+                  type="button"
+                  aria-label={`เอา ${t.label} ออก`}
+                  onClick={() => onChange({ ...view, ...t.clear })}
+                  className="rounded-full p-0.5 text-muted-foreground transition-colors hover:text-foreground"
+                >
+                  <XIcon className="size-3.5" />
+                </button>
+              </span>
+            ))}
 
-        {rest > 0 && (
+            {rest > 0 && (
+              <button
+                type="button"
+                onClick={onOpenFilter}
+                className="rounded-full border border-dashed border-border px-3 py-1 text-sm text-muted-foreground transition-colors hover:text-foreground"
+              >
+                +{rest}
+              </button>
+            )}
+          </div>
+
           <button
             type="button"
-            onClick={onOpenFilter}
-            className="rounded-md px-1 text-sm text-muted-foreground hover:text-foreground"
+            onClick={clearAll}
+            className="ml-auto flex shrink-0 items-center gap-1.5 text-sm font-medium text-primary"
           >
-            +{rest}
+            <RotateCcwIcon className="size-4" />
+            ล้างค่า
           </button>
-        )}
-
-        <button
-          type="button"
-          onClick={clearAll}
-          className="flex items-center gap-1 text-sm font-medium text-primary"
-        >
-          <RotateCcwIcon className="size-3.5" />
-          ล้างค่า
-        </button>
+        </div>
       </div>
     </>
   );

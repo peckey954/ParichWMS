@@ -94,11 +94,14 @@ export function PackingToolbar({
       {filter ? (
         <Popover open={filterOpen} onOpenChange={onFilterOpenChange}>
           <PopoverTrigger asChild>{trigger}</PopoverTrigger>
-          {/* จำกัดความสูงแล้วเลื่อนข้างใน — ตัวกรองยาวกว่าจอมือถือ
-              ไม่จำกัดไว้ ของที่อยู่ท้ายกล่องจะหลุดออกนอกจอจนกดไม่ถึง */}
+          {/* ความสูงจำกัดด้วยที่ว่างจริงที่ Radix วัดให้ ไม่ใช่ vh
+              กล่องเริ่มใต้ปุ่มซึ่งอยู่กลางจอ ใช้ 70vh แล้วท้ายกล่องยังเลยขอบล่างอยู่ดี
+              ไม่ใส่ padding ที่นี่ — ตัวกรองจัดการเอง เพราะต้องตรึงหัวกับปุ่มล้างค่า
+              แล้วเลื่อนเฉพาะตรงกลาง */}
           <PopoverContent
             align="end"
-            className="max-h-[70vh] w-72 overflow-y-auto"
+            collisionPadding={12}
+            className="flex max-h-(--radix-popover-content-available-height) w-80 flex-col p-0"
           >
             {filter}
           </PopoverContent>

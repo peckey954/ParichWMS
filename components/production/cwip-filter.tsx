@@ -6,35 +6,38 @@ import {
   RotateCcwIcon,
   SlidersHorizontalIcon,
   TagIcon,
+  TriangleAlertIcon,
 } from "lucide-react";
 import { Button } from "@peckey954/ui/components/ui/button";
 import { Checkbox } from "@peckey954/ui/components/ui/checkbox";
 import { Label } from "@peckey954/ui/components/ui/label";
 import { MultiSelect } from "@peckey954/ui/components/ui/multi-select";
-import {
-  PopoverDescription,
-  PopoverHeader,
-  PopoverTitle,
-} from "@peckey954/ui/components/ui/popover";
 import { Separator } from "@peckey954/ui/components/ui/separator";
 import {
   ToggleGroup,
   ToggleGroupItem,
 } from "@peckey954/ui/components/ui/toggle-group";
 import { CWIP_VIEW_DEFAULT, type CwipView } from "./packing-cwip";
-import { CWIP_KINDS, CWIP_ZONES, type CwipSort } from "@/lib/packing-list";
+import {
+  CWIP_KINDS,
+  CWIP_PRODUCT_NAMES,
+  CWIP_ZONES,
+  type CwipSort,
+} from "@/lib/packing-list";
 
 /* ------------------------------------------------------------------
    ตัวกรองของแท็บสต็อก CWIP
 
    เรียงตามความถี่ที่คนแตะจริง ไม่ใช่ตามความสำคัญของข้อมูล
      1. เรียงตาม      — เปลี่ยนบ่อยที่สุด เดินไปหยิบของก็สลับเป็นโซน
-                        จะเคลียร์ของเก่าก็สลับเป็น FIFO
-     2. แสดงในรายการ  — ตั้งครั้งเดียวแล้วอยู่ยาว แต่แตะบ่อยกว่าการเลือกหมวด
-     3. กรองข้อมูล    — ของจริงมีหมวดกับโซนเป็นสิบ ต้องค้นหาเอา ไม่ใช่ไล่กด
+     2. แสดงในรายการ  — ตั้งครั้งเดียวแล้วอยู่ยาว
+     3. กรองข้อมูล    — ของจริงมีหมวด โซน สินค้า เป็นสิบ ต้องค้นหาเอา
 
-   หมวดกับโซนใช้ MultiSelect ของ DS ที่มีช่องค้นหาในตัว
-   ชิปหกอันเรียงกันใช้ได้ตอนข้อมูลตัวอย่าง แต่ของจริงจะล้นกล่อง
+   หัวข้อกับปุ่มล้างค่าตรึงไว้ เลื่อนเฉพาะเนื้อในตรงกลาง
+   ของเดิมกล่องยาวกว่าจอมือถือ ปุ่มล้างค่าเลยหลุดออกไปนอกจอจนกดไม่ถึง
+
+   ทุกแถวที่กดได้สูงอย่างน้อย 44px และกินความกว้างเต็มกล่อง
+   กล่องติ๊ก 16px กดด้วยนิ้วโป้งแล้วพลาดไปโดนแถวข้าง ๆ ตลอด
 ------------------------------------------------------------------ */
 
 export const isCwipDefault = (v: CwipView) =>
@@ -42,17 +45,17 @@ export const isCwipDefault = (v: CwipView) =>
   v.showActions === CWIP_VIEW_DEFAULT.showActions &&
   v.showLots === CWIP_VIEW_DEFAULT.showLots &&
   v.lowOnly === CWIP_VIEW_DEFAULT.lowOnly &&
-  v.incomingOnly === CWIP_VIEW_DEFAULT.incomingOnly &&
   v.sort === CWIP_VIEW_DEFAULT.sort &&
   v.kinds.length === 0 &&
-  v.zones.length === 0;
+  v.zones.length === 0 &&
+  v.products.length === 0;
 
 /** จำนวนเงื่อนไขที่กรองของออกจริง ๆ — การเรียงกับการแสดงผลไม่นับ */
 export const cwipActiveCount = (v: CwipView) =>
   (v.lowOnly ? 1 : 0) +
-  (v.incomingOnly ? 1 : 0) +
   (v.kinds.length > 0 ? 1 : 0) +
-  (v.zones.length > 0 ? 1 : 0);
+  (v.zones.length > 0 ? 1 : 0) +
+  (v.products.length > 0 ? 1 : 0);
 
 const SORTS: { id: CwipSort; label: string }[] = [
   { id: "product", label: "สูตร" },
@@ -73,159 +76,183 @@ export function CwipFilter({
   const set = (next: Partial<CwipView>) => onChange({ ...view, ...next });
 
   return (
-    <>
-      <PopoverHeader>
-        <PopoverTitle>ตัวกรองและการแสดงผล</PopoverTitle>
-        <PopoverDescription>
+    <div className="flex min-h-0 flex-1 flex-col">
+      <div className="px-4 pt-4">
+        <p className="font-medium">ตัวกรองและการแสดงผล</p>
+        <p className="mt-1 text-sm text-muted-foreground">
           เลือกได้หลายอย่างพร้อมกัน ไม่เลือกเลยคือดูทั้งหมด
-        </PopoverDescription>
-      </PopoverHeader>
+        </p>
+      </div>
 
-      {/* ---------- 1. เรียงตาม ---------- */}
-      <div className="mt-4 space-y-2">
+      {/* เลื่อนเฉพาะตรงนี้ หัวข้อกับปุ่มล้างค่าอยู่นอกกรอบที่เลื่อน */}
+      <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
+        {/* ---------- 1. เรียงตาม ---------- */}
         <Label className="text-sm">เรียงตาม</Label>
         <ToggleGroup
           type="single"
           variant="outline"
-          size="sm"
           value={view.sort}
           onValueChange={(v) => v && set({ sort: v as CwipSort })}
-          className="w-full"
+          className="mt-2 w-full"
         >
           {SORTS.map((s) => (
-            <ToggleGroupItem key={s.id} value={s.id} className="flex-1">
+            <ToggleGroupItem key={s.id} value={s.id} className="h-10 flex-1">
               {s.label}
             </ToggleGroupItem>
           ))}
         </ToggleGroup>
-      </div>
 
-      <Separator className="my-4" />
+        <Separator className="my-4" />
 
-      {/* ---------- 2. แสดงในรายการ ---------- */}
-      <div className="space-y-3">
+        {/* ---------- 2. แสดงในรายการ ---------- */}
         <Label className="text-sm">แสดงในรายการ</Label>
-
-        <Label
-          htmlFor="cwip-chips"
-          className="flex items-center gap-3 font-normal"
-        >
-          <Checkbox
+        <div className="mt-1 space-y-0.5">
+          <CheckRow
             id="cwip-chips"
+            icon={TagIcon}
+            label="ป้ายในรายการ"
             checked={view.showChips}
-            onCheckedChange={(v) => set({ showChips: v === true })}
+            onChange={(v) => set({ showChips: v })}
           />
-          <span className="flex items-center gap-2">
-            <TagIcon className="size-4" />
-            ป้ายในรายการ
-          </span>
-        </Label>
-
-        <Label
-          htmlFor="cwip-actions"
-          className="flex items-center gap-3 font-normal"
-        >
-          <Checkbox
+          <CheckRow
             id="cwip-actions"
+            icon={SlidersHorizontalIcon}
+            label="ปุ่มคืนกลับคลัง / ปรับปรุง"
             checked={view.showActions}
-            onCheckedChange={(v) => set({ showActions: v === true })}
+            onChange={(v) => set({ showActions: v })}
           />
-          <span className="flex items-center gap-2">
-            <SlidersHorizontalIcon className="size-4" />
-            ปุ่มคืนกลับคลัง / ปรับปรุง
-          </span>
-        </Label>
-
-        <Label
-          htmlFor="cwip-lots"
-          className="flex items-center gap-3 font-normal"
-        >
-          <Checkbox
+          <CheckRow
             id="cwip-lots"
+            icon={ListIcon}
+            label="รายการล็อตในสินค้า"
             checked={view.showLots}
-            onCheckedChange={(v) => set({ showLots: v === true })}
+            onChange={(v) => set({ showLots: v })}
           />
-          <span className="flex items-center gap-2">
-            <ListIcon className="size-4" />
-            รายการล็อตในสินค้า
-          </span>
-        </Label>
-      </div>
-
-      <Separator className="my-4" />
-
-      {/* ---------- 3. กรองข้อมูล ---------- */}
-      <div className="space-y-3">
-        <Label className="text-sm">กรองข้อมูล</Label>
-
-        <div className="space-y-1.5">
-          <Label htmlFor="cwip-kinds" className="font-normal">
-            หมวดสินค้า
-          </Label>
-          <MultiSelect
-            id="cwip-kinds"
-            options={asOptions(CWIP_KINDS)}
-            value={view.kinds}
-            onValueChange={(kinds) => set({ kinds })}
-            placeholder="ทุกหมวด"
-            searchPlaceholder="ค้นหาหมวด"
-            maxChips={2}
-            className="bg-card"
-          />
-        </div>
-
-        {/* โซนของจริงมีเป็นสิบ ไล่กดทีละอันไม่ไหว ต้องพิมพ์ชื่อโซนหาเอา */}
-        <div className="space-y-1.5">
-          <Label htmlFor="cwip-zones" className="font-normal">
-            โซน
-          </Label>
-          <MultiSelect
-            id="cwip-zones"
-            options={asOptions(CWIP_ZONES)}
-            value={view.zones}
-            onValueChange={(zones) => set({ zones })}
-            placeholder="ทุกโซน"
-            searchPlaceholder="ค้นหาโซน"
-            maxChips={2}
-            className="bg-card"
-          />
-        </div>
-
-        {/* ผูกค่าเดียวกับชิปสต็อกต่ำด้านบน กดที่ไหนอีกที่ก็ขยับตาม */}
-        <Label htmlFor="cwip-low" className="flex items-center gap-3 font-normal">
-          <Checkbox
+          {/* ผูกค่าเดียวกับชิปสต็อกต่ำด้านบน กดที่ไหนอีกที่ก็ขยับตาม */}
+          <CheckRow
             id="cwip-low"
+            icon={TriangleAlertIcon}
+            label="เฉพาะสต็อกต่ำ"
             checked={view.lowOnly}
-            onCheckedChange={(v) => set({ lowOnly: v === true })}
+            onChange={(v) => set({ lowOnly: v })}
           />
-          เฉพาะสต็อกต่ำ
-        </Label>
+        </div>
 
-        <Label
-          htmlFor="cwip-incoming"
-          className="flex items-center gap-3 font-normal"
-        >
-          <Checkbox
-            id="cwip-incoming"
-            checked={view.incomingOnly}
-            onCheckedChange={(v) => set({ incomingOnly: v === true })}
-          />
-          เฉพาะที่มีของรอรับเข้า
-        </Label>
+        <Separator className="my-4" />
+
+        {/* ---------- 3. กรองข้อมูล ----------
+             ของจริงมีเป็นสิบ ไล่กดทีละอันไม่ไหว ต้องพิมพ์ชื่อหาเอา */}
+        <Label className="text-sm">กรองข้อมูล</Label>
+        <div className="mt-2 space-y-3">
+          <Field id="cwip-kinds" label="หมวดสินค้า">
+            <MultiSelect
+              id="cwip-kinds"
+              options={asOptions(CWIP_KINDS)}
+              value={view.kinds}
+              onValueChange={(kinds) => set({ kinds })}
+              placeholder="ทุกหมวด"
+              searchPlaceholder="ค้นหาหมวด"
+              maxChips={2}
+              className="min-h-10 bg-card"
+            />
+          </Field>
+
+          <Field id="cwip-zones" label="โซน">
+            <MultiSelect
+              id="cwip-zones"
+              options={asOptions(CWIP_ZONES)}
+              value={view.zones}
+              onValueChange={(zones) => set({ zones })}
+              placeholder="ทุกโซน"
+              searchPlaceholder="ค้นหาโซน"
+              maxChips={2}
+              className="min-h-10 bg-card"
+            />
+          </Field>
+
+          <Field id="cwip-products" label="สินค้า">
+            <MultiSelect
+              id="cwip-products"
+              options={asOptions(CWIP_PRODUCT_NAMES)}
+              value={view.products}
+              onValueChange={(products) => set({ products })}
+              placeholder="ทุกสินค้า"
+              searchPlaceholder="ค้นหาสินค้า"
+              maxChips={1}
+              className="min-h-10 bg-card"
+            />
+          </Field>
+        </div>
       </div>
 
-      {/* ปิดไว้ตอนทุกอย่างเป็นค่าเริ่มต้นอยู่แล้ว จะได้รู้ว่ามีอะไรให้ล้างไหม */}
-      <Separator className="my-4" />
-      <Button
-        variant="outline"
-        size="sm"
-        className="w-full"
-        disabled={isCwipDefault(view)}
-        onClick={() => onChange(CWIP_VIEW_DEFAULT)}
-      >
-        <RotateCcwIcon />
-        ล้างค่า
-      </Button>
-    </>
+      {/* ตรึงไว้ล่างสุด เห็นตลอดไม่ว่าเลื่อนไปไหน */}
+      <div className="border-t border-border px-4 py-3">
+        <Button
+          variant="outline"
+          className="h-10 w-full"
+          disabled={isCwipDefault(view)}
+          onClick={() => onChange(CWIP_VIEW_DEFAULT)}
+        >
+          <RotateCcwIcon />
+          ล้างค่า
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * แถวติ๊กที่กดได้ทั้งแถว
+ *
+ * เป้ากดสูง 44px กว้างเต็มกล่อง ไม่ใช่แค่กล่องติ๊ก 16px
+ * นิ้วโป้งแตะกว้างราว 45px กดเป้าเล็กกว่านั้นก็ไปโดนแถวข้าง ๆ ตลอด
+ */
+function CheckRow({
+  id,
+  icon: Icon,
+  label,
+  checked,
+  onChange,
+}: {
+  id: string;
+  icon: React.ComponentType<{ className?: string }>;
+  label: string;
+  checked: boolean;
+  onChange: (v: boolean) => void;
+}) {
+  return (
+    <Label
+      htmlFor={id}
+      className="-mx-2 flex min-h-11 items-center gap-3 rounded-md px-2 font-normal transition-colors hover:bg-accent-hover"
+    >
+      <Checkbox
+        id={id}
+        checked={checked}
+        onCheckedChange={(v) => onChange(v === true)}
+      />
+      <span className="flex items-center gap-2">
+        <Icon className="size-4" />
+        {label}
+      </span>
+    </Label>
+  );
+}
+
+function Field({
+  id,
+  label,
+  children,
+}: {
+  id: string;
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="space-y-1.5">
+      <Label htmlFor={id} className="font-normal">
+        {label}
+      </Label>
+      {children}
+    </div>
   );
 }
