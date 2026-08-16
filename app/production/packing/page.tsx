@@ -165,9 +165,18 @@ export default function PackingListPage() {
     done: [],
   };
 
+  /** ข้อความในช่องค้นหาบอกว่าตอนนี้ค้นอะไรได้บ้าง — ต่างกันทุกชิป */
+  const CWIP_PLACEHOLDER: Record<CwipChip, string> = {
+    stock: "ค้นหาสินค้า เลขล็อต หรือโซน...",
+    low: "ค้นหาสินค้า เลขล็อต หรือโซน...",
+    inbound: "ค้นหาเลขที่ขอเบิก สินค้า หรือผู้ทำรายการ...",
+    returns: "ค้นหาเลขที่ขอคืน สินค้า หรือผู้ทำรายการ...",
+    history: "ค้นหาเลขที่ทำรายการ Lot หรือผู้ทำรายการ...",
+  };
+
   const PLACEHOLDER: Record<Tab, string> = {
     waiting: "ค้นหาเลขที่ใบผลิต หรือสูตร...",
-    cwip: "ค้นหาสินค้า เลขล็อต หรือโซน...",
+    cwip: CWIP_PLACEHOLDER[cwipChip],
     done: "ค้นหาเลขที่ใบผลิต หรือสูตร...",
   };
 
@@ -220,37 +229,19 @@ export default function PackingListPage() {
           เลื่อนลงไปแล้วต้องลากกลับขึ้นทั้งหน้าเพื่อพิมพ์คำค้น */}
       <StickyToolbar hidden={hidden} barRef={barRef}>
         <div className="pt-2">
-          <PackingToolbar
-            query={query}
-            onQuery={setQuery}
-            placeholder={PLACEHOLDER[tab]}
-            actions={TAB_ACTIONS[tab]}
-            /* มีของให้กรองจริงเฉพาะแท็บ CWIP อีกสองแท็บเป็นตารางใบผลิต
-               ยังไม่ได้ตกลงว่าจะกรองอะไร จึงปล่อยเป็นปุ่มเปล่าไว้ก่อน */
-            filter={
-              tab === "cwip" && isStockView ? (
-                <CwipFilter view={cwipView} onChange={setCwipView} />
-              ) : undefined
-            }
-            filterActive={
-              tab === "cwip" && isStockView && !isCwipDefault(cwipView)
-            }
-            filterCount={
-              tab === "cwip" && isStockView
-                ? cwipActiveCount(cwipView)
-                : undefined
-            }
-            onFilter={() => soon("ตัวกรอง")}
-          />
+          {/* ชิปอยู่เหนือช่องค้นหา เพราะชิปคือขอบเขต ส่วนค้นหาคือการหาข้างในขอบเขตนั้น
+              แต่ละชิปเป็นข้อมูลคนละชุด (การ์ดสินค้า / ตารางเอกสาร / ตารางประวัติ)
+              สิ่งที่ค้นได้จึงต่างกันด้วย ดูได้จาก placeholder ที่เปลี่ยนตามชิป
+              อ่านจากบนลงล่างต้องเรียงตามการครอบ แท็บ > ชิป > ค้นหา
+              เหมือนหน้าสต็อกทั่วไปที่วางแบบนี้อยู่แล้ว
 
-          {/* ชิปอยู่ใต้ค้นหาในแถบติดบนเดียวกัน สลับมุมมองได้ตลอดตอนเลื่อน
               เลื่อนแนวนอนบนจอแคบ ห้าชิปลงจอ 390px ไม่หมด */}
           {tab === "cwip" && (
             <div
               role="tablist"
               aria-label="มุมมองสต็อก CWIP"
               className={cn(
-                "mt-3 flex items-center gap-2 overflow-x-auto",
+                "mb-3 flex items-center gap-2 overflow-x-auto",
                 "flex-nowrap [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
               )}
             >
@@ -276,6 +267,30 @@ export default function PackingListPage() {
               })}
             </div>
           )}
+
+          <PackingToolbar
+            query={query}
+            onQuery={setQuery}
+            placeholder={PLACEHOLDER[tab]}
+            actions={TAB_ACTIONS[tab]}
+            /* มีของให้กรองจริงเฉพาะแท็บ CWIP อีกสองแท็บเป็นตารางใบผลิต
+               ยังไม่ได้ตกลงว่าจะกรองอะไร จึงปล่อยเป็นปุ่มเปล่าไว้ก่อน */
+            filter={
+              tab === "cwip" && isStockView ? (
+                <CwipFilter view={cwipView} onChange={setCwipView} />
+              ) : undefined
+            }
+            filterActive={
+              tab === "cwip" && isStockView && !isCwipDefault(cwipView)
+            }
+            filterCount={
+              tab === "cwip" && isStockView
+                ? cwipActiveCount(cwipView)
+                : undefined
+            }
+            onFilter={() => soon("ตัวกรอง")}
+          />
+
         </div>
       </StickyToolbar>
 
