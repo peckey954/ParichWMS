@@ -11,7 +11,6 @@ import {
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
@@ -54,7 +53,6 @@ export function PackingToolbar({
   onFilter?: () => void;
 }) {
   const TITLE = "ตัวกรองและการแสดงผล";
-  const DESC = "เลือกได้หลายอย่างพร้อมกัน ไม่เลือกเลยคือดูทั้งหมด";
   // ใช้ไอคอนเดียวกับปุ่มตัวกรองที่หน้าสต็อกและหน้าสูตร
   // ปุ่มทำงานเหมือนกันต้องหน้าตาเหมือนกัน ไม่งั้นคนต้องเรียนรู้ใหม่ทุกหน้า
   // จุดมุมขวาบนบอกว่ามีของถูกซ่อนอยู่ จะได้ไม่ลืมว่าเคยปิดไว้
@@ -109,10 +107,14 @@ export function PackingToolbar({
 
               overflow-hidden ทับกฎของโหมดจำลองอุปกรณ์ที่ตั้ง overflow-y:auto ไว้
               ไม่งั้นกล่องทั้งใบจะเลื่อน แล้วปุ่มล้างค่าที่ตรึงไว้ก็เลื่อนตามไปด้วย */}
-          <DialogContent className="flex max-h-[85svh] flex-col gap-0 overflow-hidden! p-0 sm:max-w-md">
+          {/* ไม่มีคำอธิบายใต้หัวข้อ — aria-describedby ต้องเป็น undefined ชัด ๆ
+              ไม่งั้น Radix เตือนว่าหา DialogDescription ไม่เจอ */}
+          <DialogContent
+            aria-describedby={undefined}
+            className="flex max-h-[85svh] flex-col gap-0 overflow-hidden! p-0 sm:max-w-md"
+          >
             <DialogHeader className="px-4 pt-4 text-left">
               <DialogTitle>{TITLE}</DialogTitle>
-              <DialogDescription>{DESC}</DialogDescription>
             </DialogHeader>
             {filter}
           </DialogContent>

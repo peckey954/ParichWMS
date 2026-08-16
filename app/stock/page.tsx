@@ -21,7 +21,6 @@ import { Button } from "@peckey954/ui/components/ui/button";
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
@@ -410,12 +409,14 @@ function GeneralStockView() {
                   )}
                 </Button>
               </DialogTrigger>
-              <DialogContent className="flex max-h-[85svh] flex-col gap-0 overflow-hidden! p-0 sm:max-w-md">
+              {/* ไม่มีคำอธิบายใต้หัวข้อ — aria-describedby ต้องเป็น undefined ชัด ๆ
+                  ไม่งั้น Radix เตือนว่าหา DialogDescription ไม่เจอ */}
+              <DialogContent
+                aria-describedby={undefined}
+                className="flex max-h-[85svh] flex-col gap-0 overflow-hidden! p-0 sm:max-w-md"
+              >
                 <DialogHeader className="px-4 pt-4 text-left">
                   <DialogTitle>ตัวกรองและการแสดงผล</DialogTitle>
-                  <DialogDescription>
-                    เลือกได้หลายอย่างพร้อมกัน ไม่เลือกเลยคือดูทั้งหมด
-                  </DialogDescription>
                 </DialogHeader>
                 <StockFilter
                   view={view}
