@@ -33,8 +33,12 @@ import {
      2. แสดงในรายการ  — ตั้งครั้งเดียวแล้วอยู่ยาว
      3. กรองข้อมูล    — ของจริงมีหมวด โซน สินค้า เป็นสิบ ต้องค้นหาเอา
 
-   หัวข้อกับปุ่มล้างค่าตรึงไว้ เลื่อนเฉพาะเนื้อในตรงกลาง
-   ของเดิมกล่องยาวกว่าจอมือถือ ปุ่มล้างค่าเลยหลุดออกไปนอกจอจนกดไม่ถึง
+   แก้ในกล่องก่อน กดตกลงถึงมีผลกับรายการ
+   กล่องบังรายการอยู่แล้ว การให้มีผลทันทีที่ติ๊กจึงไม่ได้ประโยชน์อะไร
+   และทำให้ ย้อนกลับ / กากบาท / Esc มีความหมายจริงว่ายกเลิก ไม่ใช่ปิดเฉย ๆ
+
+   หัวข้อกับแถวปุ่มตรึงไว้ เลื่อนเฉพาะเนื้อในตรงกลาง
+   ของเดิมกล่องยาวกว่าจอมือถือ ปุ่มเลยหลุดออกไปนอกจอจนกดไม่ถึง
 
    ทุกแถวที่กดได้สูงอย่างน้อย 44px และกินความกว้างเต็มกล่อง
    กล่องติ๊ก 16px กดด้วยนิ้วโป้งแล้วพลาดไปโดนแถวข้าง ๆ ตลอด
@@ -68,12 +72,18 @@ const asOptions = (values: string[]) =>
 
 export function CwipFilter({
   view,
-  onChange,
+  onApply,
+  onClose,
 }: {
   view: CwipView;
-  onChange: (next: CwipView) => void;
+  onApply: (next: CwipView) => void;
+  onClose: () => void;
 }) {
-  const set = (next: Partial<CwipView>) => onChange({ ...view, ...next });
+  // ค่าที่กำลังแก้อยู่ในกล่อง ยังไม่มีผลกับรายการจนกว่าจะกดตกลง
+  // Radix ถอดเนื้อในทิ้งตอนปิด ค่าตั้งต้นจึงสดใหม่ทุกครั้งที่เปิด
+  const [draft, setDraft] = React.useState(view);
+  const set = (next: Partial<CwipView>) =>
+    setDraft((prev) => ({ ...prev, ...next }));
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -87,7 +97,7 @@ export function CwipFilter({
         <ToggleGroup
           type="single"
           variant="outline"
-          value={view.sort}
+          value={draft.sort}
           onValueChange={(v) => v && set({ sort: v as CwipSort })}
           className="mt-2 w-full"
         >
@@ -107,21 +117,21 @@ export function CwipFilter({
             id="cwip-chips"
             icon={TagIcon}
             label="ป้ายในรายการ"
-            checked={view.showChips}
+            checked={draft.showChips}
             onChange={(v) => set({ showChips: v })}
           />
           <CheckRow
             id="cwip-actions"
             icon={SlidersHorizontalIcon}
             label="ปุ่มคืนกลับคลัง / ปรับปรุง"
-            checked={view.showActions}
+            checked={draft.showActions}
             onChange={(v) => set({ showActions: v })}
           />
           <CheckRow
             id="cwip-lots"
             icon={ListIcon}
             label="รายการล็อตในสินค้า"
-            checked={view.showLots}
+            checked={draft.showLots}
             onChange={(v) => set({ showLots: v })}
           />
           {/* ผูกค่าเดียวกับชิปสต็อกต่ำด้านบน กดที่ไหนอีกที่ก็ขยับตาม */}
@@ -129,7 +139,7 @@ export function CwipFilter({
             id="cwip-low"
             icon={TriangleAlertIcon}
             label="เฉพาะสต็อกต่ำ"
-            checked={view.lowOnly}
+            checked={draft.lowOnly}
             onChange={(v) => set({ lowOnly: v })}
           />
         </div>
@@ -144,7 +154,7 @@ export function CwipFilter({
             <MultiSelect
               id="cwip-kinds"
               options={asOptions(CWIP_KINDS)}
-              value={view.kinds}
+              value={draft.kinds}
               onValueChange={(kinds) => set({ kinds })}
               placeholder="ทุกหมวด"
               searchPlaceholder="ค้นหาหมวด"
@@ -157,7 +167,7 @@ export function CwipFilter({
             <MultiSelect
               id="cwip-zones"
               options={asOptions(CWIP_ZONES)}
-              value={view.zones}
+              value={draft.zones}
               onValueChange={(zones) => set({ zones })}
               placeholder="ทุกโซน"
               searchPlaceholder="ค้นหาโซน"
@@ -170,7 +180,7 @@ export function CwipFilter({
             <MultiSelect
               id="cwip-products"
               options={asOptions(CWIP_PRODUCT_NAMES)}
-              value={view.products}
+              value={draft.products}
               onValueChange={(products) => set({ products })}
               placeholder="ทุกสินค้า"
               searchPlaceholder="ค้นหาสินค้า"
@@ -181,16 +191,31 @@ export function CwipFilter({
         </div>
       </div>
 
-      {/* ตรึงไว้ล่างสุด เห็นตลอดไม่ว่าเลื่อนไปไหน */}
-      <div className="border-t border-border px-4 py-3">
+      {/* ตรึงไว้ล่างสุด เห็นตลอดไม่ว่าเลื่อนไปไหน
+          ตกลงอยู่ขวาสุด เป็นตำแหน่งที่มือกับสายตาไปอยู่เป็นที่สุดท้ายพอดี
+          ไม่ต้องเอื้อมไปกดกากบาทมุมบนซึ่งไกลจากที่มือวางอยู่ */}
+      <div className="flex items-center gap-2 border-t border-border px-4 py-3">
         <Button
-          variant="outline"
-          className="h-10 w-full"
-          disabled={isCwipDefault(view)}
-          onClick={() => onChange(CWIP_VIEW_DEFAULT)}
+          variant="ghost"
+          className="h-10 shrink-0 text-primary"
+          disabled={isCwipDefault(draft)}
+          onClick={() => setDraft(CWIP_VIEW_DEFAULT)}
         >
           <RotateCcwIcon />
           ล้างค่า
+        </Button>
+        <Button
+          variant="outline"
+          className="ml-auto h-10 flex-1 sm:flex-none sm:w-24"
+          onClick={onClose}
+        >
+          ย้อนกลับ
+        </Button>
+        <Button
+          className="h-10 flex-1 sm:flex-none sm:w-24"
+          onClick={() => onApply(draft)}
+        >
+          ตกลง
         </Button>
       </div>
     </div>

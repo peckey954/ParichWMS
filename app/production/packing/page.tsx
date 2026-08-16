@@ -279,7 +279,14 @@ export default function PackingListPage() {
                ยังไม่ได้ตกลงว่าจะกรองอะไร จึงปล่อยเป็นปุ่มเปล่าไว้ก่อน */
             filter={
               tab === "cwip" && isStockView ? (
-                <CwipFilter view={cwipView} onChange={setCwipView} />
+                <CwipFilter
+                  view={cwipView}
+                  onApply={(next) => {
+                    setCwipView(next);
+                    setFilterOpen(false);
+                  }}
+                  onClose={() => setFilterOpen(false)}
+                />
               ) : undefined
             }
             filterActive={
