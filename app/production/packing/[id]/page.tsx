@@ -20,7 +20,6 @@ import {
   BreadcrumbSeparator,
 } from "@peckey954/ui/components/ui/breadcrumb";
 import { Button } from "@peckey954/ui/components/ui/button";
-import { Card, CardContent } from "@peckey954/ui/components/ui/card";
 import {
   Collapsible,
   CollapsibleContent,
@@ -54,6 +53,7 @@ import { toast } from "sonner";
 import { AddMaterialDialog } from "@/components/production/add-material-dialog";
 import { useNumberField } from "@/components/number-field";
 import { StatusBadge } from "@/components/status-badge";
+import { STICKY_HEAD, TableFrame } from "@/components/stock/doc-parts";
 import { formatDateTime, formatNumber, formatTon } from "@/lib/format";
 import {
   SEED_ORDER,
@@ -257,12 +257,12 @@ export default function ProductionOrderPage() {
           ))}
         </div>
 
-        <Card className="mt-4 hidden py-0 @3xl:block">
-          <CardContent className="px-0">
+        <div className="mt-4 hidden @3xl:block">
+          <TableFrame>
             <Table>
-              <TableHeader>
+              <TableHeader className={STICKY_HEAD}>
                 <TableRow>
-                  <TableHead className="pl-4">วัตถุดิบ/สินค้า</TableHead>
+                  <TableHead>วัตถุดิบ/สินค้า</TableHead>
                   <TableHead className="text-right">แนะนำใช้</TableHead>
                   <TableHead className="min-w-56">Lot</TableHead>
                   <TableHead className="text-right">
@@ -277,7 +277,7 @@ export default function ProductionOrderPage() {
                   </TableHead>
                   <TableHead className="text-right">ปริมาณที่ใช้</TableHead>
                   <TableHead className="text-right">จำนวนที่ใช้</TableHead>
-                  <TableHead className="w-12 pr-4" />
+                  <TableHead className="w-12" />
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -291,8 +291,8 @@ export default function ProductionOrderPage() {
                 ))}
               </TableBody>
             </Table>
-          </CardContent>
-        </Card>
+          </TableFrame>
+        </div>
 
         {overStock.length > 0 && (
           <Alert variant="destructive" className="mt-4">
@@ -336,7 +336,7 @@ function MaterialRow({
 
   return (
     <TableRow>
-      <TableCell className="pl-4 align-top">
+      <TableCell className="align-top">
         <div className="font-medium">{m.name}</div>
         {m.sub && (
           <div className="text-xs text-muted-foreground">{m.sub}</div>
@@ -381,7 +381,7 @@ function MaterialRow({
           className="ml-auto w-24 bg-card text-right"
         />
       </TableCell>
-      <TableCell className="pr-4 align-top">
+      <TableCell className="align-top">
         <Button
           variant="ghost"
           size="icon-sm"

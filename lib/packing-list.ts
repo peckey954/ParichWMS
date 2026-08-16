@@ -60,7 +60,7 @@ const FORMULAS = [
 ];
 
 const PACKINGS = ["50 Kg", "40 Kg", "25 Kg", "Bulk"];
-const ROUNDS = ["ปกติ", "เร่งด่วน", "กะดึก"];
+const ROUNDS = ["ปกติ", "แทรก"];
 
 function makeOrders(
   count: number,

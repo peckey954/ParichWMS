@@ -20,6 +20,15 @@ import { cn } from "@peckey954/ui/lib/utils";
      ลูกศรสองหัว = ยังไม่ได้เรียงด้วยอันนี้ กดได้
      ลูกศรหัวเดียว = เรียงอยู่ ชี้ไปทางที่กำลังเรียง
 
+   ไม่มีกรอบ ไม่มีพื้น มีแค่คำว่า "เรียงตาม:" นำหน้า
+   แถวเดียวกันมีชิปประเภทกลมขอบส้มอยู่แล้ว ถ้าใส่กรอบให้ตัวนี้ด้วย
+   จะได้ภาษาปุ่มที่สามมาแข่งสายตากันเอง
+   และพื้นเทา+ตัวเลือกขาวคือหน้าตาของแถบแท็บที่อยู่เหนือขึ้นไปพอดี
+   ในจอเดียวจะมีของสองอันที่ดูเป็นแท็บ แต่มีอันเดียวที่พาไปที่อื่นจริง
+
+   ชิปกับแท็บแปลว่า "เปลี่ยนสิ่งที่กำลังดู" แต่การเรียงไม่ได้เปลี่ยนของที่ดู
+   เป็นของชุดเดิมเรียงใหม่ จึงไม่ควรหน้าตาเหมือนกัน
+
    ป้ายของทิศทางไม่ได้เขียนไว้ เพราะมันต่างกันไปตามสิ่งที่เรียง
    ก→ฮ กับ เก่าสุดก่อน ไม่ใช่เรื่องเดียวกัน จึงบอกผ่าน title ของแต่ละอันแทน
 ------------------------------------------------------------------ */
@@ -51,11 +60,12 @@ export function SortControl<T extends string>({
     <div
       role="group"
       aria-label="เรียงตาม"
-      className={cn(
-        "flex shrink-0 items-center gap-1 rounded-full bg-secondary p-1",
-        className
-      )}
+      className={cn("flex shrink-0 items-center gap-1", className)}
     >
+      <span className="mr-1 shrink-0 text-sm text-muted-foreground">
+        เรียงตาม:
+      </span>
+
       {options.map((o) => {
         const on = value === o.id;
         const next: SortDir = on && dir === "asc" ? "desc" : "asc";
@@ -75,10 +85,10 @@ export function SortControl<T extends string>({
             aria-label={`เรียงตาม ${o.label} ${on ? (dir === "asc" ? o.asc : o.desc) : ""}`}
             onClick={() => onChange(o.id, next)}
             className={cn(
-              "flex h-8 items-center gap-1.5 rounded-full px-3 text-sm whitespace-nowrap transition-colors",
+              "flex h-8 items-center gap-1 rounded-md px-2 text-sm whitespace-nowrap transition-colors",
               "focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none",
               on
-                ? "bg-card font-semibold text-foreground shadow-sm"
+                ? "font-semibold text-primary"
                 : "text-muted-foreground hover:text-foreground"
             )}
           >

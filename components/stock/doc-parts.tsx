@@ -169,8 +169,9 @@ export function TableFrame({ children }: { children: React.ReactNode }) {
         "[&_[data-slot=table-container]]:overflow-auto",
         // ระยะในเซลล์ของ DS คือ px-2 (8px) ซึ่งแน่นเกินไปสำหรับตารางข้อมูลยาว ๆ
         // ตัวเลขสองคอลัมน์ที่ติดกันจะอ่านต่อกันเป็นก้อนเดียว แยกไม่ออกว่าจบตรงไหน
-        // ขยับเป็น 16px และเพิ่มความสูงแถว ให้แต่ละค่ามีที่หายใจของตัวเอง
-        "[&_th]:h-12 [&_th]:px-4",
+        // ขยับเป็น 16px ทุกด้าน — h-auto แทน h-12 เดิม เพราะหัวคอลัมน์ที่ตัดสองบรรทัด
+        // (เช่น "ปริมาณคงเหลือ\nในคลัง") โดนบีบแน่นในกล่องสูงคงที่ ระยะ 16px ต้องได้จริงทุกด้าน
+        "[&_th]:h-auto [&_th]:py-4 [&_th]:px-4",
         "[&_td]:px-4 [&_td]:py-3"
       )}
     >
@@ -179,8 +180,13 @@ export function TableFrame({ children }: { children: React.ReactNode }) {
   );
 }
 
-/** หัวตารางตรึงไว้ด้านบนตอนเลื่อนขึ้นลง */
-export const STICKY_HEAD = "[&_th]:sticky [&_th]:top-0 [&_th]:z-20 [&_th]:bg-card";
+/** หัวตารางตรึงไว้ด้านบนตอนเลื่อนขึ้นลง
+ *  เงาทิ้งลงข้างล่างบอกว่าเนื้อหากำลังเลื่อนลอดอยู่ใต้หัวตาราง
+ *  แบบเดียวกับเงาของคอลัมน์ตรึงซ้าย/ขวา — เส้นขอบอย่างเดียวไม่พอ
+ *  ต้องแปะเงาไว้ที่ th แต่ละอัน ไม่ใช่ thead เพราะ position:sticky ก็ทำไว้ที่ th เหมือนกัน
+ *  (thead ตรึงเองไม่ได้ในบางเบราว์เซอร์ จึงต้องตรึงทีละเซลล์) */
+export const STICKY_HEAD =
+  "[&_th]:sticky [&_th]:top-0 [&_th]:z-20 [&_th]:bg-card [&_th]:shadow-[var(--sticky-shadow-b)]";
 
 /**
  * คอลัมน์แรกตรึงซ้าย คอลัมน์สุดท้ายตรึงขวา เลื่อนแนวนอนได้เฉพาะตรงกลาง
@@ -192,11 +198,17 @@ export const COL_FIRST =
   "sticky left-0 z-10 border-r border-border bg-card shadow-[var(--sticky-shadow-r)]";
 export const COL_LAST =
   "sticky right-0 z-10 border-l border-border bg-card shadow-[var(--sticky-shadow-l)]";
-/** เซลล์หัวที่เป็นคอลัมน์ตรึงด้วย ต้องอยู่เหนือทั้งสองชั้น */
+/**
+ * เซลล์หัวที่เป็นคอลัมน์ตรึงด้วย ต้องอยู่เหนือทั้งสองชั้น
+ *
+ * มุมนี้ตรึงทั้งบนและข้าง จึงต้องมีเงาสองทิศพร้อมกัน — รวมไว้ในค่าเดียวด้วย comma
+ * แล้วบังคับ !important เพราะ STICKY_HEAD คุม th ทุกตัวด้วย selector ลูกซึ่ง
+ * specificity สูงกว่า class เดี่ยวตรงนี้ ไม่บังคับไว้เงาบนจะทับเงาข้างจนหายไป
+ */
 export const HEAD_FIRST =
-  "left-0 z-30! border-r border-border shadow-[var(--sticky-shadow-r)]";
+  "left-0 z-30! border-r border-border shadow-[var(--sticky-shadow-r),var(--sticky-shadow-b)]!";
 export const HEAD_LAST =
-  "right-0 z-30! border-l border-border shadow-[var(--sticky-shadow-l)]";
+  "right-0 z-30! border-l border-border shadow-[var(--sticky-shadow-l),var(--sticky-shadow-b)]!";
 
 /**
  * แบ่งหน้า — ใช้ Button ของ DS ไม่ใช่ Pagination

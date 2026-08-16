@@ -88,15 +88,15 @@ export function CwipFilter({
 
       {/* เลื่อนเฉพาะตรงนี้ หัวข้อกับแถวปุ่มอยู่นอกกรอบที่เลื่อน */}
       <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
+        {/* ตัวควบคุมมีคำว่า "เรียงตาม:" ในตัวแล้ว ไม่ต้องมี Label ซ้ำอีก */}
         {narrow && (
           <>
-            <Label className="text-sm">เรียงตาม</Label>
             <SortControl
               options={CWIP_SORTS}
               value={draft.sort}
               dir={draft.dir}
               onChange={(sort, dir) => set({ sort, dir })}
-              className="mt-2 w-full justify-between"
+              className="flex-wrap"
             />
             <Separator className="my-4" />
           </>
