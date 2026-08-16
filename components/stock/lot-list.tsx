@@ -6,6 +6,7 @@ import { Button } from "@peckey954/ui/components/ui/button";
 import { cn } from "@peckey954/ui/lib/utils";
 import { AdjustLotDialog, MoveLotDialog } from "./lot-dialogs";
 import {
+  CATEGORY_LABEL,
   CONDITION_LABEL,
   formatQty,
   pendingEntries,
@@ -58,6 +59,13 @@ function LotRow({
 }) {
   const chips = (
     <>
+      {/* ประเภทสินค้าขึ้นเป็นป้ายแรกเสมอ
+          โหมดสินค้ามันอยู่บนหัวการ์ดของสินค้านั้น แต่สองโหมดนี้ไม่มีหัวการ์ดสินค้า
+          ป้ายประเภทจึงต้องมาอยู่ในแถว ไม่งั้นไล่ดูข้ามโซนแล้วไม่รู้ว่าของชิ้นไหนคือประเภทอะไร
+          ใช้ป้ายขอบสีแบรนด์ตัวเดียวกับที่การ์ดสินค้าใช้ จะได้อ่านเป็นของอย่างเดียวกัน */}
+      <Badge tone="brand" appearance="outline">
+        {CATEGORY_LABEL[product.category]}
+      </Badge>
       <Badge tone="neutral" appearance="soft" className={NO_BORDER}>
         {product.packing}
       </Badge>
