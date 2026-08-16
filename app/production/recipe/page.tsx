@@ -36,8 +36,8 @@ export default function WeeklyRecipePage() {
   const [query, setQuery] = React.useState("");
   const [view, setView] = React.useState<RecipeView>("material");
   const visible = RECIPES.filter((r) => matchesRecipe(r, query));
-  // เลื่อนลงซ่อนแถบค้นหา+ชิป เลื่อนขึ้นเอากลับมา แบบเดียวกับหน้าสต็อกทั่วไป
-  const { hidden, showTop, scrollToTop, barRef } = useStickyToolbar();
+  // แถบค้นหา+ชิปล็อกติดบนตลอด แบบเดียวกับหน้าสต็อกทั่วไป
+  const { showTop, scrollToTop, barRef } = useStickyToolbar();
 
   return (
     <main className="mx-auto w-full max-w-7xl px-4 py-3 sm:px-6 sm:py-5">
@@ -82,10 +82,10 @@ export default function WeeklyRecipePage() {
         </Button>
       </div>
 
-      {/* ค้นหากับชิปอยู่ในแถบเดียวกัน ติดบนและซ่อนตัวเองตอนเลื่อนลง
+      {/* ค้นหากับชิปอยู่ในแถบเดียวกัน ล็อกติดบนตลอด
           เหมือนหน้าสต็อกทั่วไป — รายการยาว 53 สูตร ถ้าเครื่องมืออยู่บนสุดอย่างเดียว
           เลื่อนลงไปแล้วจะสลับมุมมองไม่ได้ ต้องลากกลับขึ้นไปทั้งหน้า */}
-      <StickyToolbar hidden={hidden} barRef={barRef}>
+      <StickyToolbar barRef={barRef}>
         <div className="flex items-center gap-2 pt-2">
           <InputGroup className="min-w-0 flex-1 bg-card">
             <InputGroupAddon align="inline-start">

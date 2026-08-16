@@ -5,7 +5,6 @@ import { RotateCcwIcon } from "lucide-react";
 import { Button } from "@peckey954/ui/components/ui/button";
 import { Label } from "@peckey954/ui/components/ui/label";
 import { MultiSelect } from "@peckey954/ui/components/ui/multi-select";
-import { Separator } from "@peckey954/ui/components/ui/separator";
 import { CheckChip } from "@/components/check-chip";
 import { SortControl, type SortOption } from "@/components/sort-control";
 import {
@@ -86,83 +85,73 @@ export function StockFilter({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
-        {/* อยู่ในกล่องทุกขนาดจอ เปิดกล่องแล้วเห็นทันทีว่าตอนนี้เรียงด้วยโหมดไหน
-            ตัวควบคุมมีคำว่า "เรียงตาม:" ในตัวแล้ว ไม่ต้องมี Label ซ้ำอีก */}
-        <SortControl
-          options={STOCK_SORTS}
-          value={draft.sort}
-          dir={draft.dir}
-          onChange={(sort, dir) => set({ sort, dir })}
-          className="flex-wrap"
-        />
-        <Separator className="my-4" />
+      <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-4">
+        <Section title="การเรียงข้อมูล">
+          <SortControl
+            options={STOCK_SORTS}
+            value={draft.sort}
+            dir={draft.dir}
+            onChange={(sort, dir) => set({ sort, dir })}
+          />
+        </Section>
 
-        {/* ---------- แสดงในรายการ ----------
-             เรียงแนวนอน ตัดบรรทัดเอง สี่อันลงได้ในหนึ่งถึงสองบรรทัด
-             แทนสี่แถวเรียงลงซึ่งกินความสูงในกล่องไปเปล่า ๆ */}
-        <Label className="text-sm">แสดงในรายการ</Label>
-        <div className="mt-2 flex flex-wrap gap-2">
-          <CheckChip
-            id="stock-chips"
-            label="ป้ายข้อมูล"
-            checked={draft.showChips}
-            onChange={(v) => set({ showChips: v })}
-          />
-          <CheckChip
-            id="stock-actions"
-            label="ย้าย/ปรับปรุง"
-            checked={draft.showActions}
-            onChange={(v) => set({ showActions: v })}
-          />
-          {/* โหมดโซนกับ FIFO รายการคือล็อตอยู่แล้ว ไม่มีอะไรให้หุบ */}
-          {draft.sort === "product" && (
+        <Section title="แสดงในรายการ">
+          <div className="flex flex-wrap gap-2">
             <CheckChip
-              id="stock-lots"
-              label="Lot สินค้า"
-              checked={draft.showLots}
-              onChange={(v) => set({ showLots: v })}
+              id="stock-chips"
+              label="ป้ายข้อมูล"
+              checked={draft.showChips}
+              onChange={(v) => set({ showChips: v })}
             />
-          )}
-          <CheckChip
-            id="stock-low"
-            label="สต็อกต่ำ"
-            checked={draft.lowOnly}
-            onChange={(v) => set({ lowOnly: v })}
+            <CheckChip
+              id="stock-actions"
+              label="ย้าย/ปรับปรุง"
+              checked={draft.showActions}
+              onChange={(v) => set({ showActions: v })}
+            />
+            {/* โหมดโซนกับ FIFO รายการคือล็อตอยู่แล้ว ไม่มีอะไรให้หุบ */}
+            {draft.sort === "product" && (
+              <CheckChip
+                id="stock-lots"
+                label="Lot สินค้า"
+                checked={draft.showLots}
+                onChange={(v) => set({ showLots: v })}
+              />
+            )}
+            <CheckChip
+              id="stock-low"
+              label="สต็อกต่ำ"
+              checked={draft.lowOnly}
+              onChange={(v) => set({ lowOnly: v })}
+            />
+          </div>
+        </Section>
+
+        <Section title="โซน" htmlFor="stock-zones">
+          <MultiSelect
+            id="stock-zones"
+            options={asOptions(STOCK_ZONES)}
+            value={draft.zones}
+            onValueChange={(zones) => set({ zones })}
+            placeholder="เลือกโซน"
+            searchPlaceholder="ค้นหาโซน"
+            maxChips={2}
+            className="min-h-10 bg-card"
           />
-        </div>
+        </Section>
 
-        <Separator className="my-4" />
-
-        {/* ---------- กรองข้อมูล ---------- */}
-        <Label className="text-sm">กรองข้อมูล</Label>
-        <div className="mt-2 space-y-3">
-          <Field id="stock-zones" label="โซน">
-            <MultiSelect
-              id="stock-zones"
-              options={asOptions(STOCK_ZONES)}
-              value={draft.zones}
-              onValueChange={(zones) => set({ zones })}
-              placeholder="ทุกโซน"
-              searchPlaceholder="ค้นหาโซน"
-              maxChips={2}
-              className="min-h-10 bg-card"
-            />
-          </Field>
-
-          <Field id="stock-products" label="สินค้า">
-            <MultiSelect
-              id="stock-products"
-              options={asOptions(STOCK_PRODUCT_NAMES)}
-              value={draft.products}
-              onValueChange={(products) => set({ products })}
-              placeholder="ทุกสินค้า"
-              searchPlaceholder="ค้นหาสินค้า"
-              maxChips={1}
-              className="min-h-10 bg-card"
-            />
-          </Field>
-        </div>
+        <Section title="สินค้า" htmlFor="stock-products">
+          <MultiSelect
+            id="stock-products"
+            options={asOptions(STOCK_PRODUCT_NAMES)}
+            value={draft.products}
+            onValueChange={(products) => set({ products })}
+            placeholder="เลือกสินค้า"
+            searchPlaceholder="ค้นหาสินค้า"
+            maxChips={1}
+            className="min-h-10 bg-card"
+          />
+        </Section>
       </div>
 
       {/* สองปุ่มแยกคนละมุม ล้างค่าคือรื้อของที่เพิ่งเลือกทิ้ง ตกลงคือเอาไปใช้
@@ -185,21 +174,32 @@ export function StockFilter({
   );
 }
 
-function Field({
-  id,
-  label,
+/**
+ * หัวข้อกับเนื้อหาในกล่องตัวกรอง
+ *
+ * ทุกหัวข้อขนาดเท่ากันหมด ไม่มีหัวข้อใหญ่ครอบหัวข้อเล็ก
+ * เพราะทุกอันคือเรื่องระดับเดียวกัน — เลือกอะไรสักอย่างในกล่องนี้
+ * ของเดิมมี "กรองข้อมูล" เป็นหัวข้อใหญ่ครอบสามอันล่าง ซึ่งไม่ได้บอกอะไรเพิ่ม
+ *
+ * ไม่มีเส้นคั่น ใช้ระยะห่างแทน เส้นทำให้กล่องเล็ก ๆ ดูถูกซอยเป็นห้อง ๆ
+ * ทั้งที่มีของอยู่แค่ห้าอย่าง
+ */
+function Section({
+  title,
+  htmlFor,
   children,
 }: {
-  id: string;
-  label: string;
+  title: string;
+  htmlFor?: string;
   children: React.ReactNode;
 }) {
   return (
-    <div className="space-y-1.5">
-      <Label htmlFor={id} className="font-normal">
-        {label}
+    <div>
+      <Label htmlFor={htmlFor} className="text-sm">
+        {title}
       </Label>
-      {children}
+      {/* ของที่เลือกอยู่บรรทัดของตัวเอง ไม่ใช่ต่อท้ายหัวข้อ */}
+      <div className="mt-2">{children}</div>
     </div>
   );
 }

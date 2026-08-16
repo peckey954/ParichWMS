@@ -124,19 +124,20 @@ export function DevicePreviewProvider({
  * ต้องรู้ก่อนว่าใครเป็นตัวเลื่อน — ตอนจำลองอุปกรณ์คือกรอบ ตอนเต็มจอคือหน้าต่าง
  * ไม่งั้นดักฟังผิดตัวแล้วจะไม่เกิดอะไรขึ้นเลยในโหมดจำลอง
  *
- * hidden  = กำลังเลื่อนลง ใช้ซ่อนแถบเครื่องมือให้เห็นเนื้อหาเต็ม ๆ
- * showTop = เลื่อนลงมาไกลแล้ว ควรมีปุ่มกลับขึ้นบนสุด
+ * แถบค้นหา+ชิปล็อกอยู่บนตลอด (sticky เฉย ๆ) ไม่ซ่อนตอนเลื่อนแล้ว
+ * เคยลองซ่อนตอนเลื่อนลงมาก่อน แต่บนมือถือจริงมันชนกับแถบที่อยู่บนสุดของเบราว์เซอร์เอง
+ * (ที่โผล่/หุบตามการเลื่อนเหมือนกัน) ทำให้ดูเหมือนจอกระตุกเด้งกลับ
+ * เหลือไว้แค่ showTop = เลื่อนลงมาไกลแล้ว ควรมีปุ่มกลับขึ้นบนสุด
  */
-export function useScrollState({ hideAfter = 160, topAfter = 700 } = {}) {
+export function useScrollState({ topAfter = 700 } = {}) {
   const { framed, frameRef } = useDevicePreview();
-  const [state, setState] = React.useState({ hidden: false, showTop: false });
+  const [showTop, setShowTop] = React.useState(false);
 
   React.useEffect(() => {
     const el = framed ? frameRef.current : null;
     const target: HTMLElement | Window = el ?? window;
     const read = () => (el ? el.scrollTop : window.scrollY);
 
-    let last = read();
     let ticking = false;
 
     const onScroll = () => {
@@ -144,25 +145,13 @@ export function useScrollState({ hideAfter = 160, topAfter = 700 } = {}) {
       ticking = true;
       requestAnimationFrame(() => {
         ticking = false;
-        const y = read();
-        const dy = y - last;
-        // ขยับน้อยกว่านี้ถือว่าเป็นการสั่น ไม่นับเป็นการเปลี่ยนทิศ
-        const moved = Math.abs(dy) > 6;
-        if (moved) last = y;
-
-        setState((prev) => {
-          const hidden = moved ? dy > 0 && y > hideAfter : prev.hidden;
-          const showTop = y > topAfter;
-          return prev.hidden === hidden && prev.showTop === showTop
-            ? prev
-            : { hidden, showTop };
-        });
+        setShowTop(read() > topAfter);
       });
     };
 
     target.addEventListener("scroll", onScroll, { passive: true });
     return () => target.removeEventListener("scroll", onScroll);
-  }, [framed, frameRef, hideAfter, topAfter]);
+  }, [framed, frameRef, topAfter]);
 
   const scrollToTop = React.useCallback(() => {
     const el = framed ? frameRef.current : null;
@@ -188,7 +177,7 @@ export function useScrollState({ hideAfter = 160, topAfter = 700 } = {}) {
     [framed, frameRef]
   );
 
-  return { ...state, scrollToTop, scrollIntoTop };
+  return { showTop, scrollToTop, scrollIntoTop };
 }
 
 /** ปุ่มไอคอนสามอันบนหัวเรื่อง */

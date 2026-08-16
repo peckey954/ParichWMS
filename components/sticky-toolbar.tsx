@@ -7,25 +7,22 @@ import { cn } from "@peckey954/ui/lib/utils";
 import { useDevicePreview, useScrollState } from "@/components/device-preview";
 
 /* ------------------------------------------------------------------
-   แถบเครื่องมือที่ติดบนและซ่อนตัวเองตอนเลื่อนลง
+   แถบเครื่องมือที่ล็อกติดบนตลอด (ชิป + ช่องค้นหา)
 
    รายการยาว ๆ ที่มีชิปกับช่องค้นหา ถ้าเครื่องมืออยู่บนสุดอย่างเดียว
    เลื่อนลงไปแล้วจะเปลี่ยนตัวกรองไม่ได้ ต้องเลื่อนกลับขึ้นไปทั้งหน้า
+   จึงล็อกไว้บนด้วย sticky แล้วปล่อยให้มีแค่เนื้อหาข้างล่างเลื่อนแทน
 
-   เลื่อนลง = กำลังอ่าน ซ่อนให้เห็นเนื้อหาเต็ม ๆ
-   เลื่อนขึ้น = กำลังหาอะไร เอาเครื่องมือกลับมาให้ทันที
-
-   ตอนซ่อน แถบยังอยู่ในหน้าแต่ถูกดันขึ้นไปนอกจอ จึงต้องปิดการโฟกัสด้วย
-   ไม่งั้นคนกด Tab จะหลุดเข้าไปในของที่มองไม่เห็น
+   เคยลองซ่อนแถบนี้ตอนเลื่อนลง (แล้วเลื่อนขึ้นค่อยเอากลับมา) แต่บนมือถือจริง
+   มันชนกับแถบที่อยู่บนสุดของเบราว์เซอร์เองที่โผล่/หุบตามการเลื่อนเหมือนกัน
+   ผลคือแถบดูเหมือนกระตุกเด้งกลับ เลยตัดออก ให้ล็อกอยู่บนตลอดแบบเดียว
 ------------------------------------------------------------------ */
 
 export function StickyToolbar({
-  hidden,
   barRef,
   className,
   children,
 }: {
-  hidden: boolean;
   barRef?: React.RefObject<HTMLDivElement | null>;
   className?: string;
   children: React.ReactNode;
@@ -37,14 +34,10 @@ export function StickyToolbar({
       ref={barRef}
       className={cn(
         "sticky z-30 -mx-4 mt-3 bg-surface px-4 pb-3 sm:-mx-6 sm:mt-4 sm:px-6",
-        "transition-transform duration-200",
         // ตอนจำลองอุปกรณ์ ตัวที่เลื่อนคือกรอบ ขอบบนจึงอยู่ที่ 0 ไม่ใช่ใต้แถบหัวเว็บ
         framed ? "top-0" : "top-14",
-        hidden && "-translate-y-[calc(100%+1rem)]",
         className
       )}
-      aria-hidden={hidden}
-      inert={hidden}
     >
       {children}
     </div>
@@ -83,12 +76,8 @@ export function BackToTop({
 }
 
 /** รวมทุกอย่างที่หน้าแบบนี้ต้องใช้ไว้ในที่เดียว เรียกครั้งเดียวได้ครบ */
-export function useStickyToolbar(options?: {
-  hideAfter?: number;
-  topAfter?: number;
-}) {
-  const { hidden, showTop, scrollToTop, scrollIntoTop } =
-    useScrollState(options);
+export function useStickyToolbar(options?: { topAfter?: number }) {
+  const { showTop, scrollToTop, scrollIntoTop } = useScrollState(options);
   const barRef = React.useRef<HTMLDivElement>(null);
-  return { hidden, showTop, scrollToTop, scrollIntoTop, barRef };
+  return { showTop, scrollToTop, scrollIntoTop, barRef };
 }

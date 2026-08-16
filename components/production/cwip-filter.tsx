@@ -5,7 +5,6 @@ import { RotateCcwIcon } from "lucide-react";
 import { Button } from "@peckey954/ui/components/ui/button";
 import { Label } from "@peckey954/ui/components/ui/label";
 import { MultiSelect } from "@peckey954/ui/components/ui/multi-select";
-import { Separator } from "@peckey954/ui/components/ui/separator";
 import { CheckChip } from "@/components/check-chip";
 import { SortControl, type SortOption } from "@/components/sort-control";
 import { CWIP_VIEW_DEFAULT, type CwipView } from "./packing-cwip";
@@ -76,90 +75,77 @@ export function CwipFilter({
           ต้องใช้คอมโพเนนต์หัวข้อของตัวเอง ไม่งั้น screen reader อ่านไม่เจอ */}
 
       {/* เลื่อนเฉพาะตรงนี้ หัวข้อกับแถวปุ่มอยู่นอกกรอบที่เลื่อน */}
-      <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
-        {/* อยู่ในกล่องทุกขนาดจอ เปิดกล่องแล้วเห็นทันทีว่าตอนนี้เรียงด้วยโหมดไหน
-            ตัวควบคุมมีคำว่า "เรียงตาม:" ในตัวแล้ว ไม่ต้องมี Label ซ้ำอีก */}
-        <SortControl
-          options={CWIP_SORTS}
-          value={draft.sort}
-          dir={draft.dir}
-          onChange={(sort, dir) => set({ sort, dir })}
-          className="flex-wrap"
-        />
-        <Separator className="my-4" />
-
-        {/* ---------- แสดงในรายการ ---------- */}
-        {/* เรียงแนวนอน ตัดบรรทัดเอง ประหยัดความสูงกว่าเรียงลงทีละแถว */}
-        <Label className="text-sm">แสดงในรายการ</Label>
-        <div className="mt-2 flex flex-wrap gap-2">
-          <CheckChip
-            id="cwip-chips"
-            label="ป้ายข้อมูล"
-            checked={draft.showChips}
-            onChange={(v) => set({ showChips: v })}
+      <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-4">
+        <Section title="การเรียงข้อมูล">
+          <SortControl
+            options={CWIP_SORTS}
+            value={draft.sort}
+            dir={draft.dir}
+            onChange={(sort, dir) => set({ sort, dir })}
           />
-          <CheckChip
-            id="cwip-actions"
-            label="คืนกลับคลัง/ปรับปรุง"
-            checked={draft.showActions}
-            onChange={(v) => set({ showActions: v })}
+        </Section>
+
+        <Section title="แสดงในรายการ">
+          <div className="flex flex-wrap gap-2">
+            <CheckChip
+              id="cwip-chips"
+              label="ป้ายข้อมูล"
+              checked={draft.showChips}
+              onChange={(v) => set({ showChips: v })}
+            />
+            <CheckChip
+              id="cwip-actions"
+              label="คืนกลับคลัง/ปรับปรุง"
+              checked={draft.showActions}
+              onChange={(v) => set({ showActions: v })}
+            />
+            <CheckChip
+              id="cwip-lots"
+              label="Lot สินค้า"
+              checked={draft.showLots}
+              onChange={(v) => set({ showLots: v })}
+            />
+          </div>
+        </Section>
+
+        <Section title="ประเภทสินค้า" htmlFor="cwip-kinds">
+          <MultiSelect
+            id="cwip-kinds"
+            options={asOptions(CWIP_KINDS)}
+            value={draft.kinds}
+            onValueChange={(kinds) => set({ kinds })}
+            placeholder="เลือกประเภท"
+            searchPlaceholder="ค้นหาประเภท"
+            maxChips={2}
+            className="min-h-10 bg-card"
           />
-          <CheckChip
-            id="cwip-lots"
-            label="Lot สินค้า"
-            checked={draft.showLots}
-            onChange={(v) => set({ showLots: v })}
+        </Section>
+
+        <Section title="โซน" htmlFor="cwip-zones">
+          <MultiSelect
+            id="cwip-zones"
+            options={asOptions(CWIP_ZONES)}
+            value={draft.zones}
+            onValueChange={(zones) => set({ zones })}
+            placeholder="เลือกโซน"
+            searchPlaceholder="ค้นหาโซน"
+            maxChips={2}
+            className="min-h-10 bg-card"
           />
-          {/* ไม่มีเฉพาะสต็อกต่ำในนี้ — ชิปแถวบนมี "สต็อกต่ำ (3)" อยู่แล้ว
-              ของอย่างเดียวกันอยู่สองที่ คนจะไม่รู้ว่าอันไหนคุมอันไหน
-              และตอนติ๊กในนี้แล้วชิปข้างบนไม่ขยับตาม จะดูเหมือนระบบเพี้ยน */}
-        </div>
+        </Section>
 
-        <Separator className="my-4" />
-
-        {/* ---------- กรองข้อมูล ----------
-             ของจริงมีเป็นสิบ ไล่กดทีละอันไม่ไหว ต้องพิมพ์ชื่อหาเอา */}
-        <Label className="text-sm">กรองข้อมูล</Label>
-        <div className="mt-2 space-y-3">
-          <Field id="cwip-kinds" label="หมวดสินค้า">
-            <MultiSelect
-              id="cwip-kinds"
-              options={asOptions(CWIP_KINDS)}
-              value={draft.kinds}
-              onValueChange={(kinds) => set({ kinds })}
-              placeholder="ทุกหมวด"
-              searchPlaceholder="ค้นหาหมวด"
-              maxChips={2}
-              className="min-h-10 bg-card"
-            />
-          </Field>
-
-          <Field id="cwip-zones" label="โซน">
-            <MultiSelect
-              id="cwip-zones"
-              options={asOptions(CWIP_ZONES)}
-              value={draft.zones}
-              onValueChange={(zones) => set({ zones })}
-              placeholder="ทุกโซน"
-              searchPlaceholder="ค้นหาโซน"
-              maxChips={2}
-              className="min-h-10 bg-card"
-            />
-          </Field>
-
-          <Field id="cwip-products" label="สินค้า">
-            <MultiSelect
-              id="cwip-products"
-              options={asOptions(CWIP_PRODUCT_NAMES)}
-              value={draft.products}
-              onValueChange={(products) => set({ products })}
-              placeholder="ทุกสินค้า"
-              searchPlaceholder="ค้นหาสินค้า"
-              maxChips={1}
-              className="min-h-10 bg-card"
-            />
-          </Field>
-        </div>
+        <Section title="สินค้า" htmlFor="cwip-products">
+          <MultiSelect
+            id="cwip-products"
+            options={asOptions(CWIP_PRODUCT_NAMES)}
+            value={draft.products}
+            onValueChange={(products) => set({ products })}
+            placeholder="เลือกสินค้า"
+            searchPlaceholder="ค้นหาสินค้า"
+            maxChips={1}
+            className="min-h-10 bg-card"
+          />
+        </Section>
       </div>
 
       {/* ตรึงไว้ล่างสุด เห็นตลอดไม่ว่าเลื่อนไปไหน
@@ -188,21 +174,32 @@ export function CwipFilter({
   );
 }
 
-function Field({
-  id,
-  label,
+/**
+ * หัวข้อกับเนื้อหาในกล่องตัวกรอง
+ *
+ * ทุกหัวข้อขนาดเท่ากันหมด ไม่มีหัวข้อใหญ่ครอบหัวข้อเล็ก
+ * เพราะทุกอันคือเรื่องระดับเดียวกัน — เลือกอะไรสักอย่างในกล่องนี้
+ * ของเดิมมี "กรองข้อมูล" เป็นหัวข้อใหญ่ครอบสามอันล่าง ซึ่งไม่ได้บอกอะไรเพิ่ม
+ *
+ * ไม่มีเส้นคั่น ใช้ระยะห่างแทน เส้นทำให้กล่องเล็ก ๆ ดูถูกซอยเป็นห้อง ๆ
+ * ทั้งที่มีของอยู่แค่ห้าอย่าง
+ */
+function Section({
+  title,
+  htmlFor,
   children,
 }: {
-  id: string;
-  label: string;
+  title: string;
+  htmlFor?: string;
   children: React.ReactNode;
 }) {
   return (
-    <div className="space-y-1.5">
-      <Label htmlFor={id} className="font-normal">
-        {label}
+    <div>
+      <Label htmlFor={htmlFor} className="text-sm">
+        {title}
       </Label>
-      {children}
+      {/* ของที่เลือกอยู่บรรทัดของตัวเอง ไม่ใช่ต่อท้ายหัวข้อ */}
+      <div className="mt-2">{children}</div>
     </div>
   );
 }

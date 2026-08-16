@@ -94,8 +94,8 @@ function GeneralStockView() {
   const { framed } = useDevicePreview();
   // ประวัติมาจาก context เพราะการย้าย/ปรับปรุงจะเพิ่มรายการใหม่เข้ามาระหว่างใช้งาน
   const { rows: logRows } = useStockLog();
-  // เลื่อนลงซ่อนแถบเครื่องมือ เลื่อนขึ้นเอากลับมา และโผล่ปุ่มกลับขึ้นบนสุดเมื่อลงมาไกล
-  const { hidden, showTop, scrollToTop, scrollIntoTop } = useScrollState();
+  // แถบเครื่องมือล็อกติดบนตลอด และโผล่ปุ่มกลับขึ้นบนสุดเมื่อลงมาไกล
+  const { showTop, scrollToTop, scrollIntoTop } = useScrollState();
   // ของจริงแยกประเภทกันเด็ดขาด ไม่มีมุมมอง "ทั้งหมด"
   // ชิปจึงเป็นการนำทาง (เลือกอยู่เสมอหนึ่งอัน) ไม่ใช่ตัวกรองที่ปิดได้
   // "history" เป็นมุมมองพิเศษ ไม่ใช่ประเภทสินค้า แต่อยู่แถวชิปเดียวกัน
@@ -274,7 +274,7 @@ function GeneralStockView() {
                รายการยาว ถ้าปุ่มอยู่บนสุดอย่างเดียวต้องเลื่อนกลับไปกด
                จึงยกสองอย่างที่ใช้ระหว่างไล่ดู (สลับประเภท + ซ่อน/แสดง) มาติดบนไว้
                ลบขอบซ้ายขวาออกด้วย -mx เพื่อให้พื้นหลังเต็มความกว้างตอนติด */}
-          <StickyToolbar hidden={hidden} barRef={stickyRef}>
+          <StickyToolbar barRef={stickyRef}>
           <div className="flex items-center gap-2 pt-2">
             <div
               ref={chipRowRef}
@@ -527,7 +527,7 @@ function GeneralStockView() {
                ไม่มีชิปประเภท ไม่มีเรียงตาม ไม่มีปุ่มส่งออก เพราะไม่เกี่ยวกัน */}
           {tab === "inbound" && (
             <>
-              <StickyToolbar hidden={hidden} barRef={stickyRef}>
+              <StickyToolbar barRef={stickyRef}>
                 <div className="flex items-center gap-2 pt-2">
                   <InputGroup className="min-w-0 flex-1 bg-card">
                     <InputGroupAddon align="inline-start">
@@ -559,7 +559,7 @@ function GeneralStockView() {
           {/* ---------- แท็บรอจ่าย/คืน — ใบขอเบิกกับใบขอคืนอยู่ตารางเดียวกัน ---------- */}
           {tab === "issue" && (
             <>
-              <StickyToolbar hidden={hidden} barRef={stickyRef}>
+              <StickyToolbar barRef={stickyRef}>
                 {/* ทิศทางของเอกสาร เลือกได้ทีละอัน เลื่อนแนวนอนเอาบนจอแคบ */}
                 <div
                   role="tablist"
