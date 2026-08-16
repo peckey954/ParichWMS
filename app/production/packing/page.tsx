@@ -86,8 +86,9 @@ export default function PackingListPage() {
   const [filterOpen, setFilterOpen] = React.useState(false);
   // สถานะที่คนคุมไลน์กดเปลี่ยนเอง เก็บทับของเดิมเฉพาะใบที่ถูกแก้
   const [stages, setStages] = React.useState<Record<string, OrderStage>>({});
-  // แถบค้นหา+ชิปล็อกติดบนตลอด แบบเดียวกับหน้าสต็อกทั่วไป
-  const { showTop, scrollToTop, scrollIntoTop, barRef } = useStickyToolbar();
+  // เลื่อนลงซ่อนแถบค้นหา เลื่อนขึ้นเอากลับมา แบบเดียวกับหน้าสต็อกทั่วไป
+  const { hidden, showTop, scrollToTop, scrollIntoTop, barRef } =
+    useStickyToolbar();
   const { framed } = useDevicePreview();
 
   /**
@@ -251,7 +252,7 @@ export default function PackingListPage() {
       {/* ล็อกติดบนตลอด เหมือนหน้าสต็อกทั่วไป
           แท็บ "ผลิตแล้ว" มี 46 ใบ ถ้าค้นหาอยู่บนสุดอย่างเดียว
           เลื่อนลงไปแล้วต้องลากกลับขึ้นทั้งหน้าเพื่อพิมพ์คำค้น */}
-      <StickyToolbar barRef={barRef}>
+      <StickyToolbar hidden={hidden} barRef={barRef}>
         <div className="pt-2">
           {/* ชิปอยู่เหนือช่องค้นหา เพราะชิปคือขอบเขต ส่วนค้นหาคือการหาข้างในขอบเขตนั้น
               แต่ละชิปเป็นข้อมูลคนละชุด (การ์ดสินค้า / ตารางเอกสาร / ตารางประวัติ)

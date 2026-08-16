@@ -88,8 +88,8 @@ export default function OptimizedFormulaPage() {
   const [view, setView] = React.useState<View>("weight");
   const [query, setQuery] = React.useState("");
   const [page, setPage] = React.useState(1);
-  // แถบชิป+ค้นหาล็อกติดบนตลอด แบบเดียวกับหน้าสต็อกทั่วไป
-  const { showTop, scrollToTop, barRef } = useStickyToolbar();
+  // เลื่อนลงซ่อนแถบชิป+ค้นหา เลื่อนขึ้นเอากลับมา แบบเดียวกับหน้าสต็อกทั่วไป
+  const { hidden, showTop, scrollToTop, barRef } = useStickyToolbar();
 
   const all = React.useMemo(() => computeOptimized(), []);
   const rows = all.filter((r) => matchesOptimized(r, query));
@@ -199,7 +199,7 @@ export default function OptimizedFormulaPage() {
 
            ล็อกติดบนตลอด เหมือนหน้าสต็อกทั่วไป
            สลับมุมมองได้จากตรงไหนของตารางก็ได้ ไม่ต้องเลื่อนกลับขึ้นบนสุด */}
-      <StickyToolbar barRef={barRef}>
+      <StickyToolbar hidden={hidden} barRef={barRef}>
         <div className="flex flex-wrap items-center gap-2 pt-2">
           <div
             role="radiogroup"
