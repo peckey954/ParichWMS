@@ -35,6 +35,11 @@ import {
 import { Textarea } from "@peckey954/ui/components/ui/textarea";
 import { cn } from "@peckey954/ui/lib/utils";
 import { toast } from "sonner";
+import {
+  MAX_FILE_MB,
+  PhotoUpload,
+  type Photo,
+} from "@/components/photo-upload";
 import { useNumberField } from "@/components/number-field";
 import { getInboundReceipt, formatQty, ZONES } from "@/lib/general-stock";
 
@@ -103,6 +108,68 @@ export default function AddInboundRoundPage() {
   const [zone, setZone] = React.useState<string | undefined>();
   const [quality, setQuality] = React.useState<"ok" | "bad">("ok");
   const [note, setNote] = React.useState("");
+  // ของที่ไม่ถูกต้องต้องมีหลักฐาน — รูปกับเหตุผล เก็บแยกจากหมายเหตุทั่วไป
+  const [badNote, setBadNote] = React.useState("");
+  const [photos, setPhotos] = React.useState<Photo[]>([]);
+  const seqRef = React.useRef(0);
+
+  /**
+   * จำลองการอัปโหลด — ไม่มีหลังบ้านจริง
+   * ไฟล์ใหญ่เกินตัดตั้งแต่ก่อนเริ่มอัป ไม่ต้องรอให้เซิร์ฟเวอร์ปฏิเสธ
+   */
+  const startUpload = React.useCallback((id: string) => {
+    let pct = 0;
+    const timer = setInterval(() => {
+      pct += 20;
+      setPhotos((prev) =>
+        prev.map((p) =>
+          p.id === id
+            ? pct >= 100
+              ? { ...p, status: "done", progress: 100 }
+              : { ...p, progress: pct }
+            : p
+        )
+      );
+      if (pct >= 100) clearInterval(timer);
+    }, 220);
+  }, []);
+
+  const addPhotos = (files: FileList) => {
+    const next: Photo[] = [];
+    for (const file of Array.from(files)) {
+      seqRef.current += 1;
+      const id = `ph-${seqRef.current}`;
+      const tooLarge = file.size > MAX_FILE_MB * 1024 * 1024;
+      next.push({
+        id,
+        name: file.name,
+        url: tooLarge ? undefined : URL.createObjectURL(file),
+        status: tooLarge ? "tooLarge" : "uploading",
+        progress: 0,
+      });
+      if (!tooLarge) startUpload(id);
+    }
+    setPhotos((prev) => [...prev, ...next]);
+  };
+
+  const removePhoto = (id: string) =>
+    setPhotos((prev) => {
+      // คืนหน่วยความจำของ blob ที่สร้างไว้ ไม่งั้นค้างจนกว่าจะปิดแท็บ
+      const gone = prev.find((p) => p.id === id);
+      if (gone?.url) URL.revokeObjectURL(gone.url);
+      return prev.filter((p) => p.id !== id);
+    });
+
+  const retryPhoto = (id: string) =>
+    setPhotos((prev) => {
+      const target = prev.find((p) => p.id === id);
+      // ไฟล์ใหญ่เกินลองใหม่กี่ครั้งก็ใหญ่เท่าเดิม ต้องไปเลือกไฟล์อื่นมา
+      if (!target || target.status === "tooLarge") return prev;
+      startUpload(id);
+      return prev.map((p) =>
+        p.id === id ? { ...p, status: "uploading", progress: 0 } : p
+      );
+    });
 
   if (!receipt || !doc) {
     return (
@@ -162,6 +229,15 @@ export default function AddInboundRoundPage() {
     }
     if (tonQty <= 0) {
       toast.error("กรุณาระบุจำนวนรับเข้า");
+      return;
+    }
+    // ของที่ตีกลับไปหาผู้ขายต้องบอกได้ว่าเพราะอะไร ไม่งั้นเคลมไม่ได้
+    if (quality === "bad" && badNote.trim() === "") {
+      toast.error("กรุณาระบุหมายเหตุสินค้าไม่ถูกต้อง");
+      return;
+    }
+    if (photos.some((p) => p.status === "uploading")) {
+      toast.error("รูปภาพยังอัปโหลดไม่เสร็จ");
       return;
     }
     toast.success(`บันทึกการรับเข้า ${safeDoc.code}-${seq} แล้ว`, {
@@ -378,6 +454,36 @@ export default function AddInboundRoundPage() {
               </RadioBox>
             </RadioGroup>
           </div>
+
+          {/* ---------- ของไม่ถูกต้อง ต้องมีหลักฐาน ----------
+               โผล่เฉพาะตอนเลือกไม่ถูกต้อง ไม่จองที่ว่างไว้
+               รูปกับเหตุผลคือสิ่งที่ฝ่ายจัดซื้อใช้เคลมกับผู้ขาย
+               ถ้าไม่บังคับ ของจะถูกตีกลับโดยไม่มีใครรู้ว่าเพราะอะไร */}
+          {quality === "bad" && (
+            <>
+              <div className="space-y-2 @2xl:col-span-2">
+                <Label>เพิ่มรูปภาพสินค้าที่ไม่ถูกต้อง</Label>
+                <PhotoUpload
+                  photos={photos}
+                  onAdd={addPhotos}
+                  onRemove={removePhoto}
+                  onRetry={retryPhoto}
+                />
+              </div>
+
+              <div className="space-y-1.5 @2xl:col-span-2">
+                <Label htmlFor="bad-note">หมายเหตุสินค้าไม่ถูกต้อง</Label>
+                <Textarea
+                  id="bad-note"
+                  className="bg-card"
+                  placeholder="ระบุหมายเหตุ"
+                  rows={3}
+                  value={badNote}
+                  onChange={(e) => setBadNote(e.target.value)}
+                />
+              </div>
+            </>
+          )}
 
           <div className="space-y-1.5 @2xl:col-span-2">
             <Label htmlFor="note">
