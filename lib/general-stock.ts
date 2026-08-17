@@ -745,6 +745,8 @@ export type InboundReceiptMeta = {
   poEditor?: string;
   reason: string;
   deliveryFrom: string;
+  /** หมายเหตุที่ผู้สั่งซื้อฝากไว้ตอนทำใบสั่งซื้อ — ไม่ใช่ทุกใบจะมี */
+  buyerNote?: string;
 };
 
 export type InboundReceipt = {
@@ -761,6 +763,13 @@ const REASON_POOL = [
   "สำรองคลัง",
   "เปลี่ยนทดแทนของชำรุด",
   "รองรับคำสั่งซื้อพิเศษ",
+];
+
+const BUYER_NOTE_POOL = [
+  "ของจะเข้ามาช่วงบ่าย",
+  "รถอาจเข้าล่าช้ากว่านัด แจ้งยามล่วงหน้าด้วย",
+  "แยกลงหลายเที่ยว ให้เปิดรับได้ทุกรอบ",
+  "ประสานคนขับก่อนเข้าคลัง เบอร์อยู่ในใบสั่งซื้อ",
 ];
 
 /** เลขที่ตายตัวจาก id เอกสาร กันไม่ให้เปลี่ยนค่าไปมาระหว่างเซิร์ฟเวอร์กับเบราว์เซอร์ */
@@ -790,6 +799,7 @@ function buildInboundReceipt(doc: InboundDoc): InboundReceipt {
     poEditor: rnd() < 0.3 ? pick(DOC_ACTORS, rnd) : undefined,
     reason: pick(REASON_POOL, rnd),
     deliveryFrom: doc.arriveDate,
+    buyerNote: rnd() < 0.5 ? pick(BUYER_NOTE_POOL, rnd) : undefined,
   };
 
   const batchId = `IN-${hex(rnd, 4)}-${hex(rnd, 4)}`;

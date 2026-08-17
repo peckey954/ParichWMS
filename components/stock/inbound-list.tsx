@@ -136,7 +136,7 @@ export function InboundList({ docs }: { docs: InboundDoc[] }) {
                     </TableCell>
                     <TableCell className={cn(COL_LAST, "text-right")}>
                       <Button asChild variant="outline-primary" size="sm">
-                        <Link href={`/stock/inbound/${d.id}`}>รับเข้า</Link>
+                        <Link href={`/stock/inbound/${d.id}/add`}>รับเข้า</Link>
                       </Button>
                     </TableCell>
                   </TableRow>
@@ -194,7 +194,7 @@ function InboundCard({ doc }: { doc: InboundDoc }) {
 
       <div className="mt-3 flex justify-end">
         <Button asChild variant="outline-primary" size="sm">
-          <Link href={`/stock/inbound/${doc.id}`}>รับเข้า</Link>
+          <Link href={`/stock/inbound/${doc.id}/add`}>รับเข้า</Link>
         </Button>
       </div>
     </div>

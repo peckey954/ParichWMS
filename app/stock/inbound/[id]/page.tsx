@@ -20,25 +20,6 @@ import {
   CollapsibleTrigger,
 } from "@peckey954/ui/components/ui/collapsible";
 import {
-  Dialog,
-  DialogClose,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@peckey954/ui/components/ui/dialog";
-import { Input } from "@peckey954/ui/components/ui/input";
-import { Label } from "@peckey954/ui/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@peckey954/ui/components/ui/select";
-import {
   Table,
   TableBody,
   TableCell,
@@ -47,7 +28,6 @@ import {
   TableRow,
 } from "@peckey954/ui/components/ui/table";
 import { cn } from "@peckey954/ui/lib/utils";
-import { useNumberField } from "@/components/number-field";
 import {
   CardBox,
   CardHead,
@@ -62,11 +42,9 @@ import {
 import {
   getInboundReceipt,
   outstandingQty,
-  ZONES,
   INBOUND_ROUND_STATUS_LABEL,
   QC_RESULT_LABEL,
   formatQty,
-  type InboundDoc,
   type InboundRound,
   type InboundRoundStatus,
   type QcResult,
@@ -139,17 +117,7 @@ export default function InboundReceiptPage() {
     () => getInboundReceipt(params.id),
     [params.id]
   );
-
-  const [rounds, setRounds] = React.useState<InboundRound[]>(
-    () => receipt?.rounds ?? []
-  );
-  // เปลี่ยนลิงก์ไปดูใบอื่นระหว่างที่หน้ายังไม่รีเมานต์ (client nav) ต้องรีเซ็ตตาม
-  // อัปเดตระหว่างเรนเดอร์แทนการใช้ effect ตามแนวทางของ React — กัน cascading render
-  const [loadedId, setLoadedId] = React.useState(params.id);
-  if (params.id !== loadedId) {
-    setLoadedId(params.id);
-    setRounds(receipt?.rounds ?? []);
-  }
+  const rounds = receipt?.rounds ?? [];
 
   if (!receipt) {
     return (
@@ -258,10 +226,16 @@ export default function InboundReceiptPage() {
       {/* ---------- รอบการรับเข้าสินค้า ---------- */}
       <div className="mt-8 flex items-center justify-between gap-3">
         <h2 className="text-lg font-semibold">รอบการรับเข้าสินค้า</h2>
-        <AddRoundDialog
-          doc={doc}
-          onAdd={(round) => setRounds((rs) => [...rs, round])}
-        />
+        <Button
+          asChild
+          variant="outline"
+          className="border-primary text-primary hover:text-primary"
+        >
+          <Link href={`/stock/inbound/${doc.id}/add`}>
+            <PlusIcon />
+            เพิ่มการรับเข้าสินค้า
+          </Link>
+        </Button>
       </div>
 
       {/* ---------- จอแคบ: การ์ดต่อรอบหนึ่งรอบ ---------- */}
@@ -447,159 +421,5 @@ function RoundCard({ round: r, unit }: { round: InboundRound; unit: string }) {
         <RoundStatusChip status={r.status} />
       </div>
     </div>
-  );
-}
-
-/**
- * เพิ่มรอบรับเข้าใหม่ — ใช้ตอนรถมาถึงแล้วแต่ยังไม่ผ่าน QC
- * จึงบันทึกได้แค่ข้อมูลรถ/ตู้/โซน/จำนวนที่รับ ผลตรวจกับยอดเข้าคลังมาทีหลัง
- */
-function AddRoundDialog({
-  doc,
-  onAdd,
-}: {
-  doc: InboundDoc;
-  onAdd: (round: InboundRound) => void;
-}) {
-  const [open, setOpen] = React.useState(false);
-  const [plate, setPlate] = React.useState(doc.truck);
-  const [arriveDate, setArriveDate] = React.useState(doc.arriveDate);
-  const [containerNo, setContainerNo] = React.useState("");
-  const [zone, setZone] = React.useState<string | undefined>();
-  const [packing, setPacking] = React.useState(doc.packing ?? "");
-  const [qty, setQty] = React.useState(0);
-  const qtyField = useNumberField(qty, setQty, 2);
-
-  const reset = () => {
-    setPlate(doc.truck);
-    setArriveDate(doc.arriveDate);
-    setContainerNo("");
-    setZone(undefined);
-    setPacking(doc.packing ?? "");
-    setQty(0);
-  };
-
-  function handleSave() {
-    if (qty <= 0) return;
-    onAdd({
-      id: `${doc.id}-radd-${Date.now()}`,
-      receiptCode: doc.code,
-      batchId: `IN-ADD-${Date.now().toString(16)}`,
-      plate,
-      arriveDate,
-      containerNo: containerNo.trim() || undefined,
-      zone,
-      packing: packing.trim() || undefined,
-      receivedQty: qty,
-      status: "waitingQc",
-    });
-    reset();
-    setOpen(false);
-  }
-
-  return (
-    <Dialog
-      open={open}
-      onOpenChange={(next) => {
-        setOpen(next);
-        if (!next) reset();
-      }}
-    >
-      <DialogTrigger asChild>
-        <Button
-          variant="outline"
-          className="border-primary text-primary hover:text-primary"
-        >
-          <PlusIcon />
-          เพิ่มการรับเข้าสินค้า
-        </Button>
-      </DialogTrigger>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>เพิ่มการรับเข้าสินค้า</DialogTitle>
-          <DialogDescription className="sr-only">
-            บันทึกรอบรับสินค้าใหม่ของใบ {doc.code}
-          </DialogDescription>
-        </DialogHeader>
-
-        <div className="space-y-4">
-          <div className="space-y-1.5">
-            <Label htmlFor="ar-plate">ทะเบียนรถ</Label>
-            <Input
-              id="ar-plate"
-              className="bg-card"
-              value={plate}
-              onChange={(e) => setPlate(e.target.value)}
-            />
-          </div>
-
-          <div className="space-y-1.5">
-            <Label htmlFor="ar-date">วันที่รถจะเข้า</Label>
-            <Input
-              id="ar-date"
-              className="bg-card"
-              value={arriveDate}
-              onChange={(e) => setArriveDate(e.target.value)}
-            />
-          </div>
-
-          <div className="space-y-1.5">
-            <Label htmlFor="ar-container">
-              เบอร์ตู้คอนเทนเนอร์{" "}
-              <span className="font-normal text-muted-foreground">(ไม่บังคับ)</span>
-            </Label>
-            <Input
-              id="ar-container"
-              className="bg-card"
-              value={containerNo}
-              onChange={(e) => setContainerNo(e.target.value)}
-            />
-          </div>
-
-          <div className="space-y-1.5">
-            <Label htmlFor="ar-zone">โซน</Label>
-            <Select value={zone} onValueChange={setZone}>
-              <SelectTrigger id="ar-zone" className="w-full bg-card">
-                <SelectValue placeholder="เลือกโซน" />
-              </SelectTrigger>
-              <SelectContent>
-                {ZONES.map((z) => (
-                  <SelectItem key={z} value={z}>
-                    {z}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="space-y-1.5">
-            <Label htmlFor="ar-packing">
-              บรรจุภัณฑ์{" "}
-              <span className="font-normal text-muted-foreground">(ไม่บังคับ)</span>
-            </Label>
-            <Input
-              id="ar-packing"
-              className="bg-card"
-              value={packing}
-              onChange={(e) => setPacking(e.target.value)}
-            />
-          </div>
-
-          <div className="space-y-1.5">
-            <Label htmlFor="ar-qty">รับเข้า ({doc.orderUnit})</Label>
-            <Input id="ar-qty" className="bg-card" {...qtyField} />
-          </div>
-        </div>
-
-        <DialogFooter>
-          <DialogClose asChild>
-            <Button variant="outline">ยกเลิก</Button>
-          </DialogClose>
-          <Button onClick={handleSave} disabled={qty <= 0}>
-            บันทึก
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
   );
 }
