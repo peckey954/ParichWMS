@@ -458,3 +458,57 @@ export function filterCwip(
 export const CWIP_PRODUCT_NAMES = CWIP_PRODUCTS.map((p) => p.name).sort((a, b) =>
   a.localeCompare(b, "th")
 );
+
+// ---------------------------------------------------------------
+// จัดกลุ่มล็อต CWIP — แบบเดียวกับหน้าสต็อกทั่วไป
+//
+// การเรียงที่นี่ไม่ได้เปลี่ยนแค่ลำดับ แต่เปลี่ยนหน่วยของรายการไปเลย
+//   สูตร  — กลุ่มตามสินค้า ล็อตอยู่ข้างใน
+//   โซน   — กลุ่มตามโซน ใช้ตอนยืนอยู่หน้าไลน์แล้วถามว่าตรงนี้มีอะไรบ้าง
+//   FIFO  — ไม่จัดกลุ่ม ไล่ล็อตเรียงตามอายุ ใช้ตอนเคลียร์ของค้างไลน์
+// ---------------------------------------------------------------
+
+/** ล็อตที่พกข้อมูลสินค้าติดมาด้วย — ใช้ตอนที่รายการไม่ได้จัดกลุ่มตามสินค้า */
+export type CwipFlatLot = { lot: CwipLot; product: CwipProduct };
+
+export const cwipFlatLots = (products: CwipProduct[]): CwipFlatLot[] =>
+  products.flatMap((p) => p.lots.map((lot) => ({ lot, product: p })));
+
+export type CwipLotGroup = {
+  id: string;
+  zone: string;
+  title: string;
+  rows: CwipFlatLot[];
+};
+
+export function cwipGroupByZone(
+  products: CwipProduct[],
+  dir: SortDir
+): CwipLotGroup[] {
+  const map = new Map<string, CwipFlatLot[]>();
+  for (const row of cwipFlatLots(products)) {
+    const list = map.get(row.lot.zone);
+    if (list) list.push(row);
+    else map.set(row.lot.zone, [row]);
+  }
+
+  return [...map.keys()]
+    .sort((a, b) => (dir === "asc" ? a.localeCompare(b) : b.localeCompare(a)))
+    .map((zone) => ({
+      id: zone,
+      zone,
+      title: `โซน ${zone}`,
+      rows: map.get(zone)!,
+    }));
+}
+
+/**
+ * เรียงล็อตตามอายุ ไม่จัดกลุ่ม
+ * asc คือเก่าสุดก่อน ซึ่งเป็น FIFO จริง — ของค้างไลน์นานที่สุดต้องถูกใช้ก่อน
+ */
+export const cwipSortFifo = (products: CwipProduct[], dir: SortDir) =>
+  cwipFlatLots(products).sort((a, b) =>
+    dir === "asc"
+      ? b.lot.ageDays - a.lot.ageDays
+      : a.lot.ageDays - b.lot.ageDays
+  );

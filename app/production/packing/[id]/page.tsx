@@ -78,8 +78,13 @@ export default function ProductionOrderPage() {
       materials: o.materials.filter((m) => m.id !== id),
     }));
 
+  /**
+   * ของที่เพิ่งเพิ่มขึ้นบนสุด ไม่ใช่ต่อท้าย
+   * ปุ่มเพิ่มสินค้าอยู่หัวตาราง กดแล้วของไปโผล่ท้ายรายการที่ยาวหลายจอ
+   * คนจะไม่เห็นว่าเกิดอะไรขึ้น แล้วกดซ้ำจนได้ของซ้ำ
+   */
   const addMaterial = (line: MaterialLine) =>
-    setOrder((o) => ({ ...o, materials: [...o.materials, line] }));
+    setOrder((o) => ({ ...o, materials: [line, ...o.materials] }));
 
   const overStock = order.materials.filter((m) => m.useQty > m.stockQty);
 

@@ -4,13 +4,16 @@ import * as React from "react";
 import { Badge } from "@peckey954/ui/components/ui/badge";
 import { Button } from "@peckey954/ui/components/ui/button";
 import { Separator } from "@peckey954/ui/components/ui/separator";
+import { cn } from "@peckey954/ui/lib/utils";
 import { toast } from "sonner";
 import { EmptyDocs } from "@/components/stock/doc-parts";
 import {
   cwipTotal,
   cwipZones,
   formatQty,
+  type CwipFlatLot,
   type CwipLot,
+  type CwipLotGroup,
   type CwipProduct,
   type CwipSort,
   type SortDir,
@@ -51,9 +54,13 @@ export const CWIP_VIEW_DEFAULT: CwipView = {
 export function PackingCwip({
   products,
   view,
+  zoneGroups,
+  fifoRows,
 }: {
   products: CwipProduct[];
   view: CwipView;
+  zoneGroups: CwipLotGroup[];
+  fifoRows: CwipFlatLot[];
 }) {
   if (products.length === 0) {
     return (
@@ -64,11 +71,175 @@ export function PackingCwip({
     );
   }
 
+  /* หน่วยของรายการเปลี่ยนตามโหมดที่เลือก ไม่ใช่การ์ดเดิมสลับลำดับ
+     แบบเดียวกับหน้าสต็อกทั่วไป คนที่ใช้หน้านั้นเป็นแล้วต้องใช้หน้านี้ได้ทันที */
+  if (view.sort === "zone") {
+    return (
+      <div className="space-y-4">
+        {zoneGroups.map((g) => (
+          <section
+            key={g.id}
+            className="overflow-hidden rounded-xl border border-border bg-card"
+          >
+            <div className="flex items-center gap-2 p-4">
+              <ZoneTag zone={g.zone} />
+              <div className="min-w-0">
+                <h3 className="font-semibold">{g.title}</h3>
+                <p className="mt-0.5 text-sm text-muted-foreground">
+                  {g.rows.length} รายการ ·{" "}
+                  {new Set(g.rows.map((r) => r.product.id)).size} สินค้า
+                </p>
+              </div>
+            </div>
+
+            {g.rows.map((row) => (
+              <FlatLotRow
+                key={row.lot.id}
+                row={row}
+                showZone={false}
+                view={view}
+              />
+            ))}
+          </section>
+        ))}
+      </div>
+    );
+  }
+
+  if (view.sort === "fifo") {
+    return (
+      <div className="overflow-hidden rounded-xl border border-border bg-card">
+        {fifoRows.map((row) => (
+          <FlatLotRow key={row.lot.id} row={row} showZone view={view} />
+        ))}
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-3">
       {products.map((p) => (
         <ProductCard key={p.id} product={p} view={view} />
       ))}
+    </div>
+  );
+}
+
+/** ป้ายโซน — ข้อความสีแบรนด์บนพื้นเทาอ่อน ตามที่ตกลงกันไว้ในหน้าสต็อก */
+function ZoneTag({ zone }: { zone: string }) {
+  return (
+    <span className="shrink-0 rounded-md bg-secondary px-2.5 py-0.5 text-sm font-semibold text-primary">
+      {zone}
+    </span>
+  );
+}
+
+/**
+ * แถวล็อตของโหมดโซนกับ FIFO — หน่วยของรายการคือล็อต ไม่ใช่สินค้า
+ * ชื่อสินค้าจึงย้ายเข้ามาอยู่ในแถว
+ *
+ * ป้ายอยู่บรรทัดของตัวเองใต้ชื่อ ไม่ต่อท้ายชื่อ
+ * ชื่อสินค้าที่นี่ยาวกว่าหน้าสต็อกมาก ("8-24-24+0.5Mg No filler")
+ * ต่อป้ายท้ายชื่อแล้วมันจะห่อบรรทัดคาบเกี่ยวกัน อ่านไม่ออกว่าป้ายไหนของอะไร
+ *
+ * ไม่มีป้ายหมวดสินค้าแบบหน้าสต็อกทั่วไป เพราะ CWIP รวมทุกหมวดไว้ด้วยกันอยู่แล้ว
+ * ไม่ได้แยกดูทีละหมวด ป้ายจึงไม่ได้ช่วยแยกอะไร — แต่ป้ายชนิด (Bulk / แม่ปุ๋ย)
+ * ยังอยู่ เพราะเป็นคุณสมบัติของของชิ้นนั้น ไม่ใช่ทางที่เลือกดู
+ */
+function FlatLotRow({
+  row: { lot, product },
+  showZone,
+  view,
+}: {
+  row: CwipFlatLot;
+  showZone: boolean;
+  view: CwipView;
+}) {
+  const act = (what: string) =>
+    toast.success(`${what} — ${product.name}`, {
+      description: `ล็อต ${lot.code} · โซน ${lot.zone}`,
+    });
+
+  const qty = (
+    <>
+      <span className="text-lg font-semibold">{formatQty(lot.qty)}</span>{" "}
+      <span className="text-sm text-muted-foreground">{product.unit}</span>
+    </>
+  );
+
+  return (
+    <div className="border-t border-border p-4">
+      <div className="flex flex-col @2xl:flex-row @2xl:items-center @2xl:justify-between @2xl:gap-3">
+        <div className="min-w-0 flex-1">
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex min-w-0 items-center gap-2">
+              {showZone && <ZoneTag zone={lot.zone} />}
+              <span className="font-semibold">{product.name}</span>
+            </div>
+            <p className="shrink-0 text-right tabular-nums @2xl:hidden">{qty}</p>
+          </div>
+
+          {/* ป้ายบรรทัดของตัวเอง เลื่อนแนวนอนบนจอแคบแทนการห่อบรรทัด */}
+          {view.showChips && (
+            <div
+              className={cn(
+                "mt-2 flex items-center gap-2 overflow-x-auto",
+                "flex-nowrap [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+              )}
+            >
+              <Badge tone="neutral" appearance="soft">
+                {product.kind}
+              </Badge>
+              {product.low && (
+                <Badge
+                  appearance="soft"
+                  className="[--bdg-border:transparent] [--bdg-surface:var(--chip-red)] [--bdg-text:var(--chip-red-foreground)] font-semibold"
+                >
+                  สต็อกต่ำ
+                </Badge>
+              )}
+              {product.incoming !== undefined && (
+                <Badge
+                  appearance="soft"
+                  className="[--bdg-border:transparent] [--bdg-surface:var(--chip-yellow)] [--bdg-text:var(--chip-yellow-foreground)] font-semibold"
+                >
+                  รอรับเข้า {formatQty(product.incoming)} {product.unit}
+                </Badge>
+              )}
+            </div>
+          )}
+
+          <p className="mt-2 text-sm text-muted-foreground">
+            <span className="font-medium text-foreground">{lot.code}</span>
+            <span className="block">
+              รับ {lot.receivedAt} ({lot.ageDays} วัน) · {formatQty(lot.pieces)}{" "}
+              ชิ้น{lot.perPiece !== "-" && ` (${lot.perPiece})`}
+            </span>
+          </p>
+        </div>
+
+        <div className="flex shrink-0 items-center gap-3">
+          {view.showActions && (
+            <div className="mt-3 flex w-full items-center gap-2 @2xl:mt-0 @2xl:w-auto">
+              <Button
+                variant="outline-primary"
+                className="flex-1 @2xl:w-28 @2xl:flex-none"
+                onClick={() => act("คืนกลับคลัง")}
+              >
+                คืนกลับคลัง
+              </Button>
+              <Button
+                variant="outline-primary"
+                className="flex-1 @2xl:w-28 @2xl:flex-none"
+                onClick={() => act("ปรับปรุง")}
+              >
+                ปรับปรุง
+              </Button>
+            </div>
+          )}
+          <p className="hidden w-24 text-right tabular-nums @2xl:block">{qty}</p>
+        </div>
+      </div>
     </div>
   );
 }

@@ -47,7 +47,9 @@ import {
   CWIP_RETURNS,
   DONE_ORDERS,
   WAITING_ORDERS,
+  cwipGroupByZone,
   cwipLowCount,
+  cwipSortFifo,
   filterCwip,
   matchesMove,
   matchesOrder,
@@ -140,6 +142,9 @@ export default function PackingListPage() {
     sort: cwipView.sort,
     dir: cwipView.dir,
   });
+  // สองโหมดนี้หน่วยของรายการเป็นล็อต ไม่ใช่สินค้า จึงต้องแปลงชุดข้อมูลก่อน
+  const cwipZoneGroups = cwipGroupByZone(cwip, cwipView.dir);
+  const cwipFifoRows = cwipSortFifo(cwip, cwipView.dir);
   const inbound = CWIP_INBOUND.filter((d) => matchesRequest(d, query));
   const returns = CWIP_RETURNS.filter((d) => matchesRequest(d, query));
   const history = CWIP_HISTORY.filter((m) => matchesMove(m, query));
@@ -358,7 +363,12 @@ export default function PackingListPage() {
         )}
 
         {tab === "cwip" && isStockView && (
-          <PackingCwip products={cwip} view={cwipView} />
+          <PackingCwip
+            products={cwip}
+            view={cwipView}
+            zoneGroups={cwipZoneGroups}
+            fifoRows={cwipFifoRows}
+          />
         )}
         {tab === "cwip" && cwipChip === "inbound" && (
           <CwipRequestList
