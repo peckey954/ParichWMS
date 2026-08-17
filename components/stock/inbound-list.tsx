@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Button } from "@peckey954/ui/components/ui/button";
 import { Separator } from "@peckey954/ui/components/ui/separator";
 import {
@@ -46,6 +47,7 @@ const PAGE_SIZE = 15;
 export function InboundList({ docs }: { docs: InboundDoc[] }) {
   const [page, setPage] = React.useState(1);
   const { pages, safe, slice } = paginate(docs, page, PAGE_SIZE);
+  const router = useRouter();
 
   if (docs.length === 0) {
     return (
@@ -87,11 +89,21 @@ export function InboundList({ docs }: { docs: InboundDoc[] }) {
               {slice.map((d) => {
                 const left = outstandingQty(d);
                 return (
-                  <TableRow key={d.id}>
+                  <TableRow
+                    key={d.id}
+                    // ทั้งแถวกดได้ ไม่ใช่เฉพาะตัวอักษรเลขที่ใบ
+                    // เป้าเล็กแค่คำเดียวในแถวสูง 65px คือกดพลาดตลอด
+                    // ยังเป็น <a> จริงในเซลล์แรก เปิดแท็บใหม่/คัดลอกลิงก์ได้เหมือนเดิม
+                    onClick={() => router.push(`/stock/inbound/${d.id}`)}
+                    className="cursor-pointer"
+                  >
                     <TableCell className={COL_FIRST}>
-                      <span className="block font-medium whitespace-nowrap">
+                      <Link
+                        href={`/stock/inbound/${d.id}`}
+                        className="block font-medium whitespace-nowrap hover:underline"
+                      >
                         {d.code}
-                      </span>
+                      </Link>
                       <span className="block text-sm text-muted-foreground">
                         {d.createdAt}
                       </span>
@@ -134,7 +146,12 @@ export function InboundList({ docs }: { docs: InboundDoc[] }) {
                         </span>
                       )}
                     </TableCell>
-                    <TableCell className={cn(COL_LAST, "text-right")}>
+                    {/* ปุ่มรับเข้าไปหน้ากรอกข้อมูล คนละที่กับหน้ารายละเอียด
+                        กันไม่ให้การกดปุ่มลากไปเปิดหน้ารายละเอียดแทน */}
+                    <TableCell
+                      className={cn(COL_LAST, "text-right")}
+                      onClick={(e) => e.stopPropagation()}
+                    >
                       <Button asChild variant="outline-primary" size="sm">
                         <Link href={`/stock/inbound/${d.id}/add`}>รับเข้า</Link>
                       </Button>
@@ -155,8 +172,11 @@ export function InboundList({ docs }: { docs: InboundDoc[] }) {
 function InboundCard({ doc }: { doc: InboundDoc }) {
   const left = outstandingQty(doc);
   return (
-    <div className="rounded-xl border border-border bg-card p-4">
-      <CardHead code={doc.code} at={doc.createdAt} />
+    // ลิงก์คลุมทั้งใบด้วย after:inset-0 แทนที่จะเอา <a> ครอบเนื้อหา
+    // เพราะในการ์ดมีปุ่มรับเข้าอยู่ ปุ่มซ้อนในลิงก์เป็น HTML ที่ผิด
+    // และกดแล้วจะไปเปิดหน้ารายละเอียดแทนที่จะไปหน้ากรอกข้อมูล
+    <div className="relative rounded-xl border border-border bg-card p-4">
+      <CardHead code={doc.code} at={doc.createdAt} href={`/stock/inbound/${doc.id}`} />
 
       <CardBox className="mt-3">
         <p className="font-medium">
@@ -192,7 +212,8 @@ function InboundCard({ doc }: { doc: InboundDoc }) {
 
       <Separator className="mt-3" />
 
-      <div className="mt-3 flex justify-end">
+      {/* z-10 ให้ปุ่มลอยเหนือลิงก์ที่คลุมทั้งใบ ไม่งั้นกดไม่โดน */}
+      <div className="relative z-10 mt-3 flex justify-end">
         <Button asChild variant="outline-primary" size="sm">
           <Link href={`/stock/inbound/${doc.id}/add`}>รับเข้า</Link>
         </Button>

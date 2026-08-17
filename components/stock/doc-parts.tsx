@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { ChevronLeftIcon, ChevronRightIcon } from "lucide-react";
 import { Badge } from "@peckey954/ui/components/ui/badge";
 import { Button } from "@peckey954/ui/components/ui/button";
@@ -25,11 +26,34 @@ export function CardBox({
   );
 }
 
-/** แถวหัวการ์ด — เลขที่เอกสารซ้าย เวลาขวา */
-export function CardHead({ code, at }: { code: string; at: string }) {
+/**
+ * แถวหัวการ์ด — เลขที่เอกสารซ้าย เวลาขวา
+ *
+ * ส่ง href มาแล้วเลขที่เอกสารกลายเป็นลิงก์ที่ขยายพื้นที่กดคลุมทั้งการ์ด
+ * (การ์ดที่ครอบต้องมี relative) ทำแบบนี้แทนการเอา <a> ครอบทั้งใบ
+ * เพราะในการ์ดมักมีปุ่มอยู่ด้วย ซึ่งซ้อนในลิงก์ไม่ได้
+ */
+export function CardHead({
+  code,
+  at,
+  href,
+}: {
+  code: string;
+  at: string;
+  href?: string;
+}) {
   return (
     <div className="flex flex-wrap items-baseline justify-between gap-2">
-      <span className="font-semibold">{code}</span>
+      {href ? (
+        <Link
+          href={href}
+          className="font-semibold after:absolute after:inset-0 focus-visible:outline-none"
+        >
+          {code}
+        </Link>
+      ) : (
+        <span className="font-semibold">{code}</span>
+      )}
       <span className="text-sm text-muted-foreground">{at}</span>
     </div>
   );
