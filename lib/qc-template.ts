@@ -52,6 +52,57 @@ export const VERDICT_LABEL: Record<VerdictMode, string> = {
   manual: "ผู้ตรวจติ๊กเอง",
 };
 
+// ---------------------------------------------------------------
+// พรีเซ็ต — รวมสองแกน (คีย์อะไร + ตัดสินยังไง) เป็นตัวเลือกเดียว
+// คนตั้งค่าจริงคิดเป็น "ข้อนี้เป็นแบบไหน" ไม่ได้คิดแยกสองแกนอิสระ
+// เลือกไม่ตรงพรีเซ็ตไหนเลยค่อยสลับไป "กำหนดเอง" แล้วเห็นตัวควบคุมดิบ
+// ทั้งสองแกนเหมือนเดิม ไม่เสียความละเอียดของโมเดลเดิมไปแม้แต่น้อย
+// ---------------------------------------------------------------
+
+export type CapturePreset =
+  | "tickOnly"
+  | "numberAuto"
+  | "numberManual"
+  | "textOnly"
+  | "custom";
+
+export const CAPTURE_PRESET_LABEL: Record<
+  Exclude<CapturePreset, "custom">,
+  string
+> = {
+  tickOnly: "ติ๊กผ่าน/ไม่ผ่านอย่างเดียว",
+  numberAuto: "กรอกตัวเลข — ระบบตัดสินเอง",
+  numberManual: "กรอกตัวเลข — ผู้ตรวจติ๊กเอง",
+  textOnly: "กรอกข้อความอย่างเดียว",
+};
+
+const CAPTURE_PRESET_VALUES: Record<
+  Exclude<CapturePreset, "custom">,
+  { capture: CaptureMode; verdict: VerdictMode }
+> = {
+  tickOnly: { capture: "none", verdict: "manual" },
+  numberAuto: { capture: "number", verdict: "auto" },
+  numberManual: { capture: "number", verdict: "manual" },
+  textOnly: { capture: "text", verdict: "none" },
+};
+
+/** หาว่าหัวข้อนี้ตรงกับพรีเซ็ตไหน — ไม่ตรงเลยถือว่า "กำหนดเอง" */
+export function matchCapturePreset(
+  item: Pick<QcItem, "capture" | "verdict">
+): CapturePreset {
+  const found = (
+    Object.keys(CAPTURE_PRESET_VALUES) as Exclude<CapturePreset, "custom">[]
+  ).find((key) => {
+    const v = CAPTURE_PRESET_VALUES[key];
+    return v.capture === item.capture && v.verdict === item.verdict;
+  });
+  return found ?? "custom";
+}
+
+export function capturePresetValue(preset: Exclude<CapturePreset, "custom">) {
+  return CAPTURE_PRESET_VALUES[preset];
+}
+
 /** คำที่ใช้เรียกสองขั้วของผลตรวจ */
 export type VerdictWording = "passFail" | "normalAbnormal";
 
@@ -124,6 +175,8 @@ export type QcTemplate = {
   roles: string[];
   headerFields: HeaderField[];
   items: QcItem[];
+  /** เปิดให้ผู้ตรวจเพิ่มหัวข้อเองตอนตรวจจริง — แทนบรรทัดว่าง "อื่นๆ" ที่เขียนมือในฟอร์มกระดาษ */
+  allowAdHocItems: boolean;
   failActions: FailAction[];
   requireFailAction: boolean;
   signature: {
@@ -164,6 +217,22 @@ export function newItem(): QcItem {
 
 export function newColumn(): MeasureColumn {
   return { id: uid("col"), label: "", unit: "" };
+}
+
+/**
+ * คัดลอกหัวข้อทั้งก้อนพร้อมหัวข้อย่อย — ได้ id ใหม่หมดทุกชั้น ไม่ชนของเดิม
+ * ใช้ตอนฟอร์มมีหลายข้อโครงสร้างเหมือนกัน (เช่นข้อติ๊กผ่าน/ไม่ผ่านเรียงกันหลายข้อ)
+ * เรียกได้เฉพาะใน event handler เท่านั้น เพราะข้างในเรียก uid()
+ */
+export function cloneItemDeep(item: QcItem): QcItem {
+  return {
+    ...item,
+    id: uid("item"),
+    title: item.title ? `${item.title} (คัดลอก)` : item.title,
+    columns: item.columns.map((c) => ({ ...c, id: uid("col") })),
+    rule: { ...item.rule },
+    children: item.children.map(cloneItemDeep),
+  };
 }
 
 export function newHeaderField(): HeaderField {
@@ -385,6 +454,9 @@ export const SEED_TEMPLATE: QcTemplate = {
       children: [],
     },
   ],
+
+  // ฟอร์มกระดาษต้นแบบมีบรรทัดว่าง "อื่นๆ" ให้เขียนเพิ่มเองท้ายตาราง
+  allowAdHocItems: true,
 
   failActions: [
     { id: "fa-1", label: "Repack" },

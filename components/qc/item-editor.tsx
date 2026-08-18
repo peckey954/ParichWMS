@@ -4,6 +4,7 @@ import * as React from "react";
 import {
   ChevronDownIcon,
   ChevronUpIcon,
+  CopyIcon,
   PlusIcon,
   SettingsIcon,
   Trash2Icon,
@@ -38,13 +39,18 @@ import {
 import { cn } from "@peckey954/ui/lib/utils";
 import {
   CAPTURE_LABEL,
+  CAPTURE_PRESET_LABEL,
   RULE_OP_LABEL,
   VERDICT_LABEL,
   VERDICT_WORDING_LABEL,
+  capturePresetValue,
+  cloneItemDeep,
   describeBehaviour,
   describeRule,
+  matchCapturePreset,
   newColumn,
   newItem,
+  type CapturePreset,
   type CaptureMode,
   type QcItem,
   type RuleOp,
@@ -68,6 +74,7 @@ export function ItemEditor({
   onPatch,
   onMove,
   onRemove,
+  onDuplicate,
 }: {
   item: QcItem;
   index: number;
@@ -76,10 +83,15 @@ export function ItemEditor({
   onPatch: (patch: Partial<QcItem>) => void;
   onMove: (dir: -1 | 1) => void;
   onRemove: () => void;
+  onDuplicate: () => void;
 }) {
   const [open, setOpen] = React.useState(false);
+  // เลือก "กำหนดเอง" เองทั้งที่ค่าปัจจุบันตรงกับพรีเซ็ตพอดี (เช่น หัวข้อใหม่ที่ยังไม่ได้แก้)
+  // ต้องมีสถานะแยกไว้ ไม่งั้น dropdown จะเด้งกลับไปโชว์ชื่อพรีเซ็ตทันทีเพราะยังไม่มีอะไรเปลี่ยน
+  const [forceCustom, setForceCustom] = React.useState(false);
   const isChild = depth > 0;
   const isMeasure = item.capture === "number";
+  const preset = forceCustom ? "custom" : matchCapturePreset(item);
 
   const patchColumn = (id: string, p: Partial<QcItem["columns"][number]>) =>
     onPatch({
@@ -133,6 +145,14 @@ export function ItemEditor({
             <Button
               variant="ghost"
               size="icon-sm"
+              aria-label="คัดลอกหัวข้อนี้"
+              onClick={onDuplicate}
+            >
+              <CopyIcon />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon-sm"
               aria-label="ลบหัวข้อ"
               onClick={onRemove}
             >
@@ -141,16 +161,25 @@ export function ItemEditor({
           </div>
         </div>
 
-        {/* ---- 2 แกนอิสระ: คีย์ค่าอะไร / ตัดสินยังไง ---- */}
+        {/* ---- รูปแบบหัวข้อ — พรีเซ็ตรวมสองแกนเดิม (คีย์อะไร/ตัดสินยังไง)
+             ให้เลือกทีเดียวจบสำหรับ 4 แบบที่พบบ่อยสุด ไม่ตรงพรีเซ็ตไหนค่อย
+             สลับ "กำหนดเอง" แล้วเห็นตัวควบคุมดิบทั้งสองแกนเหมือนเดิม ---- */}
         <div className="grid gap-3 pl-9 @2xl:grid-cols-3">
           <div className="space-y-2">
-            <Label htmlFor={`${item.id}-capture`}>ผู้ตรวจต้องคีย์อะไร</Label>
+            <Label htmlFor={`${item.id}-preset`}>รูปแบบหัวข้อนี้</Label>
             <Select
-              value={item.capture}
+              value={preset}
               onValueChange={(v) => {
-                const capture = v as CaptureMode;
+                const next = v as CapturePreset;
+                if (next === "custom") {
+                  setForceCustom(true);
+                  return;
+                }
+                setForceCustom(false);
+                const { capture, verdict } = capturePresetValue(next);
                 onPatch({
                   capture,
+                  verdict,
                   columns:
                     capture === "number" && item.columns.length === 0
                       ? [newColumn()]
@@ -158,41 +187,79 @@ export function ItemEditor({
                 });
               }}
             >
-              <SelectTrigger id={`${item.id}-capture`} className="w-full">
+              <SelectTrigger id={`${item.id}-preset`} className="w-full">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {(Object.keys(CAPTURE_LABEL) as CaptureMode[]).map((c) => (
-                  <SelectItem key={c} value={c}>
-                    {CAPTURE_LABEL[c]}
+                {(
+                  Object.keys(CAPTURE_PRESET_LABEL) as Exclude<
+                    CapturePreset,
+                    "custom"
+                  >[]
+                ).map((p) => (
+                  <SelectItem key={p} value={p}>
+                    {CAPTURE_PRESET_LABEL[p]}
                   </SelectItem>
                 ))}
+                <SelectItem value="custom">กำหนดเอง</SelectItem>
               </SelectContent>
             </Select>
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor={`${item.id}-verdict`}>ตัดสินผ่าน/ไม่ผ่านยังไง</Label>
-            <Select
-              value={item.verdict}
-              onValueChange={(v) => onPatch({ verdict: v as VerdictMode })}
-            >
-              <SelectTrigger id={`${item.id}-verdict`} className="w-full">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {(Object.keys(VERDICT_LABEL) as VerdictMode[]).map((v) => (
-                  <SelectItem
-                    key={v}
-                    value={v}
-                    disabled={v === "auto" && item.capture !== "number"}
-                  >
-                    {VERDICT_LABEL[v]}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+          {preset === "custom" && (
+            <>
+              <div className="space-y-2">
+                <Label htmlFor={`${item.id}-capture`}>ผู้ตรวจต้องคีย์อะไร</Label>
+                <Select
+                  value={item.capture}
+                  onValueChange={(v) => {
+                    const capture = v as CaptureMode;
+                    onPatch({
+                      capture,
+                      columns:
+                        capture === "number" && item.columns.length === 0
+                          ? [newColumn()]
+                          : item.columns,
+                    });
+                  }}
+                >
+                  <SelectTrigger id={`${item.id}-capture`} className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {(Object.keys(CAPTURE_LABEL) as CaptureMode[]).map((c) => (
+                      <SelectItem key={c} value={c}>
+                        {CAPTURE_LABEL[c]}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor={`${item.id}-verdict`}>ตัดสินผ่าน/ไม่ผ่านยังไง</Label>
+                <Select
+                  value={item.verdict}
+                  onValueChange={(v) => onPatch({ verdict: v as VerdictMode })}
+                >
+                  <SelectTrigger id={`${item.id}-verdict`} className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {(Object.keys(VERDICT_LABEL) as VerdictMode[]).map((v) => (
+                      <SelectItem
+                        key={v}
+                        value={v}
+                        disabled={v === "auto" && item.capture !== "number"}
+                      >
+                        {VERDICT_LABEL[v]}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </>
+          )}
 
           {item.verdict === "manual" && (
             <div className="space-y-2">
@@ -501,6 +568,11 @@ export function ItemEditor({
                             ),
                           })
                         }
+                        onDuplicate={() => {
+                          const children = [...item.children];
+                          children.splice(ci + 1, 0, cloneItemDeep(child));
+                          onPatch({ children });
+                        }}
                       />
                     ))}
                   </div>

@@ -35,6 +35,7 @@ import { Empty, EmptyDescription, EmptyTitle } from "@peckey954/ui/components/ui
 import { Input } from "@peckey954/ui/components/ui/input";
 import { Label } from "@peckey954/ui/components/ui/label";
 import { MultiSelect } from "@peckey954/ui/components/ui/multi-select";
+import { Separator } from "@peckey954/ui/components/ui/separator";
 import { Switch } from "@peckey954/ui/components/ui/switch";
 import {
   Table,
@@ -54,6 +55,7 @@ import {
   PUBLISHED_VERSIONS,
   ROLE_OPTIONS,
   SEED_TEMPLATE,
+  cloneItemDeep,
   findOverlaps,
   newItem,
   type QcItem,
@@ -77,6 +79,17 @@ export default function QcSetupPage() {
       if (j < 0 || j >= t.items.length) return t;
       const items = [...t.items];
       [items[i], items[j]] = [items[j], items[i]];
+      return { ...t, items };
+    });
+
+  // แทรกสำเนาต่อท้ายต้นฉบับทันที ไม่ใช่ท้ายรายการ — หัวข้อที่โครงเหมือนกัน
+  // มักอยู่ติดกันในฟอร์มจริง (เช่นข้อ 3–7 ในฟอร์มกระดาษต้นแบบ)
+  const duplicateItem = (id: string) =>
+    setTpl((t) => {
+      const i = t.items.findIndex((it) => it.id === id);
+      if (i < 0) return t;
+      const items = [...t.items];
+      items.splice(i + 1, 0, cloneItemDeep(t.items[i]));
       return { ...t, items };
     });
 
@@ -366,6 +379,7 @@ export default function QcSetupPage() {
                           items: tpl.items.filter((x) => x.id !== item.id),
                         })
                       }
+                      onDuplicate={() => duplicateItem(item.id)}
                     />
                   ))
                 )}
@@ -387,6 +401,24 @@ export default function QcSetupPage() {
                     </AlertDescription>
                   </Alert>
                 )}
+
+                <Separator />
+                <div className="flex items-start justify-between gap-4">
+                  <div className="space-y-0.5">
+                    <Label htmlFor="allow-adhoc">
+                      ผู้ตรวจเพิ่มหัวข้อเองได้ระหว่างตรวจ
+                    </Label>
+                    <p className="text-sm text-muted-foreground">
+                      แทนบรรทัดว่าง &quot;อื่นๆ&quot; ท้ายฟอร์มกระดาษ — เปิดไว้ถ้าฟอร์มนี้
+                      มีเคสที่ตั้งเป็นหัวข้อตายตัวล่วงหน้าไม่ได้ทั้งหมด
+                    </p>
+                  </div>
+                  <Switch
+                    id="allow-adhoc"
+                    checked={tpl.allowAdHocItems}
+                    onCheckedChange={(c) => patch({ allowAdHocItems: c })}
+                  />
+                </div>
               </CardContent>
             </Card>
 

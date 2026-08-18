@@ -1,6 +1,7 @@
 "use client";
 
-import { CircleDashedIcon, PlusIcon } from "lucide-react";
+import * as React from "react";
+import { CircleDashedIcon, PlusIcon, Trash2Icon } from "lucide-react";
 import { Badge } from "@peckey954/ui/components/ui/badge";
 import { Button } from "@peckey954/ui/components/ui/button";
 import { Card, CardContent } from "@peckey954/ui/components/ui/card";
@@ -142,6 +143,9 @@ export function FormPreview({ template }: { template: QcTemplate }) {
         );
       })}
 
+      {/* ---------- อื่นๆ — แทนบรรทัดว่างท้ายฟอร์มกระดาษ ---------- */}
+      {template.allowAdHocItems && <AdHocItemsPreview />}
+
       {/* ---------- หมายเหตุรวม ---------- */}
       <div className="space-y-2">
         <Label htmlFor="preview-note">
@@ -193,6 +197,60 @@ export function FormPreview({ template }: { template: QcTemplate }) {
           <SignatureSlot label="ผู้อนุมัติ" hint="ต้องมีหัวหน้ากดอนุมัติอีกชั้น" />
         )}
       </div>
+    </div>
+  );
+}
+
+/**
+ * หัวข้อที่ผู้ตรวจพิมพ์เองระหว่างตรวจจริง — คนละแบบกับหัวข้อที่ตั้งไว้ล่วงหน้า
+ * ในตัวสร้าง จึงเริ่มจากศูนย์แถวเสมอ ไม่มีอะไรให้ preview ล่วงหน้า
+ * นอกจากปุ่ม "เพิ่มรายการ" ที่ผู้ตรวจจะเห็นตอนใช้งานจริง
+ */
+function AdHocItemsPreview() {
+  const [rows, setRows] = React.useState<number[]>([]);
+  const nextId = React.useRef(0);
+
+  return (
+    <div className="space-y-3">
+      <Separator />
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <Label>อื่น ๆ</Label>
+          <p className="text-sm text-muted-foreground">
+            ผู้ตรวจเพิ่มหัวข้อตรวจเองได้ระหว่างตรวจจริง
+          </p>
+        </div>
+        <Button
+          variant="outline-primary"
+          size="sm"
+          onClick={() => {
+            nextId.current += 1;
+            setRows((r) => [...r, nextId.current]);
+          }}
+        >
+          <PlusIcon />
+          เพิ่มรายการ
+        </Button>
+      </div>
+
+      {rows.length > 0 && (
+        <div className="space-y-2">
+          {rows.map((id) => (
+            <div key={id} className="flex items-center gap-2">
+              <Input placeholder="ระบุหัวข้อตรวจ" className="flex-1" />
+              <TickChoice id={`adhoc-${id}`} pass="ผ่าน" fail="ไม่ผ่าน" />
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                aria-label="ลบรายการ"
+                onClick={() => setRows((r) => r.filter((x) => x !== id))}
+              >
+                <Trash2Icon />
+              </Button>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
