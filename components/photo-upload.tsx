@@ -1,7 +1,14 @@
 "use client";
 
 import * as React from "react";
-import { ImageIcon, PlusIcon, RotateCwIcon, XIcon } from "lucide-react";
+import {
+  ChevronLeftIcon,
+  ChevronRightIcon,
+  CirclePlusIcon,
+  ImageIcon,
+  RotateCwIcon,
+  XIcon,
+} from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -20,6 +27,9 @@ import { cn } from "@peckey954/ui/lib/utils";
 
    กดที่รูปแล้วเปิดดูเต็มจอ เพราะรูปย่อ 96px ดูไม่ออกว่าของเสียหายตรงไหน
    ซึ่งเป็นเหตุผลเดียวที่ต้องแนบรูปตั้งแต่แรก
+
+   ในกล่องดูเต็มจอเลื่อนดูรูปอื่นต่อได้เลย ไม่ต้องปิดแล้วกดรูปถัดไปทีละใบ
+   ของเสียหายมักถ่ายมาหลายมุมของกองเดียวกัน คนดูจะไล่ดูติดกันเป็นชุด
 ------------------------------------------------------------------ */
 
 /** ขีดจำกัดของไฟล์ที่รับได้ — ตรงกับข้อความที่โชว์ตอนไฟล์ใหญ่เกิน */
@@ -49,7 +59,20 @@ export function PhotoUpload({
   label?: string;
 }) {
   const inputRef = React.useRef<HTMLInputElement>(null);
-  const [preview, setPreview] = React.useState<Photo | null>(null);
+  // เก็บเป็น id ไม่ใช่ตัวรูป เพราะรายการเปลี่ยนได้ระหว่างที่กล่องเปิดอยู่
+  const [previewId, setPreviewId] = React.useState<string | null>(null);
+
+  // เลื่อนได้เฉพาะรูปที่อัปเสร็จแล้ว กรอบที่ยังโหลดอยู่หรือพังไม่มีอะไรให้ดู
+  const viewable = photos.filter((p) => p.status === "done" && p.url);
+  const index = viewable.findIndex((p) => p.id === previewId);
+  const preview = index >= 0 ? viewable[index] : null;
+
+  // วนกลับหัวท้าย ไล่ดูรูปสุดท้ายแล้วกดต่อได้เลยไม่ต้องย้อนกลับทั้งชุด
+  const step = (delta: number) => {
+    if (viewable.length === 0) return;
+    const next = (index + delta + viewable.length) % viewable.length;
+    setPreviewId(viewable[next].id);
+  };
 
   return (
     <>
@@ -58,13 +81,15 @@ export function PhotoUpload({
           type="button"
           onClick={() => inputRef.current?.click()}
           className={cn(
+            // เส้นประตามคอมโพเนนต์ในไฟล์ออกแบบ — บอกว่ากล่องนี้ยังว่าง รอของมาใส่
+            // ต่างจากกรอบรูปที่มีของแล้วซึ่งเป็นเส้นทึบ
             "flex size-24 shrink-0 flex-col items-center justify-center gap-1.5 rounded-lg",
-            "border border-primary bg-brand text-sm font-medium text-primary",
+            "border border-dashed border-primary bg-brand text-sm font-medium text-primary",
             "transition-colors hover:bg-accent-hover",
             "focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none"
           )}
         >
-          <PlusIcon className="size-5" />
+          <CirclePlusIcon className="size-6" strokeWidth={1.5} />
           {label}
         </button>
 
@@ -87,7 +112,7 @@ export function PhotoUpload({
             photo={p}
             onRemove={() => onRemove(p.id)}
             onRetry={() => onRetry(p.id)}
-            onOpen={() => p.status === "done" && setPreview(p)}
+            onOpen={() => p.status === "done" && setPreviewId(p.id)}
           />
         ))}
       </div>
@@ -95,27 +120,76 @@ export function PhotoUpload({
       {/* ดูเต็มจอ — รูปย่อ 96px ดูไม่ออกว่าของเสียหายตรงไหน */}
       <Dialog
         open={preview !== null}
-        onOpenChange={(v) => !v && setPreview(null)}
+        onOpenChange={(v) => !v && setPreviewId(null)}
       >
         <DialogContent
           aria-describedby={undefined}
-          className="max-w-3xl gap-0 overflow-hidden p-0"
+          className="max-w-3xl gap-0"
+          onKeyDown={(e) => {
+            if (e.key === "ArrowLeft") step(-1);
+            if (e.key === "ArrowRight") step(1);
+          }}
         >
-          <DialogTitle className="px-4 py-3 text-base">
+          <DialogTitle className="pr-8 text-base">
             {preview?.name}
+            {viewable.length > 1 && (
+              <span className="ml-2 text-sm font-normal text-muted-foreground tabular-nums">
+                {index + 1} / {viewable.length}
+              </span>
+            )}
           </DialogTitle>
-          {preview?.url && (
-            // ไฟล์มาจาก blob URL ในเครื่อง next/image ปรับขนาดให้ไม่ได้
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={preview.url}
-              alt={preview.name}
-              className="max-h-[75vh] w-full bg-secondary object-contain"
-            />
-          )}
+
+          {/* กรอบรูปมีระยะห่างจากขอบกล่องเหมือน modal อื่นในระบบ
+              ไม่ใช่รูปเต็มขอบซึ่งดูเหมือนรูปหลุดกรอบ */}
+          <div className="relative mt-2 overflow-hidden rounded-lg bg-secondary">
+            {preview?.url && (
+              // ไฟล์มาจาก blob URL ในเครื่อง next/image ปรับขนาดให้ไม่ได้
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={preview.url}
+                alt={preview.name}
+                className="max-h-[70vh] w-full object-contain"
+              />
+            )}
+
+            {/* ปุ่มเลื่อนอยู่ทับบนรูป ไม่กินที่เพิ่ม และอยู่ตรงที่นิ้วโป้งเอื้อมถึง
+                มีต่อเมื่อมีรูปให้เลื่อนจริง รูปเดียวก็ไม่ต้องมีปุ่มหลอกให้กด */}
+            {viewable.length > 1 && (
+              <>
+                <NavButton side="left" onClick={() => step(-1)} />
+                <NavButton side="right" onClick={() => step(1)} />
+              </>
+            )}
+          </div>
         </DialogContent>
       </Dialog>
     </>
+  );
+}
+
+function NavButton({
+  side,
+  onClick,
+}: {
+  side: "left" | "right";
+  onClick: () => void;
+}) {
+  const Icon = side === "left" ? ChevronLeftIcon : ChevronRightIcon;
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label={side === "left" ? "รูปก่อนหน้า" : "รูปถัดไป"}
+      className={cn(
+        "absolute top-1/2 flex size-10 -translate-y-1/2 items-center justify-center rounded-full",
+        "border border-border bg-card/90 text-foreground shadow-sm backdrop-blur",
+        "transition-colors hover:bg-card",
+        "focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none",
+        side === "left" ? "left-3" : "right-3"
+      )}
+    >
+      <Icon className="size-5" />
+    </button>
   );
 }
 
