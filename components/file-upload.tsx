@@ -44,6 +44,7 @@ export function FileUpload({
   onAdd,
   onRemove,
   onRetry,
+  onOpen,
 }: {
   title: string;
   /** ข้อความในช่องลากไฟล์ บอกว่าช่องนี้รับเอกสารใบไหน */
@@ -52,6 +53,8 @@ export function FileUpload({
   onAdd: (files: FileList) => void;
   onRemove: (id: string) => void;
   onRetry: (id: string) => void;
+  /** กดการ์ดแล้วเปิดดูเต็มจอ ไม่ส่งมาก็เป็นการ์ดอ่านอย่างเดียว */
+  onOpen?: (id: string) => void;
 }) {
   const inputRef = React.useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = React.useState(false);
@@ -130,6 +133,7 @@ export function FileUpload({
             file={f}
             onRemove={() => onRemove(f.id)}
             onRetry={() => onRetry(f.id)}
+            onOpen={onOpen && (() => onOpen(f.id))}
           />
         ))}
       </div>
@@ -141,12 +145,16 @@ function DocCard({
   file: f,
   onRemove,
   onRetry,
+  onOpen,
 }: {
   file: DocFile;
   onRemove: () => void;
   onRetry: () => void;
+  onOpen?: () => void;
 }) {
   const bad = f.status === "tooLarge" || f.status === "failed";
+  // กดเปิดได้เฉพาะไฟล์ที่ขึ้นครบแล้ว ที่ยังโหลดอยู่หรือพังไม่มีอะไรให้ดู
+  const openable = f.status === "done" && onOpen;
 
   return (
     <div className="relative w-[7.5rem] shrink-0">
@@ -170,6 +178,19 @@ function DocCard({
               {f.status === "tooLarge"
                 ? `ขนาดไฟล์เกิน ${MAX_DOC_MB} MB`
                 : "อัปโหลดไม่สำเร็จ"}
+            </span>
+          </button>
+        ) : openable ? (
+          <button
+            type="button"
+            onClick={onOpen}
+            aria-label={`ดูเอกสาร ${f.name}`}
+            className="flex size-full flex-col items-center justify-center gap-2 rounded-md transition-colors hover:bg-brand-hover focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none"
+          >
+            <FileTextIcon className="size-8 text-primary" strokeWidth={1.5} />
+            <span className="line-clamp-2 text-xs font-medium">{f.name}</span>
+            <span className="text-xs text-muted-foreground">
+              {formatFileSize(f.size)}
             </span>
           </button>
         ) : (
@@ -218,8 +239,8 @@ function DocCard({
  * แยกเป็น hook เพราะหน้าหนึ่งมีหลายช่อง (ของพาริช / ของผู้ขาย / บัตรคนขับ)
  * ทั้งสามช่องมีกฎเหมือนกันเป๊ะ ต่างกันแค่ชื่อ ไม่ควรเขียนซ้ำสามรอบ
  */
-export function useDocUpload() {
-  const [files, setFiles] = React.useState<DocFile[]>([]);
+export function useDocUpload(seed: DocFile[] = []) {
+  const [files, setFiles] = React.useState<DocFile[]>(seed);
   const seq = React.useRef(0);
 
   // ไม่มีหลังบ้านจริง — ไต่ความคืบหน้าให้เห็นว่าอัปอยู่

@@ -30,7 +30,12 @@ import {
 import { Textarea } from "@peckey954/ui/components/ui/textarea";
 import { cn } from "@peckey954/ui/lib/utils";
 import { toast } from "sonner";
-import { FileUpload, useDocUpload } from "@/components/file-upload";
+import {
+  FileUpload,
+  useDocUpload,
+  type DocFile,
+} from "@/components/file-upload";
+import { FileViewer, type ViewerFile } from "@/components/file-viewer";
 import { useNumberField } from "@/components/number-field";
 
 /* ------------------------------------------------------------------
@@ -58,6 +63,38 @@ const ORDER = {
 /** ช่วงเวลาที่ให้เลือก — ชั่งจริงลงเป็นชั่วโมง ไม่ได้ละเอียดถึงนาที */
 const TIMES = Array.from({ length: 15 }, (_, i) => `${String(i + 6).padStart(2, "0")}:00`);
 
+/** ไฟล์ตัวอย่างที่ถือว่าอัปเสร็จแล้ว — ยังไม่มีหลังบ้าน ใช้โชว์ตัวอ่านเอกสาร */
+function seedDocs(prefix: string, names: string[]): DocFile[] {
+  return names.map((name, i) => ({
+    id: `${prefix}-${i + 1}`,
+    name,
+    size: 6_900_000,
+    status: "done",
+    progress: 100,
+  }));
+}
+
+/**
+ * แปลงไฟล์ที่แนบเป็นข้อมูลของตัวอ่าน
+ *
+ * จำนวนหน้าคำนวณจากขนาดไฟล์ให้ได้ค่าเดิมทุกครั้ง ไม่ใช่สุ่ม
+ * สุ่มตอนเรนเดอร์แล้วค่าฝั่งเซิร์ฟเวอร์กับเบราว์เซอร์ไม่ตรงกัน hydration พัง
+ */
+function toViewer(files: DocFile[], group: string): ViewerFile[] {
+  return files
+    .filter((f) => f.status === "done")
+    .map((f) => {
+      const image = /\.(png|jpe?g)$/i.test(f.name);
+      return {
+        id: f.id,
+        name: f.name,
+        group,
+        kind: image ? ("image" as const) : ("pdf" as const),
+        pages: image ? 1 : Math.max(1, Math.min(12, Math.round(f.size / 2_000_000))),
+      };
+    });
+}
+
 const formatTon = (v: number) =>
   v.toLocaleString("th-TH", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
@@ -74,9 +111,19 @@ export default function AddWeighingPage() {
   const [supplierTon, setSupplierTon] = React.useState(50);
   const [note, setNote] = React.useState("");
 
-  const parichDocs = useDocUpload();
-  const supplierDocs = useDocUpload();
-  const idCardDocs = useDocUpload();
+  // ไฟล์ตัวอย่างที่แนบไว้แล้ว จะได้กดดูตัวอ่านเอกสารได้ทันทีโดยไม่ต้องอัปก่อน
+  const parichDocs = useDocUpload(seedDocs("wp", ["ใบชั่งเข้า-PO260116.pdf", "ใบชั่งออก-PO260116.pdf"]));
+  const supplierDocs = useDocUpload(seedDocs("ws", ["ใบชั่งผู้ขาย-HC-8842.pdf", "ใบกำกับสินค้า-HC-8842.pdf", "รูปหน้าตาชั่ง.jpg"]));
+  const idCardDocs = useDocUpload(seedDocs("wi", ["สำเนาบัตร-คนขับ.pdf"]));
+
+  const [openFileId, setOpenFileId] = React.useState<string | null>(null);
+
+  // รวมไฟล์ทั้งสามช่องเป็นชุดเดียวให้ตัวอ่าน แต่ยังคงที่มาไว้เพื่อจัดกลุ่มในราง
+  const viewerFiles: ViewerFile[] = [
+    ...toViewer(parichDocs.files, "เอกสารของพาริช"),
+    ...toViewer(supplierDocs.files, "เอกสารของผู้ขาย"),
+    ...toViewer(idCardDocs.files, "สำเนาบัตรประชาชนคนขับ"),
+  ];
 
   // คำนวณสดจากช่องที่กรอกอยู่ กรอกผิดจะเห็นส่วนต่างเพี้ยนทันที
   const netTon = Math.max(0, grossTon - tareTon);
@@ -280,6 +327,7 @@ export default function AddWeighingPage() {
             onAdd={parichDocs.add}
             onRemove={parichDocs.remove}
             onRetry={parichDocs.retry}
+            onOpen={setOpenFileId}
           />
           <FileUpload
             title="เอกสารชั่งน้ำหนักของผู้ขาย"
@@ -288,6 +336,7 @@ export default function AddWeighingPage() {
             onAdd={supplierDocs.add}
             onRemove={supplierDocs.remove}
             onRetry={supplierDocs.retry}
+            onOpen={setOpenFileId}
           />
           <FileUpload
             title="เอกสารสำเนาบัตรประชาชนคนขับ"
@@ -296,8 +345,14 @@ export default function AddWeighingPage() {
             onAdd={idCardDocs.add}
             onRemove={idCardDocs.remove}
             onRetry={idCardDocs.retry}
+            onOpen={setOpenFileId}
           />
         </div>
+        <FileViewer
+          files={viewerFiles}
+          openId={openFileId}
+          onOpenChange={setOpenFileId}
+        />
       </main>
 
       {/* ---------- แถบปุ่มล่าง ----------
