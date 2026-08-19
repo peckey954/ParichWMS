@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import Link from "next/link";
 import {
   ArrowRightLeftIcon,
   PlusIcon,
@@ -209,13 +210,23 @@ export default function WeighingPage() {
               แนบเอกสารครบแล้ว {totals.docsComplete} จาก {totals.totalTrucks} คัน
             </p>
           </div>
-          <Button
-            variant="outline-primary"
-            onClick={() => patch({ trucks: [...sheet.trucks, newTruck()] })}
-          >
-            <PlusIcon />
-            เพิ่มรถบรรทุก
-          </Button>
+          {/* หน้ากรอกเต็มมีที่ให้แนบเอกสารสามชุดกับเวลาชั่งเข้า/ออก
+              แถวในตารางใส่ได้แค่ตัวเลข จึงต้องมีทางไปหน้ากรอกจริงด้วย */}
+          <div className="flex flex-wrap items-center gap-3">
+            <Button
+              variant="outline-primary"
+              onClick={() => patch({ trucks: [...sheet.trucks, newTruck()] })}
+            >
+              <PlusIcon />
+              เพิ่มรถบรรทุก
+            </Button>
+            <Button asChild>
+              <Link href="/weighing/add">
+                <PlusIcon />
+                เพิ่มการชั่งน้ำหนัก
+              </Link>
+            </Button>
+          </div>
         </div>
 
         <Card className="mt-4 py-0">
