@@ -85,8 +85,11 @@ export function FileUpload({
           }}
           className={cn(
             // เส้นประบอกว่ากล่องนี้ยังว่าง รอของมาใส่ — ชุดเดียวกับช่องแนบรูป
-            "flex min-h-[9.5rem] w-full flex-col items-center justify-center gap-2 rounded-lg px-4 py-5",
-            "border border-dashed text-center @2xl:w-[26rem]",
+            // เรียงแนวนอน ไอคอนซ้าย ข้อความกับปุ่มขวา
+            // เพราะต้องเตี้ยเท่าการ์ดไฟล์ (96px) ซึ่งวางแนวตั้งแล้วไม่พอที่
+            // และความกว้าง 26rem ที่มีอยู่ก็เหลือใช้อยู่แล้ว
+            "flex size-24 h-24 w-full items-center gap-3 rounded-lg px-4",
+            "border border-dashed @2xl:w-[26rem]",
             // ชี้หรือลากไฟล์มาวางแล้วส้มเข้มขึ้น ไม่ใช่หม่นลงเป็นเทา
             // ตอนลากคนมองอยู่ที่ปลายเมาส์ สีต้องเข้มขึ้นชัดว่าปล่อยตรงนี้ได้
             full
@@ -96,22 +99,28 @@ export function FileUpload({
           )}
         >
           <UploadIcon
-            className={cn("size-6", full ? "text-muted-foreground" : "text-primary")}
+            className={cn(
+              "size-6 shrink-0",
+              full ? "text-muted-foreground" : "text-primary"
+            )}
             strokeWidth={1.5}
           />
-          <p className="text-sm">
-            {full ? `แนบครบ ${MAX_DOC_COUNT} ไฟล์แล้ว` : dropLabel}
-          </p>
-          {!full && (
-            <Button
-              type="button"
-              variant="outline-primary"
-              size="sm"
-              onClick={() => inputRef.current?.click()}
-            >
-              อัปโหลดไฟล์
-            </Button>
-          )}
+          <div className="min-w-0 flex-1 text-left">
+            <p className="text-sm">
+              {full ? `แนบครบ ${MAX_DOC_COUNT} ไฟล์แล้ว` : dropLabel}
+            </p>
+            {!full && (
+              <Button
+                type="button"
+                variant="outline-primary"
+                size="sm"
+                className="mt-1.5"
+                onClick={() => inputRef.current?.click()}
+              >
+                อัปโหลดไฟล์
+              </Button>
+            )}
+          </div>
         </div>
 
         <input
@@ -157,10 +166,12 @@ function DocCard({
   const openable = f.status === "done" && onOpen;
 
   return (
-    <div className="relative w-[7.5rem] shrink-0">
+    // จตุรัส 96px — เท่ากับกรอบรูปในหน้าเพิ่มการรับเข้า
+    // ของเดิม 120x152 ซึ่งสูงกว่าที่จำเป็นและไม่ตรงกับที่อื่นในระบบ
+    <div className="relative size-24 shrink-0">
       <div
         className={cn(
-          "flex h-[9.5rem] w-full flex-col items-center justify-center gap-2 overflow-hidden rounded-lg border px-2 text-center",
+          "flex size-full flex-col items-center justify-center gap-1 overflow-hidden rounded-lg border px-1.5 text-center",
           bad ? "border-destructive bg-chip-red" : "border-border bg-card"
         )}
       >
@@ -170,11 +181,11 @@ function DocCard({
             onClick={onRetry}
             className="flex flex-col items-center gap-2 text-danger-strong"
           >
-            <RotateCwIcon className="size-6" />
-            <span className="line-clamp-2 text-xs font-medium text-foreground">
+            <RotateCwIcon className="size-5" />
+            <span className="line-clamp-2 text-[11px] leading-tight font-medium text-foreground">
               {f.name}
             </span>
-            <span className="text-xs font-medium">
+            <span className="text-[11px] leading-tight font-medium">
               {f.status === "tooLarge"
                 ? `ขนาดไฟล์เกิน ${MAX_DOC_MB} MB`
                 : "อัปโหลดไม่สำเร็จ"}
@@ -185,19 +196,23 @@ function DocCard({
             type="button"
             onClick={onOpen}
             aria-label={`ดูเอกสาร ${f.name}`}
-            className="flex size-full flex-col items-center justify-center gap-2 rounded-md transition-colors hover:bg-brand-hover focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none"
+            className="flex size-full flex-col items-center justify-center gap-1 rounded-md px-1.5 transition-colors hover:bg-brand-hover focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none"
           >
-            <FileTextIcon className="size-8 text-primary" strokeWidth={1.5} />
-            <span className="line-clamp-2 text-xs font-medium">{f.name}</span>
-            <span className="text-xs text-muted-foreground">
+            <FileTextIcon className="size-6 text-primary" strokeWidth={1.5} />
+            <span className="line-clamp-2 text-[11px] leading-tight font-medium">
+              {f.name}
+            </span>
+            <span className="text-[11px] leading-tight text-muted-foreground">
               {formatFileSize(f.size)}
             </span>
           </button>
         ) : (
           <>
-            <FileTextIcon className="size-8 text-primary" strokeWidth={1.5} />
-            <span className="line-clamp-2 text-xs font-medium">{f.name}</span>
-            <span className="text-xs text-muted-foreground">
+            <FileTextIcon className="size-6 text-primary" strokeWidth={1.5} />
+            <span className="line-clamp-2 text-[11px] leading-tight font-medium">
+              {f.name}
+            </span>
+            <span className="text-[11px] leading-tight text-muted-foreground">
               {formatFileSize(f.size)}
             </span>
           </>
