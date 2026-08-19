@@ -84,10 +84,12 @@ export function FileUpload({
             // เส้นประบอกว่ากล่องนี้ยังว่าง รอของมาใส่ — ชุดเดียวกับช่องแนบรูป
             "flex min-h-[9.5rem] w-full flex-col items-center justify-center gap-2 rounded-lg px-4 py-5",
             "border border-dashed text-center @2xl:w-[26rem]",
+            // ชี้หรือลากไฟล์มาวางแล้วส้มเข้มขึ้น ไม่ใช่หม่นลงเป็นเทา
+            // ตอนลากคนมองอยู่ที่ปลายเมาส์ สีต้องเข้มขึ้นชัดว่าปล่อยตรงนี้ได้
             full
               ? "border-border bg-muted text-muted-foreground"
-              : "border-primary bg-brand",
-            dragging && "border-primary bg-accent-hover"
+              : "border-primary bg-brand transition-colors hover:bg-brand-hover",
+            dragging && !full && "bg-brand-hover"
           )}
         >
           <UploadIcon

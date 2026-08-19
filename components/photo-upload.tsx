@@ -85,7 +85,8 @@ export function PhotoUpload({
             // ต่างจากกรอบรูปที่มีของแล้วซึ่งเป็นเส้นทึบ
             "flex size-24 shrink-0 flex-col items-center justify-center gap-1.5 rounded-lg",
             "border border-dashed border-primary bg-brand text-sm font-medium text-primary",
-            "transition-colors hover:bg-accent-hover",
+            // ชี้แล้วส้มเข้มขึ้น ไม่ใช่หม่นลงเป็นเทา ซึ่งอ่านเหมือนปุ่มถูกปิด
+            "transition-colors hover:bg-brand-hover",
             "focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none"
           )}
         >

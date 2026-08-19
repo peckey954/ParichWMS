@@ -132,6 +132,11 @@
   --chip-red-foreground: #dc2626;
   --chip-pink: #fdf2f8;
   --chip-pink-foreground: #ec4899;
+
+  /* พื้นแบรนด์เข้มขึ้นอีกขั้น สำหรับตอนชี้หรือลากไฟล์มาวาง
+     ของเดิมใช้ --accent-hover ซึ่งเป็นเบจอมเทา พอวางบนพื้นส้มอ่อนแล้ว
+     กลายเป็นสีหม่นลง ดูเหมือนปุ่มถูกปิดใช้งานแทนที่จะเป็นตอบสนอง */
+  --brand-hover: hsl(25 100% 94%);
 }
 
 /* โหมดมืดสลับหัวท้าย — พื้นเป็นเฉด 950 ตัวอักษรเป็นเฉด 300/400 ของสีเดียวกัน */
@@ -154,6 +159,8 @@
   --chip-red-foreground: #f87171;
   --chip-pink: #500724;
   --chip-pink-foreground: #f9a8d4;
+
+  --brand-hover: hsl(22.2 36% 19%);
 }
 
 /* ============================================================
@@ -212,6 +219,7 @@
 }
 
 @theme inline {
+  --color-brand-hover: var(--brand-hover);
   --color-surface: var(--surface);
   --color-danger-strong: var(--danger-strong);
   --color-success-strong: var(--success-strong);
