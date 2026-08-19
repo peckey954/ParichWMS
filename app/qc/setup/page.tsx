@@ -57,7 +57,9 @@ import {
   SEED_TEMPLATE,
   cloneItemDeep,
   findOverlaps,
+  hasNumericRule,
   newItem,
+  type ItemSettings,
   type QcItem,
   type QcTemplate,
 } from "@/lib/qc-template";
@@ -90,6 +92,29 @@ export default function QcSetupPage() {
       if (i < 0) return t;
       const items = [...t.items];
       items.splice(i + 1, 0, cloneItemDeep(t.items[i]));
+      return { ...t, items };
+    });
+
+  /**
+   * ยกรูปแบบการตรวจของข้อหนึ่งไปใช้กับทุกข้อในฟอร์ม
+   *
+   * ฟอร์มจริงส่วนใหญ่ตั้งเหมือนกันหมดทั้งใบ ต่างกันแค่ชื่อกับเกณฑ์
+   * ไม่มีปุ่มนี้แปลว่าต้องเปิดกล่องทีละข้อยี่สิบรอบเพื่อตั้งค่าเดียวกัน
+   *
+   * "ระบบตัดสิน" ไปกับข้อที่ไม่มีเกณฑ์ตัวเลขไม่ได้ ข้อนั้นจะไม่มีอะไรตัดสินให้เลย
+   * จึงลดให้เป็นผู้ตรวจติ๊กแทน ดีกว่าปล่อยให้ตั้งค่าที่ทำงานไม่ได้ค้างไว้
+   */
+  const applyToAll = (s: ItemSettings) =>
+    setTpl((t) => {
+      const items = t.items.map((it) => ({
+        ...it,
+        ...s,
+        verdict:
+          s.verdict === "auto" && !hasNumericRule(it) ? "manual" : s.verdict,
+      }));
+      toast.success(`ใช้รูปแบบการตรวจกับ ${items.length} หัวข้อแล้ว`, {
+        description: "หัวข้อย่อยยังเป็นค่าเดิม ตั้งแยกได้ในแต่ละข้อ",
+      });
       return { ...t, items };
     });
 
@@ -354,7 +379,7 @@ export default function QcSetupPage() {
               <CardHeader>
                 <CardTitle>3. หัวข้อตรวจ</CardTitle>
                 <CardDescription>
-                  แต่ละหัวข้อกำหนดเกณฑ์ วิธีบันทึกผล จำนวนครั้งที่ตรวจ และหัวข้อย่อยได้
+                  แต่ละหัวข้อกำหนดชื่อ เกณฑ์ และช่องที่ผู้ตรวจต้องกรอกได้ ส่วนวิธีตรวจกับจำนวนครั้งอยู่ในปุ่มรูปแบบการตรวจ
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -380,6 +405,7 @@ export default function QcSetupPage() {
                         })
                       }
                       onDuplicate={() => duplicateItem(item.id)}
+                      onApplyToAll={tpl.items.length > 1 ? applyToAll : undefined}
                     />
                   ))
                 )}

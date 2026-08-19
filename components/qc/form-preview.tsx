@@ -29,9 +29,10 @@ import {
 } from "@peckey954/ui/components/ui/table";
 import { Textarea } from "@peckey954/ui/components/ui/textarea";
 import {
+  NOTE_COLUMN_HINT,
   VERDICT_WORDS,
   buildPreviewBlocks,
-  describeRule,
+  describeItemRules,
   showsAutoStatus,
   showsTick,
   type HeaderField,
@@ -75,6 +76,11 @@ export function FormPreview({ template }: { template: QcTemplate }) {
           const first = block.items[0].index + 1;
           const last = block.items[block.items.length - 1].index + 1;
           const [pass, fail] = VERDICT_WORDS[block.wording];
+          // ข้อในตารางเดียวกันตั้งหมายเหตุไม่เหมือนกันได้ หัวคอลัมน์จึงบอกได้
+          // เฉพาะตอนทุกข้อตรงกัน ไม่งั้นเขียนไปก็ผิดกับบางแถวอยู่ดี
+          const noteModes = new Set(block.items.map(({ item }) => item.note));
+          const groupNote = noteModes.size === 1 ? [...noteModes][0] : null;
+          const showNote = groupNote !== "off";
           return (
             <section key={`g-${bi}`} className="space-y-3">
               <h3 className="text-base font-semibold">
@@ -92,12 +98,16 @@ export function FormPreview({ template }: { template: QcTemplate }) {
                         <TableHead className="min-w-48">รายการตรวจ</TableHead>
                         <TableHead className="min-w-56">เกณฑ์มาตรฐาน</TableHead>
                         <TableHead className="w-48">ผลการตรวจ</TableHead>
-                        <TableHead className="min-w-56 pr-4">
-                          หมายเหตุ
-                          <span className="block font-normal text-muted-foreground">
-                            ไม่บังคับ
-                          </span>
-                        </TableHead>
+                        {showNote && (
+                          <TableHead className="min-w-56 pr-4">
+                            หมายเหตุ
+                            {groupNote && (
+                              <span className="block font-normal text-muted-foreground">
+                                {NOTE_COLUMN_HINT[groupNote]}
+                              </span>
+                            )}
+                          </TableHead>
+                        )}
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -115,15 +125,17 @@ export function FormPreview({ template }: { template: QcTemplate }) {
                           <TableCell>
                             <TickChoice id={item.id} pass={pass} fail={fail} />
                           </TableCell>
-                          <TableCell className="pr-4">
-                            {item.withNote ? (
-                              <Input placeholder="—" />
-                            ) : (
-                              <span className="text-sm text-muted-foreground">
-                                —
-                              </span>
-                            )}
-                          </TableCell>
+                          {showNote && (
+                            <TableCell className="pr-4">
+                              {item.note !== "off" ? (
+                                <Input placeholder="—" />
+                              ) : (
+                                <span className="text-sm text-muted-foreground">
+                                  —
+                                </span>
+                              )}
+                            </TableCell>
+                          )}
                         </TableRow>
                       ))}
                     </TableBody>
@@ -259,7 +271,7 @@ function AdHocItemsPreview() {
 
 function ItemPreview({ item, index }: { item: QcItem; index: number }) {
   const rounds = Math.max(1, item.repeatable ? item.defaultRounds : 1);
-  const ruleText = describeRule(item.rule, item.columns[0]?.unit ?? "");
+  const ruleText = describeItemRules(item);
   const [pass, fail] = VERDICT_WORDS[item.verdictWording];
   const tick = showsTick(item);
   const autoStatus = showsAutoStatus(item);
@@ -321,7 +333,7 @@ function ItemPreview({ item, index }: { item: QcItem; index: number }) {
                         )}
                       </TableCell>
                       <TableCell className="pr-4">
-                        {c.withNote ? (
+                        {c.note !== "off" ? (
                           <Input placeholder="—" />
                         ) : (
                           <span className="text-sm text-muted-foreground">—</span>
@@ -334,8 +346,6 @@ function ItemPreview({ item, index }: { item: QcItem; index: number }) {
             </Table>
           </CardContent>
         </Card>
-      ) : item.capture === "text" ? (
-        <Textarea placeholder="กรอกรายละเอียด" />
       ) : (
         /* ตารางเดียวรองรับได้ทั้ง คีย์ค่า / ติ๊ก / ทั้งสองอย่าง */
         <Card className="py-0">
@@ -347,23 +357,22 @@ function ItemPreview({ item, index }: { item: QcItem; index: number }) {
                     <TableHead className="w-20 pl-4">ครั้ง</TableHead>
                   )}
 
-                  {item.capture === "number" &&
-                    item.columns.map((c, ci) => (
-                      <TableHead
-                        key={c.id}
-                        className={cellPad(
-                          "min-w-32 text-right",
-                          !item.repeatable && ci === 0
-                        )}
-                      >
-                        {c.label || "—"}
-                        {c.unit && (
-                          <span className="block font-normal text-muted-foreground">
-                            ({c.unit})
-                          </span>
-                        )}
-                      </TableHead>
-                    ))}
+                  {item.fields.map((f, ci) => (
+                    <TableHead
+                      key={f.id}
+                      className={cellPad(
+                        f.type === "number" ? "min-w-32 text-right" : "min-w-48",
+                        !item.repeatable && ci === 0
+                      )}
+                    >
+                      {f.label || "—"}
+                      {f.type === "number" && f.unit && (
+                        <span className="block font-normal text-muted-foreground">
+                          ({f.unit})
+                        </span>
+                      )}
+                    </TableHead>
+                  ))}
 
                   {item.withTime && (
                     <TableHead className="w-32 text-right">เวลาที่ตรวจ</TableHead>
@@ -373,7 +382,7 @@ function ItemPreview({ item, index }: { item: QcItem; index: number }) {
                     <TableHead
                       className={cellPad(
                         "w-48",
-                        !item.repeatable && item.capture !== "number"
+                        !item.repeatable && item.fields.length === 0
                       )}
                     >
                       ผลการตรวจ
@@ -383,11 +392,11 @@ function ItemPreview({ item, index }: { item: QcItem; index: number }) {
                     </TableHead>
                   )}
 
-                  {item.withNote && (
+                  {item.note !== "off" && (
                     <TableHead className="min-w-48">
                       หมายเหตุ
                       <span className="block font-normal text-muted-foreground">
-                        ไม่บังคับ
+                        {NOTE_COLUMN_HINT[item.note]}
                       </span>
                     </TableHead>
                   )}
@@ -410,19 +419,22 @@ function ItemPreview({ item, index }: { item: QcItem; index: number }) {
                       <TableCell className="pl-4 tabular-nums">{r + 1}</TableCell>
                     )}
 
-                    {item.capture === "number" &&
-                      item.columns.map((c, ci) => (
-                        <TableCell
-                          key={c.id}
-                          className={cellPad("", !item.repeatable && ci === 0)}
-                        >
+                    {item.fields.map((f, ci) => (
+                      <TableCell
+                        key={f.id}
+                        className={cellPad("", !item.repeatable && ci === 0)}
+                      >
+                        {f.type === "number" ? (
                           <Input
                             type="number"
                             className="text-right tabular-nums"
                             placeholder="0.00"
                           />
-                        </TableCell>
-                      ))}
+                        ) : (
+                          <Input placeholder="—" />
+                        )}
+                      </TableCell>
+                    ))}
 
                     {item.withTime && (
                       <TableCell>
@@ -434,7 +446,7 @@ function ItemPreview({ item, index }: { item: QcItem; index: number }) {
                       <TableCell
                         className={cellPad(
                           "",
-                          !item.repeatable && item.capture !== "number"
+                          !item.repeatable && item.fields.length === 0
                         )}
                       >
                         <TickChoice
@@ -445,7 +457,7 @@ function ItemPreview({ item, index }: { item: QcItem; index: number }) {
                       </TableCell>
                     )}
 
-                    {item.withNote && (
+                    {item.note !== "off" && (
                       <TableCell>
                         <Input placeholder="—" />
                       </TableCell>

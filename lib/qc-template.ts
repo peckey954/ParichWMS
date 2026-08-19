@@ -28,80 +28,30 @@ export type HeaderField = {
 };
 
 // ---------------------------------------------------------------
-// หัวข้อตรวจแยกเป็น 2 แกนอิสระ เพราะบางข้อต้องทำทั้งสองอย่าง
-//   capture = ผู้ตรวจต้องคีย์ค่าอะไรลงไป
-//   verdict = ตัดสินผ่าน/ไม่ผ่านด้วยวิธีไหน
-// เช่น "น้ำหนักของปุ๋ย" ต้องคีย์ตัวเลข และให้ผู้ตรวจติ๊กยืนยันเองด้วย
+// หัวข้อตรวจ
+//
+// เดิมแยกเป็นสองแกน capture (คีย์อะไร) กับ verdict (ตัดสินยังไง) แล้วมีพรีเซ็ต
+// มารวมสองแกนให้อีกที กลายเป็นสามที่ที่พูดเรื่องเดียวกัน
+//
+// ตอนนี้ "คีย์อะไร" ไม่ใช่ค่าของหัวข้ออีกต่อไป แต่อ่านจากช่องที่ใส่ไว้จริง
+// ไม่มีช่อง = ติ๊กอย่างเดียว มีช่องตัวเลข = ต้องคีย์ตัวเลข
+// เหลือให้ตั้งจริง ๆ แค่ "ตัดสินยังไง" อย่างเดียว
 // ---------------------------------------------------------------
-
-/** ผู้ตรวจต้องคีย์ค่าอะไรลงไป */
-export type CaptureMode = "none" | "number" | "text";
-
-export const CAPTURE_LABEL: Record<CaptureMode, string> = {
-  none: "ไม่ต้องคีย์ค่า",
-  number: "คีย์ตัวเลข",
-  text: "คีย์ข้อความ",
-};
 
 /** ตัดสินผ่าน/ไม่ผ่านด้วยวิธีไหน */
 export type VerdictMode = "none" | "auto" | "manual";
 
 export const VERDICT_LABEL: Record<VerdictMode, string> = {
-  none: "ไม่ต้องตัดสิน",
-  auto: "ระบบตัดสินจากเกณฑ์",
-  manual: "ผู้ตรวจติ๊กเอง",
+  manual: "ผู้ตรวจติ๊ก",
+  auto: "ระบบตัดสิน",
+  none: "ไม่ตัดสิน",
 };
 
-// ---------------------------------------------------------------
-// พรีเซ็ต — รวมสองแกน (คีย์อะไร + ตัดสินยังไง) เป็นตัวเลือกเดียว
-// คนตั้งค่าจริงคิดเป็น "ข้อนี้เป็นแบบไหน" ไม่ได้คิดแยกสองแกนอิสระ
-// เลือกไม่ตรงพรีเซ็ตไหนเลยค่อยสลับไป "กำหนดเอง" แล้วเห็นตัวควบคุมดิบ
-// ทั้งสองแกนเหมือนเดิม ไม่เสียความละเอียดของโมเดลเดิมไปแม้แต่น้อย
-// ---------------------------------------------------------------
-
-export type CapturePreset =
-  | "tickOnly"
-  | "numberAuto"
-  | "numberManual"
-  | "textOnly"
-  | "custom";
-
-export const CAPTURE_PRESET_LABEL: Record<
-  Exclude<CapturePreset, "custom">,
-  string
-> = {
-  tickOnly: "ติ๊กผ่าน/ไม่ผ่านอย่างเดียว",
-  numberAuto: "กรอกตัวเลข — ระบบตัดสินเอง",
-  numberManual: "กรอกตัวเลข — ผู้ตรวจติ๊กเอง",
-  textOnly: "กรอกข้อความอย่างเดียว",
+export const VERDICT_HINT: Record<VerdictMode, string> = {
+  manual: "ผู้ตรวจติ๊กผลเอง ถ้ามีเกณฑ์ตัวเลขระบบจะขึ้นผลที่คำนวณได้ให้ดูเป็นตัวช่วย",
+  auto: "ระบบตัดสินจากเกณฑ์ของช่องตัวเลข ผู้ตรวจไม่ต้องติ๊ก",
+  none: "หัวข้อนี้เก็บค่าอย่างเดียว ไม่มีผ่าน/ไม่ผ่าน",
 };
-
-const CAPTURE_PRESET_VALUES: Record<
-  Exclude<CapturePreset, "custom">,
-  { capture: CaptureMode; verdict: VerdictMode }
-> = {
-  tickOnly: { capture: "none", verdict: "manual" },
-  numberAuto: { capture: "number", verdict: "auto" },
-  numberManual: { capture: "number", verdict: "manual" },
-  textOnly: { capture: "text", verdict: "none" },
-};
-
-/** หาว่าหัวข้อนี้ตรงกับพรีเซ็ตไหน — ไม่ตรงเลยถือว่า "กำหนดเอง" */
-export function matchCapturePreset(
-  item: Pick<QcItem, "capture" | "verdict">
-): CapturePreset {
-  const found = (
-    Object.keys(CAPTURE_PRESET_VALUES) as Exclude<CapturePreset, "custom">[]
-  ).find((key) => {
-    const v = CAPTURE_PRESET_VALUES[key];
-    return v.capture === item.capture && v.verdict === item.verdict;
-  });
-  return found ?? "custom";
-}
-
-export function capturePresetValue(preset: Exclude<CapturePreset, "custom">) {
-  return CAPTURE_PRESET_VALUES[preset];
-}
 
 /** คำที่ใช้เรียกสองขั้วของผลตรวจ */
 export type VerdictWording = "passFail" | "normalAbnormal";
@@ -116,18 +66,66 @@ export const VERDICT_WORDING_LABEL: Record<VerdictWording, string> = {
   normalAbnormal: "ปกติ / ผิดปกติ",
 };
 
-/** ช่องตัวเลขหนึ่งช่องของหัวข้อแบบวัดค่า เช่น N (%) หรือ น้ำหนักที่ชั่ง (kg) */
-export type MeasureColumn = {
-  id: string;
-  label: string;
-  unit: string;
+// ---------------------------------------------------------------
+// หมายเหตุ
+//
+// เดิมเป็นสวิตช์เปิด/ปิดอย่างเดียว แต่ของจริงต้องแยกได้ว่าบังคับหรือไม่บังคับ
+// เพราะเหตุผลตอน "ไม่ผ่าน" คือของที่ต้องมีเสมอ ไม่งั้นใบตรวจบอกไม่ได้ว่าพังตรงไหน
+// รวมเป็นแถวเดียวสี่ตัวเลือก ไม่ใช่สวิตช์เปิด/ปิดคู่กับตัวเลือกซ้ำอีกที่
+// ---------------------------------------------------------------
+
+export type NoteMode = "off" | "optional" | "onFail" | "always";
+
+export const NOTE_MODE_LABEL: Record<NoteMode, string> = {
+  off: "ไม่มี",
+  optional: "ไม่บังคับ",
+  onFail: "เมื่อไม่ผ่าน",
+  always: "บังคับ",
 };
 
-/** เกณฑ์ตัดสินผ่าน/ไม่ผ่านแบบอัตโนมัติ สำหรับหัวข้อที่คีย์ตัวเลข */
+export const NOTE_MODE_HINT: Record<NoteMode, string> = {
+  off: "ไม่มีช่องหมายเหตุในหัวข้อนี้",
+  optional: "มีช่องให้พิมพ์ จะเว้นว่างก็ได้",
+  onFail: "ต้องพิมพ์เหตุผลทุกครั้งที่ติ๊กไม่ผ่าน/ผิดปกติ",
+  always: "ต้องพิมพ์ทุกครั้ง ไม่ว่าผลจะออกมาเป็นอะไร",
+};
+
+/** ป้ายบนหัวการ์ด — ต่อคำดิบ ๆ แล้วได้ "หมายเหตุไม่มี" ซึ่งอ่านไม่รู้เรื่อง */
+export const NOTE_BADGE_LABEL: Record<NoteMode, string> = {
+  off: "ไม่มีหมายเหตุ",
+  optional: "หมายเหตุไม่บังคับ",
+  onFail: "หมายเหตุเมื่อไม่ผ่าน",
+  always: "หมายเหตุบังคับ",
+};
+
+/** ป้ายสั้น ๆ ที่ใช้บนหัวคอลัมน์หมายเหตุในหน้าตัวอย่าง */
+export const NOTE_COLUMN_HINT: Record<NoteMode, string> = {
+  off: "",
+  optional: "ไม่บังคับ",
+  onFail: "บังคับเมื่อไม่ผ่าน",
+  always: "บังคับ",
+};
+
+// ---------------------------------------------------------------
+// ช่องที่ผู้ตรวจต้องกรอก
+//
+// เกณฑ์ตัวเลขอยู่ที่ช่อง ไม่ได้อยู่ที่หัวข้อ เพราะหัวข้อเดียวมีได้หลายช่อง
+// (สูตรปุ๋ยมี N, P, K) แล้วแต่ละตัวก็มีช่วงของตัวเอง
+// ของเดิมมีเกณฑ์เดียวต่อหัวข้อ จึงบังคับให้ทุกช่องใช้ช่วงเดียวกันหมด
+// ---------------------------------------------------------------
+
+export type FieldType = "text" | "number";
+
+export const FIELD_TYPE_LABEL: Record<FieldType, string> = {
+  text: "ข้อความ",
+  number: "ตัวเลข",
+};
+
+/** เกณฑ์ตัดสินผ่าน/ไม่ผ่านแบบอัตโนมัติ ใช้กับช่องตัวเลข */
 export type RuleOp = "none" | "gte" | "lte" | "between";
 
 export const RULE_OP_LABEL: Record<RuleOp, string> = {
-  none: "ไม่มีเกณฑ์ตัวเลข",
+  none: "ไม่มีเกณฑ์",
   gte: "ไม่น้อยกว่า (≥)",
   lte: "ไม่เกิน (≤)",
   between: "อยู่ระหว่าง",
@@ -139,25 +137,84 @@ export type Rule = {
   max: number | null;
 };
 
+export type QcField = {
+  id: string;
+  label: string;
+  type: FieldType;
+  /** ใช้กับ type = "number" */
+  unit: string;
+  /** ใช้กับ type = "number" */
+  rule: Rule;
+};
+
+/** หน่วยที่โรงงานใช้จริง — ว่างคือไม่มีหน่วย เช่นช่องนับจำนวน */
+export const UNIT_OPTIONS = [
+  "kg",
+  "g",
+  "ตัน",
+  "%",
+  "°C",
+  "mm",
+  "cm",
+  "ครั้ง",
+  "กระสอบ",
+  "ถุง",
+];
+
 export type QcItem = {
   id: string;
   title: string;
   criteria: string;
-  capture: CaptureMode;
   verdict: VerdictMode;
   verdictWording: VerdictWording;
-  /** ใช้เมื่อ capture = "number" */
-  columns: MeasureColumn[];
-  rule: Rule;
+  /** ช่องที่ผู้ตรวจต้องกรอก — ไม่มีเลยคือหัวข้อแบบติ๊กอย่างเดียว */
+  fields: QcField[];
+  note: NoteMode;
   /** เปิดให้บันทึกได้หลายครั้ง (ตรวจครั้งที่ 1, 2, 3 …) */
   repeatable: boolean;
   defaultRounds: number;
   maxRounds: number;
   withTime: boolean;
-  withNote: boolean;
   /** หัวข้อย่อย — ใช้กับฟอร์มที่จัดเป็นกลุ่ม เช่น ใบตรวจก่อนผลิต */
   children: QcItem[];
 };
+
+/**
+ * ส่วนที่กล่อง "รูปแบบการตรวจ" เป็นเจ้าของ
+ *
+ * แยกเป็นชนิดของตัวเอง เพราะเป็นก้อนที่ยกไปใช้กับหัวข้ออื่นทั้งก้อนได้
+ * ชื่อหัวข้อ เกณฑ์ ช่องกรอก และหัวข้อย่อย ไม่อยู่ในนี้ — พวกนั้นเป็นของเฉพาะข้อ
+ */
+export type ItemSettings = Pick<
+  QcItem,
+  | "verdict"
+  | "verdictWording"
+  | "note"
+  | "repeatable"
+  | "defaultRounds"
+  | "maxRounds"
+  | "withTime"
+>;
+
+export const ITEM_SETTINGS_DEFAULT: ItemSettings = {
+  verdict: "manual",
+  verdictWording: "passFail",
+  note: "optional",
+  repeatable: false,
+  defaultRounds: 1,
+  maxRounds: 3,
+  withTime: false,
+};
+
+export const pickSettings = (item: QcItem): ItemSettings => ({
+  verdict: item.verdict,
+  verdictWording: item.verdictWording,
+  note: item.note,
+  repeatable: item.repeatable,
+  defaultRounds: item.defaultRounds,
+  maxRounds: item.maxRounds,
+  withTime: item.withTime,
+});
 
 export type FailAction = { id: string; label: string };
 
@@ -201,22 +258,14 @@ export function newItem(): QcItem {
     id: uid("item"),
     title: "",
     criteria: "",
-    capture: "none",
-    verdict: "manual",
-    verdictWording: "passFail",
-    columns: [],
-    rule: emptyRule(),
-    repeatable: false,
-    defaultRounds: 1,
-    maxRounds: 3,
-    withTime: false,
-    withNote: true,
+    ...ITEM_SETTINGS_DEFAULT,
+    fields: [],
     children: [],
   };
 }
 
-export function newColumn(): MeasureColumn {
-  return { id: uid("col"), label: "", unit: "" };
+export function newField(type: FieldType = "number"): QcField {
+  return { id: uid("fld"), label: "", type, unit: "", rule: emptyRule() };
 }
 
 /**
@@ -229,8 +278,11 @@ export function cloneItemDeep(item: QcItem): QcItem {
     ...item,
     id: uid("item"),
     title: item.title ? `${item.title} (คัดลอก)` : item.title,
-    columns: item.columns.map((c) => ({ ...c, id: uid("col") })),
-    rule: { ...item.rule },
+    fields: item.fields.map((f) => ({
+      ...f,
+      id: uid("fld"),
+      rule: { ...f.rule },
+    })),
     children: item.children.map(cloneItemDeep),
   };
 }
@@ -245,9 +297,16 @@ export function newHeaderField(): HeaderField {
   };
 }
 
+// ---------------------------------------------------------------
+// สิ่งที่อ่านออกมาจากช่องกรอก ไม่ได้ตั้งแยกอีกที
+// ---------------------------------------------------------------
+
+export const numberFields = (item: QcItem) =>
+  item.fields.filter((f) => f.type === "number");
+
 /** มีเกณฑ์ตัวเลขให้ระบบคำนวณได้หรือเปล่า */
 export function hasNumericRule(item: QcItem): boolean {
-  return item.capture === "number" && item.rule.op !== "none";
+  return numberFields(item).some((f) => f.rule.op !== "none");
 }
 
 /** ต้องโชว์ช่องติ๊กให้ผู้ตรวจเลือกเองหรือเปล่า */
@@ -260,7 +319,7 @@ export function showsAutoStatus(item: QcItem): boolean {
   return hasNumericRule(item) && item.verdict !== "none";
 }
 
-/** อธิบายเกณฑ์เป็นภาษาคน ใช้โชว์ในหน้าตัวอย่าง */
+/** อธิบายเกณฑ์ของช่องหนึ่งช่องเป็นภาษาคน */
 export function describeRule(rule: Rule, unit: string): string {
   const u = unit ? ` ${unit}` : "";
   switch (rule.op) {
@@ -277,16 +336,24 @@ export function describeRule(rule: Rule, unit: string): string {
   }
 }
 
-/** สรุปสั้น ๆ ว่าหัวข้อนี้ให้ทำอะไรบ้าง ใช้โชว์เป็น badge ในตัวสร้าง */
-export function describeBehaviour(item: QcItem): string {
-  const parts: string[] = [];
-  if (item.capture === "number") parts.push("คีย์ตัวเลข");
-  if (item.capture === "text") parts.push("คีย์ข้อความ");
-  if (item.verdict === "auto") parts.push("ระบบตัดสิน");
-  if (item.verdict === "manual") {
-    parts.push(`ติ๊ก${VERDICT_WORDS[item.verdictWording][0]}/${VERDICT_WORDS[item.verdictWording][1]}`);
+/**
+ * รวมเกณฑ์ของทุกช่องเป็นบรรทัดเดียว
+ * ช่องเดียวไม่ต้องขึ้นชื่อช่องนำ เพราะชื่อหัวข้อบอกอยู่แล้วว่าวัดอะไร
+ */
+export function describeItemRules(item: QcItem): string {
+  const parts = numberFields(item)
+    .map((f) => {
+      const text = describeRule(f.rule, f.unit);
+      if (!text) return "";
+      return f.label ? `${f.label} ${text}` : text;
+    })
+    .filter(Boolean);
+  if (parts.length === 0) return "";
+  if (parts.length === 1 && numberFields(item).length === 1) {
+    const only = numberFields(item)[0];
+    return describeRule(only.rule, only.unit);
   }
-  return parts.join(" + ") || "ยังไม่ได้ตั้งค่า";
+  return parts.join(" · ");
 }
 
 /** ตัดสินค่าที่วัดได้ตามเกณฑ์ — null = ยังตัดสินไม่ได้ */
@@ -300,6 +367,39 @@ export function judge(rule: Rule, value: number | null): boolean | null {
   }
   return null;
 }
+
+/**
+ * ป้ายสรุปบนหัวการ์ด — ขึ้นเฉพาะค่าที่ไม่ใช่ค่าเริ่มต้น
+ *
+ * ถ้าขึ้นทุกค่า ทุกการ์ดจะมีป้ายชุดเดียวกันหมดแล้วป้ายก็เลิกบอกอะไร
+ * การ์ดที่มีป้ายจึงแปลว่า "ข้อนี้ตั้งไว้ไม่เหมือนชาวบ้าน" ซึ่งคือสิ่งที่ต้องรีบเห็น
+ * หลักเดียวกับจุดบนปุ่มตัวกรองในหน้าสต็อก
+ */
+export function itemBadges(item: QcItem): string[] {
+  const d = ITEM_SETTINGS_DEFAULT;
+  const out: string[] = [];
+
+  if (item.verdict !== d.verdict) {
+    out.push(VERDICT_LABEL[item.verdict]);
+  } else if (item.verdictWording !== d.verdictWording) {
+    out.push(VERDICT_WORDING_LABEL[item.verdictWording]);
+  }
+
+  if (item.note !== d.note) out.push(NOTE_BADGE_LABEL[item.note]);
+  if (item.repeatable) out.push(`บันทึกได้ ${item.maxRounds} ครั้ง`);
+  if (item.withTime) out.push("มีเวลาที่ตรวจ");
+
+  return out;
+}
+
+export const isSettingsDefault = (s: ItemSettings) =>
+  s.verdict === ITEM_SETTINGS_DEFAULT.verdict &&
+  s.verdictWording === ITEM_SETTINGS_DEFAULT.verdictWording &&
+  s.note === ITEM_SETTINGS_DEFAULT.note &&
+  s.repeatable === ITEM_SETTINGS_DEFAULT.repeatable &&
+  s.defaultRounds === ITEM_SETTINGS_DEFAULT.defaultRounds &&
+  s.maxRounds === ITEM_SETTINGS_DEFAULT.maxRounds &&
+  s.withTime === ITEM_SETTINGS_DEFAULT.withTime;
 
 // ---------------------------------------------------------------
 // เวอร์ชันที่ประกาศใช้อยู่แล้วของรหัสฟอร์มเดียวกัน
@@ -355,18 +455,19 @@ const tick = (title: string, criteria: string): QcItem => ({
   id: uid("seed"),
   title,
   criteria,
-  capture: "none",
-  verdict: "manual",
-  verdictWording: "passFail",
-  columns: [],
-  rule: emptyRule(),
-  repeatable: false,
-  defaultRounds: 1,
+  ...ITEM_SETTINGS_DEFAULT,
   maxRounds: 1,
-  withTime: false,
-  withNote: true,
+  fields: [],
   children: [],
 });
+
+/** ช่องตัวเลขของเทมเพลตตั้งต้น — เขียนสั้น ๆ เพราะมีหลายช่องที่เกณฑ์เหมือนกัน */
+const num = (
+  id: string,
+  label: string,
+  unit: string,
+  rule: Rule = emptyRule()
+): QcField => ({ id, label, type: "number", unit, rule });
 
 export const SEED_TEMPLATE: QcTemplate = {
   id: "tpl-fm-qc-02-03",
@@ -398,37 +499,33 @@ export const SEED_TEMPLATE: QcTemplate = {
       id: "it-1",
       title: "น้ำหนักของปุ๋ย",
       criteria: "น้ำหนักต่อกระสอบ ≥ 50.2 kg (บรรจุ 50 kg)",
-      capture: "number",
       verdict: "manual",
       verdictWording: "passFail",
-      columns: [{ id: "c-1", label: "น้ำหนักที่ชั่ง", unit: "kg" }],
-      rule: { op: "gte", min: 50.2, max: null },
+      fields: [num("c-1", "น้ำหนักที่ชั่ง", "kg", { op: "gte", min: 50.2, max: null })],
+      note: "onFail",
       repeatable: true,
       defaultRounds: 2,
       maxRounds: 3,
       withTime: true,
-      withNote: true,
       children: [],
     },
     {
-      // คีย์ตัวเลข 3 ช่อง แล้วให้ระบบตัดสินเองจากเกณฑ์
+      // สามช่องที่มีเกณฑ์ของตัวเองแยกกัน แล้วให้ระบบตัดสินเอง
       id: "it-2",
       title: "สูตรปุ๋ย",
       criteria: "ตัวเลขธาตุอาหารที่วัดได้ต้องตรงกับสูตรที่รับรอง — 15-15-15",
-      capture: "number",
       verdict: "auto",
       verdictWording: "passFail",
-      columns: [
-        { id: "c-2", label: "N", unit: "%" },
-        { id: "c-3", label: "P₂O₅", unit: "%" },
-        { id: "c-4", label: "K₂O", unit: "%" },
+      fields: [
+        num("c-2", "N", "%", { op: "between", min: 14.5, max: 15.5 }),
+        num("c-3", "P₂O₅", "%", { op: "between", min: 14.5, max: 15.5 }),
+        num("c-4", "K₂O", "%", { op: "between", min: 14.5, max: 15.5 }),
       ],
-      rule: { op: "between", min: 14.5, max: 15.5 },
+      note: "optional",
       repeatable: true,
       defaultRounds: 2,
       maxRounds: 3,
       withTime: true,
-      withNote: true,
       children: [],
     },
     tick("ตรวจการเย็บกระสอบ", "ระยะห่างฝีเข็มต้องสม่ำเสมอ ต้องเป็นด้ายคู่"),
@@ -441,16 +538,17 @@ export const SEED_TEMPLATE: QcTemplate = {
       id: "it-8",
       title: "ความชื้น",
       criteria: "ความชื้นไม่เกิน 80%",
-      capture: "number",
       verdict: "manual",
       verdictWording: "passFail",
-      columns: [{ id: "c-5", label: "ค่าความชื้น", unit: "%" }],
-      rule: { op: "lte", min: null, max: 80 },
+      fields: [
+        num("c-5", "ค่าความชื้น", "%", { op: "lte", min: null, max: 80 }),
+        { id: "c-6", label: "จุดที่เก็บตัวอย่าง", type: "text", unit: "", rule: emptyRule() },
+      ],
+      note: "onFail",
       repeatable: true,
       defaultRounds: 2,
       maxRounds: 3,
       withTime: true,
-      withNote: true,
       children: [],
     },
   ],
@@ -503,7 +601,7 @@ export function buildPreviewBlocks(items: QcItem[]): PreviewBlock[] {
 
   items.forEach((item, i) => {
     const groupable =
-      item.capture === "none" &&
+      item.fields.length === 0 &&
       item.verdict === "manual" &&
       !item.repeatable &&
       item.children.length === 0;
