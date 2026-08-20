@@ -30,7 +30,7 @@ import {
 } from "@/lib/qc-template";
 
 /* ------------------------------------------------------------------
-   กล่องรูปแบบการตรวจ
+   กล่องการแสดงข้อมูล
 
    เดิมเป็นแผงกางออกในการ์ด ซึ่งซ้อนอยู่ในการ์ดที่ซ้อนการ์ดอีกที
    กางพร้อมกันหลายข้อแล้วหน้ายาวจนหาข้อที่กำลังแก้ไม่เจอ
@@ -92,7 +92,7 @@ export function ItemSettingsDialog({
       <DialogTrigger asChild>
         <Button variant="outline-primary" size="sm" className={className}>
           <SquarePenIcon />
-          รูปแบบการตรวจ
+          การแสดงข้อมูล
         </Button>
       </DialogTrigger>
 
@@ -105,7 +105,7 @@ export function ItemSettingsDialog({
       >
         <DialogHeader className="px-4 pt-4 text-left">
           {/* บอกด้วยว่ากำลังแก้ข้อไหน ฟอร์มยาว ๆ เปิดกล่องแล้วลืมได้ง่าย */}
-          <DialogTitle className="pr-8">รูปแบบการตรวจ — {title}</DialogTitle>
+          <DialogTitle className="pr-8">การแสดงข้อมูล — {title}</DialogTitle>
         </DialogHeader>
 
         <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-4">

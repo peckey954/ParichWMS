@@ -1,23 +1,19 @@
 "use client";
 
 import { Button } from "@peckey954/ui/components/ui/button";
-import { ButtonGroup } from "@peckey954/ui/components/ui/button-group";
 import { cn } from "@peckey954/ui/lib/utils";
 
 /* ------------------------------------------------------------------
-   ปุ่มเลือกหนึ่งอย่างจากชุด
+   ชิปเลือกหนึ่งอย่างจากชุด
 
-   ปุ่มเหลี่ยมติดกันเป็นก้อนเดียว = เลือกได้อันเดียว
-   ต่างจากชิปกลมที่แยกกันเป็นอัน ๆ ซึ่งแปลว่าเลือกได้หลายอันพร้อมกัน
-   รูปทรงบอกกฎไปแล้ว ไม่ต้องมีคำอธิบายกำกับ — หลักเดียวกับ SortControl
+   เดิมเป็นปุ่มเหลี่ยมติดกันเป็นก้อนเดียว (ButtonGroup) บังคับให้อยู่แถวเดียว
+   กว้างเท่ากันทุกปุ่มแล้วตัดคำด้วยจุดไข่ปลาเมื่อไม่พอที่ — พอมีตัวเลือกหลายอัน
+   หรือข้อความยาวบนจอมือถือ ปุ่มบีบจนอ่านไม่ออก
 
-   ตัวที่เลือกอยู่ใช้พื้นอ่อนสีแบรนด์ ไม่ใช่เปลี่ยนสีเส้นขอบ
-   เพราะ ButtonGroup ตัดขอบซ้ายของปุ่มที่ไม่ใช่ตัวแรกทิ้ง
-   เปลี่ยนสีขอบแล้วปุ่มกลางจะมีขอบส้มแค่สามด้าน
-
-   ทุกปุ่มกว้างเท่ากันและตัดคำด้วยจุดไข่ปลาเมื่อไม่พอ
-   ในกล่องกว้าง 326px บนมือถือ สี่ตัวเลือกยังอยู่แถวเดียวได้
-   ถ้าปล่อยให้ปุ่มกว้างตามข้อความ ปุ่มสุดท้ายจะทะลุขอบกล่องออกไป
+   เปลี่ยนเป็นชิปแยกอัน กว้างตามเนื้อหาของตัวเอง ตกบรรทัดใหม่ได้เมื่อแถวไม่พอที่
+   — อ่านได้เต็มคำเสมอไม่ว่าจะมีกี่ตัวเลือกหรือจอแคบแค่ไหน
+   ยังไม่ใช่ CheckChip (ปุ่มกลมมีไอคอนติ๊ก ใช้เลือกได้หลายอัน) เพราะที่นี่เหลี่ยมมน
+   ไม่มีไอคอน สื่อว่าเลือกได้แค่อันเดียวเหมือนเดิม
 ------------------------------------------------------------------ */
 
 export type Choice<T extends string> = {
@@ -33,22 +29,16 @@ export function ChoiceGroup<T extends string>({
   options,
   value,
   onChange,
-  /** false = ปุ่มกว้างตามข้อความ ใช้ตอนวางแทรกในแถวที่มีของอื่นอยู่ด้วย */
-  fill = true,
   className,
 }: {
   label: string;
   options: Choice<T>[];
   value: T;
   onChange: (value: T) => void;
-  fill?: boolean;
   className?: string;
 }) {
   return (
-    <ButtonGroup
-      aria-label={label}
-      className={cn(fill && "w-full", className)}
-    >
+    <div role="group" aria-label={label} className={cn("flex flex-wrap gap-2", className)}>
       {options.map((o) => {
         const on = value === o.id;
         return (
@@ -57,18 +47,17 @@ export function ChoiceGroup<T extends string>({
             variant="outline"
             aria-pressed={on}
             disabled={o.disabled}
-            title={o.disabled ? o.disabledHint : o.label}
+            title={o.disabled ? o.disabledHint : undefined}
             onClick={() => onChange(o.id)}
             className={cn(
-              "h-10 px-3",
-              fill && "min-w-0 flex-1 px-2",
-              on && "bg-brand font-semibold text-primary hover:bg-brand"
+              "h-10 px-3 font-normal",
+              on && "border-primary bg-brand font-semibold text-primary hover:bg-brand"
             )}
           >
-            <span className={cn(fill && "truncate")}>{o.label}</span>
+            {o.label}
           </Button>
         );
       })}
-    </ButtonGroup>
+    </div>
   );
 }
