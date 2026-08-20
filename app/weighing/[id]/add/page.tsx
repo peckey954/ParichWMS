@@ -1,7 +1,8 @@
 "use client";
 
 import * as React from "react";
-import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { useParams, useRouter } from "next/navigation";
 import { MinusIcon, PlusIcon } from "lucide-react";
 import {
   Breadcrumb,
@@ -38,9 +39,11 @@ import {
 import { FileViewer, type ViewerFile } from "@/components/file-viewer";
 import { useNumberField } from "@/components/number-field";
 import { TimeField } from "@/components/time-field";
+import { formatTon, getWeighingReceipt } from "@/lib/weighing";
 
 /* ------------------------------------------------------------------
-   เพิ่มการชั่งน้ำหนัก — หนึ่งหน้าต่อรถหนึ่งคัน
+   เพิ่มการชั่งน้ำหนัก — หนึ่งหน้าต่อรถหนึ่งคัน เข้ามาจากปุ่ม
+   "เพิ่มการชั่งน้ำหนัก" ในหน้าใบชั่งน้ำหนักของ PO นั้น
 
    รถเข้ามาชั่งพร้อมของ แล้วลงของเสร็จชั่งอีกทีตอนรถเปล่า
    น้ำหนักสินค้าจริง = ชั่งเข้า − ชั่งออก แล้วเอาไปเทียบกับใบชั่งของผู้ขาย
@@ -48,18 +51,10 @@ import { TimeField } from "@/components/time-field";
 
    กล่องสรุปด้านบนคำนวณสดจากช่องที่กรอกอยู่ ไม่ใช่ค่าที่บันทึกไว้
    กรอกผิดจะเห็นส่วนต่างเพี้ยนทันที ไม่ต้องรอกดบันทึกก่อนถึงจะรู้
------------------------------------------------------------------- */
 
-/** ข้อมูลใบสั่งซื้อที่หน้านี้อ้างถึง — ยังไม่มีหลังบ้าน ตรึงไว้ก่อน */
-const ORDER = {
-  code: "PO260115/01-01",
-  productName: "21-0-0 ฟูเจียนผง",
-  category: "วัตถุดิบปุ๋ยกระสอบ",
-  packing: "Bulk",
-  supplier: "บริษัท เอชซี อินเตอร์เนชั่นแนล เทรดดิ้ง จำกัด",
-  buyerNote: "ของจะเข้ามาช่วงบ่าย",
-  plates: ["กส - 1234", "กส - 5678", "2 กท - 2345"],
-};
+   ไม่มี backend จริงตามธรรมชาติของแอปนี้ — บันทึกแล้วขึ้น toast แล้วกลับไปหน้า
+   ที่เข้ามา เหมือนหน้าใบผลิต ไม่ใช่ push ไปหน้าตายตัว
+------------------------------------------------------------------ */
 
 /** ไฟล์ตัวอย่างที่ถือว่าอัปเสร็จแล้ว — ยังไม่มีหลังบ้าน ใช้โชว์ตัวอ่านเอกสาร */
 function seedDocs(prefix: string, names: string[]): DocFile[] {
@@ -93,20 +88,33 @@ function toViewer(files: DocFile[], group: string): ViewerFile[] {
     });
 }
 
-const formatTon = (v: number) =>
-  v.toLocaleString("th-TH", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-
-export default function AddWeighingPage() {
+export default function AddWeighingRoundPage() {
   const router = useRouter();
+  const params = useParams<{ id: string }>();
+  const receipt = React.useMemo(() => getWeighingReceipt(params.id), [params.id]);
+  const doc = receipt?.doc;
 
-  const [plateMode, setPlateMode] = React.useState<"system" | "manual">("system");
-  const [plateSystem, setPlateSystem] = React.useState(ORDER.plates[0]);
+  const plateOptions = React.useMemo(
+    () =>
+      (doc?.truck ?? "")
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean),
+    [doc?.truck]
+  );
+
+  const [plateMode, setPlateMode] = React.useState<"system" | "manual">(
+    plateOptions.length > 0 ? "system" : "manual"
+  );
+  const [plateSystem, setPlateSystem] = React.useState<string | undefined>(
+    plateOptions[0]
+  );
   const [plateManual, setPlateManual] = React.useState("");
-  const [grossTon, setGrossTon] = React.useState(50);
+  const [grossTon, setGrossTon] = React.useState(0);
   const [grossAt, setGrossAt] = React.useState("11:00");
-  const [tareTon, setTareTon] = React.useState(10);
-  const [tareAt, setTareAt] = React.useState("14:00");
-  const [supplierTon, setSupplierTon] = React.useState(50);
+  const [tareTon, setTareTon] = React.useState(0);
+  const [tareAt, setTareAt] = React.useState("11:00");
+  const [supplierTon, setSupplierTon] = React.useState(0);
   const [note, setNote] = React.useState("");
 
   // ไฟล์ตัวอย่างที่แนบไว้แล้ว จะได้กดดูตัวอ่านเอกสารได้ทันทีโดยไม่ต้องอัปก่อน
@@ -127,6 +135,43 @@ export default function AddWeighingPage() {
   const netTon = Math.max(0, grossTon - tareTon);
   const diffTon = netTon - supplierTon;
 
+  if (!receipt || !doc) {
+    return (
+      <main className="mx-auto w-full max-w-6xl px-4 pt-6 pb-24 sm:px-6">
+        <Breadcrumb>
+          <BreadcrumbList>
+            <BreadcrumbItem>
+              <BreadcrumbLink href="/">ระบบ</BreadcrumbLink>
+            </BreadcrumbItem>
+            <BreadcrumbSeparator />
+            <BreadcrumbItem>
+              <BreadcrumbLink href="/weighing">ชั่งน้ำหนัก</BreadcrumbLink>
+            </BreadcrumbItem>
+            <BreadcrumbSeparator />
+            <BreadcrumbItem>
+              <BreadcrumbPage className="text-primary">
+                เพิ่มการชั่งน้ำหนัก
+              </BreadcrumbPage>
+            </BreadcrumbItem>
+          </BreadcrumbList>
+        </Breadcrumb>
+        <div className="mt-10 rounded-xl border border-dashed border-border px-6 py-14 text-center">
+          <p className="font-medium">ไม่พบใบชั่งน้ำหนักนี้</p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            เอกสารอาจถูกลบหรือลิงก์ไม่ถูกต้อง
+          </p>
+          <Button asChild variant="outline-primary" className="mt-4">
+            <Link href="/weighing">กลับไปหน้าชั่งน้ำหนัก</Link>
+          </Button>
+        </div>
+      </main>
+    );
+  }
+
+  const { doc: safeDoc, meta, rounds } = receipt;
+  // เลขรอบต่อท้ายรหัสใบ — รอบถัดไปจากที่มีอยู่แล้วในใบนี้
+  const seq = String(rounds.length + 1).padStart(2, "0");
+
   function handleSave(draft: boolean) {
     const plate = plateMode === "system" ? plateSystem : plateManual.trim();
     if (!plate) {
@@ -144,7 +189,7 @@ export default function AddWeighingPage() {
       toast.error("เอกสารยังอัปโหลดไม่เสร็จ");
       return;
     }
-    toast.success(draft ? "บันทึกฉบับร่างแล้ว" : `บันทึกการชั่ง ${ORDER.code} แล้ว`, {
+    toast.success(draft ? "บันทึกฉบับร่างแล้ว" : `บันทึกการชั่ง ${safeDoc.code}-${seq} แล้ว`, {
       description: `${plate} — น้ำหนักสินค้าจริง ${formatTon(netTon)} ตัน`,
     });
     if (!draft) router.back();
@@ -164,19 +209,21 @@ export default function AddWeighingPage() {
             </BreadcrumbItem>
             <BreadcrumbSeparator />
             <BreadcrumbItem>
-              <BreadcrumbLink href="/weighing">ใบชั่งน้ำหนัก</BreadcrumbLink>
+              <BreadcrumbLink href={`/weighing/${doc.id}`}>
+                ใบชั่งน้ำหนัก {doc.code}
+              </BreadcrumbLink>
             </BreadcrumbItem>
             <BreadcrumbSeparator />
             <BreadcrumbItem>
               <BreadcrumbPage className="text-primary">
-                เพิ่มการรับเข้า
+                เพิ่มการชั่งน้ำหนัก
               </BreadcrumbPage>
             </BreadcrumbItem>
           </BreadcrumbList>
         </Breadcrumb>
 
         <h1 className="mt-2 text-2xl font-semibold tracking-tight">
-          เพิ่มการชั่งน้ำหนัก {ORDER.code}
+          เพิ่มการชั่งน้ำหนัก {doc.code}-{seq}
         </h1>
 
         {/* ---------- หัวใบ ----------
@@ -185,18 +232,21 @@ export default function AddWeighingPage() {
         <div className="mt-4 rounded-xl border border-border bg-card p-4">
           <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
             <p className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-              <span className="font-semibold">{ORDER.productName}</span>
-              <span className="text-sm text-muted-foreground">
-                {ORDER.category}
+              <span className="font-semibold">
+                {doc.productName}
+                {doc.productSub && ` ${doc.productSub}`}
               </span>
-              <span className="text-border" aria-hidden>
-                |
-              </span>
-              <span className="text-sm text-muted-foreground">
-                {ORDER.packing}
-              </span>
+              <span className="text-sm text-muted-foreground">{doc.category}</span>
+              {doc.packing && (
+                <>
+                  <span className="text-border" aria-hidden>
+                    |
+                  </span>
+                  <span className="text-sm text-muted-foreground">{doc.packing}</span>
+                </>
+              )}
             </p>
-            <p className="text-sm">{ORDER.supplier}</p>
+            <p className="text-sm">{doc.supplier}</p>
           </div>
 
           {/* พื้นส้มอ่อน — สามตัวเลขนี้คือคำตอบของทั้งหน้า อ่านรวดเดียวจบ
@@ -237,14 +287,20 @@ export default function AddWeighingPage() {
             {plateMode === "system" ? (
               <Select value={plateSystem} onValueChange={setPlateSystem}>
                 <SelectTrigger id="plate" className="w-full bg-card">
-                  <SelectValue />
+                  <SelectValue placeholder="เลือกทะเบียนรถ" />
                 </SelectTrigger>
                 <SelectContent>
-                  {ORDER.plates.map((p) => (
-                    <SelectItem key={p} value={p}>
-                      {p}
-                    </SelectItem>
-                  ))}
+                  {plateOptions.length === 0 ? (
+                    <div className="px-2 py-1.5 text-sm text-muted-foreground">
+                      ใบนี้ยังไม่มีทะเบียนรถในระบบ
+                    </div>
+                  ) : (
+                    plateOptions.map((p) => (
+                      <SelectItem key={p} value={p}>
+                        {p}
+                      </SelectItem>
+                    ))
+                  )}
                 </SelectContent>
               </Select>
             ) : (
@@ -262,10 +318,12 @@ export default function AddWeighingPage() {
 
         {/* หมายเหตุจากคนสั่งซื้อ — อ่านอย่างเดียว แต่ต้องเห็นก่อนลงตัวเลข
             เพราะมันบอกเงื่อนไขที่ทำให้ตัวเลขผิดไปจากปกติได้ */}
-        <p className="mt-4 rounded-lg bg-brand px-4 py-3 text-sm">
-          <span className="text-muted-foreground">หมายเหตุจากผู้สั่งซื้อ: </span>
-          <span className="font-medium">{ORDER.buyerNote}</span>
-        </p>
+        {meta.buyerNote && (
+          <p className="mt-4 rounded-lg bg-brand px-4 py-3 text-sm">
+            <span className="text-muted-foreground">หมายเหตุจากผู้สั่งซื้อ: </span>
+            <span className="font-medium">{meta.buyerNote}</span>
+          </p>
+        )}
 
         {/* ---------- น้ำหนักชั่ง ----------
              เข้ากับออกอยู่แถวเดียวกัน เพราะสองค่านี้ต้องเทียบกันตลอด
@@ -420,7 +478,6 @@ function RadioBox({
     </Label>
   );
 }
-
 
 function TonStepper({
   id,
