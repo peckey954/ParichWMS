@@ -47,6 +47,7 @@ import {
 import { Textarea } from "@peckey954/ui/components/ui/textarea";
 import { cn } from "@peckey954/ui/lib/utils";
 import { toast } from "sonner";
+import { TimeField } from "@/components/time-field";
 import { TruckDocsDialog } from "@/components/weighing/truck-docs-dialog";
 import {
   DIFF_LABEL,
@@ -316,12 +317,11 @@ export default function WeighingPage() {
                               })
                             }
                           />
-                          <Input
-                            type="time"
-                            className="tabular-nums"
+                          <TimeField
+                            aria-label="เวลาชั่งเข้า"
                             value={t.grossAt}
-                            onChange={(e) =>
-                              patchTruck(t.id, { grossAt: e.target.value })
+                            onValueChange={(grossAt) =>
+                              patchTruck(t.id, { grossAt })
                             }
                           />
                         </div>
@@ -343,12 +343,11 @@ export default function WeighingPage() {
                               })
                             }
                           />
-                          <Input
-                            type="time"
-                            className="tabular-nums"
+                          <TimeField
+                            aria-label="เวลาชั่งออก"
                             value={t.tareAt}
-                            onChange={(e) =>
-                              patchTruck(t.id, { tareAt: e.target.value })
+                            onValueChange={(tareAt) =>
+                              patchTruck(t.id, { tareAt })
                             }
                           />
                         </div>

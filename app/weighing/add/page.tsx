@@ -37,6 +37,7 @@ import {
 } from "@/components/file-upload";
 import { FileViewer, type ViewerFile } from "@/components/file-viewer";
 import { useNumberField } from "@/components/number-field";
+import { TimeField } from "@/components/time-field";
 
 /* ------------------------------------------------------------------
    เพิ่มการชั่งน้ำหนัก — หนึ่งหน้าต่อรถหนึ่งคัน
@@ -59,9 +60,6 @@ const ORDER = {
   buyerNote: "ของจะเข้ามาช่วงบ่าย",
   plates: ["กส - 1234", "กส - 5678", "2 กท - 2345"],
 };
-
-/** ช่วงเวลาที่ให้เลือก — ชั่งจริงลงเป็นชั่วโมง ไม่ได้ละเอียดถึงนาที */
-const TIMES = Array.from({ length: 15 }, (_, i) => `${String(i + 6).padStart(2, "0")}:00`);
 
 /** ไฟล์ตัวอย่างที่ถือว่าอัปเสร็จแล้ว — ยังไม่มีหลังบ้าน ใช้โชว์ตัวอ่านเอกสาร */
 function seedDocs(prefix: string, names: string[]): DocFile[] {
@@ -279,7 +277,7 @@ export default function AddWeighingPage() {
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="gross-at">เวลาเข้า</Label>
-            <TimeSelect id="gross-at" value={grossAt} onValueChange={setGrossAt} />
+            <TimeField id="gross-at" value={grossAt} onValueChange={setGrossAt} />
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="tare-ton">ชั่งออกรถเปล่า (ตัน)</Label>
@@ -287,7 +285,7 @@ export default function AddWeighingPage() {
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="tare-at">เวลาออก</Label>
-            <TimeSelect id="tare-at" value={tareAt} onValueChange={setTareAt} />
+            <TimeField id="tare-at" value={tareAt} onValueChange={setTareAt} />
           </div>
 
           <div className="space-y-1.5 @2xl:col-span-2">
@@ -423,30 +421,6 @@ function RadioBox({
   );
 }
 
-function TimeSelect({
-  id,
-  value,
-  onValueChange,
-}: {
-  id: string;
-  value: string;
-  onValueChange: (v: string) => void;
-}) {
-  return (
-    <Select value={value} onValueChange={onValueChange}>
-      <SelectTrigger id={id} className="w-full bg-card">
-        <SelectValue />
-      </SelectTrigger>
-      <SelectContent>
-        {TIMES.map((t) => (
-          <SelectItem key={t} value={t}>
-            {t}
-          </SelectItem>
-        ))}
-      </SelectContent>
-    </Select>
-  );
-}
 
 function TonStepper({
   id,

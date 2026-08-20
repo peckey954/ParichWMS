@@ -28,6 +28,7 @@ import {
   TableRow,
 } from "@peckey954/ui/components/ui/table";
 import { Textarea } from "@peckey954/ui/components/ui/textarea";
+import { TimeField } from "@/components/time-field";
 import {
   NOTE_COLUMN_HINT,
   VERDICT_WORDS,
@@ -494,7 +495,11 @@ function ItemPreview({ item, index }: { item: QcItem; index: number }) {
 
                     {item.withTime && (
                       <TableCell>
-                        <Input type="time" className="tabular-nums" />
+                        <TimeField
+                          aria-label="เวลาที่ตรวจ"
+                          value=""
+                          onValueChange={() => {}}
+                        />
                       </TableCell>
                     )}
 
