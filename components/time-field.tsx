@@ -33,9 +33,17 @@ import { cn } from "@peckey954/ui/lib/utils";
    กล่องกลางจอจะบังทั้งตาราง แล้วคนกรอกจะไม่เห็นว่าอยู่ครั้งที่เท่าไหร่
    ซึ่งเป็นสิ่งเดียวที่ต้องเห็นตอนนั้น
 
-   เลือกแล้วปิดเลย ไม่มีปุ่มยืนยัน — แบบเดียวกับ Select ทุกตัวในระบบ
-   การเลือกคือการยืนยันอยู่แล้ว ปุ่มบันทึกอีกทีคือการกดที่ไม่ได้ให้อะไร
+   ชั่วโมงกับนาทีเป็นวงล้อเลื่อน ค่าที่อยู่กลางแถบคือค่าที่เลือกอยู่
+   เลื่อนแล้วค่าในช่องเปลี่ยนตามทันที ไม่มีปุ่มยืนยัน — เห็นผลระหว่างเลื่อนเลย
+   ปิดกล่องเมื่อไหร่ก็ได้ ค่าเข้าไปตั้งแต่ตอนเลื่อนแล้ว
 ------------------------------------------------------------------ */
+
+/** ความสูงของหนึ่งแถวในวงล้อ ใช้คำนวณว่าเลื่อนไปหยุดที่ค่าไหน */
+const ITEM_H = 36;
+/** จำนวนแถวที่เห็นพร้อมกัน — เลขคี่ เพื่อให้มีแถวกลางจริง ๆ */
+const VISIBLE = 5;
+/** เว้นบนล่างครึ่งหนึ่งของที่เหลือ ค่าแรกกับค่าสุดท้ายจะได้เลื่อนมาอยู่กลางได้ */
+const PAD = ((VISIBLE - 1) / 2) * ITEM_H;
 
 const HOURS = Array.from({ length: 24 }, (_, i) => String(i).padStart(2, "0"));
 /** นาทีทีละห้า — พอถึงระดับที่ต้องเป๊ะกว่านี้ พิมพ์เร็วกว่าเลื่อนหา */
@@ -70,14 +78,6 @@ export function parseTime(raw: string): string | null {
   return `${pad(h)}:${pad(m)}`;
 }
 
-/** เลื่อนเวลาถอยหลัง ใช้กับปุ่มลัด "ลืมจดตอนตรวจ" */
-function shift(value: string, minutes: number): string {
-  const base = parseTime(value);
-  const [h, m] = (base ?? toHHMM(new Date())).split(":").map(Number);
-  const total = (h * 60 + m - minutes + 1440) % 1440;
-  return `${pad(Math.floor(total / 60))}:${pad(total % 60)}`;
-}
-
 export function TimeField({
   id,
   value,
@@ -87,13 +87,23 @@ export function TimeField({
   "aria-label": ariaLabel,
 }: {
   id?: string;
-  /** รูปแบบ HH:MM — ว่างคือยังไม่ได้กรอก */
-  value: string;
-  onValueChange: (value: string) => void;
+  /** รูปแบบ HH:MM — ว่างคือยังไม่ได้กรอก ไม่ส่งมาเลยคือให้ช่องเก็บค่าเอง */
+  value?: string;
+  onValueChange?: (value: string) => void;
   className?: string;
   placeholder?: string;
   "aria-label"?: string;
 }) {
+  // หน้าตัวอย่างฟอร์มไม่มีที่เก็บค่า แต่ช่องที่กดแล้วไม่ขยับอ่านว่าพัง
+  // ไม่ส่ง value มาก็ให้ช่องเก็บของตัวเองไป จะได้ลองกดดูได้จริง
+  const [inner, setInner] = React.useState("");
+  const controlled = value !== undefined;
+  const current = controlled ? value : inner;
+
+  const setValue = (next: string) => {
+    if (!controlled) setInner(next);
+    onValueChange?.(next);
+  };
   const [open, setOpen] = React.useState(false);
   // ตัวหนังสือระหว่างที่ยังพิมพ์ไม่จบ ยังไม่ต้องแปลงเป็นเวลาทุกตัวอักษร
   // แปลงทันทีจะเถียงกับคนพิมพ์ เช่นพิมพ์ 1 แล้วเด้งเป็น 01:00 ทั้งที่กำลังจะพิมพ์ 10
@@ -103,17 +113,12 @@ export function TimeField({
 
   const commit = () => {
     if (text === null) return;
-    if (text.trim() === "") onValueChange("");
-    else onValueChange(parseTime(text) ?? value);
+    if (text.trim() === "") setValue("");
+    else setValue(parseTime(text) ?? current);
     setText(null);
   };
 
-  const pick = (next: string) => {
-    onValueChange(next);
-    setOpen(false);
-  };
-
-  const [hh, mm] = (parseTime(value) ?? "--:--").split(":");
+  const [hh, mm] = (parseTime(current) ?? "--:--").split(":");
 
   return (
     <Popover
@@ -132,7 +137,7 @@ export function TimeField({
           autoComplete="off"
           placeholder={placeholder}
           className="tabular-nums"
-          value={text ?? value}
+          value={text ?? current}
           onChange={(e) => setText(e.target.value)}
           onBlur={commit}
           onKeyDown={(e) => {
@@ -159,39 +164,50 @@ export function TimeField({
         onOpenAutoFocus={(e) => e.preventDefault()}
       >
         {/* ปุ่มเดียวที่ตอบคำถามแปดในสิบครั้ง จึงใหญ่สุดและอยู่บนสุด */}
-        <Button className="h-11 w-full" onClick={() => pick(now)}>
+        <Button
+          className="h-11 w-full"
+          onClick={() => {
+            setValue(now);
+            setOpen(false);
+          }}
+        >
           <ClockIcon />
           ตอนนี้ <span className="tabular-nums">{now}</span>
         </Button>
 
-        {/* ตรวจเสร็จแล้วเพิ่งนึกได้ว่ายังไม่ได้ลงเวลา เกิดบ่อยพอที่จะมีปุ่มให้ */}
-        <div className="mt-2 grid grid-cols-3 gap-1">
-          {[15, 30, 60].map((min) => (
-            <Button
-              key={min}
-              variant="outline"
-              className="h-9 px-1 text-xs"
-              onClick={() => pick(shift(value || now, min))}
-            >
-              −{min === 60 ? "1 ชม." : `${min} นาที`}
-            </Button>
-          ))}
-        </div>
+        {/* ป้ายอยู่นอกกรอบวงล้อ แถบกลางจึงเริ่มที่ขอบบนของวงล้อพอดี
+            ไม่ต้องเดาว่าป้ายสูงเท่าไหร่แล้วบวกชดเชยเอา
+            และแถบเดียวพาดสองคอลัมน์ ไม่ใช่สองแถบแยกกันมีร่องตรงกลาง */}
+        <div className="mt-3 border-t border-border pt-3">
+          <div className="grid grid-cols-2 gap-2 text-center text-xs text-muted-foreground">
+            <span>ชั่วโมง</span>
+            <span>นาที</span>
+          </div>
 
-        <div className="mt-3 grid grid-cols-2 gap-2 border-t border-border pt-3">
-          <TimeColumn
-            label="ชั่วโมง"
-            options={HOURS}
-            current={hh}
-            onPick={(h) => pick(`${h}:${mm === "--" ? "00" : mm}`)}
-          />
-          <TimeColumn
-            label="นาที"
-            options={MINUTES}
-            current={mm}
-            onPick={(m) => pick(`${hh === "--" ? now.slice(0, 2) : hh}:${m}`)}
-            prefix=":"
-          />
+          <div className="relative mt-1">
+            <div
+              aria-hidden
+              className="pointer-events-none absolute inset-x-0 rounded-md bg-brand"
+              style={{ top: PAD, height: ITEM_H }}
+            />
+            <div className="relative grid grid-cols-2 gap-2">
+              <Wheel
+                label="ชั่วโมง"
+                options={HOURS}
+                value={hh === "--" ? now.slice(0, 2) : hh}
+                onChange={(h) => setValue(`${h}:${mm === "--" ? "00" : mm}`)}
+              />
+              <Wheel
+                label="นาที"
+                options={MINUTES}
+                value={mm === "--" ? "00" : mm}
+                prefix=":"
+                onChange={(m) =>
+                  setValue(`${hh === "--" ? now.slice(0, 2) : hh}:${m}`)
+                }
+              />
+            </div>
+          </div>
         </div>
       </PopoverContent>
     </Popover>
@@ -199,61 +215,105 @@ export function TimeField({
 }
 
 /**
- * คอลัมน์เลื่อนหาตัวเลข
- * เลื่อนไปที่ค่าที่เลือกอยู่ตอนเปิด ไม่ใช่เริ่มที่ 00 แล้วให้ไล่หาเอง
+ * วงล้อเลื่อนหาตัวเลข
+ *
+ * เลื่อนแล้วหยุดตรงไหน ค่าตรงนั้นคือค่าที่เลือก ไม่ต้องกดอีกที
+ * ใช้ scroll snap ของเบราว์เซอร์ทำการดูดเข้าแถว ไม่ได้เขียน physics เอง
+ * นิ้วปล่อยแล้วมันไหลต่อและหยุดพอดีแถวให้เอง เหมือนวงล้อบนมือถือ
+ *
+ * ขอบบนล่างจางหายไปด้วย mask ไม่ใช่เส้นตัด
+ * ตัวเลขที่ยังไม่ถึงกลางจึงค่อย ๆ โผล่ ไม่ใช่โผล่มาเต็มตัวแล้วหายวับ
  */
-function TimeColumn({
+function Wheel({
   label,
   options,
-  current,
-  onPick,
+  value,
+  onChange,
   prefix = "",
 }: {
   label: string;
   options: string[];
-  current: string;
-  onPick: (value: string) => void;
+  value: string;
+  onChange: (value: string) => void;
   prefix?: string;
 }) {
   const ref = React.useRef<HTMLDivElement>(null);
+  const settle = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  // ครั้งแรกกระโดดไปเลย ครั้งต่อ ๆ ไปค่อยเลื่อนให้เห็น
+  // เปิดกล่องมาแล้วเห็นวงล้อกำลังวิ่งหาที่คือเสียเวลาเปล่า
+  const jumped = React.useRef(false);
+
+  const index = Math.max(0, options.indexOf(value));
 
   React.useEffect(() => {
-    ref.current
-      ?.querySelector('[data-current="true"]')
-      ?.scrollIntoView({ block: "center" });
-  }, []);
+    const el = ref.current;
+    if (!el) return;
+    const target = index * ITEM_H;
+    // ห่างไม่ถึงหนึ่งแถวแปลว่ามันมาจากการเลื่อนของคนใช้เอง อย่าไปดึงซ้ำ
+    if (Math.abs(el.scrollTop - target) < 2) return;
+    el.scrollTo({
+      top: target,
+      behavior: jumped.current ? "smooth" : "instant",
+    });
+    jumped.current = true;
+  }, [index]);
+
+  // เบราว์เซอร์ยิง scroll รัว ๆ ระหว่างที่ยังไหลอยู่
+  // รอให้นิ่งก่อนค่อยอ่านว่าหยุดที่แถวไหน ไม่งั้นค่าจะกระพริบไปตลอดทาง
+  const handleScroll = () => {
+    if (settle.current) clearTimeout(settle.current);
+    settle.current = setTimeout(() => {
+      const el = ref.current;
+      if (!el) return;
+      const i = Math.min(
+        options.length - 1,
+        Math.max(0, Math.round(el.scrollTop / ITEM_H))
+      );
+      if (options[i] !== value) onChange(options[i]);
+    }, 100);
+  };
 
   return (
-    <div>
-      <p className="mb-1 text-xs text-muted-foreground">{label}</p>
-      <div
-        ref={ref}
-        role="listbox"
-        aria-label={label}
-        className="max-h-40 overflow-y-auto rounded-md border border-border"
-      >
-        {options.map((o) => {
-          const on = o === current;
-          return (
-            <button
-              key={o}
-              type="button"
-              role="option"
-              aria-selected={on}
-              data-current={on}
-              onClick={() => onPick(o)}
-              className={cn(
-                "block w-full px-2 py-2 text-center text-sm tabular-nums transition-colors",
-                "hover:bg-accent-hover focus-visible:bg-accent-hover focus-visible:outline-none",
-                on && "bg-brand font-semibold text-primary"
-              )}
-            >
-              {prefix}
-              {o}
-            </button>
-          );
-        })}
-      </div>
+    <div
+      ref={ref}
+      onScroll={handleScroll}
+      role="listbox"
+      aria-label={label}
+      tabIndex={0}
+      className={cn(
+        "snap-y snap-mandatory overflow-y-auto overscroll-contain",
+        "[scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
+        // ขอบบนล่างจางหายด้วย mask ไม่ใช่เส้นตัด ตัวเลขจึงค่อย ๆ โผล่
+        "[mask-image:linear-gradient(to_bottom,transparent,#000_30%,#000_70%,transparent)]",
+        "focus-visible:outline-none"
+      )}
+      style={{
+        height: VISIBLE * ITEM_H,
+        paddingTop: PAD,
+        paddingBottom: PAD,
+      }}
+    >
+      {options.map((o) => {
+        const on = o === value;
+        return (
+          <button
+            key={o}
+            type="button"
+            role="option"
+            aria-selected={on}
+            onClick={() => onChange(o)}
+            style={{ height: ITEM_H }}
+            className={cn(
+              "flex w-full snap-center items-center justify-center",
+              "text-base tabular-nums transition-colors",
+              on ? "font-semibold text-primary" : "text-muted-foreground"
+            )}
+          >
+            {prefix}
+            {o}
+          </button>
+        );
+      })}
     </div>
   );
 }

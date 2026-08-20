@@ -495,11 +495,9 @@ function ItemPreview({ item, index }: { item: QcItem; index: number }) {
 
                     {item.withTime && (
                       <TableCell>
-                        <TimeField
-                          aria-label="เวลาที่ตรวจ"
-                          value=""
-                          onValueChange={() => {}}
-                        />
+                        {/* ไม่ส่ง value มา ช่องจึงเก็บค่าเอง — หน้านี้เป็นตัวอย่าง
+                            ไม่มีที่เก็บค่าจริง แต่ช่องที่กดแล้วไม่ขยับอ่านว่าพัง */}
+                        <TimeField aria-label="เวลาที่ตรวจ" />
                       </TableCell>
                     )}
 
