@@ -14,19 +14,12 @@ import { Input } from "@peckey954/ui/components/ui/input";
 import { Label } from "@peckey954/ui/components/ui/label";
 import { cn } from "@peckey954/ui/lib/utils";
 import { CheckChip } from "@/components/check-chip";
-import { ChoiceGroup, type Choice } from "@/components/choice-group";
+import { ChipGroup, type Chip } from "@/components/chip-group";
 import {
   ITEM_SETTINGS_DEFAULT,
-  NOTE_MODE_HINT,
-  NOTE_MODE_LABEL,
-  VERDICT_HINT,
-  VERDICT_LABEL,
-  VERDICT_WORDING_LABEL,
   isSettingsDefault,
   type ItemSettings,
   type NoteMode,
-  type VerdictMode,
-  type VerdictWording,
 } from "@/lib/qc-template";
 
 /* ------------------------------------------------------------------
@@ -46,9 +39,37 @@ import {
    ไม่ใช่ติ๊กเปิดข้างบนแล้วมีสามตัวเลือกซ่อนอยู่ข้างล่างอีกที
 ------------------------------------------------------------------ */
 
-const VERDICT_ORDER: VerdictMode[] = ["manual", "auto", "none"];
-const WORDING_ORDER: VerdictWording[] = ["passFail", "normalAbnormal"];
-const NOTE_ORDER: NoteMode[] = ["off", "optional", "onFail", "always"];
+/**
+ * การตรวจสอบเป็นแถวเดียว ไม่ใช่ "ตัดสินยังไง" แล้วมี "ใช้คำว่าอะไร" ซ่อนอยู่ข้างล่างอีกที
+ * คนตั้งฟอร์มคิดเป็น "ข้อนี้ติ๊กผ่าน/ไม่ผ่าน" ไม่ได้คิดแยกสองชั้น
+ */
+type VerdictChoice = "passFail" | "normalAbnormal" | "auto" | "none";
+
+const VERDICT_CHIPS: { id: VerdictChoice; label: string; hint?: string }[] = [
+  { id: "passFail", label: "ผ่าน/ไม่ผ่าน" },
+  { id: "normalAbnormal", label: "ปกติ/ผิดปกติ" },
+  {
+    id: "auto",
+    label: "ระบบตัดสิน",
+    hint: "ระบบตัดสินจากเกณฑ์ของช่องตัวเลข ผู้ตรวจไม่ต้องติ๊ก",
+  },
+  { id: "none", label: "ไม่มี" },
+];
+
+/** ป้ายในกล่องนี้ยาวกว่าป้ายบนการ์ด เพราะตรงนี้คือที่ที่ต้องอ่านให้เข้าใจก่อนเลือก */
+const NOTE_CHIPS: { id: NoteMode; label: string }[] = [
+  { id: "optional", label: "ไม่บังคับ" },
+  { id: "onFail", label: "บังคับระบุเมื่อไม่ผ่าน/ไม่ปกติ" },
+  { id: "always", label: "บังคับ" },
+  { id: "off", label: "ไม่มี" },
+];
+
+const toSettings = (c: VerdictChoice): Partial<ItemSettings> =>
+  c === "none"
+    ? { verdict: "none" }
+    : c === "auto"
+      ? { verdict: "auto" }
+      : { verdict: "manual", verdictWording: c };
 
 export function ItemSettingsDialog({
   title,
@@ -80,11 +101,20 @@ export function ItemSettingsDialog({
     setOpen(v);
   };
 
-  const verdictOptions: Choice<VerdictMode>[] = VERDICT_ORDER.map((v) => ({
-    id: v,
-    label: VERDICT_LABEL[v],
-    disabled: v === "auto" && !canAutoJudge,
-    disabledHint: "ต้องมีช่องตัวเลขที่ตั้งเกณฑ์ไว้อย่างน้อยหนึ่งช่องก่อน",
+  const verdictValue: VerdictChoice =
+    draft.verdict === "none"
+      ? "none"
+      : draft.verdict === "auto"
+        ? "auto"
+        : draft.verdictWording;
+
+  const verdictChips: Chip<VerdictChoice>[] = VERDICT_CHIPS.map((c) => ({
+    ...c,
+    disabled: c.id === "auto" && !canAutoJudge,
+    hint:
+      c.id === "auto" && !canAutoJudge
+        ? "ต้องมีช่องตัวเลขที่ตั้งเกณฑ์ไว้อย่างน้อยหนึ่งช่องก่อน"
+        : c.hint,
   }));
 
   return (
@@ -101,7 +131,9 @@ export function ItemSettingsDialog({
           ปิดวงแหวนของ focus แล้วคืนให้เฉพาะ focus-visible ซึ่งขึ้นเฉพาะตอนกด Tab */}
       <DialogContent
         aria-describedby={undefined}
-        className="flex max-h-[85svh] flex-col gap-0 overflow-hidden! p-0 sm:max-w-md [&_[data-slot=dialog-close]]:focus:ring-0 [&_[data-slot=dialog-close]]:focus:ring-offset-0 [&_[data-slot=dialog-close]]:focus-visible:ring-2 [&_[data-slot=dialog-close]]:focus-visible:ring-ring [&_[data-slot=dialog-close]]:focus-visible:ring-offset-2"
+        // กว้างกว่ากล่องตัวกรองหนึ่งขั้น เพราะชิปหมายเหตุยาวกว่าชิปทั่วไปมาก
+        // "บังคับระบุเมื่อไม่ผ่าน/ไม่ปกติ" ต้องอ่านครบ ตัดบรรทัดกลางคำไม่ได้
+        className="flex max-h-[85svh] flex-col gap-0 overflow-hidden! p-0 sm:max-w-lg [&_[data-slot=dialog-close]]:focus:ring-0 [&_[data-slot=dialog-close]]:focus:ring-offset-0 [&_[data-slot=dialog-close]]:focus-visible:ring-2 [&_[data-slot=dialog-close]]:focus-visible:ring-ring [&_[data-slot=dialog-close]]:focus-visible:ring-offset-2"
       >
         <DialogHeader className="px-4 pt-4 text-left">
           {/* บอกด้วยว่ากำลังแก้ข้อไหน ฟอร์มยาว ๆ เปิดกล่องแล้วลืมได้ง่าย */}
@@ -110,50 +142,25 @@ export function ItemSettingsDialog({
 
         <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-4">
           <Section title="การตรวจสอบ">
-            <ChoiceGroup
+            <ChipGroup
               label="การตรวจสอบ"
-              options={verdictOptions}
-              value={draft.verdict}
-              onChange={(verdict) => set({ verdict })}
+              options={verdictChips}
+              value={verdictValue}
+              onChange={(c) => set(toSettings(c))}
             />
-            <Hint>{VERDICT_HINT[draft.verdict]}</Hint>
-
-            {/* คำที่ใช้บนปุ่มติ๊กมีความหมายเฉพาะตอนผู้ตรวจติ๊กเอง
-                โหมดอื่นไม่มีปุ่มให้ติ๊ก ตัวเลือกนี้จึงไม่ต้องอยู่ */}
-            {draft.verdict === "manual" && (
-              <div className="mt-3">
-                <Label className="text-sm font-normal text-muted-foreground">
-                  คำที่ใช้บนปุ่มติ๊ก
-                </Label>
-                <ChoiceGroup
-                  className="mt-2"
-                  label="คำที่ใช้บนปุ่มติ๊ก"
-                  options={WORDING_ORDER.map((w) => ({
-                    id: w,
-                    label: VERDICT_WORDING_LABEL[w],
-                  }))}
-                  value={draft.verdictWording}
-                  onChange={(verdictWording) => set({ verdictWording })}
-                />
-              </div>
-            )}
           </Section>
 
           <Section title="หมายเหตุ">
-            <ChoiceGroup
+            <ChipGroup
               label="หมายเหตุ"
-              options={NOTE_ORDER.map((n) => ({
-                id: n,
-                label: NOTE_MODE_LABEL[n],
-              }))}
+              options={NOTE_CHIPS}
               value={draft.note}
               onChange={(note) => set({ note })}
             />
-            <Hint>{NOTE_MODE_HINT[draft.note]}</Hint>
           </Section>
 
           <Section title="จำนวนครั้ง">
-            <ChoiceGroup
+            <ChipGroup
               label="จำนวนครั้ง"
               options={[
                 { id: "once", label: "ครั้งเดียว" },
@@ -177,7 +184,7 @@ export function ItemSettingsDialog({
             {draft.repeatable && (
               <div className="mt-3 grid grid-cols-2 gap-3">
                 <Stepper
-                  label="จำนวนครั้งเริ่มต้น"
+                  label="จำนวนครั้งขั้นต่ำ"
                   value={draft.defaultRounds}
                   min={1}
                   max={draft.maxRounds}
@@ -198,20 +205,23 @@ export function ItemSettingsDialog({
           {/* วันที่กับเวลาไม่มีเนื้อหาให้เว้นว่าง จึงต้องมีติ๊กบอกว่าเอาหรือไม่เอา
               ต่างจากชื่อย่อยกับเกณฑ์ที่ "ว่าง = ไม่มี" ตอบตัวเองอยู่แล้ว
               วันที่ในหัวเอกสารคือวันที่ของทั้งใบ ส่วนอันนี้คือของแต่ละครั้งที่ตรวจ
-              ข้อที่ตรวจซ้ำข้ามวันจึงต้องรู้ว่าครั้งไหนวันไหน */}
-          <Section title="ช่องเพิ่มเติม">
+              ข้อที่ตรวจซ้ำข้ามวันจึงต้องรู้ว่าครั้งไหนวันไหน
+
+              สองอันนี้ติ๊กพร้อมกันได้ จึงเป็นชิปที่มีกล่องติ๊กอยู่ข้างใน
+              ต่างจากชิปเปล่าด้านบนที่เลือกได้อันเดียว */}
+          <Section title="ข้อมูลแสดงเพิ่มเติม">
             <div className="flex flex-wrap gap-2">
               <CheckChip
-                id="qc-with-date"
-                label="วันที่ตรวจ"
-                checked={draft.withDate}
-                onChange={(withDate) => set({ withDate })}
-              />
-              <CheckChip
                 id="qc-with-time"
-                label="เวลาที่ตรวจ"
+                label="เวลา"
                 checked={draft.withTime}
                 onChange={(withTime) => set({ withTime })}
+              />
+              <CheckChip
+                id="qc-with-date"
+                label="วันที่"
+                checked={draft.withDate}
+                onChange={(withDate) => set({ withDate })}
               />
             </div>
           </Section>
@@ -275,11 +285,6 @@ function Section({
       <div className="mt-2">{children}</div>
     </div>
   );
-}
-
-/** บรรทัดอธิบายว่าตัวเลือกที่เลือกอยู่แปลว่าอะไรตอนตรวจจริง */
-function Hint({ children }: { children: React.ReactNode }) {
-  return <p className="mt-2 text-sm text-muted-foreground">{children}</p>;
 }
 
 /**
