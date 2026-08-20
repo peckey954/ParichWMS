@@ -121,8 +121,15 @@ export function FormPreview({ template }: { template: QcTemplate }) {
                           <TableCell className="pl-4 tabular-nums">
                             {index + 1}
                           </TableCell>
-                          <TableCell className="font-medium">
-                            {item.title || "—"}
+                          <TableCell>
+                            <span className="font-medium">
+                              {item.title || "—"}
+                            </span>
+                            {item.description && (
+                              <span className="block font-normal text-muted-foreground">
+                                {item.description}
+                              </span>
+                            )}
                           </TableCell>
                           {showCriteria && (
                             <TableCell className="text-muted-foreground">
@@ -293,6 +300,11 @@ function ItemPreview({ item, index }: { item: QcItem; index: number }) {
           <h3 className="text-base font-semibold">
             {index + 1}. {item.title || "ยังไม่ได้ตั้งชื่อหัวข้อ"}
           </h3>
+          {item.description && (
+            <p className="mt-0.5 text-sm text-muted-foreground">
+              {item.description}
+            </p>
+          )}
           {(item.criteria || ruleText) && (
             <p className="mt-0.5 text-sm text-muted-foreground">
               เกณฑ์: {item.criteria || ruleText}
@@ -333,6 +345,11 @@ function ItemPreview({ item, index }: { item: QcItem; index: number }) {
                         <span className="font-medium">
                           {index + 1}.{ci + 1} {c.title || "—"}
                         </span>
+                        {c.description && (
+                          <span className="block font-normal text-muted-foreground">
+                            {c.description}
+                          </span>
+                        )}
                       </TableCell>
                       {childCriteria && (
                         <TableCell className="text-muted-foreground">
@@ -392,6 +409,10 @@ function ItemPreview({ item, index }: { item: QcItem; index: number }) {
                     </TableHead>
                   ))}
 
+                  {item.withDate && (
+                    <TableHead className="w-40">วันที่ตรวจ</TableHead>
+                  )}
+
                   {item.withTime && (
                     <TableHead className="w-32 text-right">เวลาที่ตรวจ</TableHead>
                   )}
@@ -400,7 +421,10 @@ function ItemPreview({ item, index }: { item: QcItem; index: number }) {
                     <TableHead
                       className={cellPad(
                         "w-48",
-                        !item.repeatable && item.fields.length === 0
+                        !item.repeatable &&
+                          item.fields.length === 0 &&
+                          !item.withDate &&
+                          !item.withTime
                       )}
                     >
                       ผลการตรวจ
@@ -454,6 +478,12 @@ function ItemPreview({ item, index }: { item: QcItem; index: number }) {
                       </TableCell>
                     ))}
 
+                    {item.withDate && (
+                      <TableCell>
+                        <Input type="date" className="tabular-nums" />
+                      </TableCell>
+                    )}
+
                     {item.withTime && (
                       <TableCell>
                         <Input type="time" className="tabular-nums" />
@@ -464,7 +494,10 @@ function ItemPreview({ item, index }: { item: QcItem; index: number }) {
                       <TableCell
                         className={cellPad(
                           "",
-                          !item.repeatable && item.fields.length === 0
+                          !item.repeatable &&
+                          item.fields.length === 0 &&
+                          !item.withDate &&
+                          !item.withTime
                         )}
                       >
                         <TickChoice

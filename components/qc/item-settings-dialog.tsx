@@ -195,13 +195,25 @@ export function ItemSettingsDialog({
             )}
           </Section>
 
+          {/* วันที่กับเวลาไม่มีเนื้อหาให้เว้นว่าง จึงต้องมีติ๊กบอกว่าเอาหรือไม่เอา
+              ต่างจากชื่อย่อยกับเกณฑ์ที่ "ว่าง = ไม่มี" ตอบตัวเองอยู่แล้ว
+              วันที่ในหัวเอกสารคือวันที่ของทั้งใบ ส่วนอันนี้คือของแต่ละครั้งที่ตรวจ
+              ข้อที่ตรวจซ้ำข้ามวันจึงต้องรู้ว่าครั้งไหนวันไหน */}
           <Section title="ช่องเพิ่มเติม">
-            <CheckChip
-              id="qc-with-time"
-              label="เวลาที่ตรวจ"
-              checked={draft.withTime}
-              onChange={(withTime) => set({ withTime })}
-            />
+            <div className="flex flex-wrap gap-2">
+              <CheckChip
+                id="qc-with-date"
+                label="วันที่ตรวจ"
+                checked={draft.withDate}
+                onChange={(withDate) => set({ withDate })}
+              />
+              <CheckChip
+                id="qc-with-time"
+                label="เวลาที่ตรวจ"
+                checked={draft.withTime}
+                onChange={(withTime) => set({ withTime })}
+              />
+            </div>
           </Section>
         </div>
 

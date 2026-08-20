@@ -191,6 +191,20 @@ export function ItemEditor({
               onChange={(e) => onPatch({ criteria: e.target.value })}
             />
           </div>
+
+          {/* ข้อความย่อยใต้ชื่อหัวข้อ — บางข้อต้องบอกวิธีตรวจเพิ่ม
+              เช่นสุ่มจากตรงไหน ใช้เครื่องมืออะไร ซึ่งยัดลงชื่อหัวข้อไม่ได้
+              เว้นว่าง = ไม่มีบรรทัดนี้ในใบตรวจ ไม่ต้องมีติ๊กเปิด/ปิดอีกที */}
+          <div className="space-y-2 @2xl:col-span-2">
+            <Label htmlFor={`${item.id}-desc`}>รายละเอียดหัวข้อ</Label>
+            <Input
+              id={`${item.id}-desc`}
+              value={item.description}
+              placeholder="ข้อความย่อยใต้ชื่อหัวข้อ — เว้นว่างได้"
+              className="bg-card"
+              onChange={(e) => onPatch({ description: e.target.value })}
+            />
+          </div>
         </div>
 
         {/* ---- ช่องที่ผู้ตรวจต้องกรอก ----

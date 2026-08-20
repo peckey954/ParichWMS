@@ -164,6 +164,8 @@ export const UNIT_OPTIONS = [
 export type QcItem = {
   id: string;
   title: string;
+  /** ข้อความย่อยใต้ชื่อหัวข้อ — ว่าง = ไม่มีบรรทัดนี้ในใบตรวจ */
+  description: string;
   criteria: string;
   verdict: VerdictMode;
   verdictWording: VerdictWording;
@@ -174,6 +176,8 @@ export type QcItem = {
   repeatable: boolean;
   defaultRounds: number;
   maxRounds: number;
+  /** ช่องวันที่ของแต่ละครั้งที่ตรวจ — คนละอันกับวันที่ตรวจในหัวเอกสาร */
+  withDate: boolean;
   withTime: boolean;
   /** หัวข้อย่อย — ใช้กับฟอร์มที่จัดเป็นกลุ่ม เช่น ใบตรวจก่อนผลิต */
   children: QcItem[];
@@ -193,6 +197,7 @@ export type ItemSettings = Pick<
   | "repeatable"
   | "defaultRounds"
   | "maxRounds"
+  | "withDate"
   | "withTime"
 >;
 
@@ -203,6 +208,7 @@ export const ITEM_SETTINGS_DEFAULT: ItemSettings = {
   repeatable: false,
   defaultRounds: 1,
   maxRounds: 3,
+  withDate: false,
   withTime: false,
 };
 
@@ -213,6 +219,7 @@ export const pickSettings = (item: QcItem): ItemSettings => ({
   repeatable: item.repeatable,
   defaultRounds: item.defaultRounds,
   maxRounds: item.maxRounds,
+  withDate: item.withDate,
   withTime: item.withTime,
 });
 
@@ -257,6 +264,7 @@ export function newItem(): QcItem {
   return {
     id: uid("item"),
     title: "",
+    description: "",
     criteria: "",
     ...ITEM_SETTINGS_DEFAULT,
     fields: [],
@@ -387,7 +395,10 @@ export function itemBadges(item: QcItem): string[] {
 
   if (item.note !== d.note) out.push(NOTE_BADGE_LABEL[item.note]);
   if (item.repeatable) out.push(`บันทึกได้ ${item.maxRounds} ครั้ง`);
-  if (item.withTime) out.push("มีเวลาที่ตรวจ");
+
+  if (item.withDate && item.withTime) out.push("มีวันที่และเวลาที่ตรวจ");
+  else if (item.withDate) out.push("มีวันที่ตรวจ");
+  else if (item.withTime) out.push("มีเวลาที่ตรวจ");
 
   return out;
 }
@@ -399,6 +410,7 @@ export const isSettingsDefault = (s: ItemSettings) =>
   s.repeatable === ITEM_SETTINGS_DEFAULT.repeatable &&
   s.defaultRounds === ITEM_SETTINGS_DEFAULT.defaultRounds &&
   s.maxRounds === ITEM_SETTINGS_DEFAULT.maxRounds &&
+  s.withDate === ITEM_SETTINGS_DEFAULT.withDate &&
   s.withTime === ITEM_SETTINGS_DEFAULT.withTime;
 
 // ---------------------------------------------------------------
@@ -451,9 +463,14 @@ export const ROLE_OPTIONS = [
 // เทมเพลตตั้งต้น — ถอดมาจาก FM-QC-02-03 ใบรายงานการตรวจสอบสินค้าสำเร็จรูป
 // ---------------------------------------------------------------
 
-const tick = (title: string, criteria: string): QcItem => ({
+const tick = (
+  title: string,
+  criteria: string,
+  description = ""
+): QcItem => ({
   id: uid("seed"),
   title,
+  description,
   criteria,
   ...ITEM_SETTINGS_DEFAULT,
   maxRounds: 1,
@@ -498,6 +515,7 @@ export const SEED_TEMPLATE: QcTemplate = {
       // ตัวอย่างข้อที่ต้องทำทั้งสองอย่าง: คีย์น้ำหนัก + ผู้ตรวจติ๊กยืนยันเอง
       id: "it-1",
       title: "น้ำหนักของปุ๋ย",
+      description: "สุ่มกระสอบจากปลายสายพานหลังเย็บปิดปากแล้ว",
       criteria: "น้ำหนักต่อกระสอบ ≥ 50.2 kg (บรรจุ 50 kg)",
       verdict: "manual",
       verdictWording: "passFail",
@@ -506,6 +524,7 @@ export const SEED_TEMPLATE: QcTemplate = {
       repeatable: true,
       defaultRounds: 2,
       maxRounds: 3,
+      withDate: false,
       withTime: true,
       children: [],
     },
@@ -513,6 +532,7 @@ export const SEED_TEMPLATE: QcTemplate = {
       // สามช่องที่มีเกณฑ์ของตัวเองแยกกัน แล้วให้ระบบตัดสินเอง
       id: "it-2",
       title: "สูตรปุ๋ย",
+      description: "",
       criteria: "ตัวเลขธาตุอาหารที่วัดได้ต้องตรงกับสูตรที่รับรอง — 15-15-15",
       verdict: "auto",
       verdictWording: "passFail",
@@ -525,10 +545,15 @@ export const SEED_TEMPLATE: QcTemplate = {
       repeatable: true,
       defaultRounds: 2,
       maxRounds: 3,
+      withDate: false,
       withTime: true,
       children: [],
     },
-    tick("ตรวจการเย็บกระสอบ", "ระยะห่างฝีเข็มต้องสม่ำเสมอ ต้องเป็นด้ายคู่"),
+    tick(
+      "ตรวจการเย็บกระสอบ",
+      "ระยะห่างฝีเข็มต้องสม่ำเสมอ ต้องเป็นด้ายคู่",
+      "ดูทั้งแนวเย็บบนและล่าง"
+    ),
     tick("กลิ่นของปุ๋ย", "ไม่มีกลิ่น หรือมีกลิ่นสารเคมีอ่อน ๆ"),
     tick("การตรวจสอบด้วยการสัมผัส", "สีของเม็ดปุ๋ยต้องไม่ติดมือ"),
     tick("กระสอบที่ใช้ตรงสูตรใหม่", "ปุ๋ยหน้ากระสอบต้องตรงกับเนื้อปุ๋ยข้างใน"),
@@ -537,6 +562,7 @@ export const SEED_TEMPLATE: QcTemplate = {
       // คีย์ตัวเลข + ติ๊กเอง โดยระบบขึ้นผลที่คำนวณได้ให้ดูเป็นตัวช่วย
       id: "it-8",
       title: "ความชื้น",
+      description: "วัดด้วยเครื่องวัดความชื้นแบบเข็ม เสียบลึกกลางกระสอบ",
       criteria: "ความชื้นไม่เกิน 80%",
       verdict: "manual",
       verdictWording: "passFail",
@@ -547,7 +573,9 @@ export const SEED_TEMPLATE: QcTemplate = {
       note: "onFail",
       repeatable: true,
       defaultRounds: 2,
+      // ตรวจข้ามวันได้ ความชื้นวัดซ้ำหลังกองทิ้งไว้ จึงต้องรู้ว่าครั้งไหนวันไหน
       maxRounds: 3,
+      withDate: true,
       withTime: true,
       children: [],
     },
