@@ -47,6 +47,12 @@ import {
 } from "@peckey954/ui/components/ui/tabs";
 import { cn } from "@peckey954/ui/lib/utils";
 import { toast } from "sonner";
+import {
+  COL_FIRST,
+  HEAD_FIRST,
+  STICKY_HEAD,
+  TableFrame,
+} from "@/components/stock/doc-parts";
 import { TimeField } from "@/components/time-field";
 import {
   INSPECTORS,
@@ -634,13 +640,15 @@ function Verdict({
  */
 function SheetView({ items, rounds }: { items: QcItem[]; rounds: Round[] }) {
   return (
-    <div className="overflow-x-auto rounded-lg border border-border bg-card">
+    // ระยะในเซลล์กับกรอบใช้ชุดเดียวกับตารางอื่นในระบบ ไม่ได้ตั้งเองซ้ำอีกที
+    <TableFrame>
       <Table>
-        <TableHeader className="[&_th]:h-auto [&_th]:py-3 [&_th]:leading-snug">
+        <TableHeader className={cn(STICKY_HEAD, "[&_th]:leading-snug")}>
           <TableRow>
-            <TableHead className="w-14 pl-4">ข้อ</TableHead>
-            <TableHead className="min-w-52">รายการตรวจ</TableHead>
-            <TableHead className="min-w-56">เกณฑ์มาตรฐาน</TableHead>
+            <TableHead className={cn(HEAD_FIRST, "min-w-56")}>
+              รายการตรวจ
+            </TableHead>
+            <TableHead className="min-w-60">เกณฑ์มาตรฐาน</TableHead>
             {rounds.map((r, i) => (
               <TableHead key={r.id} className="min-w-32 text-center">
                 ครั้งที่ {i + 1}
@@ -649,7 +657,7 @@ function SheetView({ items, rounds }: { items: QcItem[]; rounds: Round[] }) {
                 </span>
               </TableHead>
             ))}
-            <TableHead className="min-w-28 pr-4 text-center">สรุป</TableHead>
+            <TableHead className="min-w-28 text-center">สรุป</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -657,14 +665,11 @@ function SheetView({ items, rounds }: { items: QcItem[]; rounds: Round[] }) {
             const [pass, fail] = VERDICT_WORDS[item.verdictWording];
             return (
               <TableRow key={item.id}>
-                <TableCell className="pl-4 tabular-nums">{i + 1}</TableCell>
-                <TableCell>
+                <TableCell className={COL_FIRST}>
+                  <span className="text-muted-foreground tabular-nums">
+                    {i + 1}.
+                  </span>{" "}
                   <span className="font-medium">{item.title}</span>
-                  {item.description && (
-                    <span className="block text-sm text-muted-foreground">
-                      {item.description}
-                    </span>
-                  )}
                 </TableCell>
                 <TableCell className="text-sm text-muted-foreground">
                   {item.criteria || describeItemRules(item) || "—"}
@@ -701,7 +706,7 @@ function SheetView({ items, rounds }: { items: QcItem[]; rounds: Round[] }) {
                   );
                 })}
 
-                <TableCell className="pr-4 text-center">
+                <TableCell className="text-center">
                   <Verdict
                     value={overallOf(item, rounds)}
                     words={[pass, fail]}
@@ -712,6 +717,6 @@ function SheetView({ items, rounds }: { items: QcItem[]; rounds: Round[] }) {
           })}
         </TableBody>
       </Table>
-    </div>
+    </TableFrame>
   );
 }

@@ -48,6 +48,12 @@ import {
 } from "@peckey954/ui/components/ui/table";
 import { cn } from "@peckey954/ui/lib/utils";
 import { toast } from "sonner";
+import {
+  COL_FIRST,
+  HEAD_FIRST,
+  STICKY_HEAD,
+  TableFrame,
+} from "@/components/stock/doc-parts";
 import { TimeField } from "@/components/time-field";
 import {
   INSPECTORS,
@@ -443,27 +449,24 @@ function RoundCard({
         </div>
 
         {/* ---- ตารางข้อตรวจ ----
-             หัวข้อกับรายละเอียดตรึงไว้ทางซ้าย เลื่อนดูช่องกรอกทางขวาได้
-             โดยยังรู้ว่ากำลังกรอกข้อไหนอยู่ */}
-        <div className="overflow-x-auto border-t border-border">
+             ใช้ TableFrame ชุดเดียวกับตารางอื่นในระบบ ระยะในเซลล์ 16px
+             ไม่ใช่ 8px ของ DS ซึ่งแน่นเกินไปสำหรับตารางที่มีช่องกรอกอยู่ข้างใน
+             ปิดกรอบนอกไว้เพราะการ์ดของรอบมีกรอบอยู่แล้ว เหลือแค่เส้นบน */}
+        <TableFrame className="rounded-none border-0 border-t border-border">
           <Table>
-            <TableHeader className="[&_th]:h-auto [&_th]:py-3 [&_th]:leading-snug">
+            <TableHeader className={cn(STICKY_HEAD, "[&_th]:leading-snug")}>
               <TableRow>
                 {/* ตรึงคอลัมน์เดียว ไม่ใช่สองคอลัมน์ซ้อนกัน
                     ตรึงสองคอลัมน์ต้องรู้ความกว้างของคอลัมน์แรกเป๊ะ ๆ ไปใส่เป็น left ของอันที่สอง
                     ตารางกว้างอัตโนมัติแล้วเลขไม่ตรง คอลัมน์ที่สองจะเลื่อนไปทับคอลัมน์ถัดไป
                     เอาลำดับข้อมาไว้ในเซลล์เดียวกับหัวข้อไปเลย เหมือนที่กระดาษอ่านว่า "8 ความชื้น" */}
-                <TableHead className="sticky left-0 z-20 min-w-52 bg-muted pl-4 shadow-[var(--sticky-shadow-r)]">
+                <TableHead className={cn(HEAD_FIRST, "min-w-56")}>
                   หัวข้อ
                 </TableHead>
-                <TableHead className="min-w-40">รายละเอียด</TableHead>
-                <TableHead className="min-w-52">เกณฑ์</TableHead>
-                <TableHead className="min-w-44">ค่าที่วัด</TableHead>
-                <TableHead className="min-w-40">ผลการตรวจสอบ</TableHead>
-                <TableHead className="min-w-44">หมายเหตุ</TableHead>
-                {/* ตัวเลขรวมของทุกครั้ง เช่นน้ำหนักรวม หรือค่าเฉลี่ยความแข็ง
-                    ข้อที่ไม่มีอะไรให้รวมก็เป็นขีดไป */}
-                <TableHead className="min-w-40 pr-4">สรุปทุกครั้ง</TableHead>
+                <TableHead className="min-w-60">เกณฑ์</TableHead>
+                <TableHead className="min-w-48">ค่าที่วัด</TableHead>
+                <TableHead className="min-w-44">ผลการตรวจสอบ</TableHead>
+                <TableHead className="min-w-48">หมายเหตุ</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -483,7 +486,7 @@ function RoundCard({
               ))}
             </TableBody>
           </Table>
-        </div>
+        </TableFrame>
       </CollapsibleContent>
     </Collapsible>
   );
@@ -558,17 +561,17 @@ function ItemLine({
 
   return (
     <TableRow className={cn(!editable && "text-muted-foreground")}>
-      <TableCell className="sticky left-0 z-10 bg-card pl-4 shadow-[var(--sticky-shadow-r)]">
+      <TableCell className={COL_FIRST}>
         <span className="text-muted-foreground tabular-nums">{index + 1}.</span>{" "}
         <span className="font-medium">{item.title}</span>
-      </TableCell>
-      <TableCell className="text-sm text-muted-foreground">
-        {item.description || "—"}
       </TableCell>
       <TableCell className="text-sm text-muted-foreground">
         {item.criteria || describeItemRules(item) || "—"}
       </TableCell>
 
+      {/* ตัวเลขรวมของทุกครั้งอยู่ใต้ช่องค่าที่วัด ไม่ได้แยกเป็นคอลัมน์ของตัวเอง
+          เป็นตัวเลขชุดเดียวกัน แค่มองคนละมุม — ครั้งนี้เท่าไหร่ กับรวมทุกครั้งเท่าไหร่
+          แยกคอลัมน์แล้วตารางล้นออกนอกกรอบ 133px ทั้งที่มีข้อมูลแค่สองในแปดแถว */}
       <TableCell>
         {item.fields.length === 0 ? (
           <span className="text-sm text-muted-foreground">—</span>
@@ -601,6 +604,17 @@ function ItemLine({
                   }
                 />
               </div>
+            ))}
+          </div>
+        )}
+
+        {summary.length > 0 && (
+          <div className="mt-2">
+            {summary.map((s) => (
+              <span key={s.label} className="block text-xs whitespace-nowrap">
+                <span className="text-muted-foreground">{s.label}: </span>
+                <span className="font-semibold tabular-nums">{s.value}</span>
+              </span>
             ))}
           </div>
         )}
@@ -658,19 +672,6 @@ function ItemLine({
             value={answer.note}
             onChange={(e) => onPatch({ note: e.target.value })}
           />
-        )}
-      </TableCell>
-
-      <TableCell className="pr-4">
-        {summary.length === 0 ? (
-          <span className="text-sm text-muted-foreground">—</span>
-        ) : (
-          summary.map((s) => (
-            <span key={s.label} className="block text-sm whitespace-nowrap">
-              <span className="text-muted-foreground">{s.label}: </span>
-              <span className="font-semibold tabular-nums">{s.value}</span>
-            </span>
-          ))
         )}
       </TableCell>
     </TableRow>

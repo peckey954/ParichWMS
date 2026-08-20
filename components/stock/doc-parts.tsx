@@ -184,7 +184,14 @@ export function EmptyDocs({
  * เติมความสูงสูงสุดเข้าไปให้กล่องนั้น มันจึงกลายเป็นตัวเลื่อนแนวตั้งด้วย
  * ผลคือหน้าเว็บไม่ยาวขึ้นตามจำนวนแถว เลื่อนดูข้อมูลอยู่ในกรอบตารางเท่านั้น
  */
-export function TableFrame({ children }: { children: React.ReactNode }) {
+export function TableFrame({
+  children,
+  /** ปิดกรอบนอกได้เมื่อตารางอยู่ในการ์ดที่มีกรอบของตัวเองอยู่แล้ว */
+  className,
+}: {
+  children: React.ReactNode;
+  className?: string;
+}) {
   return (
     <div
       className={cn(
@@ -206,7 +213,8 @@ export function TableFrame({ children }: { children: React.ReactNode }) {
         "[&_tr]:border-b-0",
         "[&_th]:border-b [&_th]:border-border",
         "[&_td]:border-b [&_td]:border-border",
-        "[&_tbody_tr:last-child_td]:border-b-0"
+        "[&_tbody_tr:last-child_td]:border-b-0",
+        className
       )}
     >
       {children}
