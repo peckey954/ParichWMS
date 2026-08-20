@@ -210,7 +210,7 @@ export function ItemEditor({
             <Input
               id={`${item.id}-desc`}
               value={item.description}
-              placeholder="ข้อความย่อยใต้ชื่อหัวข้อ — เว้นว่างได้"
+              placeholder="ข้อความย่อยใต้ชื่อหัวข้อ"
               className="bg-card"
               onChange={(e) => onPatch({ description: e.target.value })}
             />

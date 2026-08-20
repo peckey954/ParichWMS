@@ -40,6 +40,14 @@ import {
   type QcTemplate,
 } from "@/lib/qc-template";
 
+/**
+ * หัวตารางในหน้านี้เกือบทุกช่องมีสองบรรทัด — ชื่อคอลัมน์กับคำอธิบายใต้ชื่อ
+ * เช่น "ผลการตรวจ / ผู้ตรวจติ๊กเอง" หรือ "หมายเหตุ / บังคับเมื่อไม่ผ่าน"
+ * h-10 ของ DS ตั้งไว้สำหรับหัวบรรทัดเดียว สองบรรทัดแล้วตัวหนังสือชนขอบบนล่าง
+ * ปล่อยให้สูงตามเนื้อหาแล้วให้ระยะห่างบนล่างเท่ากันแทน
+ */
+const HEAD_TALL = "[&_th]:h-auto [&_th]:py-3 [&_th]:leading-snug";
+
 export function FormPreview({ template }: { template: QcTemplate }) {
   const blocks = buildPreviewBlocks(template.items);
 
@@ -95,7 +103,7 @@ export function FormPreview({ template }: { template: QcTemplate }) {
               <Card className="py-0">
                 <CardContent className="px-0">
                   <Table>
-                    <TableHeader>
+                    <TableHeader className={HEAD_TALL}>
                       <TableRow>
                         <TableHead className="w-14 pl-4">ข้อ</TableHead>
                         <TableHead className="min-w-48">รายการตรวจ</TableHead>
@@ -324,7 +332,7 @@ function ItemPreview({ item, index }: { item: QcItem; index: number }) {
         <Card className="py-0">
           <CardContent className="px-0">
             <Table>
-              <TableHeader>
+              <TableHeader className={HEAD_TALL}>
                 <TableRow>
                   <TableHead className="min-w-64 pl-4">หัวข้อย่อย</TableHead>
                   {childCriteria && (
@@ -386,7 +394,7 @@ function ItemPreview({ item, index }: { item: QcItem; index: number }) {
         <Card className="py-0">
           <CardContent className="px-0">
             <Table>
-              <TableHeader>
+              <TableHeader className={HEAD_TALL}>
                 <TableRow>
                   {item.repeatable && (
                     <TableHead className="w-20 pl-4">ครั้ง</TableHead>
