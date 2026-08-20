@@ -215,12 +215,20 @@ export type Round = {
   inspector: string;
   /** key คือ id ของหัวข้อ */
   answers: Record<string, Answer>;
+  /**
+   * บันทึกรอบนี้ไปแล้วหรือยัง
+   *
+   * รอบห่างกันเป็นชั่วโมง ผู้ตรวจไม่ได้เปิดหน้าจอค้างไว้ทั้งวัน
+   * ตรวจรอบไหนเสร็จต้องบันทึกรอบนั้นเลย ไม่ใช่รอกดบันทึกทีเดียวตอนจบทั้งใบ
+   * บันทึกแล้วล็อกไว้ก่อน เหมือนคอลัมน์ในกระดาษที่เขียนเสร็จแล้วไม่กลับไปเขียนทับ
+   */
+  saved: boolean;
 };
 
 export const emptyAnswer = (): Answer => ({ values: {}, pass: null, note: "" });
 
 export function newRound(id: string): Round {
-  return { id, time: "", date: "", inspector: "", answers: {} };
+  return { id, time: "", date: "", inspector: "", answers: {}, saved: false };
 }
 
 export const answerOf = (round: Round, itemId: string): Answer =>

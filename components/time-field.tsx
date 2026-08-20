@@ -82,6 +82,7 @@ export function TimeField({
   id,
   value,
   onValueChange,
+  disabled,
   className,
   placeholder = "--:--",
   "aria-label": ariaLabel,
@@ -90,6 +91,7 @@ export function TimeField({
   /** รูปแบบ HH:MM — ว่างคือยังไม่ได้กรอก ไม่ส่งมาเลยคือให้ช่องเก็บค่าเอง */
   value?: string;
   onValueChange?: (value: string) => void;
+  disabled?: boolean;
   className?: string;
   placeholder?: string;
   "aria-label"?: string;
@@ -132,6 +134,7 @@ export function TimeField({
         <InputGroupInput
           id={id}
           aria-label={ariaLabel}
+          disabled={disabled}
           // แป้นตัวเลขบนมือถือ ไม่ใช่แป้นตัวอักษรเต็มที่ต้องสลับโหมดเอง
           inputMode="numeric"
           autoComplete="off"
@@ -150,7 +153,11 @@ export function TimeField({
         <InputGroupAddon align="inline-end">
           <PopoverTrigger asChild>
             {/* 32px ไม่ใช่ 24px ที่เป็นค่าเริ่มต้น — คนกดใส่ถุงมืออยู่หน้าไลน์ */}
-            <InputGroupButton size="icon-sm" aria-label="เลือกเวลาจากรายการ">
+            <InputGroupButton
+              size="icon-sm"
+              disabled={disabled}
+              aria-label="เลือกเวลาจากรายการ"
+            >
               <ClockIcon />
             </InputGroupButton>
           </PopoverTrigger>
