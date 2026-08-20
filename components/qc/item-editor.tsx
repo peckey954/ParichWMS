@@ -1,13 +1,7 @@
 "use client";
 
 import * as React from "react";
-import {
-  ChevronDownIcon,
-  ChevronUpIcon,
-  CopyIcon,
-  PlusIcon,
-  Trash2Icon,
-} from "lucide-react";
+import { CopyIcon, PlusIcon, Trash2Icon } from "lucide-react";
 import { Badge } from "@peckey954/ui/components/ui/badge";
 import { Button } from "@peckey954/ui/components/ui/button";
 import { Card, CardContent } from "@peckey954/ui/components/ui/card";
@@ -22,6 +16,7 @@ import {
 } from "@peckey954/ui/components/ui/select";
 import { cn } from "@peckey954/ui/lib/utils";
 import { ChoiceGroup } from "@/components/choice-group";
+import { DRAG_ITEM_ATTR, DragHandle } from "@/components/drag-handle";
 import { ItemSettingsDialog } from "@/components/qc/item-settings-dialog";
 import {
   FIELD_TYPE_LABEL,
@@ -92,7 +87,7 @@ export function ItemEditor({
     });
 
   return (
-    <Card className={cn(isChild && "border-dashed")}>
+    <Card {...{ [DRAG_ITEM_ATTR]: "" }} className={cn(isChild && "border-dashed")}>
       <CardContent className="space-y-4">
         {/* ---- แถวบน: ลำดับ + ป้ายสรุป + ปุ่มจัดการ ----
              จอแคบเรียงสามชั้น ชื่อกับปุ่มไอคอนบรรทัดแรก ป้ายบรรทัดสอง
@@ -103,24 +98,14 @@ export function ItemEditor({
           <span className="order-1 font-semibold">{label}</span>
 
           <div className="order-2 ml-auto flex shrink-0 items-center gap-1 @2xl:order-4 @2xl:ml-0">
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              aria-label="เลื่อนขึ้น"
-              disabled={index === 0}
-              onClick={() => onMove(-1)}
-            >
-              <ChevronUpIcon />
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              aria-label="เลื่อนลง"
-              disabled={index === total - 1}
-              onClick={() => onMove(1)}
-            >
-              <ChevronDownIcon />
-            </Button>
+            {/* ปุ่มเดียวลากขึ้นลง แทนลูกศรสองปุ่ม
+                ย้ายข้อ 8 ไปข้อ 2 ด้วยลูกศรคือกดหกครั้ง ลากทีเดียวจบ
+                ปิดเมื่อมีใบเดียว เพราะไม่มีอะไรให้สลับด้วย */}
+            <DragHandle
+              label={label}
+              disabled={total < 2}
+              onMove={onMove}
+            />
             <Button
               variant="ghost"
               size="icon-sm"
