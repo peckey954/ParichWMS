@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { ChevronDownIcon, PlusIcon } from "lucide-react";
+import { ChevronDownIcon, MinusIcon, PlusIcon } from "lucide-react";
 import { Button } from "@peckey954/ui/components/ui/button";
 import {
   Command,
@@ -21,8 +21,13 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@peckey954/ui/components/ui/dialog";
+import {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupButton,
+  InputGroupInput,
+} from "@peckey954/ui/components/ui/input-group";
 import { Label } from "@peckey954/ui/components/ui/label";
-import { MultiSelect } from "@peckey954/ui/components/ui/multi-select";
 import {
   Popover,
   PopoverContent,
@@ -36,6 +41,8 @@ import {
   SelectValue,
 } from "@peckey954/ui/components/ui/select";
 import { cn } from "@peckey954/ui/lib/utils";
+import { useNumberField } from "@/components/number-field";
+import { MultiSelectChips } from "@/components/multi-select-chips";
 import { formatDate, formatNumber, formatTon } from "@/lib/format";
 import {
   ADDABLE_MATERIALS,
@@ -70,6 +77,7 @@ export function AddMaterialDialog({
   const [categoryId, setCategoryId] = React.useState<string | undefined>();
   const [materialId, setMaterialId] = React.useState<string | undefined>();
   const [lotCodes, setLotCodes] = React.useState<string[]>([]);
+  const [useQty, setUseQty] = React.useState(0);
 
   const availableMaterials = ADDABLE_MATERIALS.filter(
     (m) => !existingIds.includes(m.id)
@@ -88,21 +96,24 @@ export function AddMaterialDialog({
     setCategoryId(undefined);
     setMaterialId(undefined);
     setLotCodes([]);
+    setUseQty(0);
   };
 
   function handleCategoryChange(next: string) {
     setCategoryId(next);
     setMaterialId(undefined);
     setLotCodes([]);
+    setUseQty(0);
   }
 
   function handleMaterialChange(next: string) {
     setMaterialId(next);
     setLotCodes([]);
+    setUseQty(0);
   }
 
   function handleSave() {
-    if (!material || selectedLots.length === 0) return;
+    if (!material || selectedLots.length === 0 || useQty <= 0) return;
     onAdd({
       id: material.id,
       name: material.name,
@@ -114,7 +125,7 @@ export function AddMaterialDialog({
       lot: selectedLots[0].code,
       stockQty: selectedLots.reduce((sum, l) => sum + l.pieces, 0),
       tonPerUnit: material.tonPerUnit,
-      useQty: 0,
+      useQty,
       sweepable: material.sweepable,
       sweepTon: 0,
     });
@@ -203,7 +214,7 @@ export function AddMaterialDialog({
 
             <div className="space-y-1.5">
               <Label htmlFor="am-lot">Lot</Label>
-              <MultiSelect
+              <MultiSelectChips
                 id="am-lot"
                 disabled={!materialId}
                 options={lotOptions.map((l) => ({
@@ -229,8 +240,14 @@ export function AddMaterialDialog({
                 placeholder="เลือก Lot"
                 searchPlaceholder="ค้นหา"
                 hideSelectAll
-                className="min-h-10 bg-card"
+                className="bg-card"
               />
+            </div>
+
+            {/* คีย์จำนวนที่ใช้ได้ทันทีตอนเพิ่ม ไม่ต้องเพิ่มแล้วไปแก้ในตารางอีกที */}
+            <div className="space-y-1.5">
+              <Label htmlFor="am-qty">จำนวนที่ใช้ (ชิ้น)</Label>
+              <QtyStepper id="am-qty" value={useQty} onValueChange={setUseQty} />
             </div>
           </div>
         )}
@@ -239,7 +256,10 @@ export function AddMaterialDialog({
           <DialogClose asChild>
             <Button variant="outline">ย้อนกลับ</Button>
           </DialogClose>
-          <Button onClick={handleSave} disabled={selectedLots.length === 0}>
+          <Button
+            onClick={handleSave}
+            disabled={selectedLots.length === 0 || useQty <= 0}
+          >
             บันทึก
           </Button>
         </DialogFooter>
@@ -372,5 +392,43 @@ function ProductCombobox({
         </Command>
       </PopoverContent>
     </Popover>
+  );
+}
+
+function QtyStepper({
+  id,
+  value,
+  onValueChange,
+}: {
+  id: string;
+  value: number;
+  onValueChange: (next: number) => void;
+}) {
+  const field = useNumberField(value, onValueChange);
+  const step = (delta: number) =>
+    onValueChange(Math.max(0, value + delta));
+
+  return (
+    <InputGroup className="bg-card">
+      <InputGroupAddon align="inline-start">
+        <InputGroupButton
+          size="icon-xs"
+          aria-label="ลดจำนวน"
+          onClick={() => step(-1)}
+        >
+          <MinusIcon />
+        </InputGroupButton>
+      </InputGroupAddon>
+      <InputGroupInput {...field} id={id} className="text-center" />
+      <InputGroupAddon align="inline-end">
+        <InputGroupButton
+          size="icon-xs"
+          aria-label="เพิ่มจำนวน"
+          onClick={() => step(1)}
+        >
+          <PlusIcon />
+        </InputGroupButton>
+      </InputGroupAddon>
+    </InputGroup>
   );
 }

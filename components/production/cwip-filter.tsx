@@ -4,8 +4,8 @@ import * as React from "react";
 import { RotateCcwIcon } from "lucide-react";
 import { Button } from "@peckey954/ui/components/ui/button";
 import { Label } from "@peckey954/ui/components/ui/label";
-import { MultiSelect } from "@peckey954/ui/components/ui/multi-select";
 import { CheckChip } from "@/components/check-chip";
+import { MultiSelectChips } from "@/components/multi-select-chips";
 import { SortControl, type SortOption } from "@/components/sort-control";
 import { CWIP_VIEW_DEFAULT, type CwipView } from "./packing-cwip";
 import {
@@ -107,7 +107,7 @@ export function CwipFilter({
         </Section>
 
         <Section title="ประเภทสินค้า" htmlFor="cwip-kinds">
-          <MultiSelect
+          <MultiSelectChips
             id="cwip-kinds"
             options={asOptions(CWIP_KINDS)}
             value={draft.kinds}
@@ -120,7 +120,7 @@ export function CwipFilter({
         </Section>
 
         <Section title="สินค้า" htmlFor="cwip-products">
-          <MultiSelect
+          <MultiSelectChips
             id="cwip-products"
             options={asOptions(CWIP_PRODUCT_NAMES)}
             value={draft.products}

@@ -4,8 +4,8 @@ import * as React from "react";
 import { RotateCcwIcon } from "lucide-react";
 import { Button } from "@peckey954/ui/components/ui/button";
 import { Label } from "@peckey954/ui/components/ui/label";
-import { MultiSelect } from "@peckey954/ui/components/ui/multi-select";
 import { CheckChip } from "@/components/check-chip";
+import { MultiSelectChips } from "@/components/multi-select-chips";
 import { SortControl, type SortOption } from "@/components/sort-control";
 import {
   CATEGORIES,
@@ -132,7 +132,7 @@ export function StockFilter({
         </Section>
 
         <Section title="ประเภทสินค้า" htmlFor="stock-kinds">
-          <MultiSelect
+          <MultiSelectChips
             id="stock-kinds"
             options={CATEGORY_OPTIONS}
             value={draft.kinds}
@@ -145,7 +145,7 @@ export function StockFilter({
         </Section>
 
         <Section title="สินค้า" htmlFor="stock-products">
-          <MultiSelect
+          <MultiSelectChips
             id="stock-products"
             options={asOptions(STOCK_PRODUCT_NAMES)}
             value={draft.products}

@@ -34,7 +34,6 @@ import {
 import { Empty, EmptyDescription, EmptyTitle } from "@peckey954/ui/components/ui/empty";
 import { Input } from "@peckey954/ui/components/ui/input";
 import { Label } from "@peckey954/ui/components/ui/label";
-import { MultiSelect } from "@peckey954/ui/components/ui/multi-select";
 import { Separator } from "@peckey954/ui/components/ui/separator";
 import { Switch } from "@peckey954/ui/components/ui/switch";
 import {
@@ -47,6 +46,7 @@ import {
 } from "@peckey954/ui/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@peckey954/ui/components/ui/tabs";
 import { toast } from "sonner";
+import { MultiSelectChips } from "@/components/multi-select-chips";
 import { FailActionsEditor } from "@/components/qc/fail-actions-editor";
 import { FormPreview } from "@/components/qc/form-preview";
 import { HeaderFieldsEditor } from "@/components/qc/header-fields-editor";
@@ -261,7 +261,7 @@ export default function QcSetupPage() {
 
                 <div className="space-y-2">
                   <Label>กลุ่มผู้ใช้ที่ใช้ฟอร์มนี้ได้</Label>
-                  <MultiSelect
+                  <MultiSelectChips
                     options={ROLE_OPTIONS}
                     value={tpl.roles}
                     onValueChange={(v) => patch({ roles: v })}
