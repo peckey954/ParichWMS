@@ -16,12 +16,11 @@ import {
   showsTick,
   type QcItem,
   type QcTemplate,
-  type Rule,
 } from "@/lib/qc-template";
 
 // ---------------------------------------------------------------
-// โครงฟอร์มตัวอย่าง — ถอดจาก FM-QC-02-03 ใบรายงานการตรวจสอบสินค้าสำเร็จรูป
-// ตรงกับกระดาษทุกข้อ ทั้งลำดับ ชื่อ และเกณฑ์
+// โครงฟอร์มตัวอย่าง — ตามหน้าจอที่ออกแบบไว้
+// สามข้อแรกคือที่เห็นในแบบ ส่วนข้อ 4 เป็นต้นไปเป็นข้อติ๊กจากฟอร์มกระดาษ
 // ---------------------------------------------------------------
 
 const base = {
@@ -46,23 +45,6 @@ const tick = (id: string, title: string, criteria: string): QcItem => ({
   maxRounds: 1,
 });
 
-/** ข้อที่ต้องคีย์ตัวเลข และตรวจซ้ำได้หลายรอบ */
-const measure = (
-  id: string,
-  title: string,
-  criteria: string,
-  field: { id: string; label: string; unit: string; rule: Rule }
-): QcItem => ({
-  ...base,
-  id,
-  title,
-  criteria,
-  fields: [{ ...field, type: "number" }],
-  repeatable: true,
-  defaultRounds: 1,
-  maxRounds: 3,
-});
-
 export const INSPECT_TEMPLATE: Pick<
   QcTemplate,
   "id" | "name" | "formCode" | "revision" | "items"
@@ -72,47 +54,132 @@ export const INSPECT_TEMPLATE: Pick<
   formCode: "FM-QC-02-03",
   revision: "Rev.02",
   items: [
-    measure("q1", "น้ำหนักของปุ๋ย", "น้ำหนักต่อกระสอบ ≥ 50.2 kg (บรรจุ 50 kg)", {
-      id: "q1f",
-      label: "น้ำหนักที่ชั่ง",
-      unit: "kg",
-      rule: { op: "gte", min: 50.2, max: null },
-    }),
     {
+      ...base,
+      id: "q1",
+      title: "น้ำหนักของปุ๋ย",
+      criteria: "น้ำหนักต่อกระสอบ ≥ 50.2 kg (บรรจุ 50 kg)",
+      fields: [
+        {
+          id: "q1f",
+          label: "น้ำหนักที่ชั่ง",
+          type: "number",
+          unit: "Kg",
+          rule: { op: "gte", min: 50.2, max: null },
+        },
+      ],
+      repeatable: true,
+      defaultRounds: 1,
+      maxRounds: 5,
+    },
+    {
+      // ข้อนี้ไม่มีช่องให้คีย์ค่า ผู้ตรวจดูตัวเลขบนกระสอบแล้วติ๊กอย่างเดียว
       ...base,
       id: "q2",
       title: "สูตรปุ๋ย",
-      criteria: "ตัวเลขธาตุอาหารที่วัดได้ต้องตรงกับสูตรที่รับรอง — 15-15-15",
-      fields: [
-        { id: "q2n", label: "N", type: "number", unit: "%", rule: { op: "between", min: 14.5, max: 15.5 } },
-        { id: "q2p", label: "P₂O₅", type: "number", unit: "%", rule: { op: "between", min: 14.5, max: 15.5 } },
-        { id: "q2k", label: "K₂O", type: "number", unit: "%", rule: { op: "between", min: 14.5, max: 15.5 } },
-      ],
+      criteria: "ตัวเลขแสดงประมาณธาตุอาหารรับรอง",
+      fields: [],
       repeatable: true,
       defaultRounds: 1,
-      maxRounds: 3,
+      maxRounds: 5,
     },
-    tick("q3", "ตรวจการเย็บกระสอบ", "ระยะห่างฝีเข็มต้องสม่ำเสมอ ต้องเป็นด้ายคู่"),
-    tick("q4", "กลิ่นของปุ๋ย", "ไม่มีกลิ่น หรือมีกลิ่นสารเคมีอ่อน ๆ"),
-    tick("q5", "การตรวจสอบด้วยการสัมผัส", "สีของเม็ดปุ๋ยต้องไม่ติดมือ"),
-    tick("q6", "กระสอบที่ใช้ตรงสูตรไหม", "ปุ๋ยหน้ากระสอบต้องตรงกับเนื้อปุ๋ยข้างใน"),
-    tick("q7", "สติ๊กเกอร์แลกแต้ม", "สติ๊กเกอร์ต้องมีทุกกระสอบ"),
     {
       ...base,
-      id: "q8",
-      title: "ความชื้น",
-      description: "วัดด้วยเครื่องวัดความชื้นแบบเข็ม เสียบลึกกลางกระสอบ",
-      criteria: "ความชื้นไม่เกิน 80%",
+      id: "q3",
+      title: "ตรวจสอบความแข็งเม็ดปุ๋ย",
+      criteria: "ความแข็งของเม็ดปุ๋ย ≥ 0.4 Kg",
       note: "onFail",
       fields: [
-        { id: "q8f", label: "ค่าความชื้น", type: "number", unit: "%", rule: { op: "lte", min: null, max: 80 } },
+        {
+          id: "q3f",
+          label: "ค่าความแข็ง",
+          type: "number",
+          unit: "Kg",
+          rule: { op: "gte", min: 0.4, max: null },
+        },
       ],
       repeatable: true,
       defaultRounds: 1,
-      maxRounds: 3,
+      maxRounds: 5,
     },
+    tick("q4", "ตรวจการเย็บกระสอบ", "ระยะห่างฝีเข็มต้องสม่ำเสมอ ต้องเป็นด้ายคู่"),
+    tick("q5", "กลิ่นของปุ๋ย", "ไม่มีกลิ่น หรือมีกลิ่นสารเคมีอ่อน ๆ"),
+    tick("q6", "การตรวจสอบด้วยการสัมผัส", "สีของเม็ดปุ๋ยต้องไม่ติดมือ"),
+    tick("q7", "กระสอบที่ใช้ตรงสูตรไหม", "ปุ๋ยหน้ากระสอบต้องตรงกับเนื้อปุ๋ยข้างใน"),
+    tick("q8", "สติ๊กเกอร์แลกแต้ม", "สติ๊กเกอร์ต้องมีทุกกระสอบ"),
   ],
 };
+
+// ---------------------------------------------------------------
+// ตัวเลขสรุปมุมขวาของหัวข้อ
+//
+// บางข้อคำตอบไม่ได้อยู่ที่ค่าครั้งใดครั้งหนึ่ง แต่อยู่ที่ค่ารวมของทุกครั้ง
+// น้ำหนักดูผลรวม ความแข็งดูค่าเฉลี่ย — ให้คนอ่านเห็นเลยโดยไม่ต้องบวกเอง
+// เก็บแยกจาก QcItem เพราะเป็นเรื่องของการแสดงผล ไม่ใช่โครงของฟอร์ม
+// ---------------------------------------------------------------
+
+export type ItemSummary = {
+  label: string;
+  kind: "sum" | "avg";
+  /** ช่องที่เอามาคำนวณ */
+  fieldId: string;
+  unit: string;
+  /** โชว์อีกตัวเป็นเปอร์เซ็นต์ เทียบกับค่ามาตรฐานต่อหนึ่งครั้ง */
+  percentOf?: { label: string; per: number };
+};
+
+export const ITEM_SUMMARY: Record<string, ItemSummary> = {
+  q1: {
+    label: "น้ำหนักรวม",
+    kind: "sum",
+    fieldId: "q1f",
+    unit: "Kg",
+    percentOf: { label: "% รวม", per: 50 },
+  },
+  q3: { label: "เฉลี่ยความแข็ง", kind: "avg", fieldId: "q3f", unit: "Kg" },
+};
+
+/** ค่าที่คีย์ไว้ของข้อนี้ในทุกรอบ — เอาไปรวมหรือเฉลี่ย */
+export function valuesAcross(
+  item: QcItem,
+  rounds: Round[],
+  fieldId: string
+): number[] {
+  const out: number[] = [];
+  rounds.forEach((r, i) => {
+    if (!editableIn(item, i)) return;
+    const raw = answerOf(r, item.id).values[fieldId];
+    if (raw === undefined || raw.trim() === "") return;
+    const n = Number(raw);
+    if (!Number.isNaN(n)) out.push(n);
+  });
+  return out;
+}
+
+/** ข้อความสรุปมุมขวา — คืนรายการว่างเมื่อยังไม่มีค่าให้คำนวณ */
+export function summaryText(
+  item: QcItem,
+  rounds: Round[]
+): { label: string; value: string }[] {
+  const cfg = ITEM_SUMMARY[item.id];
+  if (!cfg) return [];
+  const nums = valuesAcross(item, rounds, cfg.fieldId);
+  if (nums.length === 0) return [];
+
+  const total = nums.reduce((a, b) => a + b, 0);
+  const main = cfg.kind === "sum" ? total : total / nums.length;
+  const out = [
+    { label: cfg.label, value: `${main.toFixed(2)} ${cfg.unit}` },
+  ];
+
+  if (cfg.percentOf) {
+    // เทียบกับน้ำหนักมาตรฐานของจำนวนครั้งที่ชั่งไปแล้ว
+    const target = cfg.percentOf.per * nums.length;
+    const pct = target === 0 ? 0 : (total / target) * 100;
+    out.push({ label: cfg.percentOf.label, value: `${pct.toFixed(2)} %` });
+  }
+  return out;
+}
 
 /** ใบสั่งผลิตที่ใบตรวจนี้อ้างถึง — ยังไม่มีหลังบ้าน ตรึงไว้ก่อน */
 export const INSPECT_DOC = {
@@ -123,6 +190,7 @@ export const INSPECT_DOC = {
   packing: "Bulk",
   lot: "A-9M",
   supplier: "บริษัท เอชซี อินเตอร์เนชั่นแนล เทรดดิ้ง จำกัด",
+  /** ยอดที่ต้องตรวจทั้งใบ ช่องอื่นในกล่องสถิติคำนวณจากผลตรวจ */
   inspectTon: 800,
 };
 

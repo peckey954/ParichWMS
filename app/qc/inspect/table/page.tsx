@@ -60,6 +60,7 @@ import {
   newRound,
   noteMissing,
   overallOf,
+  summaryText,
   verdictOf,
   type Answer,
   type Round,
@@ -141,6 +142,17 @@ export default function QcInspectTablePage() {
   };
 
   const failed = items.filter((i) => overallOf(i, rounds) === false);
+
+  /**
+   * ยอดที่ไม่ผ่านคิดตามสัดส่วนข้อที่ตก — ยังไม่มีหลังบ้านให้ผูกยอดจริง
+   * ตรวจยังไม่เสร็จก็ยังบอกไม่ได้ ขึ้นขีดไว้ตามแบบ
+   */
+  const answered = items.some((i) => overallOf(i, rounds) !== null);
+  const failTon = answered
+    ? (INSPECT_DOC.inspectTon * failed.length) / items.length
+    : null;
+  const inTon = failTon === null ? null : INSPECT_DOC.inspectTon - failTon;
+
 
   const save = () => {
     const bad = rounds.findIndex((r, i) => {
@@ -249,14 +261,20 @@ export default function QcInspectTablePage() {
           </p>
           <p className="text-sm">{INSPECT_DOC.supplier}</p>
         </div>
-        <div className="mt-3 grid gap-4 rounded-lg bg-brand p-4 @2xl:grid-cols-3">
+        {/* สี่ตัวเลขตามแบบ — สองตัวหลังคำนวณจากยอดที่ตรวจกับสัดส่วนที่ไม่ผ่าน
+            ของที่ไม่ผ่านไม่ได้เข้าคลัง ยอดเข้าคลังจึงเป็นยอดตรวจลบส่วนที่ตก */}
+        <div className="mt-3 grid gap-4 rounded-lg bg-brand p-4 @2xl:grid-cols-4">
           <Stat label="ตรวจสอบ (ตัน)" value={fmtTon(INSPECT_DOC.inspectTon)} />
-          <Stat label="ตรวจแล้ว (ครั้ง)" value={String(rounds.length)} />
           <Stat
-            label="ข้อที่ไม่ผ่าน"
-            value={failed.length === 0 ? "—" : String(failed.length)}
-            danger={failed.length > 0}
+            label="ไม่ผ่าน (ตัน)"
+            value={failTon === null ? "-" : fmtTon(failTon)}
+            danger={!!failTon}
           />
+          <Stat
+            label="เข้าคลังเฉลี่ย (ตัน)"
+            value={inTon === null ? "-" : fmtTon(inTon / rounds.length)}
+          />
+          <Stat label="เข้าคลัง (ตัน)" value={inTon === null ? "-" : fmtTon(inTon)} />
         </div>
       </div>
 
@@ -268,6 +286,7 @@ export default function QcInspectTablePage() {
             items={items}
             round={round}
             index={ri}
+            allRounds={rounds}
             firstRound={rounds[0]}
             open={open[round.id] ?? false}
             onOpenChange={(v) =>
@@ -333,6 +352,7 @@ function RoundCard({
   items,
   round,
   index,
+  allRounds,
   firstRound,
   open,
   onOpenChange,
@@ -342,6 +362,8 @@ function RoundCard({
   items: QcItem[];
   round: Round;
   index: number;
+  /** ทุกรอบ — ตัวเลขรวมอย่างน้ำหนักรวมกับค่าเฉลี่ยคิดข้ามรอบ ไม่ใช่แค่รอบนี้ */
+  allRounds: Round[];
   /** รอบแรก — ใช้ดึงคำตอบของข้อที่ตรวจครั้งเดียวมาโชว์ในรอบหลัง ๆ */
   firstRound: Round;
   open: boolean;
@@ -382,7 +404,7 @@ function RoundCard({
           {/* เวลากับผู้ตรวจเป็นของรอบ ไม่ใช่ของแต่ละข้อ */}
           <div className="grid gap-4 @2xl:grid-cols-3">
             <div className="space-y-2">
-              <Label htmlFor={`${round.id}-time`}>เวลาที่ตรวจ</Label>
+              <Label htmlFor={`${round.id}-time`}>เวลาตรวจสอบ</Label>
               <TimeField
                 id={`${round.id}-time`}
                 value={round.time}
@@ -437,13 +459,17 @@ function RoundCard({
                 <TableHead className="min-w-40">รายละเอียด</TableHead>
                 <TableHead className="min-w-52">เกณฑ์</TableHead>
                 <TableHead className="min-w-44">ค่าที่วัด</TableHead>
-                <TableHead className="min-w-40">ผลการตรวจ</TableHead>
-                <TableHead className="min-w-44 pr-4">หมายเหตุ</TableHead>
+                <TableHead className="min-w-40">ผลการตรวจสอบ</TableHead>
+                <TableHead className="min-w-44">หมายเหตุ</TableHead>
+                {/* ตัวเลขรวมของทุกครั้ง เช่นน้ำหนักรวม หรือค่าเฉลี่ยความแข็ง
+                    ข้อที่ไม่มีอะไรให้รวมก็เป็นขีดไป */}
+                <TableHead className="min-w-40 pr-4">สรุปทุกครั้ง</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {items.map((item, i) => (
                 <ItemLine
+                  summary={summaryText(item, allRounds)}
                   key={item.id}
                   item={item}
                   index={i}
@@ -514,12 +540,14 @@ function ItemLine({
   index,
   editable,
   answer,
+  summary,
   onPatch,
 }: {
   item: QcItem;
   index: number;
   editable: boolean;
   answer: Answer;
+  summary: { label: string; value: string }[];
   onPatch: (p: Partial<Answer>) => void;
 }) {
   const [pass, fail] = VERDICT_WORDS[item.verdictWording];
@@ -618,7 +646,7 @@ function ItemLine({
         )}
       </TableCell>
 
-      <TableCell className="pr-4">
+      <TableCell>
         {item.note === "off" ? (
           <span className="text-sm text-muted-foreground">—</span>
         ) : (
@@ -630,6 +658,19 @@ function ItemLine({
             value={answer.note}
             onChange={(e) => onPatch({ note: e.target.value })}
           />
+        )}
+      </TableCell>
+
+      <TableCell className="pr-4">
+        {summary.length === 0 ? (
+          <span className="text-sm text-muted-foreground">—</span>
+        ) : (
+          summary.map((s) => (
+            <span key={s.label} className="block text-sm whitespace-nowrap">
+              <span className="text-muted-foreground">{s.label}: </span>
+              <span className="font-semibold tabular-nums">{s.value}</span>
+            </span>
+          ))
         )}
       </TableCell>
     </TableRow>

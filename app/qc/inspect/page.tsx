@@ -60,6 +60,7 @@ import {
   noteMissing,
   overallOf,
   roundDone,
+  summaryText,
   verdictOf,
   type Answer,
   type Round,
@@ -132,6 +133,17 @@ export default function QcInspectPage() {
   };
 
   const failed = items.filter((i) => overallOf(i, rounds) === false);
+
+  /**
+   * ยอดที่ไม่ผ่านคิดตามสัดส่วนข้อที่ตก — ยังไม่มีหลังบ้านให้ผูกยอดจริง
+   * ตรวจยังไม่เสร็จก็ยังบอกไม่ได้ ขึ้นขีดไว้ตามแบบ
+   */
+  const answered = items.some((i) => overallOf(i, rounds) !== null);
+  const failTon = answered
+    ? (INSPECT_DOC.inspectTon * failed.length) / items.length
+    : null;
+  const inTon = failTon === null ? null : INSPECT_DOC.inspectTon - failTon;
+
 
   const save = () => {
     const bad = rounds.findIndex((r, i) => !roundDone(items, r, i));
@@ -230,22 +242,20 @@ export default function QcInspectPage() {
           <p className="text-sm">{INSPECT_DOC.supplier}</p>
         </div>
 
+        {/* สี่ตัวเลขตามแบบ — สองตัวหลังคำนวณจากยอดที่ตรวจกับสัดส่วนที่ไม่ผ่าน
+            ของที่ไม่ผ่านไม่ได้เข้าคลัง ยอดเข้าคลังจึงเป็นยอดตรวจลบส่วนที่ตก */}
         <div className="mt-3 grid gap-4 rounded-lg bg-brand p-4 @2xl:grid-cols-4">
           <Stat label="ตรวจสอบ (ตัน)" value={fmtTon(INSPECT_DOC.inspectTon)} />
-          <Stat label="ตรวจแล้ว (ครั้ง)" value={String(rounds.length)} />
           <Stat
-            label="ข้อที่ไม่ผ่าน"
-            value={failed.length === 0 ? "—" : String(failed.length)}
-            danger={failed.length > 0}
+            label="ไม่ผ่าน (ตัน)"
+            value={failTon === null ? "-" : fmtTon(failTon)}
+            danger={!!failTon}
           />
           <Stat
-            label="สถานะใบตรวจ"
-            value={
-              rounds.every((r, i) => roundDone(items, r, i))
-                ? "กรอกครบแล้ว"
-                : "ยังกรอกไม่ครบ"
-            }
+            label="เข้าคลังเฉลี่ย (ตัน)"
+            value={inTon === null ? "-" : fmtTon(inTon / rounds.length)}
           />
+          <Stat label="เข้าคลัง (ตัน)" value={inTon === null ? "-" : fmtTon(inTon)} />
         </div>
       </div>
 
@@ -292,6 +302,7 @@ export default function QcInspectPage() {
                   item={item}
                   index={items.indexOf(item)}
                   answer={answerOf(round, item.id)}
+                  summary={summaryText(item, rounds)}
                   onPatch={(p) => patchAnswer(round.id, item.id, p)}
                 />
               ))}
@@ -383,7 +394,7 @@ function RoundHead({
       <p className="font-semibold">ตรวจครั้งที่ {index + 1}</p>
       <div className="mt-3 grid gap-4 @2xl:grid-cols-3">
         <div className="space-y-2">
-          <Label htmlFor={`${round.id}-time`}>เวลาที่ตรวจ</Label>
+          <Label htmlFor={`${round.id}-time`}>เวลาตรวจสอบ</Label>
           <TimeField
             id={`${round.id}-time`}
             value={round.time}
@@ -427,11 +438,14 @@ function ItemRow({
   item,
   index,
   answer,
+  summary,
   onPatch,
 }: {
   item: QcItem;
   index: number;
   answer: Answer;
+  /** ตัวเลขรวมของทุกครั้ง เช่นน้ำหนักรวม หรือค่าเฉลี่ยความแข็ง */
+  summary: { label: string; value: string }[];
   onPatch: (p: Partial<Answer>) => void;
 }) {
   const [pass, fail] = VERDICT_WORDS[item.verdictWording];
@@ -458,7 +472,18 @@ function ItemRow({
             </p>
           )}
         </div>
-        <Verdict value={verdict} words={[pass, fail]} />
+        {/* ตัวเลขรวมของทุกครั้งอยู่ข้างผลตรวจ คนอ่านจะได้ไม่ต้องบวกเอง */}
+        <div className="flex shrink-0 flex-wrap items-center gap-x-4 gap-y-1">
+          {summary.map((s) => (
+            <span key={s.label} className="text-sm text-muted-foreground">
+              {s.label}:{" "}
+              <span className="font-semibold text-foreground tabular-nums">
+                {s.value}
+              </span>
+            </span>
+          ))}
+          <Verdict value={verdict} words={[pass, fail]} />
+        </div>
       </div>
 
       <div className="mt-3 grid gap-4 @3xl:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)]">
@@ -496,7 +521,7 @@ function ItemRow({
 
         {showsTick(item) && (
           <div className="space-y-2">
-            <Label className="text-sm font-normal">ผลการตรวจ</Label>
+            <Label className="text-sm font-normal">ผลการตรวจสอบ</Label>
             <RadioGroup
               className="flex h-9 items-center gap-4"
               value={answer.pass === null ? "" : answer.pass ? "p" : "f"}
