@@ -182,7 +182,12 @@ export function ItemEditor({
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor={`${item.id}-criteria`}>เกณฑ์</Label>
+            <Label htmlFor={`${item.id}-criteria`}>
+              เกณฑ์{" "}
+              <span className="font-normal text-muted-foreground">
+                (ไม่บังคับ)
+              </span>
+            </Label>
             <Input
               id={`${item.id}-criteria`}
               value={item.criteria}
@@ -196,7 +201,12 @@ export function ItemEditor({
               เช่นสุ่มจากตรงไหน ใช้เครื่องมืออะไร ซึ่งยัดลงชื่อหัวข้อไม่ได้
               เว้นว่าง = ไม่มีบรรทัดนี้ในใบตรวจ ไม่ต้องมีติ๊กเปิด/ปิดอีกที */}
           <div className="space-y-2 @2xl:col-span-2">
-            <Label htmlFor={`${item.id}-desc`}>รายละเอียดหัวข้อ</Label>
+            <Label htmlFor={`${item.id}-desc`}>
+              รายละเอียดหัวข้อ{" "}
+              <span className="font-normal text-muted-foreground">
+                (ไม่บังคับ)
+              </span>
+            </Label>
             <Input
               id={`${item.id}-desc`}
               value={item.description}
