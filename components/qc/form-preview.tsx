@@ -81,6 +81,9 @@ export function FormPreview({ template }: { template: QcTemplate }) {
           const noteModes = new Set(block.items.map(({ item }) => item.note));
           const groupNote = noteModes.size === 1 ? [...noteModes][0] : null;
           const showNote = groupNote !== "off";
+          // เว้นเกณฑ์ไว้ทุกข้อ = ตารางนี้ไม่มีคอลัมน์เกณฑ์ ไม่ใช่มีคอลัมน์ที่เต็มไปด้วยขีด
+          // มีบางข้อกรอกไว้ คอลัมน์ยังต้องอยู่ ข้อที่ว่างค่อยขึ้นขีดตามเดิม
+          const showCriteria = block.items.some(({ item }) => item.criteria.trim());
           return (
             <section key={`g-${bi}`} className="space-y-3">
               <h3 className="text-base font-semibold">
@@ -96,7 +99,9 @@ export function FormPreview({ template }: { template: QcTemplate }) {
                       <TableRow>
                         <TableHead className="w-14 pl-4">ข้อ</TableHead>
                         <TableHead className="min-w-48">รายการตรวจ</TableHead>
-                        <TableHead className="min-w-56">เกณฑ์มาตรฐาน</TableHead>
+                        {showCriteria && (
+                          <TableHead className="min-w-56">เกณฑ์มาตรฐาน</TableHead>
+                        )}
                         <TableHead className="w-48">ผลการตรวจ</TableHead>
                         {showNote && (
                           <TableHead className="min-w-56 pr-4">
@@ -119,9 +124,11 @@ export function FormPreview({ template }: { template: QcTemplate }) {
                           <TableCell className="font-medium">
                             {item.title || "—"}
                           </TableCell>
-                          <TableCell className="text-muted-foreground">
-                            {item.criteria || "—"}
-                          </TableCell>
+                          {showCriteria && (
+                            <TableCell className="text-muted-foreground">
+                              {item.criteria || "—"}
+                            </TableCell>
+                          )}
                           <TableCell>
                             <TickChoice id={item.id} pass={pass} fail={fail} />
                           </TableCell>
@@ -275,6 +282,9 @@ function ItemPreview({ item, index }: { item: QcItem; index: number }) {
   const [pass, fail] = VERDICT_WORDS[item.verdictWording];
   const tick = showsTick(item);
   const autoStatus = showsAutoStatus(item);
+  // เว้นเกณฑ์ไว้ทุกข้อย่อย = ไม่มีคอลัมน์เกณฑ์ เหมือนตารางข้อที่ติ๊กอย่างเดียว
+  const childCriteria = item.children.some((c) => c.criteria.trim());
+  const childNote = item.children.some((c) => c.note !== "off");
 
   return (
     <section className="space-y-3">
@@ -305,9 +315,13 @@ function ItemPreview({ item, index }: { item: QcItem; index: number }) {
               <TableHeader>
                 <TableRow>
                   <TableHead className="min-w-64 pl-4">หัวข้อย่อย</TableHead>
-                  <TableHead className="min-w-56">เกณฑ์มาตรฐาน</TableHead>
+                  {childCriteria && (
+                    <TableHead className="min-w-56">เกณฑ์มาตรฐาน</TableHead>
+                  )}
                   <TableHead className="w-48">ผลการตรวจ</TableHead>
-                  <TableHead className="min-w-48 pr-4">หมายเหตุ</TableHead>
+                  {childNote && (
+                    <TableHead className="min-w-48 pr-4">หมายเหตุ</TableHead>
+                  )}
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -320,9 +334,11 @@ function ItemPreview({ item, index }: { item: QcItem; index: number }) {
                           {index + 1}.{ci + 1} {c.title || "—"}
                         </span>
                       </TableCell>
-                      <TableCell className="text-muted-foreground">
-                        {c.criteria || "—"}
-                      </TableCell>
+                      {childCriteria && (
+                        <TableCell className="text-muted-foreground">
+                          {c.criteria || "—"}
+                        </TableCell>
+                      )}
                       <TableCell>
                         {showsTick(c) ? (
                           <TickChoice id={c.id} pass={p} fail={f} />
@@ -332,13 +348,15 @@ function ItemPreview({ item, index }: { item: QcItem; index: number }) {
                           </span>
                         )}
                       </TableCell>
-                      <TableCell className="pr-4">
-                        {c.note !== "off" ? (
-                          <Input placeholder="—" />
-                        ) : (
-                          <span className="text-sm text-muted-foreground">—</span>
-                        )}
-                      </TableCell>
+                      {childNote && (
+                        <TableCell className="pr-4">
+                          {c.note !== "off" ? (
+                            <Input placeholder="—" />
+                          ) : (
+                            <span className="text-sm text-muted-foreground">—</span>
+                          )}
+                        </TableCell>
+                      )}
                     </TableRow>
                   );
                 })}

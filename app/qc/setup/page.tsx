@@ -380,6 +380,9 @@ export default function QcSetupPage() {
                 <CardTitle>3. หัวข้อตรวจ</CardTitle>
                 <CardDescription>
                   แต่ละหัวข้อกำหนดชื่อ เกณฑ์ และช่องที่ผู้ตรวจต้องกรอกได้ ส่วนวิธีตรวจกับจำนวนครั้งอยู่ในปุ่มรูปแบบการตรวจ
+                  <span className="mt-1 block">
+                    ช่องไหนไม่ต้องมีในใบตรวจให้เว้นว่างไว้ คอลัมน์นั้นจะไม่ขึ้นในฟอร์ม
+                  </span>
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
