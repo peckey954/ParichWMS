@@ -1,41 +1,23 @@
 "use client";
 
 import * as React from "react";
-import {
-  CalendarClockIcon,
-  EyeIcon,
-  ListChecksIcon,
-  PlusIcon,
-  SaveIcon,
-  TriangleAlertIcon,
-} from "lucide-react";
-import {
-  Alert,
-  AlertDescription,
-  AlertTitle,
-} from "@peckey954/ui/components/ui/alert";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { FileTextIcon, SearchIcon } from "lucide-react";
 import { Badge } from "@peckey954/ui/components/ui/badge";
 import {
   Breadcrumb,
   BreadcrumbItem,
-  BreadcrumbLink,
   BreadcrumbList,
   BreadcrumbPage,
-  BreadcrumbSeparator,
 } from "@peckey954/ui/components/ui/breadcrumb";
-import { Button } from "@peckey954/ui/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@peckey954/ui/components/ui/card";
+import { Card, CardContent } from "@peckey954/ui/components/ui/card";
 import { Empty, EmptyDescription, EmptyTitle } from "@peckey954/ui/components/ui/empty";
-import { Input } from "@peckey954/ui/components/ui/input";
-import { Label } from "@peckey954/ui/components/ui/label";
-import { Separator } from "@peckey954/ui/components/ui/separator";
-import { Switch } from "@peckey954/ui/components/ui/switch";
+import {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupInput,
+} from "@peckey954/ui/components/ui/input-group";
 import {
   Table,
   TableBody,
@@ -44,514 +26,151 @@ import {
   TableHeader,
   TableRow,
 } from "@peckey954/ui/components/ui/table";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@peckey954/ui/components/ui/tabs";
-import { toast } from "sonner";
-import { MultiSelectChips } from "@/components/multi-select-chips";
-import { FailActionsEditor } from "@/components/qc/fail-actions-editor";
-import { FormPreview } from "@/components/qc/form-preview";
-import { HeaderFieldsEditor } from "@/components/qc/header-fields-editor";
-import { ItemEditor } from "@/components/qc/item-editor";
 import {
-  PUBLISHED_VERSIONS,
-  ROLE_OPTIONS,
-  SEED_TEMPLATE,
-  cloneItemDeep,
-  findOverlaps,
-  hasNumericRule,
-  newItem,
-  type ItemSettings,
-  type QcItem,
-  type QcTemplate,
+  QC_TEMPLATES,
+  STATUS_LABEL,
+  STATUS_TONE,
+  activeVersion,
+  draftVersion,
+  representativeVersion,
 } from "@/lib/qc-template";
 
-export default function QcSetupPage() {
-  const [tpl, setTpl] = React.useState<QcTemplate>(SEED_TEMPLATE);
+/**
+ * หน้าแรกของการตั้งค่าเทมเพลต QC — ตารางรวมทุกรหัสฟอร์มในระบบ
+ * กดแถวเข้าไปดู/แก้โครงสร้างของฟอร์มนั้นทีละอัน ที่ /qc/setup/[familyId]
+ *
+ * แต่ละแถวคือ "รหัสฟอร์ม" หนึ่งอัน ซึ่งข้างในมีได้หลายเวอร์ชัน (ดูที่หน้ารายละเอียด)
+ * คอลัมน์เวอร์ชันในตารางนี้จึงโชว์เฉพาะตัวแทน — เวอร์ชันที่ใช้งานอยู่ก่อน
+ * ถ้ายังไม่เคยเผยแพร่ก็โชว์ฉบับร่างแทน
+ */
+export default function QcTemplateListPage() {
+  const [query, setQuery] = React.useState("");
+  const router = useRouter();
 
-  const patch = (p: Partial<QcTemplate>) => setTpl((t) => ({ ...t, ...p }));
-
-  const patchItem = (id: string, p: Partial<QcItem>) =>
-    setTpl((t) => ({
-      ...t,
-      items: t.items.map((it) => (it.id === id ? { ...it, ...p } : it)),
-    }));
-
-  const moveItem = (i: number, dir: -1 | 1) =>
-    setTpl((t) => {
-      const j = i + dir;
-      if (j < 0 || j >= t.items.length) return t;
-      const items = [...t.items];
-      [items[i], items[j]] = [items[j], items[i]];
-      return { ...t, items };
-    });
-
-  // แทรกสำเนาต่อท้ายต้นฉบับทันที ไม่ใช่ท้ายรายการ — หัวข้อที่โครงเหมือนกัน
-  // มักอยู่ติดกันในฟอร์มจริง (เช่นข้อ 3–7 ในฟอร์มกระดาษต้นแบบ)
-  const duplicateItem = (id: string) =>
-    setTpl((t) => {
-      const i = t.items.findIndex((it) => it.id === id);
-      if (i < 0) return t;
-      const items = [...t.items];
-      items.splice(i + 1, 0, cloneItemDeep(t.items[i]));
-      return { ...t, items };
-    });
-
-  /**
-   * ยกรูปแบบการตรวจของข้อหนึ่งไปใช้กับทุกข้อในฟอร์ม
-   *
-   * ฟอร์มจริงส่วนใหญ่ตั้งเหมือนกันหมดทั้งใบ ต่างกันแค่ชื่อกับเกณฑ์
-   * ไม่มีปุ่มนี้แปลว่าต้องเปิดกล่องทีละข้อยี่สิบรอบเพื่อตั้งค่าเดียวกัน
-   *
-   * "ระบบตัดสิน" ไปกับข้อที่ไม่มีเกณฑ์ตัวเลขไม่ได้ ข้อนั้นจะไม่มีอะไรตัดสินให้เลย
-   * จึงลดให้เป็นผู้ตรวจติ๊กแทน ดีกว่าปล่อยให้ตั้งค่าที่ทำงานไม่ได้ค้างไว้
-   */
-  const applyToAll = (s: ItemSettings) =>
-    setTpl((t) => {
-      const items = t.items.map((it) => ({
-        ...it,
-        ...s,
-        verdict:
-          s.verdict === "auto" && !hasNumericRule(it) ? "manual" : s.verdict,
-      }));
-      toast.success(`ใช้รูปแบบการตรวจกับ ${items.length} หัวข้อแล้ว`, {
-        description: "หัวข้อย่อยยังเป็นค่าเดิม ตั้งแยกได้ในแต่ละข้อ",
-      });
-      return { ...t, items };
-    });
-
-  const overlaps = findOverlaps(tpl.effectiveFrom, tpl.effectiveTo);
-  const untitled = tpl.items.filter((i) => !i.title.trim()).length;
-  const canPublish =
-    tpl.name.trim() !== "" &&
-    tpl.effectiveFrom !== "" &&
-    overlaps.length === 0 &&
-    untitled === 0 &&
-    tpl.items.length > 0;
-
-  function handlePublish() {
-    if (!canPublish) {
-      toast.error("ยังเผยแพร่ไม่ได้ — แก้ข้อที่ค้างอยู่ก่อน");
-      return;
-    }
-    toast.success(`เผยแพร่ ${tpl.formCode} ${tpl.revision} แล้ว`, {
-      description: `เริ่มใช้ ${tpl.effectiveFrom} · ${tpl.items.length} หัวข้อตรวจ`,
-    });
-  }
+  const q = query.trim().toLowerCase();
+  const visible = QC_TEMPLATES.filter((f) => {
+    if (!q) return true;
+    const rep = representativeVersion(f);
+    return (
+      rep.name.toLowerCase().includes(q) || f.formCode.toLowerCase().includes(q)
+    );
+  });
 
   return (
-    <>
-      <main className="mx-auto w-full max-w-6xl px-4 py-6 sm:px-6">
-        <Breadcrumb>
-          <BreadcrumbList>
-            <BreadcrumbItem>
-              <BreadcrumbLink href="/">ระบบ</BreadcrumbLink>
-            </BreadcrumbItem>
-            <BreadcrumbSeparator />
-            <BreadcrumbItem>
-              <BreadcrumbLink href="/qc/setup">ตรวจสอบคุณภาพสินค้า</BreadcrumbLink>
-            </BreadcrumbItem>
-            <BreadcrumbSeparator />
-            <BreadcrumbItem>
-              <BreadcrumbPage className="text-primary">
-                ตั้งค่าเทมเพลต
-              </BreadcrumbPage>
-            </BreadcrumbItem>
-          </BreadcrumbList>
-        </Breadcrumb>
+    <main className="mx-auto w-full max-w-6xl px-4 py-6 sm:px-6">
+      <Breadcrumb>
+        <BreadcrumbList>
+          <BreadcrumbItem>
+            <BreadcrumbPage className="text-primary">
+              ตรวจสอบคุณภาพสินค้า
+            </BreadcrumbPage>
+          </BreadcrumbItem>
+        </BreadcrumbList>
+      </Breadcrumb>
 
-        <div className="mt-4 flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <h1 className="text-2xl font-semibold tracking-tight">
-              ตั้งค่าเทมเพลตฟอร์ม QC
-            </h1>
-            <p className="mt-1 text-sm text-muted-foreground">
-              สร้างโครงฟอร์มตรวจคุณภาพเอง เพิ่ม–ลด–แก้หัวข้อได้โดยไม่ต้องแก้โปรแกรม
-            </p>
-          </div>
-          <div className="flex items-center gap-2">
-            <Badge
-              tone={tpl.status === "active" ? "success" : "neutral"}
-              appearance="soft"
-            >
-              {tpl.status === "active"
-                ? "เปิดใช้งาน"
-                : tpl.status === "draft"
-                  ? "ฉบับร่าง"
-                  : "ปิดใช้งาน"}
-            </Badge>
-            <Badge tone="neutral" appearance="outline">
-              {tpl.formCode} {tpl.revision}
-            </Badge>
-          </div>
-        </div>
-
-        <Tabs defaultValue="build" className="mt-6">
-          <TabsList>
-            <TabsTrigger value="build">
-              <ListChecksIcon />
-              โครงสร้างฟอร์ม
-            </TabsTrigger>
-            <TabsTrigger value="preview">
-              <EyeIcon />
-              ตัวอย่างฟอร์ม
-            </TabsTrigger>
-          </TabsList>
-
-          {/* ================= โครงสร้างฟอร์ม ================= */}
-          <TabsContent value="build" className="mt-6 space-y-6">
-            {/* ---- 1. ข้อมูลเทมเพลต ---- */}
-            <Card>
-              <CardHeader>
-                <CardTitle>1. ข้อมูลเทมเพลต</CardTitle>
-                <CardDescription>
-                  ชื่อฟอร์ม ช่วงเวลาที่ใช้ และกลุ่มผู้ใช้ที่เข้าถึงได้
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-5">
-                <div className="grid gap-4 @2xl:grid-cols-2">
-                  <div className="space-y-2 sm:col-span-2">
-                    <Label htmlFor="tpl-name">ชื่อเทมเพลต</Label>
-                    <Input
-                      id="tpl-name"
-                      value={tpl.name}
-                      onChange={(e) => patch({ name: e.target.value })}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="tpl-code">รหัสฟอร์ม</Label>
-                    <Input
-                      id="tpl-code"
-                      value={tpl.formCode}
-                      onChange={(e) => patch({ formCode: e.target.value })}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="tpl-rev">เวอร์ชัน</Label>
-                    <Input
-                      id="tpl-rev"
-                      value={tpl.revision}
-                      onChange={(e) => patch({ revision: e.target.value })}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="tpl-from">วันที่เริ่มใช้</Label>
-                    <Input
-                      id="tpl-from"
-                      type="date"
-                      value={tpl.effectiveFrom}
-                      onChange={(e) => patch({ effectiveFrom: e.target.value })}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="tpl-to">
-                      วันที่เลิกใช้{" "}
-                      <span className="font-normal text-muted-foreground">
-                        (เว้นว่าง = ใช้ต่อเนื่อง)
-                      </span>
-                    </Label>
-                    <Input
-                      id="tpl-to"
-                      type="date"
-                      value={tpl.effectiveTo ?? ""}
-                      onChange={(e) =>
-                        patch({ effectiveTo: e.target.value || null })
-                      }
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <Label>กลุ่มผู้ใช้ที่ใช้ฟอร์มนี้ได้</Label>
-                  <MultiSelectChips
-                    options={ROLE_OPTIONS}
-                    value={tpl.roles}
-                    onValueChange={(v) => patch({ roles: v })}
-                    placeholder="เลือกกลุ่มผู้ใช้"
-                    searchPlaceholder="ค้นหากลุ่มผู้ใช้"
-                    selectAllLabel="เลือกทั้งหมด"
-                    maxChips={3}
-                  />
-                </div>
-
-                <div className="flex items-start justify-between gap-4">
-                  <div className="space-y-0.5">
-                    <Label htmlFor="tpl-active">เปิดใช้งานเทมเพลตนี้</Label>
-                    <p className="text-sm text-muted-foreground">
-                      ปิดไว้ได้ถ้ายังไม่พร้อมใช้ ผู้ตรวจจะยังไม่เห็นฟอร์มนี้
-                    </p>
-                  </div>
-                  <Switch
-                    id="tpl-active"
-                    checked={tpl.status === "active"}
-                    onCheckedChange={(c) =>
-                      patch({ status: c ? "active" : "inactive" })
-                    }
-                  />
-                </div>
-
-                {/* ประวัติเวอร์ชัน + ตรวจวันที่ชนกัน */}
-                <div className="space-y-3">
-                  <div className="flex items-center gap-2">
-                    <CalendarClockIcon className="size-4" />
-                    <Label>เวอร์ชันที่ประกาศใช้แล้วของรหัสฟอร์มนี้</Label>
-                  </div>
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>เวอร์ชัน</TableHead>
-                        <TableHead>เริ่มใช้</TableHead>
-                        <TableHead>เลิกใช้</TableHead>
-                        <TableHead>สถานะ</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {PUBLISHED_VERSIONS.map((v) => {
-                        const clash = overlaps.some(
-                          (o) => o.revision === v.revision
-                        );
-                        return (
-                          <TableRow key={v.revision}>
-                            <TableCell className="font-medium">
-                              {v.revision}
-                            </TableCell>
-                            <TableCell className="tabular-nums">
-                              {v.from}
-                            </TableCell>
-                            <TableCell className="tabular-nums">
-                              {v.to ?? "—"}
-                            </TableCell>
-                            <TableCell>
-                              <Badge
-                                tone={
-                                  clash
-                                    ? "danger"
-                                    : v.status === "active"
-                                      ? "success"
-                                      : "neutral"
-                                }
-                                appearance="soft"
-                              >
-                                {clash
-                                  ? "ช่วงวันที่ชนกัน"
-                                  : v.status === "active"
-                                    ? "ใช้อยู่"
-                                    : "เลิกใช้แล้ว"}
-                              </Badge>
-                            </TableCell>
-                          </TableRow>
-                        );
-                      })}
-                    </TableBody>
-                  </Table>
-
-                  {overlaps.length > 0 && (
-                    <Alert variant="destructive">
-                      <TriangleAlertIcon />
-                      <AlertTitle>ช่วงวันที่ทับกับเวอร์ชันที่ใช้อยู่</AlertTitle>
-                      <AlertDescription>
-                        ชนกับ {overlaps.map((o) => o.revision).join(", ")} —
-                        ต้องกำหนดวันเลิกใช้ของเวอร์ชันเดิม หรือเลื่อนวันเริ่มใช้ของเวอร์ชันนี้
-                        ให้ไม่ซ้อนกันก่อนจึงจะเผยแพร่ได้
-                      </AlertDescription>
-                    </Alert>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* ---- 2. ส่วนหัวเอกสาร ---- */}
-            <Card>
-              <CardHeader>
-                <CardTitle>2. ส่วนหัวเอกสาร</CardTitle>
-                <CardDescription>
-                  ช่องที่ผู้ตรวจต้องกรอกก่อนเริ่มตรวจ เช่น เลขที่เอกสาร สินค้า เครื่องจักร
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <HeaderFieldsEditor
-                  fields={tpl.headerFields}
-                  onChange={(headerFields) => patch({ headerFields })}
-                />
-              </CardContent>
-            </Card>
-
-            {/* ---- 3. หัวข้อตรวจ ---- */}
-            <Card>
-              <CardHeader>
-                <CardTitle>3. หัวข้อตรวจ</CardTitle>
-                <CardDescription>
-                  แต่ละหัวข้อกำหนดชื่อ เกณฑ์ และช่องที่ผู้ตรวจต้องกรอกได้ ส่วนวิธีตรวจกับจำนวนครั้งอยู่ในปุ่มรูปแบบการตรวจ
-                  <span className="mt-1 block">
-                    ช่องไหนไม่ต้องมีในใบตรวจให้เว้นว่างไว้ คอลัมน์นั้นจะไม่ขึ้นในฟอร์ม
-                  </span>
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {tpl.items.length === 0 ? (
-                  <Empty>
-                    <EmptyTitle>ยังไม่มีหัวข้อตรวจ</EmptyTitle>
-                    <EmptyDescription>
-                      กดปุ่มด้านล่างเพื่อเพิ่มหัวข้อแรก
-                    </EmptyDescription>
-                  </Empty>
-                ) : (
-                  tpl.items.map((item, i) => (
-                    <ItemEditor
-                      key={item.id}
-                      item={item}
-                      index={i}
-                      total={tpl.items.length}
-                      onPatch={(p) => patchItem(item.id, p)}
-                      onMove={(dir) => moveItem(i, dir)}
-                      onRemove={() =>
-                        patch({
-                          items: tpl.items.filter((x) => x.id !== item.id),
-                        })
-                      }
-                      onDuplicate={() => duplicateItem(item.id)}
-                      onApplyToAll={tpl.items.length > 1 ? applyToAll : undefined}
-                    />
-                  ))
-                )}
-
-                <Button
-                  variant="outline-primary"
-                  onClick={() => patch({ items: [...tpl.items, newItem()] })}
-                >
-                  <PlusIcon />
-                  เพิ่มหัวข้อตรวจ
-                </Button>
-
-                {untitled > 0 && (
-                  <Alert variant="warning">
-                    <TriangleAlertIcon />
-                    <AlertTitle>ยังมี {untitled} หัวข้อที่ไม่ได้ตั้งชื่อ</AlertTitle>
-                    <AlertDescription>
-                      ต้องตั้งชื่อให้ครบก่อนจึงจะเผยแพร่เทมเพลตได้
-                    </AlertDescription>
-                  </Alert>
-                )}
-
-                <Separator />
-                <div className="flex items-start justify-between gap-4">
-                  <div className="space-y-0.5">
-                    <Label htmlFor="allow-adhoc">
-                      ผู้ตรวจเพิ่มหัวข้อเองได้ระหว่างตรวจ
-                    </Label>
-                    <p className="text-sm text-muted-foreground">
-                      แทนบรรทัดว่าง &quot;อื่นๆ&quot; ท้ายฟอร์มกระดาษ — เปิดไว้ถ้าฟอร์มนี้
-                      มีเคสที่ตั้งเป็นหัวข้อตายตัวล่วงหน้าไม่ได้ทั้งหมด
-                    </p>
-                  </div>
-                  <Switch
-                    id="allow-adhoc"
-                    checked={tpl.allowAdHocItems}
-                    onCheckedChange={(c) => patch({ allowAdHocItems: c })}
-                  />
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* ---- 4. เมื่อผลตรวจไม่ผ่าน ---- */}
-            <Card>
-              <CardHeader>
-                <CardTitle>4. เมื่อผลตรวจไม่ผ่าน</CardTitle>
-                <CardDescription>
-                  ตัวเลือกที่ผู้ตรวจต้องติ๊กว่าจะจัดการสินค้าที่ไม่ผ่านอย่างไร แก้ข้อความได้เอง
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-5">
-                <FailActionsEditor
-                  actions={tpl.failActions}
-                  onChange={(failActions) => patch({ failActions })}
-                />
-                <div className="flex items-start justify-between gap-4">
-                  <div className="space-y-0.5">
-                    <Label htmlFor="require-fa">บังคับเลือกเมื่อมีข้อไม่ผ่าน</Label>
-                    <p className="text-sm text-muted-foreground">
-                      ถ้าเปิด จะบันทึกใบตรวจไม่ได้จนกว่าจะเลือกวิธีจัดการ
-                    </p>
-                  </div>
-                  <Switch
-                    id="require-fa"
-                    checked={tpl.requireFailAction}
-                    onCheckedChange={(c) => patch({ requireFailAction: c })}
-                  />
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* ---- 5. การลงชื่อ ---- */}
-            <Card>
-              <CardHeader>
-                <CardTitle>5. การลงชื่อเมื่อตรวจเสร็จ</CardTitle>
-                <CardDescription>
-                  ทุกใบตรวจจะบันทึกผู้ทำและเวลาเสมอ ปิดสองอย่างนี้ไม่ได้
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex items-start justify-between gap-4">
-                  <div className="space-y-0.5">
-                    <Label>ลงชื่อผู้ตรวจ + เวลาที่ตรวจเสร็จ</Label>
-                    <p className="text-sm text-muted-foreground">
-                      ดึงจากผู้ใช้ที่ล็อกอินและเวลาที่กดยืนยัน แก้ย้อนหลังไม่ได้
-                    </p>
-                  </div>
-                  <Badge tone="success" appearance="soft">
-                    บังคับเสมอ
-                  </Badge>
-                </div>
-                <div className="flex items-start justify-between gap-4">
-                  <div className="space-y-0.5">
-                    <Label htmlFor="sig-approver">ต้องมีผู้อนุมัติอีกชั้น</Label>
-                    <p className="text-sm text-muted-foreground">
-                      เปิดเมื่อฟอร์มนี้ต้องให้หัวหน้ากดอนุมัติหลังผู้ตรวจส่ง
-                    </p>
-                  </div>
-                  <Switch
-                    id="sig-approver"
-                    checked={tpl.signature.approver}
-                    onCheckedChange={(c) =>
-                      patch({ signature: { ...tpl.signature, approver: c } })
-                    }
-                  />
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          {/* ================= ตัวอย่างฟอร์ม ================= */}
-          <TabsContent value="preview" className="mt-6">
-            <Alert variant="brand" className="mb-6">
-              <EyeIcon />
-              <AlertTitle>นี่คือหน้าตาที่ผู้ตรวจจะเห็น</AlertTitle>
-              <AlertDescription>
-                สร้างจากโครงสร้างที่ตั้งไว้ทางแท็บซ้าย แก้โครงแล้วหน้านี้เปลี่ยนตามทันที
-                — ช่องกรอกในหน้านี้ยังไม่บันทึกค่า
-              </AlertDescription>
-            </Alert>
-            <FormPreview template={tpl} />
-          </TabsContent>
-        </Tabs>
-      </main>
-
-      {/* ---------- แถบปุ่มล่าง ---------- */}
-      <div className="sticky bottom-0 border-t border-border bg-background">
-        <div className="mx-auto flex w-full max-w-6xl items-center justify-between gap-3 px-4 py-3 sm:px-6">
-          <span className="text-sm text-muted-foreground">
-            {tpl.items.length} หัวข้อตรวจ · {tpl.headerFields.length} ฟิลด์ส่วนหัว
-          </span>
-          <div className="flex gap-2">
-            <Button
-              variant="outline-primary"
-              onClick={() => toast.success("บันทึกฉบับร่างแล้ว")}
-            >
-              <SaveIcon />
-              บันทึกร่าง
-            </Button>
-            <Button onClick={handlePublish}>เผยแพร่เทมเพลต</Button>
-          </div>
-        </div>
+      <div className="mt-4">
+        <h1 className="text-2xl font-semibold tracking-tight">
+          เทมเพลตฟอร์ม QC
+        </h1>
+        <p className="mt-1 text-sm text-muted-foreground">
+          ทุกฟอร์มตรวจคุณภาพในระบบ กดเข้าไปดูโครงสร้าง แก้ไข หรือย้อนดูเวอร์ชันเก่าได้ทีละฟอร์ม
+        </p>
       </div>
-    </>
+
+      <div className="mt-4">
+        <InputGroup className="max-w-sm bg-card">
+          <InputGroupAddon align="inline-start">
+            <SearchIcon />
+          </InputGroupAddon>
+          <InputGroupInput
+            placeholder="ค้นหาชื่อฟอร์มหรือรหัสฟอร์ม..."
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+          />
+        </InputGroup>
+      </div>
+
+      <Card className="mt-4 py-0">
+        <CardContent className="px-0">
+          {visible.length === 0 ? (
+            <Empty className="py-10">
+              <EmptyTitle>ไม่พบเทมเพลตที่ค้นหา</EmptyTitle>
+              <EmptyDescription>ลองใช้คำค้นสั้นลง</EmptyDescription>
+            </Empty>
+          ) : (
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="min-w-56 pl-4">ชื่อฟอร์ม</TableHead>
+                    <TableHead>เวอร์ชันที่ใช้งาน</TableHead>
+                    <TableHead>ฉบับร่าง</TableHead>
+                    <TableHead>เริ่มใช้</TableHead>
+                    <TableHead className="text-right pr-4">หัวข้อตรวจ</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {visible.map((family) => {
+                    const active = activeVersion(family);
+                    const draft = draftVersion(family);
+                    const rep = representativeVersion(family);
+                    const href = `/qc/setup/${family.id}`;
+                    return (
+                      <TableRow
+                        key={family.id}
+                        // ทั้งแถวกดได้ ไม่ใช่แค่ตัวอักษรชื่อฟอร์ม
+                        onClick={() => router.push(href)}
+                        className="cursor-pointer"
+                      >
+                        <TableCell className="pl-4">
+                          <Link
+                            href={href}
+                            className="block font-medium hover:underline"
+                          >
+                            {rep.name || "ยังไม่ได้ตั้งชื่อฟอร์ม"}
+                          </Link>
+                          <span className="mt-0.5 flex items-center gap-1 text-sm text-muted-foreground">
+                            <FileTextIcon className="size-3.5" />
+                            {family.formCode}
+                          </span>
+                        </TableCell>
+                        <TableCell>
+                          {active ? (
+                            <div>
+                              <Badge tone={STATUS_TONE.active} appearance="soft">
+                                {active.revision}
+                              </Badge>
+                            </div>
+                          ) : (
+                            <span className="text-sm text-muted-foreground">
+                              ยังไม่เคยเผยแพร่
+                            </span>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          {draft ? (
+                            <Badge tone={STATUS_TONE.draft} appearance="outline">
+                              {draft.revision} · {STATUS_LABEL.draft}
+                            </Badge>
+                          ) : (
+                            <span className="text-sm text-muted-foreground">—</span>
+                          )}
+                        </TableCell>
+                        <TableCell className="tabular-nums whitespace-nowrap">
+                          {rep.effectiveFrom || "—"}
+                        </TableCell>
+                        <TableCell className="pr-4 text-right tabular-nums">
+                          {rep.items.length}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </main>
   );
 }

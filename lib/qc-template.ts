@@ -184,7 +184,7 @@ export type QcItem = {
 };
 
 /**
- * ส่วนที่กล่อง "รูปแบบการตรวจ" เป็นเจ้าของ
+ * ส่วนที่กล่อง "การแสดงข้อมูล" เป็นเจ้าของ
  *
  * แยกเป็นชนิดของตัวเอง เพราะเป็นก้อนที่ยกไปใช้กับหัวข้ออื่นทั้งก้อนได้
  * ชื่อหัวข้อ เกณฑ์ ช่องกรอก และหัวข้อย่อย ไม่อยู่ในนี้ — พวกนั้นเป็นของเฉพาะข้อ
@@ -226,6 +226,18 @@ export const pickSettings = (item: QcItem): ItemSettings => ({
 export type FailAction = { id: string; label: string };
 
 export type TemplateStatus = "draft" | "active" | "inactive";
+
+export const STATUS_LABEL: Record<TemplateStatus, string> = {
+  active: "เปิดใช้งาน",
+  draft: "ฉบับร่าง",
+  inactive: "ปิดใช้งาน",
+};
+
+export const STATUS_TONE: Record<TemplateStatus, "success" | "neutral"> = {
+  active: "success",
+  draft: "neutral",
+  inactive: "neutral",
+};
 
 export type QcTemplate = {
   id: string;
@@ -414,21 +426,47 @@ export const isSettingsDefault = (s: ItemSettings) =>
   s.withTime === ITEM_SETTINGS_DEFAULT.withTime;
 
 // ---------------------------------------------------------------
-// เวอร์ชันที่ประกาศใช้อยู่แล้วของรหัสฟอร์มเดียวกัน
-// ใช้ตรวจว่าช่วงวันที่ของเวอร์ชันใหม่ไปชนกับของเดิมหรือเปล่า
+// เทมเพลตหนึ่งรหัสฟอร์ม มีได้หลายเวอร์ชันตามเวลา
+//
+// รหัสฟอร์ม (formCode) คือตัวที่คงที่ — "เทมเพลต" ในหน้าตารางรวมคือรหัสฟอร์มนี้
+// ส่วนแต่ละเวอร์ชัน (QcTemplate หนึ่งก้อน) คือภาพนิ่งของโครงฟอร์ม ณ ช่วงเวลาหนึ่ง
+// versions เรียงใหม่สุดไปเก่าสุดเสมอ — ตัวบนสุดคือฉบับร่างที่กำลังแก้ (ถ้ามี)
+// หรือเวอร์ชันล่าสุดที่เผยแพร่แล้ว (ถ้าไม่มีฉบับร่างค้างอยู่)
 // ---------------------------------------------------------------
 
-export type PublishedVersion = {
-  revision: string;
-  from: string;
-  to: string | null;
-  status: TemplateStatus;
+export type QcTemplateFamily = {
+  /** คงที่ตลอดอายุของรหัสฟอร์ม ไม่เปลี่ยนตามเวอร์ชัน */
+  id: string;
+  formCode: string;
+  versions: QcTemplate[];
 };
 
-export const PUBLISHED_VERSIONS: PublishedVersion[] = [
-  { revision: "Rev.00", from: "2025-01-01", to: "2026-01-15", status: "inactive" },
-  { revision: "Rev.01", from: "2026-01-16", to: null, status: "active" },
-];
+export const activeVersion = (family: QcTemplateFamily) =>
+  family.versions.find((v) => v.status === "active");
+
+export const draftVersion = (family: QcTemplateFamily) =>
+  family.versions.find((v) => v.status === "draft");
+
+/** เวอร์ชันที่ควรใช้เป็นตัวแทนฟอร์มทั้งอันในหน้าตารางรวม */
+export function representativeVersion(family: QcTemplateFamily): QcTemplate {
+  return activeVersion(family) ?? draftVersion(family) ?? family.versions[0];
+}
+
+/** "Rev.01" -> "Rev.02" — ตัวเลขท้ายชื่อขยับขึ้นหนึ่ง คงจำนวนหลักเดิม */
+export function nextRevisionLabel(revision: string): string {
+  const m = revision.match(/^(.*?)(\d+)$/);
+  if (!m) return `${revision} (ร่างใหม่)`;
+  const [, prefix, digits] = m;
+  const next = String(Number(digits) + 1).padStart(digits.length, "0");
+  return `${prefix}${next}`;
+}
+
+/** วันก่อนหน้าวันที่ระบุ — ใช้ปิดช่วงเวอร์ชันเดิมตอนเวอร์ชันใหม่เริ่มใช้ */
+export function dayBeforeISO(dateStr: string): string {
+  const d = new Date(`${dateStr}T00:00:00`);
+  d.setDate(d.getDate() - 1);
+  return d.toISOString().slice(0, 10);
+}
 
 /**
  * หาเวอร์ชันที่ช่วงวันที่ทับกับช่วงที่กำลังตั้ง
@@ -437,16 +475,16 @@ export const PUBLISHED_VERSIONS: PublishedVersion[] = [
 export function findOverlaps(
   from: string,
   to: string | null,
-  versions: PublishedVersion[] = PUBLISHED_VERSIONS
-): PublishedVersion[] {
+  versions: QcTemplate[]
+): QcTemplate[] {
   if (!from) return [];
   const start = Date.parse(from);
   const end = to ? Date.parse(to) : Number.POSITIVE_INFINITY;
   if (Number.isNaN(start)) return [];
 
   return versions.filter((v) => {
-    const vStart = Date.parse(v.from);
-    const vEnd = v.to ? Date.parse(v.to) : Number.POSITIVE_INFINITY;
+    const vStart = Date.parse(v.effectiveFrom);
+    const vEnd = v.effectiveTo ? Date.parse(v.effectiveTo) : Number.POSITIVE_INFINITY;
     return start <= vEnd && vStart <= end;
   });
 }
@@ -460,7 +498,9 @@ export const ROLE_OPTIONS = [
 ];
 
 // ---------------------------------------------------------------
-// เทมเพลตตั้งต้น — ถอดมาจาก FM-QC-02-03 ใบรายงานการตรวจสอบสินค้าสำเร็จรูป
+// เทมเพลตตัวอย่าง — ถอดมาจากฟอร์มกระดาษจริงของโรงงาน
+// เก็บเป็นหลายเวอร์ชันย้อนหลังต่อรหัสฟอร์ม เพื่อให้หน้าตั้งค่าโชว์ประวัติ
+// และย้อนกลับไปใช้เวอร์ชันเก่าได้จริง (ไม่ใช่แค่โชว์ตารางเปล่า ๆ)
 // ---------------------------------------------------------------
 
 const tick = (
@@ -486,113 +526,235 @@ const num = (
   rule: Rule = emptyRule()
 ): QcField => ({ id, label, type: "number", unit, rule });
 
-export const SEED_TEMPLATE: QcTemplate = {
-  id: "tpl-fm-qc-02-03",
+// =================================================================
+// FM-QC-02-03 ใบรายงานการตรวจสอบสินค้าสำเร็จรูป
+// สามเวอร์ชัน: Rev.00 (เลิกใช้) -> Rev.01 (ใช้อยู่) -> Rev.02 (ฉบับร่าง)
+// แต่ละเวอร์ชันเพิ่มข้อตรวจขึ้นทีละข้อ ตรงกับที่โรงงานทยอยเพิ่มจุดตรวจจริง
+// =================================================================
+
+/** ทุกหัวข้อตรวจที่เคยมีของฟอร์มนี้ — แต่ละเวอร์ชันเลือกไปใช้บางส่วน */
+const fmQc0203Items: QcItem[] = [
+  {
+    // ตัวอย่างข้อที่ต้องทำทั้งสองอย่าง: คีย์น้ำหนัก + ผู้ตรวจติ๊กยืนยันเอง
+    id: "it-1",
+    title: "น้ำหนักของปุ๋ย",
+    description: "สุ่มกระสอบจากปลายสายพานหลังเย็บปิดปากแล้ว",
+    criteria: "น้ำหนักต่อกระสอบ ≥ 50.2 kg (บรรจุ 50 kg)",
+    verdict: "manual",
+    verdictWording: "passFail",
+    fields: [num("c-1", "น้ำหนักที่ชั่ง", "kg", { op: "gte", min: 50.2, max: null })],
+    note: "onFail",
+    repeatable: true,
+    defaultRounds: 2,
+    maxRounds: 3,
+    withDate: false,
+    withTime: true,
+    children: [],
+  },
+  {
+    // เพิ่มเข้ามาใน Rev.01 — สามช่องที่มีเกณฑ์ของตัวเองแยกกัน แล้วให้ระบบตัดสินเอง
+    id: "it-2",
+    title: "สูตรปุ๋ย",
+    description: "",
+    criteria: "ตัวเลขธาตุอาหารที่วัดได้ต้องตรงกับสูตรที่รับรอง — 15-15-15",
+    verdict: "auto",
+    verdictWording: "passFail",
+    fields: [
+      num("c-2", "N", "%", { op: "between", min: 14.5, max: 15.5 }),
+      num("c-3", "P₂O₅", "%", { op: "between", min: 14.5, max: 15.5 }),
+      num("c-4", "K₂O", "%", { op: "between", min: 14.5, max: 15.5 }),
+    ],
+    note: "optional",
+    repeatable: true,
+    defaultRounds: 2,
+    maxRounds: 3,
+    withDate: false,
+    withTime: true,
+    children: [],
+  },
+  tick(
+    "ตรวจการเย็บกระสอบ",
+    "ระยะห่างฝีเข็มต้องสม่ำเสมอ ต้องเป็นด้ายคู่",
+    "ดูทั้งแนวเย็บบนและล่าง"
+  ),
+  tick("กลิ่นของปุ๋ย", "ไม่มีกลิ่น หรือมีกลิ่นสารเคมีอ่อน ๆ"),
+  tick("การตรวจสอบด้วยการสัมผัส", "สีของเม็ดปุ๋ยต้องไม่ติดมือ"),
+  tick("กระสอบที่ใช้ตรงสูตรใหม่", "ปุ๋ยหน้ากระสอบต้องตรงกับเนื้อปุ๋ยข้างใน"),
+  tick("สติ๊กเกอร์แลกแต้ม", "สติ๊กเกอร์ต้องมีทุกกระสอบ"),
+  {
+    // เพิ่มเข้ามาใน Rev.02 (ฉบับร่าง) — คีย์ตัวเลข + ติ๊กเอง โดยระบบขึ้นผลที่คำนวณได้ให้ดูเป็นตัวช่วย
+    id: "it-8",
+    title: "ความชื้น",
+    description: "วัดด้วยเครื่องวัดความชื้นแบบเข็ม เสียบลึกกลางกระสอบ",
+    criteria: "ความชื้นไม่เกิน 80%",
+    verdict: "manual",
+    verdictWording: "passFail",
+    fields: [
+      num("c-5", "ค่าความชื้น", "%", { op: "lte", min: null, max: 80 }),
+      { id: "c-6", label: "จุดที่เก็บตัวอย่าง", type: "text", unit: "", rule: emptyRule() },
+    ],
+    note: "onFail",
+    repeatable: true,
+    defaultRounds: 2,
+    // ตรวจข้ามวันได้ ความชื้นวัดซ้ำหลังกองทิ้งไว้ จึงต้องรู้ว่าครั้งไหนวันไหน
+    maxRounds: 3,
+    withDate: true,
+    withTime: true,
+    children: [],
+  },
+];
+
+/** ส่วนที่ทุกเวอร์ชันของฟอร์มนี้ใช้ร่วมกัน — ต่างกันแค่ id/revision/สถานะ/ช่วงวันที่/หัวข้อ */
+const fmQc0203Base = {
   name: "ใบรายงานการตรวจสอบสินค้าสำเร็จรูป",
   formCode: "FM-QC-02-03",
-  revision: "Rev.02",
-  status: "draft",
-  effectiveFrom: "2026-09-01",
-  effectiveTo: null,
   roles: ["qc-inspector", "qc-supervisor"],
-
   headerFields: [
-    { id: "hf-a", label: "ชื่อปุ๋ย", kind: "ref", required: true, options: [], source: "สินค้า" },
-    { id: "hf-b", label: "เครื่องจักร No.", kind: "ref", required: true, options: [], source: "เครื่องจักร" },
-    { id: "hf-c", label: "เลขที่ใบสั่งผลิต", kind: "ref", required: true, options: [], source: "ใบสั่งผลิต" },
-    { id: "hf-d", label: "วันที่ตรวจ", kind: "date", required: true, options: [] },
+    { id: "hf-a", label: "ชื่อปุ๋ย", kind: "ref" as const, required: true, options: [], source: "สินค้า" },
+    { id: "hf-b", label: "เครื่องจักร No.", kind: "ref" as const, required: true, options: [], source: "เครื่องจักร" },
+    { id: "hf-c", label: "เลขที่ใบสั่งผลิต", kind: "ref" as const, required: true, options: [], source: "ใบสั่งผลิต" },
+    { id: "hf-d", label: "วันที่ตรวจ", kind: "date" as const, required: true, options: [] },
     {
       id: "hf-e",
       label: "สายการผลิต",
-      kind: "select",
+      kind: "select" as const,
       required: false,
       options: ["Bulk Blend", "แบ่งบรรจุ", "ปั้นเม็ด"],
     },
   ],
-
-  items: [
-    {
-      // ตัวอย่างข้อที่ต้องทำทั้งสองอย่าง: คีย์น้ำหนัก + ผู้ตรวจติ๊กยืนยันเอง
-      id: "it-1",
-      title: "น้ำหนักของปุ๋ย",
-      description: "สุ่มกระสอบจากปลายสายพานหลังเย็บปิดปากแล้ว",
-      criteria: "น้ำหนักต่อกระสอบ ≥ 50.2 kg (บรรจุ 50 kg)",
-      verdict: "manual",
-      verdictWording: "passFail",
-      fields: [num("c-1", "น้ำหนักที่ชั่ง", "kg", { op: "gte", min: 50.2, max: null })],
-      note: "onFail",
-      repeatable: true,
-      defaultRounds: 2,
-      maxRounds: 3,
-      withDate: false,
-      withTime: true,
-      children: [],
-    },
-    {
-      // สามช่องที่มีเกณฑ์ของตัวเองแยกกัน แล้วให้ระบบตัดสินเอง
-      id: "it-2",
-      title: "สูตรปุ๋ย",
-      description: "",
-      criteria: "ตัวเลขธาตุอาหารที่วัดได้ต้องตรงกับสูตรที่รับรอง — 15-15-15",
-      verdict: "auto",
-      verdictWording: "passFail",
-      fields: [
-        num("c-2", "N", "%", { op: "between", min: 14.5, max: 15.5 }),
-        num("c-3", "P₂O₅", "%", { op: "between", min: 14.5, max: 15.5 }),
-        num("c-4", "K₂O", "%", { op: "between", min: 14.5, max: 15.5 }),
-      ],
-      note: "optional",
-      repeatable: true,
-      defaultRounds: 2,
-      maxRounds: 3,
-      withDate: false,
-      withTime: true,
-      children: [],
-    },
-    tick(
-      "ตรวจการเย็บกระสอบ",
-      "ระยะห่างฝีเข็มต้องสม่ำเสมอ ต้องเป็นด้ายคู่",
-      "ดูทั้งแนวเย็บบนและล่าง"
-    ),
-    tick("กลิ่นของปุ๋ย", "ไม่มีกลิ่น หรือมีกลิ่นสารเคมีอ่อน ๆ"),
-    tick("การตรวจสอบด้วยการสัมผัส", "สีของเม็ดปุ๋ยต้องไม่ติดมือ"),
-    tick("กระสอบที่ใช้ตรงสูตรใหม่", "ปุ๋ยหน้ากระสอบต้องตรงกับเนื้อปุ๋ยข้างใน"),
-    tick("สติ๊กเกอร์แลกแต้ม", "สติ๊กเกอร์ต้องมีทุกกระสอบ"),
-    {
-      // คีย์ตัวเลข + ติ๊กเอง โดยระบบขึ้นผลที่คำนวณได้ให้ดูเป็นตัวช่วย
-      id: "it-8",
-      title: "ความชื้น",
-      description: "วัดด้วยเครื่องวัดความชื้นแบบเข็ม เสียบลึกกลางกระสอบ",
-      criteria: "ความชื้นไม่เกิน 80%",
-      verdict: "manual",
-      verdictWording: "passFail",
-      fields: [
-        num("c-5", "ค่าความชื้น", "%", { op: "lte", min: null, max: 80 }),
-        { id: "c-6", label: "จุดที่เก็บตัวอย่าง", type: "text", unit: "", rule: emptyRule() },
-      ],
-      note: "onFail",
-      repeatable: true,
-      defaultRounds: 2,
-      // ตรวจข้ามวันได้ ความชื้นวัดซ้ำหลังกองทิ้งไว้ จึงต้องรู้ว่าครั้งไหนวันไหน
-      maxRounds: 3,
-      withDate: true,
-      withTime: true,
-      children: [],
-    },
-  ],
-
   // ฟอร์มกระดาษต้นแบบมีบรรทัดว่าง "อื่นๆ" ให้เขียนเพิ่มเองท้ายตาราง
   allowAdHocItems: true,
-
   failActions: [
     { id: "fa-1", label: "Repack" },
     { id: "fa-2", label: "รับสภาพ" },
     { id: "fa-3", label: "ส่งคืน" },
   ],
   requireFailAction: true,
-
   signature: { inspector: true, time: true, approver: false },
 };
+
+const fmQc0203Rev00: QcTemplate = {
+  ...fmQc0203Base,
+  id: "tpl-fm-qc-02-03-rev00",
+  revision: "Rev.00",
+  status: "inactive",
+  effectiveFrom: "2025-01-01",
+  effectiveTo: "2026-01-15",
+  items: fmQc0203Items.filter((it) => it.id !== "it-2" && it.id !== "it-8"),
+};
+
+const fmQc0203Rev01: QcTemplate = {
+  ...fmQc0203Base,
+  id: "tpl-fm-qc-02-03-rev01",
+  revision: "Rev.01",
+  status: "active",
+  effectiveFrom: "2026-01-16",
+  effectiveTo: null,
+  items: fmQc0203Items.filter((it) => it.id !== "it-8"),
+};
+
+const fmQc0203Rev02: QcTemplate = {
+  ...fmQc0203Base,
+  id: "tpl-fm-qc-02-03-rev02",
+  revision: "Rev.02",
+  status: "draft",
+  effectiveFrom: "2026-09-01",
+  effectiveTo: null,
+  items: fmQc0203Items,
+};
+
+// =================================================================
+// FM-QC-01-01 ใบตรวจรับวัตถุดิบ — มีเวอร์ชันเดียว ใช้งานอยู่
+// =================================================================
+
+const fmQc0101Rev01: QcTemplate = {
+  id: "tpl-fm-qc-01-01-rev01",
+  name: "ใบตรวจรับวัตถุดิบ",
+  formCode: "FM-QC-01-01",
+  revision: "Rev.01",
+  status: "active",
+  effectiveFrom: "2025-06-01",
+  effectiveTo: null,
+  roles: ["qc-inspector"],
+  headerFields: [
+    { id: "hf-r1", label: "ผู้ขาย", kind: "text", required: true, options: [] },
+    { id: "hf-r2", label: "เลขที่ใบส่งของ", kind: "text", required: true, options: [] },
+    { id: "hf-r3", label: "วันที่ตรวจ", kind: "date", required: true, options: [] },
+  ],
+  items: [
+    {
+      id: "rm-1",
+      title: "น้ำหนักวัตถุดิบ",
+      description: "ชั่งเทียบกับใบส่งของ",
+      criteria: "คลาดเคลื่อนไม่เกิน ±1%",
+      verdict: "manual",
+      verdictWording: "passFail",
+      fields: [num("rm-c1", "น้ำหนักที่ชั่ง", "kg")],
+      note: "onFail",
+      repeatable: false,
+      defaultRounds: 1,
+      maxRounds: 1,
+      withDate: false,
+      withTime: false,
+      children: [],
+    },
+    tick("สภาพบรรจุภัณฑ์", "ไม่ฉีกขาด ไม่เปียกชื้น"),
+    tick("เอกสารกำกับ", "มี MSDS/ใบรับรองคุณภาพแนบมาด้วย"),
+  ],
+  allowAdHocItems: false,
+  failActions: [
+    { id: "rm-fa-1", label: "ส่งคืนผู้ขาย" },
+    { id: "rm-fa-2", label: "กักรอตรวจซ้ำ" },
+  ],
+  requireFailAction: true,
+  signature: { inspector: true, time: true, approver: false },
+};
+
+// =================================================================
+// FM-QC-03-01 ใบตรวจก่อนผลิต — ยังไม่เคยเผยแพร่ มีแต่ฉบับร่างรอตั้งวันเริ่มใช้
+// =================================================================
+
+const fmQc0301Rev01: QcTemplate = {
+  id: "tpl-fm-qc-03-01-rev01",
+  name: "ใบตรวจก่อนผลิต",
+  formCode: "FM-QC-03-01",
+  revision: "Rev.01",
+  status: "draft",
+  effectiveFrom: "",
+  effectiveTo: null,
+  roles: ["qc-inspector", "prod-lead"],
+  headerFields: [
+    { id: "hf-p1", label: "เครื่องจักร No.", kind: "ref", required: true, options: [], source: "เครื่องจักร" },
+    { id: "hf-p2", label: "วันที่ตรวจ", kind: "date", required: true, options: [] },
+  ],
+  items: [
+    tick("ความสะอาดของเครื่องจักร", "ไม่มีเศษวัสดุค้างจากล็อตก่อน"),
+    tick("ความพร้อมของสายพาน", "ไม่มีรอยฉีกขาดหรือหลวม"),
+  ],
+  allowAdHocItems: true,
+  failActions: [{ id: "pp-fa-1", label: "หยุดผลิตรอแก้ไข" }],
+  requireFailAction: true,
+  signature: { inspector: true, time: true, approver: false },
+};
+
+/** ทุกเทมเพลต QC ในระบบ — หน้าตารางรวม (/qc/setup) แสดงจากลิสต์นี้ */
+export const QC_TEMPLATES: QcTemplateFamily[] = [
+  {
+    id: "tpl-fm-qc-02-03",
+    formCode: "FM-QC-02-03",
+    versions: [fmQc0203Rev02, fmQc0203Rev01, fmQc0203Rev00],
+  },
+  {
+    id: "tpl-fm-qc-01-01",
+    formCode: "FM-QC-01-01",
+    versions: [fmQc0101Rev01],
+  },
+  {
+    id: "tpl-fm-qc-03-01",
+    formCode: "FM-QC-03-01",
+    versions: [fmQc0301Rev01],
+  },
+];
 
 /**
  * จัดหัวข้อที่ติดกันและเป็นแบบ "ติ๊กอย่างเดียว" เหมือนกัน ให้อยู่ตารางเดียวกัน
