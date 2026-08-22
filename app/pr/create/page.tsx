@@ -98,8 +98,12 @@ export default function CreatePrPage() {
   }
 
   return (
-    <>
-      <main className="mx-auto w-full max-w-3xl px-4 pt-6 pb-24 sm:px-6">
+    // ขั้นแรกของฟอร์มมีแค่ช่องเดียว เนื้อหาสั้นกว่าจอ — ถ้าไม่กำหนดความสูงขั้นต่ำ
+    // แถบปุ่มด้านล่าง (sticky bottom-0) จะลอยอยู่ใต้เนื้อหาสั้นๆ แทนที่จะติด
+    // ขอบล่างจอจริง เพราะ sticky ยึดตามตำแหน่งที่เลื่อนผ่าน ไม่ใช่ผลักไปสุดขอบ
+    // ให้ flex-1 ใน main ดันแถบปุ่มลงไปสุดความสูงขั้นต่ำนี้แทน
+    <div className="flex min-h-[calc(100vh-3.5rem)] flex-col">
+      <main className="mx-auto w-full max-w-3xl flex-1 px-4 pt-6 pb-24 sm:px-6">
         <Breadcrumb>
           <BreadcrumbList>
             <BreadcrumbItem>
@@ -266,7 +270,7 @@ export default function CreatePrPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </>
+    </div>
   );
 }
 

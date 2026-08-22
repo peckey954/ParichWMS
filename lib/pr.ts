@@ -18,18 +18,6 @@ export const PR_STATUS_LABEL: Record<PrStatus, string> = {
   cancelled: "ยกเลิก",
 };
 
-/** ใช้ tone ในตัวของ Badge ครบทั้งห้าค่าพอดีกับห้าสถานะ ไม่ต้องสร้าง chip สีเอง */
-export const PR_STATUS_TONE: Record<
-  PrStatus,
-  "brand" | "success" | "warning" | "danger" | "neutral"
-> = {
-  sent: "warning",
-  ordered: "brand",
-  partial: "neutral",
-  stocked: "success",
-  cancelled: "danger",
-};
-
 export type PrReason = "produce" | "sell" | "other";
 
 export const PR_REASON_LABEL: Record<PrReason, string> = {
@@ -89,7 +77,7 @@ export const PR_PRODUCTS: PrProduct[] = [
     group: "PNR",
     name: "16-16-16",
     sub: "เม็ดคละ",
-    packingOptions: ["Bulk", "1 ตัน"],
+    packingOptions: ["1 ตัน", "500 กก."],
     unit: "ตัน",
   },
   {
@@ -98,7 +86,7 @@ export const PR_PRODUCTS: PrProduct[] = [
     group: "PNR",
     name: "21-0-0",
     sub: "จัมโบ้แดง",
-    packingOptions: ["Bulk"],
+    packingOptions: ["1 ตัน"],
     unit: "ตัน",
   },
   {
@@ -107,7 +95,7 @@ export const PR_PRODUCTS: PrProduct[] = [
     group: "แม่ปุ๋ย",
     name: "21-0-0",
     sub: "ฟูเจียน ผง",
-    packingOptions: ["Bulk", "50 Kg"],
+    packingOptions: ["50 Kg", "25 Kg"],
     unit: "ตัน",
   },
   {
@@ -116,7 +104,7 @@ export const PR_PRODUCTS: PrProduct[] = [
     group: "แม่ปุ๋ย",
     name: "46-0-0",
     sub: "ยูเรีย เม็ด",
-    packingOptions: ["Bulk", "50 Kg"],
+    packingOptions: ["50 Kg", "25 Kg"],
     unit: "ตัน",
   },
   {
@@ -140,9 +128,9 @@ export const PR_PRODUCTS: PrProduct[] = [
   {
     id: "prod-7",
     category: "sticker",
-    group: "Bulk",
+    group: "ฉลากสินค้า",
     name: "สติกเกอร์ QR",
-    sub: "ตรวจสอบย้อนกลับ",
+    sub: "แบบม้วน",
     packingOptions: ["1,000 ดวง"],
     unit: "ชิ้น",
   },

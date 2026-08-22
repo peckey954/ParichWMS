@@ -17,8 +17,8 @@ import {
   formatReasons,
   PR_CATEGORY_LABEL,
   PR_STATUS_LABEL,
-  PR_STATUS_TONE,
   type PrDoc,
+  type PrStatus,
 } from "@/lib/pr";
 import {
   CardBox,
@@ -43,6 +43,32 @@ import {
  * (เลย์เอาต์เอกสารทั่วไป ไม่ใช่ตรรกะเฉพาะสต็อก)
  */
 const PAGE_SIZE = 15;
+
+/** สีชิปสถานะ — พื้นสีอ่อนไม่มีขอบ (ตัดขอบด้วย --bdg-border:transparent)
+ *  เขียนคลาสเต็มทุกตัว ห้ามประกอบชื่อด้วย template string เพราะ Tailwind
+ *  อ่านซอร์สเป็นข้อความตรงๆ ประกอบเอาตอนรันแล้ว utility จะไม่ถูกสร้าง */
+const PR_STATUS_CHIP: Record<PrStatus, string> = {
+  sent: "[--bdg-surface:var(--chip-yellow)] [--bdg-text:var(--chip-yellow-foreground)]",
+  ordered:
+    "[--bdg-surface:var(--chip-orange)] [--bdg-text:var(--chip-orange-foreground)]",
+  partial: "[--bdg-surface:var(--chip-lime)] [--bdg-text:var(--chip-lime-foreground)]",
+  stocked: "[--bdg-surface:var(--chip-green)] [--bdg-text:var(--chip-green-foreground)]",
+  cancelled: "[--bdg-surface:var(--chip-red)] [--bdg-text:var(--chip-red-foreground)]",
+};
+
+function PrStatusChip({ status }: { status: PrStatus }) {
+  return (
+    <Badge
+      appearance="soft"
+      className={cn(
+        "[--bdg-border:transparent] font-semibold whitespace-nowrap",
+        PR_STATUS_CHIP[status]
+      )}
+    >
+      {PR_STATUS_LABEL[status]}
+    </Badge>
+  );
+}
 
 export function PrList({ docs }: { docs: PrDoc[] }) {
   const [page, setPage] = React.useState(1);
@@ -125,13 +151,7 @@ export function PrList({ docs }: { docs: PrDoc[] }) {
                     )}
                   </TableCell>
                   <TableCell className={COL_LAST}>
-                    <Badge
-                      tone={PR_STATUS_TONE[d.status]}
-                      appearance="soft"
-                      className="font-semibold whitespace-nowrap"
-                    >
-                      {PR_STATUS_LABEL[d.status]}
-                    </Badge>
+                    <PrStatusChip status={d.status} />
                   </TableCell>
                 </TableRow>
               ))}
@@ -172,13 +192,7 @@ function PrCard({ doc: d }: { doc: PrDoc }) {
       <Separator className="mt-3" />
 
       <div className="mt-3 flex justify-end">
-        <Badge
-          tone={PR_STATUS_TONE[d.status]}
-          appearance="soft"
-          className={cn("font-semibold")}
-        >
-          {PR_STATUS_LABEL[d.status]}
-        </Badge>
+        <PrStatusChip status={d.status} />
       </div>
     </div>
   );
