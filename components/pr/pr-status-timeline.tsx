@@ -77,7 +77,6 @@ export function PrStatusTimeline({ doc }: { doc: PrDoc }) {
                 icon={CircleXIcon}
                 chipClass="bg-[var(--chip-red)] text-[var(--chip-red-foreground)]"
                 label="ยกเลิก"
-                labelClassName="text-destructive"
                 detail={
                   <>
                     <DetailLine actor={doc.cancelActor} at={doc.cancelAt} department={PURCHASE_DEPT_LABEL} />
@@ -126,7 +125,6 @@ function StepRow({
   icon: Icon,
   chipClass,
   label,
-  labelClassName,
   entry,
   detail,
   isLast,
@@ -134,7 +132,6 @@ function StepRow({
   icon: typeof PackageCheckIcon;
   chipClass: string;
   label: string;
-  labelClassName?: string;
   entry?: { actor: string; at: string; department: string };
   detail?: React.ReactNode;
   isLast: boolean;
@@ -155,11 +152,7 @@ function StepRow({
       </span>
       <div className="pt-1">
         <p
-          className={cn(
-            "font-semibold",
-            !reached && "font-normal text-muted-foreground",
-            labelClassName
-          )}
+          className={cn("font-semibold", !reached && "font-normal text-muted-foreground")}
         >
           {label}
         </p>

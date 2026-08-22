@@ -102,8 +102,11 @@ export default function PrDetailPage() {
   }
 
   return (
-    <>
-      <main className="mx-auto w-full max-w-3xl px-4 pt-6 pb-24 sm:px-6">
+    // เนื้อหาสั้นกว่าจอได้ (ใบที่ยกเลิกไม่มีตารางยาวๆ) — ถ้าไม่กำหนดความสูง
+    // ขั้นต่ำ ปุ่มย้อนกลับ (sticky bottom-0) จะลอยอยู่ใต้เนื้อหาแทนติดขอบล่าง
+    // จอจริง ให้ flex-1 ใน main ดันปุ่มลงไปสุดความสูงขั้นต่ำนี้แทนเสมอ
+    <div className="flex min-h-[calc(100vh-3.5rem)] flex-col">
+      <main className="mx-auto w-full max-w-3xl flex-1 px-4 pt-6 pb-6 sm:px-6">
         <Crumbs />
 
         <div className="mt-4 flex items-start justify-between gap-3">
@@ -164,7 +167,9 @@ export default function PrDetailPage() {
           </Alert>
         )}
 
-        <Collapsible defaultOpen className="mt-5 rounded-xl border border-border bg-card">
+        {/* หุบไว้ก่อนเสมอ — เห็นแค่สินค้ากับยอดขอซื้อ/เหตุผลก็พอตอบคำถามหลักได้แล้ว
+            กดขยายค่อยเห็นรายละเอียด (วันที่ต้องการ/ผู้ขอซื้อ/ผู้แก้ไขล่าสุด) */}
+        <Collapsible className="mt-5 rounded-xl border border-border bg-card">
           <CollapsibleTrigger asChild>
             <button
               type="button"
@@ -220,13 +225,16 @@ export default function PrDetailPage() {
         <div className="mt-4">
           <PrStatusTimeline doc={doc} />
         </div>
+      </main>
 
-        <div className="mt-6">
+      {/* ---------- แถบปุ่มล่าง ---------- */}
+      <div className="sticky bottom-0 z-30 border-t border-border bg-background">
+        <div className="mx-auto flex w-full max-w-3xl items-center px-4 py-3 sm:px-6">
           <Button variant="outline-primary" onClick={() => router.back()}>
             ย้อนกลับ
           </Button>
         </div>
-      </main>
+      </div>
 
       <AlertDialog open={cancelOpen} onOpenChange={setCancelOpen}>
         <AlertDialogContent>
@@ -242,7 +250,7 @@ export default function PrDetailPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </>
+    </div>
   );
 }
 

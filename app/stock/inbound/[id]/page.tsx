@@ -144,148 +144,158 @@ export default function InboundReceiptPage() {
   const stockedQty = rounds.reduce((sum, r) => sum + (r.stockedQty ?? 0), 0);
 
   return (
-    <main className="mx-auto w-full max-w-6xl px-4 pt-6 pb-24 sm:px-6">
-      <Crumbs />
+    // เนื้อหาสั้นกว่าจอได้ (ใบที่ยังไม่มีรอบรับเข้าเลย) — ถ้าไม่กำหนดความสูง
+    // ขั้นต่ำ ปุ่มย้อนกลับ (sticky bottom-0) จะลอยอยู่ใต้เนื้อหาแทนติดขอบล่าง
+    // จอจริง ให้ flex-1 ใน main ดันปุ่มลงไปสุดความสูงขั้นต่ำนี้แทนเสมอ
+    <div className="flex min-h-[calc(100vh-3.5rem)] flex-col">
+      <main className="mx-auto w-full max-w-6xl flex-1 px-4 pt-6 pb-6 sm:px-6">
+        <Crumbs />
 
-      <h1 className="mt-4 text-2xl font-semibold tracking-tight">
-        ใบรับเข้าสต็อกทั่วไป {doc.code}
-      </h1>
-      <p className="mt-1.5 text-sm text-muted-foreground">{doc.createdAt}</p>
+        <h1 className="mt-4 text-2xl font-semibold tracking-tight">
+          ใบรับเข้าสต็อกทั่วไป {doc.code}
+        </h1>
+        <p className="mt-1.5 text-sm text-muted-foreground">{doc.createdAt}</p>
 
-      <Collapsible defaultOpen className="mt-5 rounded-xl border border-border bg-card">
-        <CollapsibleTrigger asChild>
-          {/* items-start กันปุ่มหุบไหลตามเนื้อหาที่ห่อบรรทัด — ปักไว้ชิดขวาบนเสมอ */}
-          <button
-            type="button"
-            className="group flex w-full items-start justify-between gap-3 px-4 pt-4 pb-3 text-left"
-          >
-            <span className="flex min-w-0 flex-1 flex-col gap-y-1">
-              <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
-                <span className="font-medium">{doc.productName}</span>
-                {doc.productSub && (
-                  <span className="text-sm text-muted-foreground">
-                    {doc.productSub}
-                  </span>
-                )}
-                {doc.packing && (
-                  <>
-                    <span className="hidden text-border @2xl:inline" aria-hidden>
-                      |
+        {/* หุบไว้ก่อนเสมอ — เห็นแค่สรุปยอดก็พอตอบคำถามหลักได้แล้ว กดขยายค่อยเห็น
+            รายละเอียดใบสั่งซื้อ */}
+        <Collapsible className="mt-5 rounded-xl border border-border bg-card">
+          <CollapsibleTrigger asChild>
+            {/* items-start กันปุ่มหุบไหลตามเนื้อหาที่ห่อบรรทัด — ปักไว้ชิดขวาบนเสมอ */}
+            <button
+              type="button"
+              className="group flex w-full items-start justify-between gap-3 px-4 pt-4 pb-3 text-left"
+            >
+              <span className="flex min-w-0 flex-1 flex-col gap-y-1">
+                <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                  <span className="font-medium">{doc.productName}</span>
+                  {doc.productSub && (
+                    <span className="text-sm text-muted-foreground">
+                      {doc.productSub}
                     </span>
-                    <span className="text-sm">{doc.packing}</span>
-                  </>
-                )}
+                  )}
+                  {doc.packing && (
+                    <>
+                      <span className="hidden text-border @2xl:inline" aria-hidden>
+                        |
+                      </span>
+                      <span className="text-sm">{doc.packing}</span>
+                    </>
+                  )}
+                </span>
+                <span className="text-sm font-medium">{doc.supplier}</span>
               </span>
-              <span className="text-sm font-medium">{doc.supplier}</span>
-            </span>
-            <ChevronDownIcon className="mt-0.5 size-5 shrink-0 text-muted-foreground transition-transform group-data-[state=open]:rotate-180" />
-          </button>
-        </CollapsibleTrigger>
+              <ChevronDownIcon className="mt-0.5 size-5 shrink-0 text-muted-foreground transition-transform group-data-[state=open]:rotate-180" />
+            </button>
+          </CollapsibleTrigger>
 
-        {/* อยู่นอกส่วนที่หุบ — สี่ยอดนี้คือตัวเลขอ้างอิงที่ต้องเทียบกับตารางรอบตลอดทั้งหน้า */}
-        <div className="px-4 pb-4">
-          <div className="grid grid-cols-2 gap-4 rounded-lg bg-brand p-4 @xl:grid-cols-4">
-            <SummaryStat
-              label={`สั่งซื้อ (${doc.orderUnit})`}
-              value={formatQty(doc.orderQty)}
-            />
-            <SummaryStat
-              label={`รับเข้า (${doc.orderUnit})`}
-              value={formatQty(doc.receivedQty)}
-              note={left > 0 ? `ค้างรับ ${formatQty(left)}` : undefined}
-            />
-            <SummaryStat
-              label={`ไม่ผ่าน (${doc.orderUnit})`}
-              value={rejectedQty > 0 ? `-${formatQty(rejectedQty)}` : formatQty(0)}
-              valueClassName={rejectedQty > 0 ? "text-danger-strong" : undefined}
-            />
-            <SummaryStat
-              label={`เข้าคลัง (${doc.orderUnit})`}
-              value={formatQty(stockedQty)}
-            />
+          {/* อยู่นอกส่วนที่หุบ — สี่ยอดนี้คือตัวเลขอ้างอิงที่ต้องเทียบกับตารางรอบตลอดทั้งหน้า */}
+          <div className="px-4 pb-4">
+            <div className="grid grid-cols-2 gap-4 rounded-lg bg-brand p-4 @xl:grid-cols-4">
+              <SummaryStat
+                label={`สั่งซื้อ (${doc.orderUnit})`}
+                value={formatQty(doc.orderQty)}
+              />
+              <SummaryStat
+                label={`รับเข้า (${doc.orderUnit})`}
+                value={formatQty(doc.receivedQty)}
+                note={left > 0 ? `ค้างรับ ${formatQty(left)}` : undefined}
+              />
+              <SummaryStat
+                label={`ไม่ผ่าน (${doc.orderUnit})`}
+                value={rejectedQty > 0 ? `-${formatQty(rejectedQty)}` : formatQty(0)}
+                valueClassName={rejectedQty > 0 ? "text-danger-strong" : undefined}
+              />
+              <SummaryStat
+                label={`เข้าคลัง (${doc.orderUnit})`}
+                value={formatQty(stockedQty)}
+              />
+            </div>
           </div>
+
+          <CollapsibleContent className="px-4 pb-4">
+            <div className="grid grid-cols-2 gap-3 text-sm @2xl:grid-cols-4">
+              <MetaField label="เลขที่ใบขอซื้อ" value={meta.prCode} />
+              <MetaField label="PRQ Unique ID" value={meta.prqId} />
+              <MetaField label="ผู้ทำใบขอซื้อ" value={meta.prMaker} />
+              <MetaField label="ผู้แก้ไขขอซื้อล่าสุด" value={meta.prEditor ?? "-"} />
+              <MetaField label="ผู้ทำใบสั่งซื้อ" value={meta.poMaker} />
+              <MetaField label="ผู้แก้ไขสั่งซื้อล่าสุด" value={meta.poEditor ?? "-"} />
+              <MetaField label="เหตุผลการซื้อ" value={meta.reason} />
+              <MetaField
+                label="ช่วงวันที่จัดส่ง"
+                value={`${meta.deliveryFrom} - ยังไม่ระบุ`}
+              />
+            </div>
+          </CollapsibleContent>
+        </Collapsible>
+
+        {/* ---------- รอบการรับเข้าสินค้า ---------- */}
+        <div className="mt-8 flex items-center justify-between gap-3">
+          <h2 className="text-lg font-semibold">รอบการรับเข้าสินค้า</h2>
+          <Button
+            asChild
+            variant="outline"
+            className="border-primary text-primary hover:text-primary"
+          >
+            <Link href={`/stock/inbound/${doc.id}/add`}>
+              <PlusIcon />
+              เพิ่มการรับเข้าสินค้า
+            </Link>
+          </Button>
         </div>
 
-        <CollapsibleContent className="px-4 pb-4">
-          <div className="grid grid-cols-2 gap-3 text-sm @2xl:grid-cols-4">
-            <MetaField label="เลขที่ใบขอซื้อ" value={meta.prCode} />
-            <MetaField label="PRQ Unique ID" value={meta.prqId} />
-            <MetaField label="ผู้ทำใบขอซื้อ" value={meta.prMaker} />
-            <MetaField label="ผู้แก้ไขขอซื้อล่าสุด" value={meta.prEditor ?? "-"} />
-            <MetaField label="ผู้ทำใบสั่งซื้อ" value={meta.poMaker} />
-            <MetaField label="ผู้แก้ไขสั่งซื้อล่าสุด" value={meta.poEditor ?? "-"} />
-            <MetaField label="เหตุผลการซื้อ" value={meta.reason} />
-            <MetaField
-              label="ช่วงวันที่จัดส่ง"
-              value={`${meta.deliveryFrom} - ยังไม่ระบุ`}
-            />
-          </div>
-        </CollapsibleContent>
-      </Collapsible>
+        {/* ---------- จอแคบ: การ์ดต่อรอบหนึ่งรอบ ---------- */}
+        <div className="mt-4 space-y-3 @3xl:hidden">
+          {rounds.map((r) => (
+            <RoundCard key={r.id} round={r} unit={doc.orderUnit} />
+          ))}
+        </div>
 
-      {/* ---------- รอบการรับเข้าสินค้า ---------- */}
-      <div className="mt-8 flex items-center justify-between gap-3">
-        <h2 className="text-lg font-semibold">รอบการรับเข้าสินค้า</h2>
-        <Button
-          asChild
-          variant="outline"
-          className="border-primary text-primary hover:text-primary"
-        >
-          <Link href={`/stock/inbound/${doc.id}/add`}>
-            <PlusIcon />
-            เพิ่มการรับเข้าสินค้า
-          </Link>
-        </Button>
-      </div>
+        {/* ---------- จอกว้าง: ตาราง ---------- */}
+        <div className="mt-4 hidden @3xl:block">
+          <TableFrame>
+            <Table>
+              <TableHeader className={STICKY_HEAD}>
+                <TableRow>
+                  <TableHead className={HEAD_FIRST}>เลขที่รับสินค้า</TableHead>
+                  <TableHead>เลขที่ ID</TableHead>
+                  <TableHead>ทะเบียนรถ</TableHead>
+                  <TableHead>วันที่รถจะเข้า</TableHead>
+                  <TableHead>เบอร์ตู้คอนเทนเนอร์</TableHead>
+                  <TableHead>โซน</TableHead>
+                  <TableHead>บรรจุภัณฑ์</TableHead>
+                  <TableHead className="text-right">
+                    รับเข้า ({doc.orderUnit})
+                  </TableHead>
+                  <TableHead className="text-right">
+                    ไม่ผ่าน ({doc.orderUnit})
+                  </TableHead>
+                  <TableHead>ผลตรวจสอบ QC</TableHead>
+                  <TableHead className="text-right">
+                    เข้าคลัง ({doc.orderUnit})
+                  </TableHead>
+                  <TableHead className={HEAD_LAST}>สถานะ</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {rounds.map((r) => (
+                  <RoundRow key={r.id} round={r} />
+                ))}
+              </TableBody>
+            </Table>
+          </TableFrame>
+        </div>
+      </main>
 
-      {/* ---------- จอแคบ: การ์ดต่อรอบหนึ่งรอบ ---------- */}
-      <div className="mt-4 space-y-3 @3xl:hidden">
-        {rounds.map((r) => (
-          <RoundCard key={r.id} round={r} unit={doc.orderUnit} />
-        ))}
+      {/* ---------- แถบปุ่มล่าง ---------- */}
+      <div className="sticky bottom-0 z-30 border-t border-border bg-background">
+        <div className="mx-auto flex w-full max-w-6xl items-center px-4 py-3 sm:px-6">
+          <Button variant="outline-primary" onClick={() => router.back()}>
+            ย้อนกลับ
+          </Button>
+        </div>
       </div>
-
-      {/* ---------- จอกว้าง: ตาราง ---------- */}
-      <div className="mt-4 hidden @3xl:block">
-        <TableFrame>
-          <Table>
-            <TableHeader className={STICKY_HEAD}>
-              <TableRow>
-                <TableHead className={HEAD_FIRST}>เลขที่รับสินค้า</TableHead>
-                <TableHead>เลขที่ ID</TableHead>
-                <TableHead>ทะเบียนรถ</TableHead>
-                <TableHead>วันที่รถจะเข้า</TableHead>
-                <TableHead>เบอร์ตู้คอนเทนเนอร์</TableHead>
-                <TableHead>โซน</TableHead>
-                <TableHead>บรรจุภัณฑ์</TableHead>
-                <TableHead className="text-right">
-                  รับเข้า ({doc.orderUnit})
-                </TableHead>
-                <TableHead className="text-right">
-                  ไม่ผ่าน ({doc.orderUnit})
-                </TableHead>
-                <TableHead>ผลตรวจสอบ QC</TableHead>
-                <TableHead className="text-right">
-                  เข้าคลัง ({doc.orderUnit})
-                </TableHead>
-                <TableHead className={HEAD_LAST}>สถานะ</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {rounds.map((r) => (
-                <RoundRow key={r.id} round={r} />
-              ))}
-            </TableBody>
-          </Table>
-        </TableFrame>
-      </div>
-
-      <div className="mt-6">
-        <Button variant="outline-primary" onClick={() => router.back()}>
-          ย้อนกลับ
-        </Button>
-      </div>
-    </main>
+    </div>
   );
 }
 

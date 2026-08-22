@@ -107,163 +107,173 @@ export default function WeighingReceiptPage() {
   const kind = diffKind(totals.diffTon);
 
   return (
-    <main className="mx-auto w-full max-w-6xl px-4 pt-6 pb-24 sm:px-6">
-      <Crumbs code={doc.code} />
+    // เนื้อหาสั้นกว่าจอได้ (ยังไม่เคยชั่งเลยไม่มีตารางยาวๆ) — ถ้าไม่กำหนดความสูง
+    // ขั้นต่ำ ปุ่มย้อนกลับ (sticky bottom-0) จะลอยอยู่ใต้เนื้อหาแทนติดขอบล่าง
+    // จอจริง ให้ flex-1 ใน main ดันปุ่มลงไปสุดความสูงขั้นต่ำนี้แทนเสมอ
+    <div className="flex min-h-[calc(100vh-3.5rem)] flex-col">
+      <main className="mx-auto w-full max-w-6xl flex-1 px-4 pt-6 pb-6 sm:px-6">
+        <Crumbs code={doc.code} />
 
-      <h1 className="mt-4 text-2xl font-semibold tracking-tight">
-        ใบชั่งน้ำหนัก {doc.code}
-      </h1>
-      <p className="mt-1.5 text-sm text-muted-foreground">{doc.createdAt}</p>
+        <h1 className="mt-4 text-2xl font-semibold tracking-tight">
+          ใบชั่งน้ำหนัก {doc.code}
+        </h1>
+        <p className="mt-1.5 text-sm text-muted-foreground">{doc.createdAt}</p>
 
-      <Collapsible defaultOpen className="mt-5 rounded-xl border border-border bg-card">
-        <CollapsibleTrigger asChild>
-          {/* items-start กันปุ่มหุบไหลตามเนื้อหาที่ห่อบรรทัด — ปักไว้ชิดขวาบนเสมอ */}
-          <button
-            type="button"
-            className="group flex w-full items-start justify-between gap-3 px-4 pt-4 pb-3 text-left"
-          >
-            <span className="flex min-w-0 flex-1 flex-col gap-y-1">
-              <span className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-                <span className="font-semibold">
-                  {doc.productName}
-                  {doc.productSub && ` ${doc.productSub}`}
-                </span>
-                <span className="text-sm text-muted-foreground">{doc.category}</span>
-                {doc.packing && (
-                  <>
-                    <span className="hidden text-border @2xl:inline" aria-hidden>
-                      |
-                    </span>
-                    <span className="text-sm">{doc.packing}</span>
-                  </>
-                )}
-              </span>
-              <span className="text-sm font-medium">{doc.supplier}</span>
-            </span>
-            <ChevronDownIcon className="mt-0.5 size-5 shrink-0 text-muted-foreground transition-transform group-data-[state=open]:rotate-180" />
-          </button>
-        </CollapsibleTrigger>
-
-        {/* อยู่นอกส่วนที่หุบ — สามยอดนี้คือตัวเลขอ้างอิงที่ต้องเทียบกับตารางรอบตลอดทั้งหน้า */}
-        <div className="px-4 pb-4">
-          <div className="grid gap-4 rounded-lg bg-brand p-4 @2xl:grid-cols-3">
-            <SummaryStat label="น้ำหนักจริง (ตัน)" value={formatTon(totals.netTon)} />
-            <SummaryStat
-              label="น้ำหนักตามผู้ขาย (ตัน)"
-              value={formatTon(totals.supplierTon)}
-            />
-            <div>
-              <p className="text-sm text-muted-foreground">ส่วนต่าง (ตัน)</p>
-              <p className="mt-1 flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-                <span
-                  className={cn(
-                    "text-lg font-semibold tabular-nums",
-                    totals.diffTon < 0 && "text-danger-strong"
+        {/* หุบไว้ก่อนเสมอ — เห็นแค่สรุปยอดก็พอตอบคำถามหลักได้แล้ว กดขยายค่อยเห็น
+            รายละเอียดใบสั่งซื้อ */}
+        <Collapsible className="mt-5 rounded-xl border border-border bg-card">
+          <CollapsibleTrigger asChild>
+            {/* items-start กันปุ่มหุบไหลตามเนื้อหาที่ห่อบรรทัด — ปักไว้ชิดขวาบนเสมอ */}
+            <button
+              type="button"
+              className="group flex w-full items-start justify-between gap-3 px-4 pt-4 pb-3 text-left"
+            >
+              <span className="flex min-w-0 flex-1 flex-col gap-y-1">
+                <span className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                  <span className="font-semibold">
+                    {doc.productName}
+                    {doc.productSub && ` ${doc.productSub}`}
+                  </span>
+                  <span className="text-sm text-muted-foreground">{doc.category}</span>
+                  {doc.packing && (
+                    <>
+                      <span className="hidden text-border @2xl:inline" aria-hidden>
+                        |
+                      </span>
+                      <span className="text-sm">{doc.packing}</span>
+                    </>
                   )}
-                >
-                  {formatSignedTon(totals.diffTon)}
                 </span>
-                {kind && (
+                <span className="text-sm font-medium">{doc.supplier}</span>
+              </span>
+              <ChevronDownIcon className="mt-0.5 size-5 shrink-0 text-muted-foreground transition-transform group-data-[state=open]:rotate-180" />
+            </button>
+          </CollapsibleTrigger>
+
+          {/* อยู่นอกส่วนที่หุบ — สามยอดนี้คือตัวเลขอ้างอิงที่ต้องเทียบกับตารางรอบตลอดทั้งหน้า */}
+          <div className="px-4 pb-4">
+            <div className="grid gap-4 rounded-lg bg-brand p-4 @2xl:grid-cols-3">
+              <SummaryStat label="น้ำหนักจริง (ตัน)" value={formatTon(totals.netTon)} />
+              <SummaryStat
+                label="น้ำหนักตามผู้ขาย (ตัน)"
+                value={formatTon(totals.supplierTon)}
+              />
+              <div>
+                <p className="text-sm text-muted-foreground">ส่วนต่าง (ตัน)</p>
+                <p className="mt-1 flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
                   <span
                     className={cn(
-                      "text-sm font-medium",
-                      kind === "loss" ? "text-danger-strong" : "text-muted-foreground"
+                      "text-lg font-semibold tabular-nums",
+                      totals.diffTon < 0 && "text-danger-strong"
                     )}
                   >
-                    {DIFF_LABEL[kind]}{" "}
-                    {totals.diffPercent !== 0 &&
-                      `${totals.diffPercent > 0 ? "+" : ""}${totals.diffPercent.toFixed(2)}%`}
+                    {formatSignedTon(totals.diffTon)}
                   </span>
-                )}
-              </p>
+                  {kind && (
+                    <span
+                      className={cn(
+                        "text-sm font-medium",
+                        kind === "loss" ? "text-danger-strong" : "text-muted-foreground"
+                      )}
+                    >
+                      {DIFF_LABEL[kind]}{" "}
+                      {totals.diffPercent !== 0 &&
+                        `${totals.diffPercent > 0 ? "+" : ""}${totals.diffPercent.toFixed(2)}%`}
+                    </span>
+                  )}
+                </p>
+              </div>
             </div>
           </div>
+
+          <CollapsibleContent className="px-4 pb-4">
+            <div className="grid grid-cols-2 gap-3 text-sm @2xl:grid-cols-4">
+              <MetaField label="เลขที่ใบขอซื้อ" value={meta.prCode} />
+              <MetaField label="PRQ Unique ID" value={meta.prqId} />
+              <MetaField label="ผู้ทำใบขอซื้อ" value={meta.prMaker} />
+              <MetaField label="ผู้แก้ไขขอซื้อล่าสุด" value={meta.prEditor ?? "-"} />
+              <MetaField label="ผู้ทำใบสั่งซื้อ" value={meta.poMaker} />
+              <MetaField label="ผู้แก้ไขสั่งซื้อล่าสุด" value={meta.poEditor ?? "-"} />
+              <MetaField label="เหตุผลการซื้อ" value={meta.reason} />
+              <MetaField
+                label="ช่วงวันที่จัดส่ง"
+                value={`${meta.deliveryFrom} - ยังไม่ระบุ`}
+              />
+            </div>
+          </CollapsibleContent>
+        </Collapsible>
+
+        {/* ---------- รอบการชั่งน้ำหนัก ---------- */}
+        <div className="mt-8 flex items-center justify-between gap-3">
+          <h2 className="text-lg font-semibold">รอบการชั่งน้ำหนัก</h2>
+          <Button
+            asChild
+            variant="outline"
+            className="border-primary text-primary hover:text-primary"
+          >
+            <Link href={`/weighing/${doc.id}/add`}>
+              <PlusIcon />
+              เพิ่มการชั่งน้ำหนัก
+            </Link>
+          </Button>
         </div>
 
-        <CollapsibleContent className="px-4 pb-4">
-          <div className="grid grid-cols-2 gap-3 text-sm @2xl:grid-cols-4">
-            <MetaField label="เลขที่ใบขอซื้อ" value={meta.prCode} />
-            <MetaField label="PRQ Unique ID" value={meta.prqId} />
-            <MetaField label="ผู้ทำใบขอซื้อ" value={meta.prMaker} />
-            <MetaField label="ผู้แก้ไขขอซื้อล่าสุด" value={meta.prEditor ?? "-"} />
-            <MetaField label="ผู้ทำใบสั่งซื้อ" value={meta.poMaker} />
-            <MetaField label="ผู้แก้ไขสั่งซื้อล่าสุด" value={meta.poEditor ?? "-"} />
-            <MetaField label="เหตุผลการซื้อ" value={meta.reason} />
-            <MetaField
-              label="ช่วงวันที่จัดส่ง"
-              value={`${meta.deliveryFrom} - ยังไม่ระบุ`}
-            />
-          </div>
-        </CollapsibleContent>
-      </Collapsible>
+        {/* ---------- จอแคบ: การ์ดต่อรอบหนึ่งรอบ ---------- */}
+        <div className="mt-4 space-y-3 @3xl:hidden">
+          {rounds.map((r) => (
+            <RoundCard key={r.id} round={r} />
+          ))}
+        </div>
 
-      {/* ---------- รอบการชั่งน้ำหนัก ---------- */}
-      <div className="mt-8 flex items-center justify-between gap-3">
-        <h2 className="text-lg font-semibold">รอบการชั่งน้ำหนัก</h2>
-        <Button
-          asChild
-          variant="outline"
-          className="border-primary text-primary hover:text-primary"
-        >
-          <Link href={`/weighing/${doc.id}/add`}>
-            <PlusIcon />
-            เพิ่มการชั่งน้ำหนัก
-          </Link>
-        </Button>
-      </div>
+        {/* ---------- จอกว้าง: ตาราง ---------- */}
+        <div className="mt-4 hidden @3xl:block">
+          <TableFrame>
+            <Table>
+              <TableHeader className={STICKY_HEAD}>
+                <TableRow>
+                  <TableHead className={HEAD_FIRST}>เลขที่รับสินค้า</TableHead>
+                  <TableHead>เลขที่ ID</TableHead>
+                  <TableHead>ทะเบียนรถ</TableHead>
+                  <TableHead>วันที่รถจะเข้า</TableHead>
+                  <TableHead className="text-right">
+                    ชั่งเข้ารถพร้อมสินค้า
+                    <span className="block font-normal text-muted-foreground">(ตัน)</span>
+                  </TableHead>
+                  <TableHead className="text-right">
+                    ชั่งออกรถเปล่า
+                    <span className="block font-normal text-muted-foreground">(ตัน)</span>
+                  </TableHead>
+                  <TableHead className="text-right">
+                    น้ำหนักสินค้าจริง
+                    <span className="block font-normal text-muted-foreground">(ตัน)</span>
+                  </TableHead>
+                  <TableHead className="text-right">
+                    น้ำหนักสินค้าตามผู้ขาย
+                    <span className="block font-normal text-muted-foreground">(ตัน)</span>
+                  </TableHead>
+                  <TableHead className="text-right">ส่วนต่าง (ตัน)</TableHead>
+                  <TableHead className={HEAD_LAST}>สถานะ</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {rounds.map((r) => (
+                  <RoundRow key={r.id} round={r} />
+                ))}
+              </TableBody>
+            </Table>
+          </TableFrame>
+        </div>
+      </main>
 
-      {/* ---------- จอแคบ: การ์ดต่อรอบหนึ่งรอบ ---------- */}
-      <div className="mt-4 space-y-3 @3xl:hidden">
-        {rounds.map((r) => (
-          <RoundCard key={r.id} round={r} />
-        ))}
+      {/* ---------- แถบปุ่มล่าง ---------- */}
+      <div className="sticky bottom-0 z-30 border-t border-border bg-background">
+        <div className="mx-auto flex w-full max-w-6xl items-center px-4 py-3 sm:px-6">
+          <Button variant="outline-primary" onClick={() => router.back()}>
+            ย้อนกลับ
+          </Button>
+        </div>
       </div>
-
-      {/* ---------- จอกว้าง: ตาราง ---------- */}
-      <div className="mt-4 hidden @3xl:block">
-        <TableFrame>
-          <Table>
-            <TableHeader className={STICKY_HEAD}>
-              <TableRow>
-                <TableHead className={HEAD_FIRST}>เลขที่รับสินค้า</TableHead>
-                <TableHead>เลขที่ ID</TableHead>
-                <TableHead>ทะเบียนรถ</TableHead>
-                <TableHead>วันที่รถจะเข้า</TableHead>
-                <TableHead className="text-right">
-                  ชั่งเข้ารถพร้อมสินค้า
-                  <span className="block font-normal text-muted-foreground">(ตัน)</span>
-                </TableHead>
-                <TableHead className="text-right">
-                  ชั่งออกรถเปล่า
-                  <span className="block font-normal text-muted-foreground">(ตัน)</span>
-                </TableHead>
-                <TableHead className="text-right">
-                  น้ำหนักสินค้าจริง
-                  <span className="block font-normal text-muted-foreground">(ตัน)</span>
-                </TableHead>
-                <TableHead className="text-right">
-                  น้ำหนักสินค้าตามผู้ขาย
-                  <span className="block font-normal text-muted-foreground">(ตัน)</span>
-                </TableHead>
-                <TableHead className="text-right">ส่วนต่าง (ตัน)</TableHead>
-                <TableHead className={HEAD_LAST}>สถานะ</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {rounds.map((r) => (
-                <RoundRow key={r.id} round={r} />
-              ))}
-            </TableBody>
-          </Table>
-        </TableFrame>
-      </div>
-
-      <div className="mt-6">
-        <Button variant="outline-primary" onClick={() => router.back()}>
-          ย้อนกลับ
-        </Button>
-      </div>
-    </main>
+    </div>
   );
 }
 
