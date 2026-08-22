@@ -108,7 +108,15 @@ export const MODULES: ModuleItem[] = [
   },
 
   // ---------- การตรวจคุณภาพสินค้า ----------
-  { id: "qc-raw", group: "qc", label: "ตรวจรับวัตถุดิบ", code: "FM-QC-02-03", icon: "filePlus", pending: 7 },
+  {
+    id: "qc-raw",
+    group: "qc",
+    label: "ตรวจรับวัตถุดิบ",
+    code: "FM-QC-02-03",
+    icon: "filePlus",
+    href: "/qc/receiving",
+    pending: 7,
+  },
   { id: "qc-fg-in", group: "qc", label: "ตรวจรับสินค้า", code: "FM-QC-02-03", icon: "packageSearch" },
   {
     id: "qc-pre",
