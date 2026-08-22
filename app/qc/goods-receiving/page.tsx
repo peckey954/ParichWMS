@@ -43,7 +43,7 @@ import {
 } from "@/lib/qc-receiving";
 
 /* ------------------------------------------------------------------
-   ตรวจรับวัตถุดิบ — รายการใบที่รอตรวจกับที่ตรวจไปแล้ว
+   ตรวจรับสินค้า — รายการใบที่รอตรวจกับที่ตรวจไปแล้ว
 
    แท็บสองอันเป็นสองกองงานคนละแบบ ไม่ใช่ตัวกรองของกองเดียวกัน
    ฝั่งรอตรวจคือคิวที่ต้องทำ ฝั่งตรวจแล้วคือของที่เอาไว้ย้อนดู
@@ -76,7 +76,7 @@ export default function QcReceivingPage() {
         <BreadcrumbList>
           <BreadcrumbItem>
             <BreadcrumbPage className="text-primary">
-              ตรวจรับวัตถุดิบ
+              ตรวจรับสินค้า
             </BreadcrumbPage>
           </BreadcrumbItem>
         </BreadcrumbList>
@@ -85,7 +85,7 @@ export default function QcReceivingPage() {
       <div className="mt-4">
         <h1 className="text-2xl font-semibold tracking-tight">ตรวจรับสินค้า</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          ตรวจรับวัตถุดิบเข้าคลัง
+          ตรวจรับสินค้าเข้าคลัง
         </p>
       </div>
 
@@ -171,7 +171,7 @@ function ReceivingTable({ docs }: { docs: ReceivingDoc[] }) {
         </TableHeader>
         <TableBody>
           {docs.map((d) => {
-            const href = `/qc/receiving/${d.id}`;
+            const href = `/qc/goods-receiving/${d.id}`;
             return (
               <TableRow
                 key={d.id}

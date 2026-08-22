@@ -163,7 +163,7 @@ function ReceivingSheet({ doc }: { doc: NonNullable<ReturnType<typeof findDoc>> 
           </BreadcrumbItem>
           <BreadcrumbSeparator />
           <BreadcrumbItem>
-            <BreadcrumbLink href="/qc/receiving">ตรวจรับวัตถุดิบ</BreadcrumbLink>
+            <BreadcrumbLink href="/qc/goods-receiving">ตรวจรับสินค้า</BreadcrumbLink>
           </BreadcrumbItem>
           <BreadcrumbSeparator />
           <BreadcrumbItem>
