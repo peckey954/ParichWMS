@@ -276,7 +276,7 @@ function seeded(n: number) {
 const pad = (n: number) => String(n).padStart(2, "0");
 const pick = <T,>(pool: T[], rnd: () => number) => pool[Math.floor(rnd() * pool.length)];
 
-const REQUESTER_POOL = [
+export const PR_REQUESTERS = [
   "อลิสา พรสุขสิริ",
   "ธนกฤต ศรีบุญเรือง",
   "พิมพ์ชนก วงศ์อารีย์",
@@ -315,7 +315,7 @@ function buildTimeline(
   requester: string,
   rnd: () => number
 ): Pick<PrDoc, "timeline" | "cancelReason" | "cancelActor" | "cancelAt"> {
-  const warehouseActor = pick(REQUESTER_POOL, rnd);
+  const warehouseActor = pick(PR_REQUESTERS, rnd);
   const timeline: PrTimelineEntry[] = [
     { step: "sent", actor: requester, at: timelineStamp(rnd), department: PURCHASE_DEPT },
   ];
@@ -367,7 +367,7 @@ function morePr(count = 30): PrDoc[] {
     const qty = Math.round((20 + rnd() * 980) / 10) * 10;
     const day = 18 - (i % 14);
     const status = STATUS_CYCLE[i % STATUS_CYCLE.length];
-    const requester = pick(REQUESTER_POOL, rnd);
+    const requester = pick(PR_REQUESTERS, rnd);
     // สุ่มเหตุผลอย่างน้อยหนึ่งอย่างเสมอ ไม่มีใบไหนไม่มีเหตุผลการซื้อ
     const reasons = PR_REASONS.filter(() => rnd() < 0.45);
     if (reasons.length === 0) reasons.push(pick(PR_REASONS, rnd));
@@ -386,7 +386,7 @@ function morePr(count = 30): PrDoc[] {
       reasons,
       neededDate: `${pad(1 + Math.floor(rnd() * 28))}/${pad(1 + Math.floor(rnd() * 12))}/2026`,
       requester,
-      editedBy: rnd() < 0.35 ? pick(REQUESTER_POOL, rnd) : undefined,
+      editedBy: rnd() < 0.35 ? pick(PR_REQUESTERS, rnd) : undefined,
       status,
       ...buildTimeline(status, requester, rnd),
     } satisfies PrDoc;

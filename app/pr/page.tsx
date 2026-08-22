@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { CalendarIcon, ListFilterIcon, PlusIcon, SearchIcon } from "lucide-react";
+import { ListFilterIcon, PlusIcon, SearchIcon } from "lucide-react";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -13,15 +13,30 @@ import {
 } from "@peckey954/ui/components/ui/breadcrumb";
 import { Button } from "@peckey954/ui/components/ui/button";
 import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@peckey954/ui/components/ui/dialog";
+import {
   InputGroup,
   InputGroupAddon,
   InputGroupInput,
 } from "@peckey954/ui/components/ui/input-group";
 import { cn } from "@peckey954/ui/lib/utils";
+import { parseDateSlash } from "@/components/date-select";
 import { useDevicePreview, useScrollState } from "@/components/device-preview";
 import { BackToTop, StickyToolbar } from "@/components/sticky-toolbar";
+import { PrFilter, PR_VIEW_DEFAULT, isPrViewDefault, type PrView } from "@/components/pr/pr-filter";
 import { PrList } from "@/components/pr/pr-list";
-import { matchesPr, PR_DOCS, PR_STATUS_LABEL, type PrStatus } from "@/lib/pr";
+import {
+  matchesPr,
+  PR_DOCS,
+  PR_PRODUCTS,
+  PR_STATUS_LABEL,
+  type PrStatus,
+} from "@/lib/pr";
 
 /* ------------------------------------------------------------------
    ขอซื้อ PR — หน้ารายการ ต้นทางของสายการจัดซื้อ
@@ -53,6 +68,9 @@ export default function PrListPage() {
 
   const [status, setStatus] = React.useState<StatusChip>("all");
   const [query, setQuery] = React.useState("");
+  const [view, setView] = React.useState<PrView>(PR_VIEW_DEFAULT);
+  const [filterOpen, setFilterOpen] = React.useState(false);
+  const filterActive = !isPrViewDefault(view);
 
   const chipRowRef = React.useRef<HTMLDivElement>(null);
   const chipRefs = React.useRef<Record<string, HTMLButtonElement | null>>({});
@@ -72,9 +90,43 @@ export default function PrListPage() {
     return c;
   }, []);
 
-  const visible = PR_DOCS.filter(
-    (d) => (status === "all" || d.status === status) && matchesPr(d, query)
-  );
+  const visible = PR_DOCS.filter((d) => {
+    if (status !== "all" && d.status !== status) return false;
+    if (!matchesPr(d, query)) return false;
+
+    const from = view.neededRange?.from;
+    const to = view.neededRange?.to;
+    if (from || to) {
+      const needed = parseDateSlash(d.neededDate);
+      if (!needed) return false;
+      if (from && needed < from) return false;
+      if (to && needed > to) return false;
+    }
+
+    if (view.codeQuery.trim() !== "") {
+      if (!d.code.toLowerCase().includes(view.codeQuery.trim().toLowerCase())) return false;
+    }
+
+    if (view.categories.length > 0 && !view.categories.includes(d.categoryId)) return false;
+
+    // สินค้าเก็บเป็น id — ใบขอซื้อเก็บแค่ประเภท/ชื่อ/หมวดที่คัดลอกไว้ตอนสร้าง
+    // จึงต้องย้อนหา product ที่ id นั้นตรงกับข้อมูลของใบก่อน
+    if (view.productIds.length > 0) {
+      const matches = view.productIds.some((id) => {
+        const p = PR_PRODUCTS.find((x) => x.id === id);
+        return p && p.category === d.categoryId && p.name === d.productName && p.sub === d.productSub;
+      });
+      if (!matches) return false;
+    }
+
+    if (view.packings.length > 0 && (!d.packing || !view.packings.includes(d.packing))) {
+      return false;
+    }
+
+    if (view.requesters.length > 0 && !view.requesters.includes(d.requester)) return false;
+
+    return true;
+  });
 
   const changeStatus = (next: StatusChip) => {
     setStatus(next);
@@ -177,22 +229,39 @@ export default function PrListPage() {
                   onChange={(e) => setQuery(e.target.value)}
                 />
               </InputGroup>
-              {/* ยังไม่มีตัวเลือกช่วงวันที่ในระบบ — ช่องนี้เป็นเลย์เอาต์ตามแบบไว้ก่อน
-                  เหมือนปุ่มตัวกรองข้างๆ ที่ยังไม่ผูกเงื่อนไขจริง */}
-              <InputGroup className="hidden w-48 shrink-0 bg-card @lg:flex">
-                <InputGroupAddon align="inline-start">
-                  <CalendarIcon />
-                </InputGroupAddon>
-                <InputGroupInput readOnly placeholder="วันที่" />
-              </InputGroup>
-              <Button
-                variant="outline-primary"
-                size="icon"
-                aria-label="ตัวกรองใบขอซื้อ"
-                className="shrink-0"
-              >
-                <ListFilterIcon />
-              </Button>
+              {/* ตัวกรองเป็นกล่องกลางจอ ชุดเดียวกับหน้าสต็อกทั่วไป
+                  แก้ในกล่องก่อน กดตกลงถึงมีผล กากบาทกับ Esc คือยกเลิก */}
+              <Dialog open={filterOpen} onOpenChange={setFilterOpen}>
+                <DialogTrigger asChild>
+                  <Button
+                    variant="outline-primary"
+                    size="icon"
+                    aria-label="ตัวกรองและการแสดงผล"
+                    className="relative shrink-0"
+                  >
+                    <ListFilterIcon />
+                    {/* จุดบอกว่ามีอะไรถูกเปลี่ยนไว้ ไม่บอกว่ากี่อย่าง */}
+                    {filterActive && (
+                      <span className="absolute top-1 right-1 size-2 rounded-full bg-primary" />
+                    )}
+                  </Button>
+                </DialogTrigger>
+                <DialogContent
+                  aria-describedby={undefined}
+                  className="flex max-h-[85svh] flex-col gap-0 overflow-hidden! p-0 sm:max-w-md [&_[data-slot=dialog-close]]:focus:ring-0 [&_[data-slot=dialog-close]]:focus:ring-offset-0 [&_[data-slot=dialog-close]]:focus-visible:ring-2 [&_[data-slot=dialog-close]]:focus-visible:ring-ring [&_[data-slot=dialog-close]]:focus-visible:ring-offset-2"
+                >
+                  <DialogHeader className="px-4 pt-4 text-left">
+                    <DialogTitle>ตัวกรองและการแสดงผล</DialogTitle>
+                  </DialogHeader>
+                  <PrFilter
+                    view={view}
+                    onApply={(next) => {
+                      setView(next);
+                      setFilterOpen(false);
+                    }}
+                  />
+                </DialogContent>
+              </Dialog>
             </div>
           </StickyToolbar>
 

@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { ChevronDownIcon } from "lucide-react";
+import { CalendarIcon, ChevronDownIcon } from "lucide-react";
 import { Button } from "@peckey954/ui/components/ui/button";
 import { Calendar } from "@peckey954/ui/components/ui/calendar";
 import {
@@ -82,6 +82,74 @@ export function DateSelect({
           onSelect={(d) => {
             onValueChange(d);
             setOpen(false);
+          }}
+        />
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+/** ต้องมีคีย์ from เสมอ (ค่าเป็น undefined ได้) ไม่ใช่ from ไม่บังคับมีคีย์ —
+ *  โครงสร้างต้องตรงกับ DateRange ของ react-day-picker เป๊ะเพื่อส่งให้ Calendar
+ *  ตรงๆ ได้โดยไม่ต้อง import ชนิดจากแพ็กเกจนั้นเข้ามาตรงๆ (เป็น dependency
+ *  ของ @peckey954/ui ไม่ใช่ของโปรเจกต์นี้เอง — pnpm ไม่ hoist ให้ import ตรงได้) */
+export type DateRange = { from: Date | undefined; to?: Date | undefined };
+
+/**
+ * ช่องเลือกช่วงวันที่ — ใช้ในกล่องตัวกรอง ไม่ปิดกล่องปฏิทินทันทีที่เลือกวันแรก
+ * เพราะต้องเลือกวันที่สองต่อ (react-day-picker ส่ง to:undefined ระหว่างที่ยัง
+ * เลือกไม่ครบ ปิดกล่องตอนนั้นจะตัดจบก่อนเลือกวันที่สองเสร็จ)
+ */
+export function DateRangeSelect({
+  id,
+  value,
+  onValueChange,
+  placeholder = "เลือกวันที่",
+  className,
+}: {
+  id?: string;
+  value?: DateRange;
+  onValueChange: (range: DateRange | undefined) => void;
+  placeholder?: string;
+  className?: string;
+}) {
+  const [open, setOpen] = React.useState(false);
+
+  const label = value?.from
+    ? value.to
+      ? `${formatDateSlash(value.from)} - ${formatDateSlash(value.to)}`
+      : formatDateSlash(value.from)
+    : placeholder;
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          id={id}
+          type="button"
+          variant="outline"
+          className={cn(
+            "w-full justify-between bg-card font-normal",
+            !value?.from && "text-muted-foreground",
+            className
+          )}
+        >
+          <span className="flex items-center gap-2 truncate">
+            <CalendarIcon className="size-4 shrink-0" />
+            <span className="truncate">{label}</span>
+          </span>
+          <ChevronDownIcon className="shrink-0 text-muted-foreground" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent align="start" className="w-auto p-0">
+        <Calendar
+          mode="range"
+          formatters={{ formatCaption, formatWeekdayName: formatWeekday }}
+          selected={value}
+          defaultMonth={value?.from}
+          onSelect={(r) => {
+            onValueChange(r);
+            if (r?.from && r?.to) setOpen(false);
           }}
         />
       </PopoverContent>
