@@ -117,8 +117,15 @@ export default function QcInspectPage() {
   const [docRef, setDocRef] = React.useState(INSPECT_DOC.refOptions[0]);
   const [product, setProduct] = React.useState(INSPECT_DOC.product);
   const [rounds, setRounds] = React.useState<Round[]>([newRound("r1")]);
-  // กางเฉพาะรอบแรกไว้ตั้งแต่เปิดหน้า รอบที่ยังไม่ถึงกับสรุปทั้งใบไม่ต้องกินที่
-  const [open, setOpen] = React.useState<Record<string, boolean>>({ r1: true });
+  /**
+   * กางได้ทีละรอบ ไม่ใช่หลายรอบพร้อมกัน
+   *
+   * เพราะปุ่มบันทึกอยู่ที่แถบล่างของหน้าซึ่งมีอันเดียว
+   * ถ้ากางสองรอบพร้อมกัน ปุ่มนั้นจะตอบไม่ได้ว่ากำลังจะบันทึกรอบไหน
+   * อยากเทียบข้ามรอบใช้การ์ดสรุปทั้งใบ ซึ่งเปิดแยกจากรอบได้
+   */
+  const [openRound, setOpenRound] = React.useState<string | null>("r1");
+  const [openAll, setOpenAll] = React.useState(false);
 
   const patchAnswer = (
     roundId: string,
@@ -146,7 +153,7 @@ export default function QcInspectPage() {
   const addRound = () => {
     const id = `r${rounds.length + 1}`;
     setRounds((rs) => [...rs, newRound(id)]);
-    setOpen({ [id]: true });
+    setOpenRound(id);
   };
 
   const failed = items.filter((i) => overallOf(i, rounds) === false);
@@ -175,13 +182,19 @@ export default function QcInspectPage() {
       return;
     }
     patchRound(round.id, { saved: true });
-    setOpen((o) => ({ ...o, [round.id]: false }));
+    setOpenRound(null);
     toast.success(`บันทึกครั้งที่ ${ri + 1} แล้ว`, {
       description: `${round.time}${round.inspector ? ` · ${round.inspector}` : ""}`,
     });
   };
 
   const allSaved = rounds.every((r) => r.saved);
+
+  // รอบที่กำลังกางอยู่และยังไม่ได้บันทึก คือสิ่งที่ปุ่มบนแถบล่างหมายถึง
+  const activeIndex = rounds.findIndex(
+    (r) => r.id === openRound && !r.saved
+  );
+  const activeRound = activeIndex >= 0 ? rounds[activeIndex] : null;
 
   /** ปิดใบตรวจได้ต่อเมื่อบันทึกครบทุกรอบแล้ว ไม่ใช่แค่กรอกครบ */
   const closeSheet = () => {
@@ -190,7 +203,7 @@ export default function QcInspectPage() {
       toast.error(`ยังไม่ได้บันทึกครั้งที่ ${bad + 1}`, {
         description: "บันทึกให้ครบทุกครั้งก่อนปิดใบตรวจ",
       });
-      setOpen((o) => ({ ...o, [rounds[bad].id]: true }));
+      setOpenRound(rounds[bad].id);
       return;
     }
     toast.success(`ปิดใบตรวจ ${INSPECT_TEMPLATE.formCode} แล้ว`, {
@@ -307,11 +320,10 @@ export default function QcInspectPage() {
             round={round}
             index={ri}
             firstRound={rounds[0]}
-            open={open[round.id] ?? false}
-            onOpenChange={(v) => setOpen((o) => ({ ...o, [round.id]: v }))}
+            open={openRound === round.id}
+            onOpenChange={(v) => setOpenRound(v ? round.id : null)}
             onPatchRound={(p) => patchRound(round.id, p)}
             onPatchAnswer={(itemId, p) => patchAnswer(round.id, itemId, p)}
-            onSave={() => saveRound(round, ri)}
             summaryOf={(item) => summaryText(item, rounds)}
           />
         ))}
@@ -326,8 +338,8 @@ export default function QcInspectPage() {
         {/* สรุปทั้งใบเป็นการ์ดหุบได้เหมือนกัน หุบไว้ตั้งแต่แรกเพราะเป็นของที่ดูตอนจบ
             ไม่ใช่ของที่ใช้ระหว่างกรอก */}
         <Collapsible
-          open={open.all ?? false}
-          onOpenChange={(v) => setOpen((o) => ({ ...o, all: v }))}
+          open={openAll}
+          onOpenChange={setOpenAll}
           className="overflow-hidden rounded-xl border border-border bg-card"
         >
           <CollapsibleTrigger className="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-accent-hover">
@@ -340,7 +352,7 @@ export default function QcInspectPage() {
             <ChevronDownIcon
               className={cn(
                 "size-4 shrink-0 text-muted-foreground transition-transform",
-                (open.all ?? false) && "rotate-180"
+                openAll && "rotate-180"
               )}
             />
           </CollapsibleTrigger>
@@ -361,10 +373,18 @@ export default function QcInspectPage() {
             <Button variant="outline" onClick={() => router.back()}>
               ย้อนกลับ
             </Button>
-            {/* ปุ่มนี้ปิดงานทั้งใบ ไม่ใช่ปุ่มบันทึก — ของที่กรอกถูกบันทึกไปทีละรอบแล้ว */}
-            <Button disabled={!allSaved} onClick={closeSheet}>
-              ปิดใบตรวจ
-            </Button>
+            {/* ปุ่มหลักมีอันเดียวเสมอ และเปลี่ยนความหมายตามรอบที่กำลังกางอยู่
+                กำลังกรอกรอบไหนอยู่ก็บันทึกรอบนั้น กรอกครบทุกรอบแล้วค่อยปิดทั้งใบ
+                มีปุ่มบันทึกทั้งในการ์ดและที่แถบล่างพร้อมกัน คนใช้จะไม่รู้ว่าสองอันต่างกันยังไง */}
+            {activeRound ? (
+              <Button onClick={() => saveRound(activeRound, activeIndex)}>
+                บันทึกครั้งที่ {activeIndex + 1}
+              </Button>
+            ) : (
+              <Button disabled={!allSaved} onClick={closeSheet}>
+                ปิดใบตรวจ
+              </Button>
+            )}
           </div>
         </div>
       </div>
@@ -417,7 +437,6 @@ function RoundCard({
   onOpenChange,
   onPatchRound,
   onPatchAnswer,
-  onSave,
   summaryOf,
 }: {
   items: QcItem[];
@@ -429,7 +448,6 @@ function RoundCard({
   onOpenChange: (v: boolean) => void;
   onPatchRound: (p: Partial<Round>) => void;
   onPatchAnswer: (itemId: string, p: Partial<Answer>) => void;
-  onSave: () => void;
   summaryOf: (item: QcItem) => { label: string; value: string }[];
 }) {
   const mine = items.filter((i) => editableIn(i, index));
@@ -517,10 +535,11 @@ function RoundCard({
             </div>
           )}
 
-          {/* บันทึกอยู่ท้ายการ์ดของรอบ ไม่ใช่แถบล่างของหน้า
-              เพราะสิ่งที่เพิ่งทำเสร็จคือรอบนี้ ไม่ใช่ทั้งใบ */}
-          <div className="flex justify-end">
-            {round.saved ? (
+          {/* ปุ่มบันทึกไม่ได้อยู่ตรงนี้ อยู่ที่แถบล่างของหน้าซึ่งเห็นตลอดเวลา
+              การ์ดของรอบสูงกว่าหนึ่งจอ ปุ่มท้ายการ์ดต้องเลื่อนลงไปหาทุกครั้ง
+              เหลือแค่ปุ่มแก้ไข ซึ่งเป็นของเฉพาะการ์ดใบนี้และนาน ๆ ใช้ที */}
+          {round.saved && (
+            <div className="flex justify-end">
               <Button
                 variant="outline"
                 onClick={() => onPatchRound({ saved: false })}
@@ -528,10 +547,8 @@ function RoundCard({
                 <PencilIcon />
                 แก้ไขครั้งที่ {index + 1}
               </Button>
-            ) : (
-              <Button onClick={onSave}>บันทึกครั้งที่ {index + 1}</Button>
-            )}
-          </div>
+            </div>
+          )}
         </div>
       </CollapsibleContent>
     </Collapsible>
