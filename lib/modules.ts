@@ -53,7 +53,14 @@ export type ModuleItem = {
 
 export const MODULES: ModuleItem[] = [
   // ---------- การสั่งซื้อสินค้า ----------
-  { id: "pr", group: "purchase", label: "ขอซื้อ PR", code: "FM-ST-01-05", icon: "squareCheck" },
+  {
+    id: "pr",
+    group: "purchase",
+    label: "ขอซื้อ PR",
+    code: "FM-ST-01-05",
+    icon: "squareCheck",
+    href: "/pr",
+  },
   { id: "po", group: "purchase", label: "สั่งซื้อ PO", code: "FM-ST-01-05", icon: "cart" },
   { id: "approve", group: "purchase", label: "อนุมัติ", code: "FM-PD-01-03", icon: "circleCheck", pending: 12 },
   {
