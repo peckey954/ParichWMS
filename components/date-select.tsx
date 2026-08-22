@@ -34,6 +34,13 @@ export function formatDateSlash(d: Date) {
   return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()}`;
 }
 
+/** แปลงกลับจาก dd/mm/yyyy — ใช้ตอนเปิดฟอร์มแก้ไขที่มีค่าจากข้อมูลเดิมอยู่แล้ว */
+export function parseDateSlash(s: string): Date | undefined {
+  const [d, m, y] = s.split("/").map(Number);
+  if (!d || !m || !y) return undefined;
+  return new Date(y, m - 1, d);
+}
+
 export function DateSelect({
   id,
   value,

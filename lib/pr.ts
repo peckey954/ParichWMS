@@ -28,6 +28,38 @@ export const PR_REASON_LABEL: Record<PrReason, string> = {
 
 export const PR_REASONS: PrReason[] = ["produce", "sell", "other"];
 
+/* ------------------------------------------------------------------
+   เส้นทางสถานะ — แสดงในหน้ารายละเอียดเป็นสี่ขั้นเรียงจากปลายทางไปต้นทาง
+   (เข้าคลังแล้ว → ทยอยรับ → สั่งซื้อ → ส่งคำขอ) ขั้นที่ยังไปไม่ถึงใช้ป้ายกริยา
+   ("สั่งซื้อสินค้า") ส่วนขั้นที่ถึงแล้วใช้ป้ายกริยาสมบูรณ์ ("สั่งซื้อแล้ว")
+   — ยกเว้น "ทยอยรับสินค้า" กับ "รับสินค้าเข้าคลัง" ที่ใช้คำเดียวกันทั้งสอง
+   สถานะ เพราะเป็นคำอธิบายขั้นตอนที่คลังใช้เรียกเหมือนกันไม่ว่าจะถึงหรือยัง
+   ถ้ายกเลิกระหว่างทาง จะมาแทนที่ตำแหน่งขั้น "สั่งซื้อ" เสมอ (ยกเลิกได้ก็ต่อเมื่อ
+   ยังไม่สั่งซื้อ — ดู PR_STATUS_LABEL.sent ที่เป็นขั้นเดียวที่แก้ไข/ยกเลิกได้)
+------------------------------------------------------------------ */
+export type PrTimelineStepId = "sent" | "ordered" | "partial" | "stocked";
+
+export const PR_TIMELINE_PENDING_LABEL: Record<PrTimelineStepId, string> = {
+  sent: "ส่งคำขอแล้ว",
+  ordered: "สั่งซื้อสินค้า",
+  partial: "ทยอยรับสินค้า",
+  stocked: "รับสินค้าเข้าคลัง",
+};
+
+export const PR_TIMELINE_DONE_LABEL: Record<PrTimelineStepId, string> = {
+  sent: "ส่งคำขอแล้ว",
+  ordered: "สั่งซื้อแล้ว",
+  partial: "ทยอยรับสินค้า",
+  stocked: "รับสินค้าเข้าคลัง",
+};
+
+export type PrTimelineEntry = {
+  step: PrTimelineStepId;
+  actor: string;
+  at: string;
+  department: string;
+};
+
 export type PrCategoryId =
   | "jumboFert"
   | "sackFert"
@@ -202,6 +234,12 @@ export type PrDoc = {
   /** มีค่าเฉพาะใบที่เคยถูกแก้ไขหลังสร้าง ไม่ใช่ทุกใบจะมี */
   editedBy?: string;
   status: PrStatus;
+  /** ประวัติเฉพาะขั้นที่ถึงแล้ว เรียงเก่าสุดก่อน ใช้วาดเส้นทางสถานะ */
+  timeline: PrTimelineEntry[];
+  /** มีค่าเฉพาะใบที่ถูกยกเลิก */
+  cancelReason?: string;
+  cancelActor?: string;
+  cancelAt?: string;
 };
 
 export function matchesPr(d: PrDoc, q: string): boolean {
@@ -252,6 +290,73 @@ function docStamp(seq: number, rnd: () => number) {
   return `1/${day}/2026 | ${pad(8 + (seq % 9))}:${pad(Math.floor(rnd() * 60))}:${pad(Math.floor(rnd() * 60))}`;
 }
 
+/** วันเวลาแบบเดียวกับที่ใช้ในเส้นทางสถานะ — dd/mm/yyyy - HH:MM:SS */
+function timelineStamp(rnd: () => number) {
+  return `${pad(1 + Math.floor(rnd() * 28))}/${pad(1 + Math.floor(rnd() * 12))}/2026 - ${pad(Math.floor(rnd() * 24))}:${pad(Math.floor(rnd() * 60))}:${pad(Math.floor(rnd() * 60))}`;
+}
+
+const PURCHASE_DEPT = "จัดซื้อ";
+const WAREHOUSE_DEPT = "คลังสินค้า";
+
+const CANCEL_REASON_POOL = [
+  "เอกสารไม่ถูกต้อง",
+  "ข้อมูลไม่ถูกต้อง",
+  "เปลี่ยนแผนการสั่งซื้อ",
+  "ซ้ำกับใบขอซื้ออื่น",
+];
+
+/**
+ * สร้างเส้นทางสถานะให้ตรงกับ status — ยกเลิกได้เฉพาะช่วง "ส่งคำขอแล้ว"
+ * เท่านั้น (ตรงกับกฎที่ว่าแก้ไข/ยกเลิกได้เฉพาะตอนยังไม่สั่งซื้อ) จึงมีแค่ขั้น
+ * "ส่งคำขอแล้ว" ก่อนเปลี่ยนเป็นยกเลิกเสมอ ไม่มีกรณียกเลิกหลังสั่งซื้อไปแล้ว
+ */
+function buildTimeline(
+  status: PrStatus,
+  requester: string,
+  rnd: () => number
+): Pick<PrDoc, "timeline" | "cancelReason" | "cancelActor" | "cancelAt"> {
+  const warehouseActor = pick(REQUESTER_POOL, rnd);
+  const timeline: PrTimelineEntry[] = [
+    { step: "sent", actor: requester, at: timelineStamp(rnd), department: PURCHASE_DEPT },
+  ];
+
+  if (status === "cancelled") {
+    return {
+      timeline,
+      cancelReason: pick(CANCEL_REASON_POOL, rnd),
+      cancelActor: requester,
+      cancelAt: timelineStamp(rnd),
+    };
+  }
+
+  if (status === "ordered" || status === "partial" || status === "stocked") {
+    timeline.push({
+      step: "ordered",
+      actor: requester,
+      at: timelineStamp(rnd),
+      department: PURCHASE_DEPT,
+    });
+  }
+  if (status === "partial" || status === "stocked") {
+    timeline.push({
+      step: "partial",
+      actor: warehouseActor,
+      at: timelineStamp(rnd),
+      department: WAREHOUSE_DEPT,
+    });
+  }
+  if (status === "stocked") {
+    timeline.push({
+      step: "stocked",
+      actor: warehouseActor,
+      at: timelineStamp(rnd),
+      department: WAREHOUSE_DEPT,
+    });
+  }
+
+  return { timeline };
+}
+
 /** สถานะวนตามรอบ 5 — ตารางตัวอย่างจึงมีครบทุกสถานะให้เห็นสีชิปครบชุด */
 const STATUS_CYCLE: PrStatus[] = ["sent", "ordered", "partial", "stocked", "cancelled"];
 
@@ -283,8 +388,13 @@ function morePr(count = 30): PrDoc[] {
       requester,
       editedBy: rnd() < 0.35 ? pick(REQUESTER_POOL, rnd) : undefined,
       status,
+      ...buildTimeline(status, requester, rnd),
     } satisfies PrDoc;
   });
 }
 
 export const PR_DOCS: PrDoc[] = morePr();
+
+export function getPrDoc(id: string): PrDoc | undefined {
+  return PR_DOCS.find((d) => d.id === id);
+}

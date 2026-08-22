@@ -1,6 +1,8 @@
 "use client";
 
 import * as React from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Badge } from "@peckey954/ui/components/ui/badge";
 import { Separator } from "@peckey954/ui/components/ui/separator";
 import {
@@ -36,8 +38,8 @@ import {
 } from "@/components/stock/doc-parts";
 
 /**
- * รายการใบขอซื้อ — ไม่มีหน้ารายละเอียดแยกต่างหาก (ยังไม่มีแบบมาให้)
- * แถวจึงไม่คลิกไปไหน โชว์ครบทุกคอลัมน์ในตารางเดียวเลย
+ * รายการใบขอซื้อ — กดแถว/การ์ดแล้วไปหน้ารายละเอียดของใบนั้น
+ * (แก้ไข/ยกเลิกได้จากหน้ารายละเอียด เฉพาะตอนสถานะ "ส่งคำขอแล้ว")
  *
  * จอกว้าง — ตาราง จอแคบ — การ์ด ใช้ชิ้นส่วนร่วมจาก components/stock/doc-parts
  * (เลย์เอาต์เอกสารทั่วไป ไม่ใช่ตรรกะเฉพาะสต็อก)
@@ -73,6 +75,7 @@ function PrStatusChip({ status }: { status: PrStatus }) {
 export function PrList({ docs }: { docs: PrDoc[] }) {
   const [page, setPage] = React.useState(1);
   const { pages, safe, slice } = paginate(docs, page, PAGE_SIZE);
+  const router = useRouter();
 
   if (docs.length === 0) {
     return <EmptyDocs title="ไม่พบใบขอซื้อ" hint="ลองใช้คำค้นสั้นลง" />;
@@ -110,9 +113,20 @@ export function PrList({ docs }: { docs: PrDoc[] }) {
             </TableHeader>
             <TableBody>
               {slice.map((d) => (
-                <TableRow key={d.id}>
+                <TableRow
+                  key={d.id}
+                  // ทั้งแถวกดได้ ไม่ใช่เฉพาะตัวอักษรเลขที่ใบ — เป้าเล็กแค่คำเดียว
+                  // ในแถวสูง 65px คือกดพลาดตลอด ยังเป็น <a> จริงในเซลล์แรกด้วย
+                  onClick={() => router.push(`/pr/${d.id}`)}
+                  className="cursor-pointer"
+                >
                   <TableCell className={COL_FIRST}>
-                    <span className="block font-medium whitespace-nowrap">{d.code}</span>
+                    <Link
+                      href={`/pr/${d.id}`}
+                      className="block font-medium whitespace-nowrap hover:underline"
+                    >
+                      {d.code}
+                    </Link>
                     <span className="block text-sm text-muted-foreground">
                       {d.createdAt}
                     </span>
@@ -167,8 +181,11 @@ export function PrList({ docs }: { docs: PrDoc[] }) {
 
 function PrCard({ doc: d }: { doc: PrDoc }) {
   return (
-    <div className="rounded-xl border border-border bg-card p-4">
-      <CardHead code={d.code} at={d.createdAt} />
+    // ลิงก์คลุมทั้งใบด้วย after:inset-0 ใน CardHead แทนที่จะเอา <a> ครอบเนื้อหา
+    // เพราะการ์ดไม่มีปุ่มซ้อนอยู่ข้างในเหมือนการ์ดอื่น จะครอบทั้งใบตรงๆ ก็ได้
+    // แต่ใช้ลิงก์ที่ CardHead ให้อยู่แล้วเพื่อความสม่ำเสมอกับการ์ดเอกสารอื่น
+    <div className="relative rounded-xl border border-border bg-card p-4">
+      <CardHead code={d.code} at={d.createdAt} href={`/pr/${d.id}`} />
 
       <CardBox className="mt-3">
         <p className="font-medium">
