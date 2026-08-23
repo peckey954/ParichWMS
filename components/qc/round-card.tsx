@@ -49,6 +49,7 @@ import { VERDICT_WORDS, showsTick, type QcItem } from "@/lib/qc-template";
 ------------------------------------------------------------------ */
 
 export function RoundCard({
+  id,
   items,
   round,
   index,
@@ -57,6 +58,7 @@ export function RoundCard({
   onOpenChange,
   onPatchAnswer,
 }: {
+  id: string;
   items: QcItem[];
   round: Round;
   index: number;
@@ -78,9 +80,11 @@ export function RoundCard({
 
   return (
     <Collapsible
+      id={id}
       open={open}
       onOpenChange={onOpenChange}
-      className="overflow-hidden rounded-xl border border-border bg-card"
+      // scroll-mt เผื่อความสูงของแถบหัวเว็บที่ตรึงอยู่ ไม่งั้นหัวการ์ดจะไปมุดใต้แถบ
+      className="scroll-mt-20 overflow-hidden rounded-xl border border-border bg-card"
     >
       <CollapsibleTrigger className="flex w-full items-center gap-3 px-4 py-4 text-left transition-colors hover:bg-accent-hover">
         <div className="min-w-0 flex-1">

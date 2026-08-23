@@ -75,6 +75,36 @@ function ReceivingSheet({ doc }: { doc: NonNullable<ReturnType<typeof findDoc>> 
   const [rounds, setRounds] = React.useState<Round[]>(() => [newRound("r1")]);
   // กางทีละใบ กางหลายใบพร้อมกันแล้วหน้ายาวเป็นพันพิกเซลโดยไม่ได้ช่วยอะไร
   const [openRound, setOpenRound] = React.useState<string | null>("r1");
+
+  /**
+   * กางการ์ดไหนก็เลื่อนไปหัวการ์ดนั้น
+   *
+   * กางได้ทีละใบ พอกางใบใหม่ใบเก่าก็หุบ หน้าหดสั้นลงเป็นพันพิกเซลทันที
+   * แต่เบราว์เซอร์ค้าง scrollTop ค่าเดิมไว้ ตำแหน่งที่ตาอยู่จึงไปโผล่กลางการ์ดใหม่
+   * หรือเลยไปท้ายเลย ทั้งที่เพิ่งกดเพื่อจะเริ่มกรอกตั้งแต่ข้อแรก
+   *
+   * ข้ามรอบแรกตอนเปิดหน้า ไม่งั้นเปิดมาหน้าจะเด้งลงไปหาการ์ดเองโดยไม่มีใครสั่ง
+   */
+  const firstRender = React.useRef(true);
+  React.useEffect(() => {
+    if (firstRender.current) {
+      firstRender.current = false;
+      return;
+    }
+    if (!openRound) return;
+
+    // รอให้เบราว์เซอร์คำนวณความสูงใหม่ให้เสร็จก่อนค่อยเลื่อน
+    // สั่งเลื่อนทันทีในเอฟเฟกต์ มันคิดจากความสูงชุดเก่าที่การ์ดใบก่อนยังกางอยู่
+    // แล้วพอหน้าหดสั้นลง ตำแหน่งที่เลื่อนไปก็โดนตัดให้อยู่ท้ายหน้าแทน
+    const id = requestAnimationFrame(() =>
+      requestAnimationFrame(() =>
+        document
+          .getElementById(`round-${openRound}`)
+          ?.scrollIntoView({ block: "start", behavior: "smooth" })
+      )
+    );
+    return () => cancelAnimationFrame(id);
+  }, [openRound]);
   const [disposition, setDisposition] = React.useState<Disposition | null>(null);
   const [note, setNote] = React.useState("");
   const [openInfo, setOpenInfo] = React.useState(true);
@@ -256,6 +286,7 @@ function ReceivingSheet({ doc }: { doc: NonNullable<ReturnType<typeof findDoc>> 
         {rounds.map((round, i) => (
           <RoundCard
             key={round.id}
+            id={`round-${round.id}`}
             items={items}
             round={round}
             index={i}
