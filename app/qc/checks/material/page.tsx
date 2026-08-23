@@ -36,7 +36,7 @@ import {
   CHECK_SHEETS,
   MATERIALS,
   SHIFTS,
-  SHIFT_LABEL,
+  shiftLabel,
   TODAY,
   WEEKDAYS,
   isHoliday,
@@ -104,7 +104,7 @@ export default function MaterialCheckPage() {
             ตรวจวัตถุดิบในถัง
           </h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            FM-QC-02-05 · ตรวจทุกกะ เช้าและบ่าย
+            FM-QC-02-05 · ตรวจทุกกะ วันละ {SHIFTS.length} กะ
           </p>
         </div>
         <Button onClick={() => router.push("/qc/checks/material/new")}>
@@ -264,13 +264,16 @@ function MonthCalendar({
               <span className="text-sm font-medium tabular-nums">
                 {Number(date.slice(-2))}
               </span>
+              {/* สี่กะเรียงสองแถวสองคอลัมน์ ไม่ใช่เรียงยาวสี่จุด
+                  ช่องวันบนมือถือกว้างราว 48px สี่จุดเรียงกันจะชนขอบ
+                  และเรียงเป็นตารางยังอ่านง่ายกว่าว่ากลางวันแถวบน กลางคืนแถวล่าง */}
               {!holiday && (
-                <span className="flex gap-1">
+                <span className="grid grid-cols-2 gap-x-1.5 gap-y-1">
                   {slots.map((s) => (
                     <SlotDot
                       key={s.shift}
                       status={s.status}
-                      title={`${SHIFT_LABEL[s.shift]} — ${s.status}`}
+                      title={`${shiftLabel(s.shift)} — ${s.status}`}
                     />
                   ))}
                 </span>
@@ -304,7 +307,10 @@ function Legend() {
         <SlotDot status="missing" title="ไม่ได้ตรวจ" />
         ไม่ได้ตรวจ
       </span>
-      <span>สองจุด = กะเช้า / กะบ่าย</span>
+      <span className="tabular-nums">
+        สี่จุดเรียงจากซ้ายบน ={" "}
+        {SHIFTS.map((s) => `${s.from}–${s.to}`).join(" · ")}
+      </span>
     </div>
   );
 }
@@ -316,7 +322,12 @@ function Legend() {
  */
 function SheetGrid({ days }: { days: string[] }) {
   return (
-    <TableFrame>
+    <>
+      <p className="mb-2 text-sm text-muted-foreground tabular-nums">
+        ในแต่ละช่อง สี่เครื่องหมายเรียงจากซ้ายบน ={" "}
+        {SHIFTS.map((s) => `${s.from}–${s.to}`).join(" · ")}
+      </p>
+      <TableFrame>
       <Table>
         <TableHeader className={cn(STICKY_HEAD, "[&_th]:leading-snug")}>
           <TableRow>
@@ -324,9 +335,6 @@ function SheetGrid({ days }: { days: string[] }) {
             {MATERIALS.map((m) => (
               <TableHead key={m} className="min-w-24 text-center">
                 {m}
-                <span className="block font-normal text-muted-foreground">
-                  เช้า / บ่าย
-                </span>
               </TableHead>
             ))}
           </TableRow>
@@ -358,7 +366,9 @@ function SheetGrid({ days }: { days: string[] }) {
                 </TableCell>
                 {MATERIALS.map((mat) => (
                   <TableCell key={mat} className="text-center">
-                    <span className="flex items-center justify-center gap-3">
+                    {/* สี่กะเรียงสองแถวเหมือนในปฏิทิน คอลัมน์จึงยังเป็นหนึ่งคอลัมน์ต่อวัตถุดิบ
+                        ไม่ใช่แตกเป็นเจ็ดคูณสี่ยี่สิบแปดคอลัมน์ซึ่งกว้างจนใช้ไม่ได้ */}
+                    <span className="inline-grid grid-cols-2 gap-x-3 gap-y-0.5">
                       {SHIFTS.map((s) => (
                         <CellMark
                           key={s.id}
@@ -376,6 +386,7 @@ function SheetGrid({ days }: { days: string[] }) {
         </TableBody>
       </Table>
     </TableFrame>
+    </>
   );
 }
 
@@ -426,7 +437,7 @@ function SheetList({ days }: { days: string[] }) {
           >
             <div className="flex flex-wrap items-center justify-between gap-2">
               <span className="font-medium tabular-nums">
-                {r.date} · กะ{SHIFT_LABEL[r.shift]}
+                {r.date} · กะ {shiftLabel(r.shift)}
               </span>
               <SlotBadge status={r.status} />
             </div>
@@ -481,7 +492,7 @@ function SheetList({ days }: { days: string[] }) {
                         {r.date}
                       </Link>
                     </TableCell>
-                    <TableCell>{SHIFT_LABEL[r.shift]}</TableCell>
+                    <TableCell className="tabular-nums whitespace-nowrap">{shiftLabel(r.shift)}</TableCell>
                     <TableCell className="text-sm">
                       {r.sheet?.tank ?? "—"}
                     </TableCell>

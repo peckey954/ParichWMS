@@ -27,7 +27,7 @@ import { toast } from "sonner";
 import {
   MATERIALS,
   SHIFTS,
-  SHIFT_LABEL,
+  shiftLabel,
   TANKS,
   TODAY,
   answerOf,
@@ -67,7 +67,7 @@ export default function MaterialSheetPage({
   return (
     <SheetEditor
       key={id}
-      initial={existing ?? newSheet("new", TODAY, "morning")}
+      initial={existing ?? newSheet("new", TODAY, SHIFTS[0].id)}
       isNew={id === "new"}
     />
   );
@@ -110,7 +110,7 @@ function SheetEditor({
     const stamp = `${TODAY} ${new Date().toTimeString().slice(0, 5)}`;
     patch({ savedAt: stamp });
     toast.success(`บันทึกใบตรวจ ${sheet.code} แล้ว`, {
-      description: `${sheet.date} กะ${SHIFT_LABEL[sheet.shift]} · ประทับเวลา ${stamp}`,
+      description: `${sheet.date} กะ ${shiftLabel(sheet.shift)} · ประทับเวลา ${stamp}`,
     });
     router.push("/qc/checks/material");
   };
@@ -176,7 +176,8 @@ function SheetEditor({
             <SelectContent>
               {SHIFTS.map((s) => (
                 <SelectItem key={s.id} value={s.id}>
-                  กะ{s.label}
+                  {shiftLabel(s.id)}
+                  {s.overnight && " (ข้ามคืน)"}
                 </SelectItem>
               ))}
             </SelectContent>

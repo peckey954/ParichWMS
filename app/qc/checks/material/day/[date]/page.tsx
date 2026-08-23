@@ -17,7 +17,7 @@ import {
   MATERIALS,
   MONTH_NAMES,
   SHIFTS,
-  SHIFT_LABEL,
+  shiftLabel,
   answerOf,
   isHoliday,
   sheetStatus,
@@ -73,7 +73,9 @@ export default async function CheckDayPage({
         {thaiDate(date)}
       </h1>
       <p className="mt-1 text-sm text-muted-foreground">
-        {holiday ? "วันหยุด ไม่ต้องตรวจ" : "ตรวจวัตถุดิบในถัง ทั้งกะเช้าและกะบ่าย"}
+        {holiday
+          ? "วันหยุด ไม่ต้องตรวจ"
+          : `ตรวจวัตถุดิบในถัง ครบทั้ง ${SHIFTS.length} กะ`}
       </p>
 
       <div className="mt-6 space-y-3">
@@ -90,7 +92,7 @@ export default async function CheckDayPage({
               )}
             >
               <div className="flex flex-wrap items-center justify-between gap-3">
-                <p className="font-semibold">กะ{s.label}</p>
+                <p className="font-semibold">กะ {shiftLabel(s.id)}</p>
                 <SlotBadge status={status} />
               </div>
 
@@ -138,7 +140,7 @@ export default async function CheckDayPage({
                         <Link
                           href={`/qc/checks/material/new?date=${date}&shift=${s.id}`}
                         >
-                          เปิดใบตรวจกะ{SHIFT_LABEL[s.id]}
+                          เปิดใบตรวจกะ{shiftLabel(s.id)}
                         </Link>
                       </Button>
                     </div>

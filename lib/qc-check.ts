@@ -11,24 +11,45 @@
 export const TODAY = "2026-08-23";
 
 // ---------------------------------------------------------------
-// กะ
+// กะ — เรียกด้วยช่วงเวลา ไม่ใช่ชื่อ
 //
-// ฟอร์มกระดาษแยกเป็นคนละแผ่นระหว่าง Day shift กับ Night shift
-// และในแผ่น Day ยังแยกช่องเวลาเป็นเช้ากับบ่ายอีก
-// หน่วยของงานจึงเป็น "วัน × กะ" ไม่ใช่ "วัน"
+// โรงงานเดินสี่กะ สองกะกลางวันกับสองกะกลางคืน
+// สองกะกลางคืนไม่มีชื่อเรียกที่ทุกคนใช้ตรงกัน เรียกด้วยช่วงเวลาไปเลยจึงไม่ต้องเดา
+// และคนหน้างานจำเวลาเข้ากะได้อยู่แล้ว ไม่ต้องแปลจากชื่อกลับเป็นเวลาอีกที
+//
+// กะ 01:00–05:00 คร่อมเที่ยงคืน จึงต้องตกลงว่าใบเป็นของวันไหน
+// ที่นี่ใช้ "วันที่กะเริ่ม" — กะ 01:00 ของคืนวันที่ 5 ต่อวันที่ 6 นับเป็นของวันที่ 6
+// เพราะเป็นค่าที่ตรงกับสิ่งที่คนเห็นบนนาฬิกาตอนเข้ากะ ไม่ต้องคิดย้อน
 // ---------------------------------------------------------------
 
-export type Shift = "morning" | "afternoon";
+export type Shift = "s1" | "s2" | "s3" | "s4";
 
-export const SHIFTS: { id: Shift; label: string }[] = [
-  { id: "morning", label: "เช้า" },
-  { id: "afternoon", label: "บ่าย" },
+export type ShiftDef = {
+  id: Shift;
+  from: string;
+  to: string;
+  /** คร่อมเที่ยงคืนไหม ใช้เตือนในหน้าใบว่าให้ลงวันที่ไหน */
+  overnight?: boolean;
+};
+
+export const SHIFTS: ShiftDef[] = [
+  { id: "s1", from: "08:00", to: "12:00" },
+  { id: "s2", from: "13:00", to: "17:00" },
+  { id: "s3", from: "20:00", to: "00:00", overnight: true },
+  { id: "s4", from: "01:00", to: "05:00" },
 ];
 
-export const SHIFT_LABEL: Record<Shift, string> = {
-  morning: "เช้า",
-  afternoon: "บ่าย",
+export const shiftDef = (id: Shift) =>
+  SHIFTS.find((s) => s.id === id) ?? SHIFTS[0];
+
+/** ป้ายของกะคือช่วงเวลา ไม่มีชื่อเรียกแยก */
+export const shiftLabel = (id: Shift) => {
+  const s = shiftDef(id);
+  return `${s.from}–${s.to}`;
 };
+
+/** ลำดับของกะในวัน ใช้เรียงช่องในปฏิทินกับตาราง */
+export const shiftIndex = (id: Shift) => SHIFTS.findIndex((s) => s.id === id);
 
 // ---------------------------------------------------------------
 // ใบตรวจวัตถุดิบในถัง
@@ -86,7 +107,7 @@ export function newSheet(
 ): CheckSheet {
   return {
     id,
-    code: `QC${date.replace(/-/g, "").slice(2)}/${shift === "morning" ? "01" : "02"}`,
+    code: `QC${date.replace(/-/g, "").slice(2)}/${String(shiftIndex(shift) + 1).padStart(2, "0")}`,
     tank,
     date,
     shift,
@@ -234,9 +255,9 @@ const INSPECTORS = ["สมชาย ใจดี", "ประเสริฐ �
 
 /** วันที่ไม่มีใครทำเลยทั้งวัน */
 const SKIP_DAYS = [12, 20];
-/** วันที่ทำแค่กะเช้า */
-const MORNING_ONLY = [6, 18];
-/** วันที่กรอกไม่ครบ */
+/** วันที่ทำเฉพาะสองกะกลางวัน กะกลางคืนไม่มีใครลง */
+const DAY_ONLY = [6, 18];
+/** วันที่กรอกไม่ครบทุกรายการ */
 const PARTIAL_DAYS = [14];
 /** วันที่เจอของผิดปกติ */
 const ABNORMAL_DAYS = [5, 19];
@@ -252,19 +273,18 @@ function seedSheets(): CheckSheet[] {
     const day = Number(date.slice(-2));
     if (SKIP_DAYS.includes(day)) continue;
 
-    const shifts: Shift[] = MORNING_ONLY.includes(day)
-      ? ["morning"]
-      : ["morning", "afternoon"];
+    const shifts = DAY_ONLY.includes(day)
+      ? SHIFTS.slice(0, 2)
+      : SHIFTS;
 
-    for (const shift of shifts) {
-      const sheet = newSheet(`ck-${date}-${shift}`, date, shift);
-      sheet.inspector = INSPECTORS[day % INSPECTORS.length];
-      sheet.savedAt = `${date} ${shift === "morning" ? "10:42" : "15:20"}`;
+    for (const sh of shifts) {
+      const sheet = newSheet(`ck-${date}-${sh.id}`, date, sh.id);
+      sheet.inspector = INSPECTORS[(day + shiftIndex(sh.id)) % INSPECTORS.length];
+      sheet.savedAt = `${date} ${sh.to}`;
 
       MATERIALS.forEach((mat, i) => {
-        // กรอกไม่ครบ = เว้นสองรายการท้ายไว้
         if (PARTIAL_DAYS.includes(day) && i >= MATERIALS.length - 2) return;
-        const bad = ABNORMAL_DAYS.includes(day) && i === 2;
+        const bad = ABNORMAL_DAYS.includes(day) && i === 2 && sh.id === "s1";
         sheet.answers[mat] = {
           result: bad ? "abnormal" : "normal",
           note: bad ? "พบก้อนแข็งจับตัวในถัง" : "",
