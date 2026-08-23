@@ -80,17 +80,9 @@ export function RoundCard({
     <Collapsible
       open={open}
       onOpenChange={onOpenChange}
-      className="rounded-xl border border-border bg-card"
+      className="overflow-hidden rounded-xl border border-border bg-card"
     >
-      {/* หัวการ์ดตรึงไว้ตอนเลื่อน — การ์ดที่กางแล้วสูงกว่าหนึ่งจอเสมอ (แปดข้อ)
-          เลื่อนไปข้อที่หกแล้วต้องยังรู้ว่าอยู่ครั้งที่เท่าไหร่ และเหลืออีกกี่ข้อ
-          โดยไม่ต้องเลื่อนกลับขึ้นไปดู
-
-          ตรึงที่ top-14 ไม่ใช่ 0 เพราะแถบหัวเว็บสูง 3.5rem ตรึงอยู่ก่อนแล้ว
-          ตรึงที่ 0 หัวการ์ดจะไปมุดอยู่ใต้แถบนั้นและมองไม่เห็น
-          และการ์ดต้องไม่มี overflow-hidden ไม่งั้น sticky ข้างในจะไม่ทำงาน
-          จึงมนมุมบนที่ตัว trigger เองแทน */}
-      <CollapsibleTrigger className="sticky top-14 z-10 flex w-full items-center gap-3 rounded-t-xl border-b border-transparent bg-card px-4 py-4 text-left transition-colors hover:bg-accent-hover data-[state=open]:border-border">
+      <CollapsibleTrigger className="flex w-full items-center gap-3 px-4 py-4 text-left transition-colors hover:bg-accent-hover">
         <div className="min-w-0 flex-1">
           <p className="font-semibold">ตรวจสอบครั้งที่ {index + 1}</p>
           <p className="mt-0.5 text-sm text-muted-foreground tabular-nums">
@@ -153,6 +145,16 @@ export function RoundCard({
   );
 }
 
+/**
+ * ป้ายบอกผลของรอบ
+ *
+ * ยังตรวจไม่ครบก็บอกแค่ว่ารอตรวจสอบ ไม่ต้องนับว่าเหลือกี่ข้อ
+ * ตัวเลขนับถอยหลังชวนให้เข้าใจว่าเป็นเป้าที่ต้องไล่ให้ทัน
+ * ทั้งที่สิ่งที่คนอ่านต้องรู้มีแค่ "รอบนี้จบหรือยัง"
+ *
+ * ผ่าน/ไม่ผ่านขึ้นต่อเมื่อครบทุกข้อแล้วเท่านั้น
+ * ตกข้อแรกแล้วขึ้นไม่ผ่านทันทีตั้งแต่ยังตรวจไม่ครบ คือสรุปผลก่อนตรวจเสร็จ
+ */
 function RoundBadge({
   total,
   done,
@@ -162,18 +164,18 @@ function RoundBadge({
   done: number;
   fail: number;
 }) {
+  if (done < total)
+    return (
+      <Badge tone="warning" appearance="soft">
+        <TriangleAlertIcon />
+        รอตรวจสอบ
+      </Badge>
+    );
   if (fail > 0)
     return (
       <Badge tone="danger" appearance="soft">
         <CircleXIcon />
         ไม่ผ่าน
-      </Badge>
-    );
-  if (done < total)
-    return (
-      <Badge tone="warning" appearance="soft">
-        <TriangleAlertIcon />
-        รอตรวจสอบ {total - done}/{total} ข้อ
       </Badge>
     );
   return (
