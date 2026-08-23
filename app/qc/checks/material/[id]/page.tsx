@@ -48,8 +48,9 @@ import {
    ทั้งที่ทำแล้ว ส่วน "บันทึกเมื่อ" ระบบประทับให้เองและแก้ไม่ได้
    สองค่านี้ต่างกัน และความต่างคือสิ่งที่บอกว่าใบไหนกรอกย้อนหลัง
 
-   ทุกรายการวางโครงเดียวกัน ชื่อวัตถุดิบซ้าย ปุ่มปกติ/ผิดปกติขวา
-   แล้วหมายเหตุเต็มความกว้างข้างล่าง ตำแหน่งปุ่มจึงอยู่แนวตรงกันทุกรายการ
+   ทุกรายการวางโครงเดียวกัน ชื่อวัตถุดิบได้บรรทัดของตัวเองเต็มความกว้าง
+   แถวล่างเป็นสองคอลัมน์เสมอ ผลการตรวจสอบกับหมายเหตุ
+   ปุ่มจึงอยู่ตำแหน่งเดียวกันทุกรายการ และเป็นโครงเดียวกับใบตรวจรับสินค้า
 ------------------------------------------------------------------ */
 
 export default function MaterialSheetPage({
@@ -256,14 +257,23 @@ function MaterialRow({
 }) {
   return (
     <div className="rounded-xl border border-border bg-card p-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <p className="font-semibold">
-          {material}{" "}
-          <span className="font-normal text-muted-foreground">(KG)</span>
-        </p>
-        <div className="flex items-center gap-2">
-          <span className="text-sm text-muted-foreground">ผลตรวจ</span>
-          <div role="radiogroup" aria-label={`ผลตรวจ ${material}`} className="flex gap-2">
+      {/* ชื่อวัตถุดิบได้บรรทัดของตัวเองเต็มความกว้าง ไม่ต้องแย่งที่กับปุ่ม
+          แถวล่างเป็นสองคอลัมน์เสมอ ผลการตรวจสอบกับหมายเหตุ
+          ปุ่มจึงอยู่ตำแหน่งเดียวกันทุกรายการ กวาดตาลงมาเป็นแนวตรง
+          และเป็นโครงเดียวกับใบตรวจรับสินค้า ทั้งระบบวางเหมือนกัน */}
+      <p className="font-semibold">
+        {material}{" "}
+        <span className="font-normal text-muted-foreground">(KG)</span>
+      </p>
+
+      <div className="mt-3 grid gap-3 @2xl:grid-cols-2">
+        <div className="space-y-1.5">
+          <Label className="text-sm font-normal">ผลการตรวจสอบ</Label>
+          <div
+            role="radiogroup"
+            aria-label={`ผลการตรวจสอบ ${material}`}
+            className="grid grid-cols-2 gap-3"
+          >
             <Choice
               id={`${material}-normal`}
               label="ปกติ"
@@ -280,29 +290,31 @@ function MaterialRow({
             />
           </div>
         </div>
-      </div>
 
-      <div className="mt-3 space-y-1.5">
-        <Label htmlFor={`${material}-note`} className="text-sm font-normal">
-          หมายเหตุ{" "}
-          <span className="text-muted-foreground">
-            ({answer.result === "abnormal" ? "บังคับ" : "ไม่บังคับ"})
-          </span>
-        </Label>
-        <Input
-          id={`${material}-note`}
-          className={cn(
-            "bg-card",
-            answer.result === "abnormal" &&
-              answer.note.trim() === "" &&
-              "border-destructive"
-          )}
-          placeholder={
-            answer.result === "abnormal" ? "ระบุว่าผิดปกติยังไง" : "ระบุหมายเหตุ"
-          }
-          value={answer.note}
-          onChange={(e) => onPatch({ note: e.target.value })}
-        />
+        <div className="space-y-1.5">
+          <Label htmlFor={`${material}-note`} className="text-sm font-normal">
+            หมายเหตุ{" "}
+            <span className="text-muted-foreground">
+              ({answer.result === "abnormal" ? "บังคับ" : "ไม่บังคับ"})
+            </span>
+          </Label>
+          <Input
+            id={`${material}-note`}
+            className={cn(
+              "h-11 bg-card",
+              answer.result === "abnormal" &&
+                answer.note.trim() === "" &&
+                "border-destructive"
+            )}
+            placeholder={
+              answer.result === "abnormal"
+                ? "ระบุว่าผิดปกติยังไง"
+                : "ระบุหมายเหตุ"
+            }
+            value={answer.note}
+            onChange={(e) => onPatch({ note: e.target.value })}
+          />
+        </div>
       </div>
     </div>
   );
@@ -334,7 +346,7 @@ function Choice({
       aria-checked={on}
       onClick={onClick}
       className={cn(
-        "flex h-11 min-w-28 items-center justify-center gap-2 rounded-md border px-3",
+        "flex h-11 items-center justify-center gap-2 rounded-md border px-3",
         "text-sm transition-colors",
         "focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none",
         on &&
