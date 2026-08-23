@@ -18,7 +18,6 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@peckey954/ui/components/ui/collapsible";
-import { Empty, EmptyDescription, EmptyTitle } from "@peckey954/ui/components/ui/empty";
 import { Label } from "@peckey954/ui/components/ui/label";
 import { Textarea } from "@peckey954/ui/components/ui/textarea";
 import { cn } from "@peckey954/ui/lib/utils";
@@ -71,9 +70,11 @@ function ReceivingSheet({ doc }: { doc: NonNullable<ReturnType<typeof findDoc>> 
   const router = useRouter();
   const items = RECEIVING_TEMPLATE.items;
 
-  const [rounds, setRounds] = React.useState<Round[]>([]);
+  // เปิดหน้ามามีครั้งที่ 1 รออยู่แล้ว ไม่ต้องกดเพิ่มก่อนถึงจะเริ่มกรอกได้
+  // ใบตรวจทุกใบต้องตรวจอย่างน้อยหนึ่งครั้งอยู่แล้ว สถานะว่างเปล่าจึงไม่มีความหมาย
+  const [rounds, setRounds] = React.useState<Round[]>(() => [newRound("r1")]);
   // กางทีละใบ กางหลายใบพร้อมกันแล้วหน้ายาวเป็นพันพิกเซลโดยไม่ได้ช่วยอะไร
-  const [openRound, setOpenRound] = React.useState<string | null>(null);
+  const [openRound, setOpenRound] = React.useState<string | null>("r1");
   const [disposition, setDisposition] = React.useState<Disposition | null>(null);
   const [note, setNote] = React.useState("");
   const [openInfo, setOpenInfo] = React.useState(true);
@@ -249,40 +250,33 @@ function ReceivingSheet({ doc }: { doc: NonNullable<ReturnType<typeof findDoc>> 
       </Collapsible>
 
       {/* ---------- ครั้งที่ตรวจ ---------- */}
-      <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
-        <h2 className="text-lg font-semibold">การตรวจสอบ</h2>
-        <Button
-          onClick={addRound}
-          disabled={!canAddRound(items, rounds.length)}
-        >
-          <PlusIcon />
-          เพิ่มครั้งที่ตรวจ
-        </Button>
-      </div>
+      <h2 className="mt-6 text-lg font-semibold">การตรวจสอบ</h2>
 
       <div className="mt-4 space-y-3">
-        {rounds.length === 0 ? (
-          <div className="rounded-xl border border-border bg-card">
-            <Empty className="py-16">
-              <EmptyTitle>ไม่มีข้อมูล</EmptyTitle>
-              <EmptyDescription>กรุณาเพิ่มครั้งที่ตรวจ</EmptyDescription>
-            </Empty>
-          </div>
-        ) : (
-          rounds.map((round, i) => (
-            <RoundCard
-              key={round.id}
-              items={items}
-              round={round}
-              index={i}
-              firstRound={rounds[0]}
-              open={openRound === round.id}
-              onOpenChange={(v) => setOpenRound(v ? round.id : null)}
-              onPatchAnswer={(itemId, p) => patchAnswer(round.id, itemId, p)}
-            />
-          ))
-        )}
+        {rounds.map((round, i) => (
+          <RoundCard
+            key={round.id}
+            items={items}
+            round={round}
+            index={i}
+            firstRound={rounds[0]}
+            open={openRound === round.id}
+            onOpenChange={(v) => setOpenRound(v ? round.id : null)}
+            onPatchAnswer={(itemId, p) => patchAnswer(round.id, itemId, p)}
+          />
+        ))}
       </div>
+
+      {/* ปุ่มเพิ่มอยู่ท้ายรายการตรงกลาง เพราะมันคือสิ่งที่ทำ "หลัง" ตรวจรอบก่อนเสร็จ
+          อยู่หัวรายการจะกลายเป็นปุ่มแรกที่ตาเห็น ทั้งที่เป็นงานลำดับหลังสุด */}
+      {canAddRound(items, rounds.length) && (
+        <div className="mt-4 flex justify-center">
+          <Button variant="outline-primary" onClick={addRound}>
+            <PlusIcon />
+            เพิ่มครั้งที่ตรวจ
+          </Button>
+        </div>
+      )}
 
       {/* ---------- ไม่ผ่านแล้วทำยังไงกับของ ----------
            ขึ้นเฉพาะตอนมีข้อที่ไม่ผ่านจริง ผ่านหมดแล้วไม่มีอะไรให้ตัดสิน
