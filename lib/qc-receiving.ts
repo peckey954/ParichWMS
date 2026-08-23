@@ -29,6 +29,8 @@ export type ReceivingDoc = {
   productNote: string;
   supplier: string;
   packing: string;
+  /** ขนาดบรรจุต่อถุง เช่น 50 Kg */
+  bagSize: string;
   lot: string;
   /** ยอดที่ต้องตรวจ หน่วยตัน */
   ton: number;
@@ -46,6 +48,7 @@ const doc = (n: number, extra: Partial<ReceivingDoc> = {}): ReceivingDoc => ({
   productNote: "ฟูเจียน ผง",
   supplier: "เอชซี อินเตอร์เนชั่นแนล เทรดดิ้ง จำกัด",
   packing: "Bulk",
+  bagSize: "50 Kg",
   lot: "A-9M",
   ton: 800,
   receiver: "อลิสา พรสุขสิริ",

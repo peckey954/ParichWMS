@@ -2,13 +2,7 @@
 
 import * as React from "react";
 import { notFound, useRouter } from "next/navigation";
-import {
-  ChevronUpIcon,
-  CircleCheckIcon,
-  CircleDashedIcon,
-  CircleXIcon,
-  PlusIcon,
-} from "lucide-react";
+import { ChevronUpIcon, PlusIcon } from "lucide-react";
 import { Badge } from "@peckey954/ui/components/ui/badge";
 import {
   Breadcrumb,
@@ -29,7 +23,7 @@ import { Label } from "@peckey954/ui/components/ui/label";
 import { Textarea } from "@peckey954/ui/components/ui/textarea";
 import { cn } from "@peckey954/ui/lib/utils";
 import { toast } from "sonner";
-import { RoundDialog } from "@/components/qc/round-dialog";
+import { RoundCard } from "@/components/qc/round-card";
 import {
   answerOf,
   canAddRound,
@@ -43,22 +37,19 @@ import {
   RECEIVING_TEMPLATE,
   findDoc,
   roundDigest,
-  shortList,
   tonnage,
   type Disposition,
 } from "@/lib/qc-receiving";
 
 /* ------------------------------------------------------------------
-   ใบตรวจสอบสินค้าหนึ่งใบ
+   ใบตรวจสอบรับสินค้าหนึ่งใบ
 
-   แต่ละครั้งที่ตรวจเป็นแถวเดียว กดแล้วเปิดกล่องกรอก
-   เพราะการกรอกหนึ่งรอบคืองานที่ทำรวดเดียวจบ ระหว่างนั้นไม่ต้องเห็นส่วนอื่นของใบ
-   ส่วนหน้านี้คือที่ที่ตอบว่า "ตรวจไปกี่ครั้ง ผลรวมเป็นยังไง แล้วจะทำยังไงกับของ"
+   แต่ละครั้งที่ตรวจเป็นการ์ดหุบ/กางได้ในหน้า ไม่ใช่กล่องเด้งกลางจอ
+   กล่องกลางจอบังทั้งหน้าและสร้างพื้นที่เลื่อนซ้อนกันสองชั้น
+   การ์ดในหน้าเห็นทุกรอบพร้อมกัน หัวการ์ดบอกผลของแต่ละรอบตั้งแต่ยังไม่กาง
 
-   แถวสรุปของแต่ละครั้งบอกสามอย่าง — เวลา/ผู้ตรวจ, ไม่ผ่านข้อไหน, ผลรวม
-   แถวที่ผ่านไม่ต้องอธิบายอะไรเพิ่ม บอกค่าที่วัดได้พอเป็นหลักฐานว่าตรวจจริง
-   แถวที่ไม่ผ่านต้องบอกให้ได้ว่าไม่ผ่านข้อไหนตั้งแต่ยังไม่เปิด
-   เพราะนั่นคือตัวตัดสินว่าจะ repack รับสภาพ หรือส่งคืน ซึ่งเลือกอยู่ท้ายหน้านี้
+   หน้านี้ตอบสามคำถาม ตรวจไปกี่ครั้ง ผลรวมเป็นยังไง แล้วจะทำยังไงกับของ
+   ข้อที่ไม่ผ่านเป็นตัวตัดสินว่าจะ repack รับสภาพ หรือส่งคืน ซึ่งเลือกอยู่ท้ายหน้านี้
 ------------------------------------------------------------------ */
 
 const fmtTon = (v: number) =>
@@ -81,17 +72,19 @@ function ReceivingSheet({ doc }: { doc: NonNullable<ReturnType<typeof findDoc>> 
   const items = RECEIVING_TEMPLATE.items;
 
   const [rounds, setRounds] = React.useState<Round[]>([]);
-  const [editing, setEditing] = React.useState<string | null>(null);
+  // กางทีละใบ กางหลายใบพร้อมกันแล้วหน้ายาวเป็นพันพิกเซลโดยไม่ได้ช่วยอะไร
+  const [openRound, setOpenRound] = React.useState<string | null>(null);
   const [disposition, setDisposition] = React.useState<Disposition | null>(null);
   const [note, setNote] = React.useState("");
   const [openInfo, setOpenInfo] = React.useState(true);
 
   const digests = rounds.map((r, i) => roundDigest(items, r, i));
   const hasFail = digests.some((d) => d.pass === false);
-  const ton = tonnage(doc.ton, hasFail, disposition);
-
-  const patchRound = (roundId: string, p: Partial<Round>) =>
-    setRounds((rs) => rs.map((r) => (r.id === roundId ? { ...r, ...p } : r)));
+  // ยังไม่มีใครตรวจอะไรเลย ก็ยังบอกไม่ได้ว่าของจะเข้าคลังเท่าไหร่
+  const started = digests.some((d) => d.done > 0);
+  const ton = started
+    ? tonnage(doc.ton, hasFail, disposition)
+    : { fail: null as number | null, warehouse: null as number | null };
 
   const patchAnswer = (roundId: string, itemId: string, p: Partial<Answer>) =>
     setRounds((rs) =>
@@ -108,35 +101,35 @@ function ReceivingSheet({ doc }: { doc: NonNullable<ReturnType<typeof findDoc>> 
       )
     );
 
-  /** เพิ่มครั้งแล้วเปิดกล่องกรอกให้เลย ไม่ต้องกดอีกทีเพื่อเริ่มกรอก */
+  /** เพิ่มครั้งแล้วกางใบใหม่ให้เลย ไม่ต้องกดอีกทีเพื่อเริ่มกรอก */
   const addRound = () => {
     const id = `r${rounds.length + 1}`;
     setRounds((rs) => [...rs, newRound(id)]);
-    setEditing(id);
+    setOpenRound(id);
   };
 
-  const current = rounds.find((r) => r.id === editing) ?? null;
-  const currentIndex = rounds.findIndex((r) => r.id === editing);
-
-  const saveRound = () => {
-    if (!current) return;
-    const bad = items
-      .filter((i) => currentIndex === 0 || i.repeatable)
-      .find((i) => noteMissing(i, answerOf(current, i.id)));
-    if (bad) {
-      toast.error("ยังระบุเหตุผลไม่ครบ", {
-        description: `ข้อ "${bad.title}" ไม่ผ่าน ต้องระบุหมายเหตุ`,
-      });
-      return;
-    }
-    patchRound(current.id, { saved: true });
-    setEditing(null);
-    toast.success(`บันทึกครั้งที่ ${currentIndex + 1} แล้ว`);
+  const saveDraft = () => {
+    toast.success(`บันทึกร่าง ${doc.code} แล้ว`, {
+      description: `ตรวจไปแล้ว ${rounds.length} ครั้ง`,
+    });
   };
 
   const save = () => {
     if (rounds.length === 0) {
       toast.error("ยังไม่มีครั้งที่ตรวจ", { description: "กดเพิ่มครั้งที่ตรวจก่อน" });
+      return;
+    }
+    const missing = rounds.flatMap((r, ri) =>
+      items
+        .filter((i) => ri === 0 || i.repeatable)
+        .filter((i) => noteMissing(i, answerOf(r, i.id)))
+        .map((i) => ({ ri, title: i.title }))
+    );
+    if (missing.length > 0) {
+      toast.error("ยังระบุเหตุผลไม่ครบ", {
+        description: `ครั้งที่ ${missing[0].ri + 1} ข้อ "${missing[0].title}" ไม่ผ่าน ต้องระบุหมายเหตุ`,
+      });
+      setOpenRound(rounds[missing[0].ri].id);
       return;
     }
     if (hasFail && disposition === null) {
@@ -173,7 +166,7 @@ function ReceivingSheet({ doc }: { doc: NonNullable<ReturnType<typeof findDoc>> 
       </Breadcrumb>
 
       <h1 className="mt-2 text-2xl font-semibold tracking-tight">
-        ใบตรวจสอบสินค้า {doc.code}-01
+        ใบตรวจสอบรับสินค้า {doc.code}-01
       </h1>
 
       {/* ---------- ของอะไร ยอดเท่าไหร่ ใครรับ ---------- */}
@@ -190,6 +183,10 @@ function ReceivingSheet({ doc }: { doc: NonNullable<ReturnType<typeof findDoc>> 
               |
             </span>
             <span className="text-sm text-muted-foreground">{doc.packing}</span>
+            <span className="text-border" aria-hidden>
+              |
+            </span>
+            <span className="text-sm text-muted-foreground">{doc.bagSize}</span>
             <Badge tone="brand" appearance="soft">
               {doc.lot}
             </Badge>
@@ -220,10 +217,11 @@ function ReceivingSheet({ doc }: { doc: NonNullable<ReturnType<typeof findDoc>> 
                 }
                 danger={ton.fail !== null}
               />
+              {/* เฉลี่ยต่อครั้งที่ตรวจ ไม่มีของเข้าคลังก็ไม่มีอะไรให้เฉลี่ย */}
               <Stat
                 label="เข้าคลังเฉลี่ย (ตัน)"
                 value={
-                  ton.warehouse === null || rounds.length === 0
+                  !ton.warehouse || rounds.length === 0
                     ? "-"
                     : fmtTon(ton.warehouse / rounds.length)
                 }
@@ -272,12 +270,15 @@ function ReceivingSheet({ doc }: { doc: NonNullable<ReturnType<typeof findDoc>> 
           </div>
         ) : (
           rounds.map((round, i) => (
-            <RoundRow
+            <RoundCard
               key={round.id}
-              index={i}
+              items={items}
               round={round}
-              digest={digests[i]}
-              onOpen={() => setEditing(round.id)}
+              index={i}
+              firstRound={rounds[0]}
+              open={openRound === round.id}
+              onOpenChange={(v) => setOpenRound(v ? round.id : null)}
+              onPatchAnswer={(itemId, p) => patchAnswer(round.id, itemId, p)}
             />
           ))
         )}
@@ -338,12 +339,14 @@ function ReceivingSheet({ doc }: { doc: NonNullable<ReturnType<typeof findDoc>> 
       {/* ---------- แถบบันทึก ---------- */}
       <div className="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-card/95 backdrop-blur">
         <div className="mx-auto flex w-full max-w-6xl items-center justify-between gap-3 px-4 py-3 sm:px-6">
-          <span className="text-sm text-muted-foreground">
-            ตรวจแล้ว {rounds.filter((r) => r.saved).length}/{rounds.length} ครั้ง
-          </span>
+          <Button variant="outline" onClick={() => router.back()}>
+            ย้อนกลับ
+          </Button>
+          {/* ร่างเก็บของที่กรอกค้างไว้โดยไม่ตรวจความครบ ใบตรวจกินเวลาข้ามกะได้
+              บันทึกคือปิดงาน ต้องกรอกครบและเลือกวิธีจัดการของที่ไม่ผ่านแล้ว */}
           <div className="flex items-center gap-2">
-            <Button variant="outline" onClick={() => router.back()}>
-              ย้อนกลับ
+            <Button variant="outline-primary" onClick={saveDraft}>
+              บันทึกร่าง
             </Button>
             <Button className="w-28" onClick={save}>
               บันทึก
@@ -352,24 +355,6 @@ function ReceivingSheet({ doc }: { doc: NonNullable<ReturnType<typeof findDoc>> 
         </div>
       </div>
 
-      {current && (
-        <RoundDialog
-          open
-          onOpenChange={(v) => !v && setEditing(null)}
-          items={items}
-          round={current}
-          index={currentIndex}
-          firstRound={rounds[0]}
-          ton={doc.ton}
-          product={`${doc.product} ฟูเจียนผง`}
-          supplier={doc.supplier}
-          packing={doc.packing}
-          lot={doc.lot}
-          onPatchRound={(p) => patchRound(current.id, p)}
-          onPatchAnswer={(itemId, p) => patchAnswer(current.id, itemId, p)}
-          onSave={saveRound}
-        />
-      )}
     </main>
   );
 }
@@ -399,85 +384,5 @@ function Stat({
         )}
       </p>
     </div>
-  );
-}
-
-/**
- * หนึ่งครั้งที่ตรวจ = หนึ่งแถว กดแล้วเปิดกล่องกรอก
- *
- * ตรงกลางคือส่วนที่ตอบว่าเกิดอะไรขึ้นในรอบนั้นโดยไม่ต้องเปิดดู
- *   ไม่ผ่าน — บอกชื่อข้อที่ตก สองชื่อแรกแล้วนับที่เหลือ
- *   ผ่าน   — บอกค่าที่วัดได้ เป็นหลักฐานว่าตรวจจริง ไม่ใช่กดผ่านรวด
- */
-function RoundRow({
-  index,
-  round,
-  digest,
-  onOpen,
-}: {
-  index: number;
-  round: Round;
-  digest: ReturnType<typeof roundDigest>;
-  onOpen: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onOpen}
-      className={cn(
-        "flex w-full flex-wrap items-center gap-x-4 gap-y-1 rounded-xl border px-4 py-4 text-left",
-        "border-border bg-card transition-colors hover:bg-accent-hover",
-        "focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none"
-      )}
-    >
-      <span className="font-semibold">ตรวจสอบครั้งที่ {index + 1}</span>
-
-      <span className="text-sm text-muted-foreground tabular-nums">
-        {round.time || "ยังไม่ระบุเวลา"}
-      </span>
-
-      <span className="min-w-0 flex-1 truncate text-sm">
-        {digest.failed.length > 0 ? (
-          <span className="text-danger-strong">
-            ไม่ผ่าน: {shortList(digest.failed)}
-          </span>
-        ) : (
-          <span className="text-muted-foreground">
-            {digest.values.length > 0 ? digest.values.join(" · ") : ""}
-          </span>
-        )}
-      </span>
-
-      <RoundBadge digest={digest} />
-    </button>
-  );
-}
-
-function RoundBadge({ digest }: { digest: ReturnType<typeof roundDigest> }) {
-  if (digest.pass === null)
-    return (
-      <span className="flex shrink-0 items-center gap-1 text-sm text-muted-foreground">
-        <CircleDashedIcon className="size-4" />
-        ยังไม่ตรวจ
-      </span>
-    );
-  if (digest.pass === false)
-    return (
-      <Badge tone="danger" appearance="soft">
-        <CircleXIcon />
-        ไม่ผ่าน
-      </Badge>
-    );
-  if (digest.done < digest.total)
-    return (
-      <Badge tone="warning" appearance="soft">
-        กรอกแล้ว {digest.done}/{digest.total}
-      </Badge>
-    );
-  return (
-    <Badge tone="success" appearance="soft">
-      <CircleCheckIcon />
-      ผ่าน
-    </Badge>
   );
 }
