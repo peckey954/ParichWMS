@@ -25,6 +25,7 @@ import {
 import { Label } from "@peckey954/ui/components/ui/label";
 import { cn } from "@peckey954/ui/lib/utils";
 import { useNumberField } from "@/components/number-field";
+import { VerdictChoice } from "@/components/qc/verdict-choice";
 import {
   answerOf,
   editableIn,
@@ -266,14 +267,14 @@ function ItemBlock({
           <Label className="text-sm font-normal">ผลการตรวจสอบ</Label>
           {showsTick(item) ? (
             <div className="grid grid-cols-2 gap-3">
-              <Choice
+              <VerdictChoice
                 id={`${item.id}-pass`}
                 label={pass}
                 on={answer.pass === true}
                 tone="pass"
                 onClick={() => onPatch({ pass: true })}
               />
-              <Choice
+              <VerdictChoice
                 id={`${item.id}-fail`}
                 label={fail}
                 on={answer.pass === false}
@@ -356,55 +357,5 @@ function NumberStepper({
         </InputGroupButton>
       </InputGroupAddon>
     </InputGroup>
-  );
-}
-
-/**
- * ปุ่มผ่าน/ไม่ผ่าน — เขียวกับแดง มีวงกลมบอกสถานะในตัว
- * สีเป็นตัวช่วยกวาดตาหาข้อที่ตก ไม่ใช่ตัวเดียวที่บอกว่าเลือกอะไรไว้
- */
-function Choice({
-  id,
-  label,
-  on,
-  tone,
-  onClick,
-}: {
-  id: string;
-  label: string;
-  on: boolean;
-  tone: "pass" | "fail";
-  onClick: () => void;
-}) {
-  return (
-    <button
-      id={id}
-      type="button"
-      role="radio"
-      aria-checked={on}
-      onClick={onClick}
-      className={cn(
-        "flex h-11 items-center gap-2 rounded-md border px-3",
-        "text-sm whitespace-nowrap transition-colors",
-        "focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none",
-        on &&
-          tone === "pass" &&
-          "border-success-border bg-success font-medium text-success-foreground",
-        on &&
-          tone === "fail" &&
-          "border-danger-border bg-danger font-medium text-danger-foreground",
-        !on && "border-border text-foreground hover:bg-accent-hover"
-      )}
-    >
-      <span
-        className={cn(
-          "flex size-4 shrink-0 items-center justify-center rounded-full border",
-          on ? "border-current" : "border-border"
-        )}
-      >
-        {on && <span className="size-2 rounded-full bg-current" />}
-      </span>
-      {label}
-    </button>
   );
 }

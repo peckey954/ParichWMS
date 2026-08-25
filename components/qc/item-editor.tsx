@@ -18,8 +18,11 @@ import { cn } from "@peckey954/ui/lib/utils";
 import { ChoiceGroup } from "@/components/choice-group";
 import { DRAG_ITEM_ATTR, DragHandle } from "@/components/drag-handle";
 import { ItemSettingsDialog } from "@/components/qc/item-settings-dialog";
+import { Stepper } from "@/components/stepper";
 import {
+  FIELD_TYPE_HINT,
   FIELD_TYPE_LABEL,
+  REF_SOURCES,
   RULE_OP_LABEL,
   UNIT_OPTIONS,
   cloneItemDeep,
@@ -78,6 +81,7 @@ export function ItemEditor({
   onApplyToAll?: (settings: ItemSettings) => void;
 }) {
   const isChild = depth > 0;
+  const isRows = item.kind === "rows";
   const label = isChild ? `หัวข้อย่อยที่ ${index + 1}` : `หัวข้อที่ ${index + 1}`;
   const badges = itemBadges(item);
 
@@ -207,6 +211,7 @@ export function ItemEditor({
              ปิดสวิตช์ทั้งที่มีช่องอยู่สามช่องแปลว่ามีข้อมูลที่มองไม่เห็น */}
         <FieldsSection
           item={item}
+          isRows={isRows}
           onAdd={() => onPatch({ fields: [...item.fields, newField()] })}
           onPatchField={patchField}
           onRemoveField={(id) =>
@@ -214,8 +219,19 @@ export function ItemEditor({
           }
         />
 
+        {/* ---- จำนวนในการตรวจ (เฉพาะหัวข้อย่อย) ----
+             หัวข้อหลักย้ายไปตั้งรวมที่ "4. จำนวนในการตรวจ" ของทั้งฟอร์มแล้ว (มีผลกับทุกหัวข้อ
+             หลักพร้อมกัน ไม่ต้องไล่ตั้งทีละข้อ) แต่หัวข้อย่อยอยู่นอกเหนือจากตรงนั้น เพราะหัวข้อย่อย
+             ไม่ได้ตรวจซ้ำพร้อมกับหัวข้อหลักเสมอไป จึงยังต้องมีจุดตั้งของตัวเองอยู่ที่นี่ */}
+        {isChild && (
+          <div className="space-y-2">
+            <Label>จำนวนในการตรวจ</Label>
+            <RepeatCountFields item={item} onPatch={onPatch} />
+          </div>
+        )}
+
         {/* ---- หัวข้อย่อย — ซ้อนได้ชั้นเดียว ---- */}
-        {!isChild && (
+        {!isChild && !isRows && (
           <div className="space-y-3">
             <div className="flex items-center justify-between gap-3">
               <Label>หัวข้อย่อย</Label>
@@ -273,13 +289,54 @@ export function ItemEditor({
 
 // ---------------------------------------------------------------
 
+/**
+ * "ครั้งเดียว/ตรวจซ้ำได้หลายครั้ง" ของข้อแบบ "รายครั้ง" (kind ไม่ใช่ rows)
+ * ใช้ร่วมกันทั้งหัวข้อหลักและหัวข้อย่อย เพราะหัวข้อย่อยก็ตรวจซ้ำเป็นรอบได้เหมือนกัน
+ * แค่ไม่มีให้เลือกประเภทการตรวจเอง (หัวข้อย่อยเป็น "รายครั้ง" เสมอ ไม่มีทางเป็นตาราง)
+ */
+/**
+ * ไม่มีสวิตช์ "ครั้งเดียว/หลายครั้ง" แยกอีกชั้น — จำนวนขั้นต่ำ/สูงสุดตอบเรื่องนี้อยู่แล้ว
+ * ตั้งเป็น 1/1 ก็คือครั้งเดียว ค่าเริ่มต้นของหัวข้อใหม่จึงเป็น 1/1 เสมอ
+ * repeatable ในข้อมูลยังอยู่ (ใช้จริงตอนตรวจ) แค่อนุมานจาก maxRounds > 1 แทนที่จะมีสวิตช์
+ * ให้ตั้งเองซ้ำกับตัวเลข
+ */
+function RepeatCountFields({
+  item,
+  onPatch,
+}: {
+  item: QcItem;
+  onPatch: (patch: Partial<QcItem>) => void;
+}) {
+  return (
+    <div className="grid gap-3 @2xl:grid-cols-2">
+      <Stepper
+        label="จำนวนขั้นต่ำ"
+        value={item.defaultRounds}
+        min={1}
+        max={item.maxRounds}
+        onChange={(defaultRounds) => onPatch({ defaultRounds })}
+      />
+      <Stepper
+        label="เพิ่มได้สูงสุด"
+        value={item.maxRounds}
+        min={item.defaultRounds}
+        max={99}
+        onChange={(maxRounds) => onPatch({ maxRounds, repeatable: maxRounds > 1 })}
+      />
+    </div>
+  );
+}
+
 function FieldsSection({
   item,
+  isRows,
   onAdd,
   onPatchField,
   onRemoveField,
 }: {
   item: QcItem;
+  /** ตารางเพิ่มแถวเอง — ช่องชุดเดียวกันนี้กลายเป็นคอลัมน์ จึงต้องเรียกให้ตรงกับที่เห็น */
+  isRows: boolean;
   onAdd: () => void;
   onPatchField: (id: string, p: Partial<QcField>) => void;
   onRemoveField: (id: string) => void;
@@ -287,16 +344,18 @@ function FieldsSection({
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between gap-3">
-        <Label>การระบุข้อมูล</Label>
+        <Label>{isRows ? "คอลัมน์ในตาราง" : "การระบุข้อมูล"}</Label>
         <Button variant="outline-primary" size="sm" onClick={onAdd}>
           <PlusIcon />
-          เพิ่มข้อมูล
+          {isRows ? "เพิ่มคอลัมน์" : "เพิ่มข้อมูล"}
         </Button>
       </div>
 
       {item.fields.length === 0 ? (
         <p className="text-sm text-muted-foreground">
-          ไม่มีช่องให้กรอก — หัวข้อนี้ผู้ตรวจติ๊กผลอย่างเดียว
+          {isRows
+            ? "ยังไม่มีคอลัมน์ — ตารางจะมีแต่ช่องผลตรวจกับหมายเหตุ"
+            : "ไม่มีช่องให้กรอก — หัวข้อนี้ผู้ตรวจติ๊กผลอย่างเดียว"}
         </p>
       ) : (
         <div className="space-y-3">
@@ -305,6 +364,7 @@ function FieldsSection({
               key={f.id}
               field={f}
               index={i}
+              isRows={isRows}
               onPatch={(p) => onPatchField(f.id, p)}
               onRemove={() => onRemoveField(f.id)}
             />
@@ -327,63 +387,101 @@ function FieldsSection({
 function FieldCard({
   field: f,
   index,
+  isRows,
   onPatch,
   onRemove,
 }: {
   field: QcField;
   index: number;
+  isRows: boolean;
   onPatch: (p: Partial<QcField>) => void;
   onRemove: () => void;
 }) {
   const isNumber = f.type === "number";
+
+  /**
+   * สลับประเภทแล้วต้องล้างของที่ประเภทใหม่ใช้ไม่ได้ทิ้ง
+   * ไม่งั้นหน่วย เกณฑ์ ตัวเลือก จะค้างอยู่เป็นข้อมูลที่มองไม่เห็นแต่ยังถูกบันทึก
+   * แล้วสลับกลับมาทีหลังเจอค่าเก่าโผล่ขึ้นมาเองโดยไม่มีใครสั่ง
+   */
+  const switchType = (type: FieldType) =>
+    onPatch({
+      type,
+      unit: type === "number" ? f.unit : "",
+      rule: type === "number" ? f.rule : emptyRule(),
+      options: type === "choice" ? f.options : [],
+      source: type === "ref" ? f.source : "",
+    });
 
   return (
     <Card className="border-dashed py-0">
       <CardContent className="space-y-4 px-4 py-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <span className="text-sm font-medium">
-            การระบุข้อมูลที่ {index + 1}
+            {isRows ? "คอลัมน์ที่" : "การระบุข้อมูลที่"} {index + 1}
           </span>
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-muted-foreground">ประเภท</span>
-            <ChoiceGroup
-              label="ประเภทข้อมูล"
-              options={(["text", "number"] as FieldType[]).map((t) => ({
-                id: t,
-                label: FIELD_TYPE_LABEL[t],
-              }))}
-              value={f.type}
-              onChange={(type) =>
-                // สลับไปข้อความแล้วหน่วยกับเกณฑ์ไม่มีความหมาย ล้างทิ้งไม่ให้ค้างเป็นข้อมูลที่มองไม่เห็น
-                onPatch(
-                  type === "text"
-                    ? { type, unit: "", rule: emptyRule() }
-                    : { type }
-                )
-              }
-            />
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              aria-label="ลบช่องนี้"
-              onClick={onRemove}
-            >
-              <Trash2Icon />
-            </Button>
-          </div>
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            aria-label="ลบช่องนี้"
+            onClick={onRemove}
+          >
+            <Trash2Icon />
+          </Button>
+        </div>
+
+        {/* สี่ประเภทลงแถวเดียวกับป้าย "ประเภท" ไม่พอที่บนจอแคบ
+            แยกเป็นบรรทัดของตัวเองแล้วชิปตกบรรทัดได้ตามปกติ */}
+        <div className="space-y-2">
+          <Label>ประเภทข้อมูล</Label>
+          <ChoiceGroup
+            label="ประเภทข้อมูล"
+            options={(["text", "number", "choice", "ref"] as FieldType[]).map(
+              (t) => ({ id: t, label: FIELD_TYPE_LABEL[t] })
+            )}
+            value={f.type}
+            onChange={switchType}
+          />
+          <p className="text-sm text-muted-foreground">
+            {FIELD_TYPE_HINT[f.type]}
+          </p>
         </div>
 
         <div className="grid gap-4 @2xl:grid-cols-2">
           <div className="space-y-2">
-            <Label htmlFor={`${f.id}-label`}>ชื่อข้อมูล</Label>
+            <Label htmlFor={`${f.id}-label`}>
+              {isRows ? "ชื่อคอลัมน์" : "ชื่อข้อมูล"}
+            </Label>
             <Input
               id={`${f.id}-label`}
               value={f.label}
-              placeholder="ระบุชื่อข้อมูล"
+              placeholder={isRows ? "ระบุชื่อคอลัมน์" : "ระบุชื่อข้อมูล"}
               className="bg-card"
               onChange={(e) => onPatch({ label: e.target.value })}
             />
           </div>
+
+          {f.type === "ref" && (
+            <div className="space-y-2">
+              <Label htmlFor={`${f.id}-src`}>ดึงจากตาราง</Label>
+              <Select
+                value={f.source || "none"}
+                onValueChange={(v) => onPatch({ source: v === "none" ? "" : v })}
+              >
+                <SelectTrigger id={`${f.id}-src`} className="w-full bg-card">
+                  <SelectValue placeholder="เลือกตาราง" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">ยังไม่ได้เลือก</SelectItem>
+                  {REF_SOURCES.map((r) => (
+                    <SelectItem key={r} value={r}>
+                      {r}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
 
           {isNumber && (
             <div className="space-y-2">
@@ -407,6 +505,14 @@ function FieldCard({
             </div>
           )}
         </div>
+
+        {f.type === "choice" && (
+          <CommaOptionsInput
+            id={`${f.id}-options`}
+            options={f.options}
+            onChange={(options) => onPatch({ options })}
+          />
+        )}
 
         {isNumber && (
           <div className="grid gap-4 @2xl:grid-cols-3">
@@ -476,5 +582,54 @@ function FieldCard({
         )}
       </CardContent>
     </Card>
+  );
+}
+
+/**
+ * คำที่ผู้ตรวจเลือกได้ในช่องแบบตัวเลือก
+ *
+ * ตั้งเป็นคำ ไม่ใช่เลข 1/2/3 เพราะเลขต้องมีคำอธิบายกำกับอยู่ดี
+ * ฟอร์มกระดาษเขียน "(1) วัตถุดิบ (2) ผลิตภัณฑ์" ก็เพราะเขียนคำเต็มทุกช่องไม่ไหว
+ * ในจอไม่มีข้อจำกัดนั้น เก็บคำไปเลยแล้วไม่ต้องมีใครจำว่า 2 แปลว่าอะไร
+ */
+/**
+ * ตัวเลือกของช่องแบบ "ตัวเลือก" — พิมพ์คั่นด้วยคอมมาบรรทัดเดียว ไม่ใช่แถวแยกทีละอัน
+ * แถวแยกกินพื้นที่มากเกินไปสำหรับของที่มักมีแค่สองสามคำสั้น ๆ (เช่น L1, L2)
+ *
+ * เก็บข้อความดิบไว้ในตัวเอง ไม่ผูกตรงกับ options ทุกตัวอักษร เพราะ join/split ตัดช่องว่าง
+ * ท้ายทิ้งทุกครั้งที่ re-render — พิมพ์ ", " ค้างไว้ระหว่างพิมพ์ตัวเลือกถัดไปจะโดนลบตามไปด้วย
+ * ถ้าผูกตรง ๆ ทำให้พิมพ์คอมมาแล้วเว้นวรรคต่อไม่ได้
+ */
+function CommaOptionsInput({
+  id,
+  options,
+  onChange,
+}: {
+  id: string;
+  options: string[];
+  onChange: (next: string[]) => void;
+}) {
+  const [text, setText] = React.useState(() => options.join(", "));
+
+  return (
+    <div className="space-y-2">
+      <Label htmlFor={id}>ตัวเลือก</Label>
+      <Input
+        id={id}
+        value={text}
+        placeholder="คั่นด้วยคอมมา เช่น L1, L2, L3"
+        className="bg-card"
+        onChange={(e) => {
+          const v = e.target.value;
+          setText(v);
+          onChange(
+            v
+              .split(",")
+              .map((s) => s.trim())
+              .filter((s) => s !== "")
+          );
+        }}
+      />
+    </div>
   );
 }

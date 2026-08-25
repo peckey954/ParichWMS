@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { MinusIcon, PlusIcon, RotateCcwIcon, SquarePenIcon } from "lucide-react";
+import { RotateCcwIcon, SquarePenIcon } from "lucide-react";
 import { Button } from "@peckey954/ui/components/ui/button";
 import {
   Dialog,
@@ -10,9 +10,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@peckey954/ui/components/ui/dialog";
-import { Input } from "@peckey954/ui/components/ui/input";
 import { Label } from "@peckey954/ui/components/ui/label";
-import { cn } from "@peckey954/ui/lib/utils";
 import { CheckChip } from "@/components/check-chip";
 import { ChipGroup, type Chip } from "@/components/chip-group";
 import {
@@ -159,47 +157,23 @@ export function ItemSettingsDialog({
             />
           </Section>
 
-          <Section title="จำนวนครั้ง">
+          {/* บังคับหรือข้ามได้ — ข้อที่ข้ามได้จะมีตัวเลือก "ไม่ได้ตรวจ" เพิ่มให้ผู้ตรวจ
+              และไม่ถูกนับว่าใบไม่ครบ ต่างจากข้อบังคับที่เว้นว่างแล้วบันทึกไม่ได้
+              คนละเรื่องกับหมายเหตุ ซึ่งบังคับ "คำอธิบาย" ไม่ใช่ "คำตอบ" */}
+          <Section title="การกรอก">
             <ChipGroup
-              label="จำนวนครั้ง"
+              label="การกรอก"
               options={[
-                { id: "once", label: "ครั้งเดียว" },
-                { id: "many", label: "มากกว่า 1 ครั้ง" },
+                { id: "required", label: "ต้องตอบทุกใบ" },
+                {
+                  id: "optional",
+                  label: "ข้ามได้",
+                  hint: "ผู้ตรวจติ๊ก ไม่ได้ตรวจ ได้ และใบยังนับว่าครบ",
+                },
               ]}
-              value={draft.repeatable ? "many" : "once"}
-              onChange={(v) =>
-                set(
-                  v === "many"
-                    ? {
-                        repeatable: true,
-                        // เปิดครั้งแรกให้เริ่มที่สองครั้ง เพราะ "หลายครั้ง" ที่แปลว่าครั้งเดียวไม่มีความหมาย
-                        defaultRounds: Math.max(2, draft.defaultRounds),
-                        maxRounds: Math.max(3, draft.maxRounds),
-                      }
-                    : { repeatable: false }
-                )
-              }
+              value={draft.required ? "required" : "optional"}
+              onChange={(v) => set({ required: v === "required" })}
             />
-
-            {draft.repeatable && (
-              <div className="mt-3 grid grid-cols-2 gap-3">
-                <Stepper
-                  label="จำนวนครั้งขั้นต่ำ"
-                  value={draft.defaultRounds}
-                  min={1}
-                  max={draft.maxRounds}
-                  onChange={(defaultRounds) => set({ defaultRounds })}
-                />
-                <Stepper
-                  label="เพิ่มได้สูงสุด"
-                  value={draft.maxRounds}
-                  // เพิ่มได้สูงสุดน้อยกว่าจำนวนที่ขึ้นให้ตั้งแต่แรกไม่ได้ ตารางจะขัดกับตัวเอง
-                  min={draft.defaultRounds}
-                  max={20}
-                  onChange={(maxRounds) => set({ maxRounds })}
-                />
-              </div>
-            )}
           </Section>
 
           {/* วันที่กับเวลาไม่มีเนื้อหาให้เว้นว่าง จึงต้องมีติ๊กบอกว่าเอาหรือไม่เอา
@@ -284,88 +258,5 @@ function Section({
       <Label className="text-sm">{title}</Label>
       <div className="mt-2">{children}</div>
     </div>
-  );
-}
-
-/**
- * ช่องตัวเลขที่มีปุ่มลบ/บวก
- * ค่าที่ใช้จริงอยู่ระหว่าง 1 ถึง 20 พิมพ์เองก็ได้แต่ส่วนใหญ่กดปุ่มเร็วกว่า
- */
-function Stepper({
-  label,
-  value,
-  min,
-  max,
-  onChange,
-}: {
-  label: string;
-  value: number;
-  min: number;
-  max: number;
-  onChange: (v: number) => void;
-}) {
-  const clamp = (v: number) => Math.min(max, Math.max(min, v));
-  const id = `stepper-${label}`;
-
-  return (
-    <div>
-      <Label htmlFor={id} className="text-sm font-normal text-muted-foreground">
-        {label}
-      </Label>
-      <div className="mt-2 flex items-center rounded-md border border-border bg-card">
-        <StepButton
-          label={`ลด${label}`}
-          disabled={value <= min}
-          onClick={() => onChange(clamp(value - 1))}
-        >
-          <MinusIcon />
-        </StepButton>
-        <Input
-          id={id}
-          type="number"
-          value={value}
-          min={min}
-          max={max}
-          onChange={(e) => onChange(clamp(Number(e.target.value) || min))}
-          className="h-10 min-w-0 flex-1 border-0 bg-transparent text-center tabular-nums shadow-none focus-visible:ring-0"
-        />
-        <StepButton
-          label={`เพิ่ม${label}`}
-          disabled={value >= max}
-          onClick={() => onChange(clamp(value + 1))}
-        >
-          <PlusIcon />
-        </StepButton>
-      </div>
-    </div>
-  );
-}
-
-function StepButton({
-  label,
-  disabled,
-  onClick,
-  children,
-}: {
-  label: string;
-  disabled: boolean;
-  onClick: () => void;
-  children: React.ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      aria-label={label}
-      disabled={disabled}
-      onClick={onClick}
-      className={cn(
-        "flex size-10 shrink-0 items-center justify-center rounded-md text-muted-foreground",
-        "transition-colors hover:text-foreground disabled:opacity-40",
-        "focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none",
-        "[&_svg]:size-4"
-      )}
-    >
-      {children}
-    </button>
   );
 }

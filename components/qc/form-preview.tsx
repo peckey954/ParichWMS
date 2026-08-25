@@ -1,10 +1,23 @@
 "use client";
 
 import * as React from "react";
-import { CircleDashedIcon, PlusIcon, Trash2Icon } from "lucide-react";
+import {
+  CalendarDaysIcon,
+  ChevronDownIcon,
+  CircleDashedIcon,
+  ClockIcon,
+  PlusIcon,
+  Trash2Icon,
+  TriangleAlertIcon,
+} from "lucide-react";
 import { Badge } from "@peckey954/ui/components/ui/badge";
 import { Button } from "@peckey954/ui/components/ui/button";
 import { Card, CardContent } from "@peckey954/ui/components/ui/card";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@peckey954/ui/components/ui/collapsible";
 import { Input } from "@peckey954/ui/components/ui/input";
 import { Label } from "@peckey954/ui/components/ui/label";
 import {
@@ -19,38 +32,53 @@ import {
   SelectValue,
 } from "@peckey954/ui/components/ui/select";
 import { Separator } from "@peckey954/ui/components/ui/separator";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@peckey954/ui/components/ui/table";
+import { cn } from "@peckey954/ui/lib/utils";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@peckey954/ui/components/ui/tabs";
 import { Textarea } from "@peckey954/ui/components/ui/textarea";
+import { SchedulePreviewCalendar } from "@/components/qc/schedule-calendar";
 import { TimeField } from "@/components/time-field";
+import { VerdictChoice } from "@/components/qc/verdict-choice";
 import {
   NOTE_COLUMN_HINT,
+  SKIP_DAYS_LABEL,
   VERDICT_WORDS,
   buildPreviewBlocks,
   describeItemRules,
   showsAutoStatus,
+  showsCalendar,
   showsTick,
+  slotLabel,
+  slotOvernight,
   type HeaderField,
+  type QcField,
   type QcItem,
   type QcTemplate,
 } from "@/lib/qc-template";
 
-/**
- * หัวตารางในหน้านี้เกือบทุกช่องมีสองบรรทัด — ชื่อคอลัมน์กับคำอธิบายใต้ชื่อ
- * เช่น "ผลการตรวจ / ผู้ตรวจติ๊กเอง" หรือ "หมายเหตุ / บังคับเมื่อไม่ผ่าน"
- * h-10 ของ DS ตั้งไว้สำหรับหัวบรรทัดเดียว สองบรรทัดแล้วตัวหนังสือชนขอบบนล่าง
- * ปล่อยให้สูงตามเนื้อหาแล้วให้ระยะห่างบนล่างเท่ากันแทน
- */
-const HEAD_TALL = "[&_th]:h-auto [&_th]:py-3 [&_th]:leading-snug";
-
 export function FormPreview({ template }: { template: QcTemplate }) {
   const blocks = buildPreviewBlocks(template.items);
+
+  /**
+   * "รายครั้ง" ไม่ใช่เรื่องของข้อใดข้อหนึ่ง แต่เป็นเรื่องของทั้งใบ — ตรงกับของจริงที่ใบตรวจรับ
+   * สินค้าใช้ (RoundCard ใน @/components/qc/round-card.tsx): กดเพิ่มรอบทีเดียว ทุกข้อที่ตั้งไว้ว่า
+   * ตรวจซ้ำได้ขึ้นพร้อมกันในการ์ดเดียวกัน ไม่ใช่ข้อใครข้อมันมีปุ่มเพิ่ม/การ์ดแยกของตัวเอง
+   * ข้อที่ตรวจครั้งเดียว (ไม่ repeatable) ก็ยังอยู่ในการ์ดรอบเดียวกัน แค่ตอบได้แค่รอบแรก
+   * รอบหลังโชว์เป็นแถวอ่านอย่างเดียว — เหมือนของจริงเป๊ะ
+   *
+   * ข้อแบบ "รายข้อมูล" (kind: rows) กับหัวข้อที่มีหัวข้อย่อยยังแยกออกมาต่างหาก เพราะเป็นคนละเรื่อง
+   * รายข้อมูลคือแต่ละใบเป็นของคนละชิ้น ไม่เกี่ยวกับ "รอบตรวจ" ของทั้งใบเลย
+   */
+  const usesRounds = template.items.some(
+    (it) => it.kind === "check" && it.children.length === 0 && it.repeatable
+  );
+  const roundItems = template.items
+    .map((item, index) => ({ item, index }))
+    .filter(({ item }) => item.kind === "check" && item.children.length === 0);
+  const leftoverBlocks = usesRounds
+    ? blocks.filter(
+        (b) => b.kind === "single" && (b.item.kind === "rows" || b.item.children.length > 0)
+      )
+    : blocks;
 
   return (
     <div className="space-y-6">
@@ -63,6 +91,60 @@ export function FormPreview({ template }: { template: QcTemplate }) {
           {template.formCode} {template.revision}
         </p>
       </div>
+
+      {/* รอบการตรวจอยู่เหนือหัวเอกสาร เพราะเป็นสิ่งที่ตอบว่า "ทำไมถึงมาเปิดใบนี้"
+          ฟอร์มตามรอบเวลาเปิดใบเพราะถึงรอบ ไม่ได้เปิดเพราะมีของมาให้ตรวจ */}
+      {showsCalendar(template) && (
+        <div className="rounded-xl border border-border bg-muted p-4">
+          <div className="flex items-center gap-2">
+            <CalendarDaysIcon className="size-4 text-primary" />
+            <p className="font-medium">
+              ฟอร์มนี้ตรวจตามรอบเวลา — วันละ {template.schedule.slots.length} ใบ
+            </p>
+          </div>
+          <p className="mt-1 text-sm text-muted-foreground">
+            ตรวจ{SKIP_DAYS_LABEL[template.schedule.skipDays]} —
+            วันไหนไม่มีใบครบทุกช่วงเวลาจะขึ้นเป็นช่องว่างในปฏิทินและตารางทั้งเดือน
+          </p>
+
+          {/* เลือกดูเป็นปฏิทินหรือรายการช่วงเวลาได้ — แบบเดียวกับหน้าใบตรวจวัตถุดิบในถัง
+              ที่นี่เป็นแค่ตัวอย่างโครง ยังไม่มีใบจริง จุดในปฏิทินจึงไม่ใช่สถานะทำ/ไม่ทำ */}
+          <Tabs defaultValue="calendar" className="mt-3 gap-3">
+            <TabsList>
+              <TabsTrigger value="calendar">
+                <CalendarDaysIcon />
+                ปฏิทิน
+              </TabsTrigger>
+              <TabsTrigger value="list">
+                <ClockIcon />
+                ช่วงเวลา
+              </TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="calendar">
+              <div className="rounded-lg border border-border bg-card p-3">
+                <SchedulePreviewCalendar schedule={template.schedule} />
+              </div>
+            </TabsContent>
+
+            <TabsContent value="list">
+              <div className="flex flex-wrap gap-2">
+                {template.schedule.slots.map((sl) => (
+                  <span
+                    key={sl.id}
+                    className="rounded-full border border-border bg-card px-3 py-1 text-sm tabular-nums"
+                  >
+                    {slotLabel(sl)}
+                    {slotOvernight(sl) && (
+                      <span className="ml-1 text-muted-foreground">ข้ามคืน</span>
+                    )}
+                  </span>
+                ))}
+              </div>
+            </TabsContent>
+          </Tabs>
+        </div>
+      )}
 
       <Card>
         <CardContent>
@@ -80,7 +162,9 @@ export function FormPreview({ template }: { template: QcTemplate }) {
       </Card>
 
       {/* ---------- หัวข้อตรวจ ---------- */}
-      {blocks.map((block, bi) => {
+      {usesRounds && <SharedRoundsPreview items={roundItems} />}
+
+      {leftoverBlocks.map((block, bi) => {
         if (block.kind === "group") {
           const first = block.items[0].index + 1;
           const last = block.items[block.items.length - 1].index + 1;
@@ -101,70 +185,42 @@ export function FormPreview({ template }: { template: QcTemplate }) {
                   ตรวจแบบติ๊ก {pass} / {fail}
                 </span>
               </h3>
-              <Card className="py-0">
-                <CardContent className="px-0">
-                  <Table>
-                    <TableHeader className={HEAD_TALL}>
-                      <TableRow>
-                        <TableHead className="w-14 pl-4">ข้อ</TableHead>
-                        <TableHead className="min-w-48">รายการตรวจ</TableHead>
-                        {showCriteria && (
-                          <TableHead className="min-w-56">เกณฑ์มาตรฐาน</TableHead>
+              {/* การ์ดทีละข้อทุกจอ ไม่มีตารางเลย — ตารางหลายคอลัมน์บนจอแคบบีบจนติ๊กผลตรวจยาก
+                  คอลัมน์ขวาสุด (ผลการตรวจ) มักโดนตัดพ้นขอบจอไปเลย ส่วนจอกว้างก็เอาการ์ดเดิม
+                  มาเรียงยาวต่อ ไม่ต้องมีสองแบบให้ดูแลคู่กัน */}
+              <div className="space-y-3">
+                {block.items.map(({ item, index }) => (
+                  <PreviewCardShell
+                    key={item.id}
+                    eyebrow={`ข้อ ${index + 1}`}
+                    title={item.title || "—"}
+                    description={item.description}
+                    criteria={showCriteria ? item.criteria || "—" : undefined}
+                  >
+                    <VerdictCardChoice
+                      id={item.id}
+                      pass={pass}
+                      fail={fail}
+                      skippable={!item.required}
+                    />
+                    {showNote && (
+                      <FieldRow
+                        label={
+                          groupNote
+                            ? `หมายเหตุ · ${NOTE_COLUMN_HINT[groupNote]}`
+                            : "หมายเหตุ"
+                        }
+                      >
+                        {item.note !== "off" ? (
+                          <Input placeholder="—" />
+                        ) : (
+                          <span className="text-sm text-muted-foreground">—</span>
                         )}
-                        <TableHead className="w-48">ผลการตรวจ</TableHead>
-                        {showNote && (
-                          <TableHead className="min-w-56 pr-4">
-                            หมายเหตุ
-                            {groupNote && (
-                              <span className="block font-normal text-muted-foreground">
-                                {NOTE_COLUMN_HINT[groupNote]}
-                              </span>
-                            )}
-                          </TableHead>
-                        )}
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {block.items.map(({ item, index }) => (
-                        <TableRow key={item.id}>
-                          <TableCell className="pl-4 tabular-nums">
-                            {index + 1}
-                          </TableCell>
-                          <TableCell>
-                            <span className="font-medium">
-                              {item.title || "—"}
-                            </span>
-                            {item.description && (
-                              <span className="block font-normal text-muted-foreground">
-                                {item.description}
-                              </span>
-                            )}
-                          </TableCell>
-                          {showCriteria && (
-                            <TableCell className="text-muted-foreground">
-                              {item.criteria || "—"}
-                            </TableCell>
-                          )}
-                          <TableCell>
-                            <TickChoice id={item.id} pass={pass} fail={fail} />
-                          </TableCell>
-                          {showNote && (
-                            <TableCell className="pr-4">
-                              {item.note !== "off" ? (
-                                <Input placeholder="—" />
-                              ) : (
-                                <span className="text-sm text-muted-foreground">
-                                  —
-                                </span>
-                              )}
-                            </TableCell>
-                          )}
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </CardContent>
-              </Card>
+                      </FieldRow>
+                    )}
+                  </PreviewCardShell>
+                ))}
+              </div>
             </section>
           );
         }
@@ -293,7 +349,22 @@ function AdHocItemsPreview() {
 // ---------------------------------------------------------------
 
 function ItemPreview({ item, index }: { item: QcItem; index: number }) {
-  const rounds = Math.max(1, item.repeatable ? item.defaultRounds : 1);
+  // ตารางเพิ่มแถวเองมีสถานะของตัวเอง (แถวที่ผู้ตรวจกดเพิ่ม) จึงเป็นคนละคอมโพเนนต์
+  // ไม่ใช่ตารางเดิมที่ใส่ if เพิ่มเข้าไป
+  // key ผูกกับจำนวนแถวตั้งต้น — ตั้งค่าในตัวสร้างเปลี่ยนเมื่อไหร่ ตารางตัวอย่างเริ่มใหม่
+  // ใช้ key แทน effect ที่คอย setState ตาม prop ซึ่งเรนเดอร์ซ้อนโดยไม่จำเป็น
+  if (item.kind === "rows")
+    return (
+      <RowsItemPreview
+        key={item.defaultRounds}
+        item={item}
+        index={index}
+      />
+    );
+
+  // ข้อที่ไม่มีหัวข้อย่อยและ "ตรวจซ้ำได้" ไม่ผ่านมาถึงตรงนี้แล้ว — FormPreview ระดับบนสุด
+  // ดักออกไปรวมกับข้ออื่นที่ตรวจซ้ำได้ใน SharedRoundsPreview (การ์ดรอบเดียวกันทั้งใบ) แทน
+
   const ruleText = describeItemRules(item);
   const [pass, fail] = VERDICT_WORDS[item.verdictWording];
   const tick = showsTick(item);
@@ -304,244 +375,119 @@ function ItemPreview({ item, index }: { item: QcItem; index: number }) {
 
   return (
     <section className="space-y-3">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h3 className="text-base font-semibold">
-            {index + 1}. {item.title || "ยังไม่ได้ตั้งชื่อหัวข้อ"}
-          </h3>
-          {item.description && (
-            <p className="mt-0.5 text-sm text-muted-foreground">
-              {item.description}
-            </p>
-          )}
-          {(item.criteria || ruleText) && (
-            <p className="mt-0.5 text-sm text-muted-foreground">
-              เกณฑ์: {item.criteria || ruleText}
-            </p>
-          )}
-        </div>
-        {item.repeatable && (
-          <Button variant="outline-primary" size="sm">
-            <PlusIcon />
-            เพิ่มครั้ง
-          </Button>
+      <div>
+        <h3 className="text-base font-semibold">
+          {index + 1}. {item.title || "ยังไม่ได้ตั้งชื่อหัวข้อ"}
+        </h3>
+        {item.description && (
+          <p className="mt-0.5 text-sm text-muted-foreground">
+            {item.description}
+          </p>
+        )}
+        {(item.criteria || ruleText) && (
+          <p className="mt-0.5 text-sm text-muted-foreground">
+            เกณฑ์: {item.criteria || ruleText}
+          </p>
         )}
       </div>
 
-      {/* หัวข้อที่มีหัวข้อย่อย → ตารางของข้อย่อย */}
+      {/* หัวข้อที่มีหัวข้อย่อย → การ์ดทีละหัวข้อย่อยทุกจอ ไม่มีตาราง */}
       {item.children.length > 0 ? (
-        <Card className="py-0">
-          <CardContent className="px-0">
-            <Table>
-              <TableHeader className={HEAD_TALL}>
-                <TableRow>
-                  <TableHead className="min-w-64 pl-4">หัวข้อย่อย</TableHead>
-                  {childCriteria && (
-                    <TableHead className="min-w-56">เกณฑ์มาตรฐาน</TableHead>
-                  )}
-                  <TableHead className="w-48">ผลการตรวจ</TableHead>
-                  {childNote && (
-                    <TableHead className="min-w-48 pr-4">หมายเหตุ</TableHead>
-                  )}
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {item.children.map((c, ci) => {
-                  const [p, f] = VERDICT_WORDS[c.verdictWording];
-                  return (
-                    <TableRow key={c.id}>
-                      <TableCell className="pl-4">
-                        <span className="font-medium">
-                          {index + 1}.{ci + 1} {c.title || "—"}
-                        </span>
-                        {c.description && (
-                          <span className="block font-normal text-muted-foreground">
-                            {c.description}
-                          </span>
-                        )}
-                      </TableCell>
-                      {childCriteria && (
-                        <TableCell className="text-muted-foreground">
-                          {c.criteria || "—"}
-                        </TableCell>
-                      )}
-                      <TableCell>
-                        {showsTick(c) ? (
-                          <TickChoice id={c.id} pass={p} fail={f} />
-                        ) : (
-                          <span className="text-sm text-muted-foreground">
-                            ระบบตัดสินให้
-                          </span>
-                        )}
-                      </TableCell>
-                      {childNote && (
-                        <TableCell className="pr-4">
-                          {c.note !== "off" ? (
-                            <Input placeholder="—" />
-                          ) : (
-                            <span className="text-sm text-muted-foreground">—</span>
-                          )}
-                        </TableCell>
-                      )}
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
+        <div className="space-y-3">
+          {item.children.map((c, ci) => {
+            const [p, f] = VERDICT_WORDS[c.verdictWording];
+            return (
+              <PreviewCardShell
+                key={c.id}
+                eyebrow={`${index + 1}.${ci + 1}`}
+                title={c.title || "—"}
+                description={c.description}
+                criteria={childCriteria ? c.criteria || "—" : undefined}
+              >
+                {showsTick(c) ? (
+                  <VerdictCardChoice
+                    id={c.id}
+                    pass={p}
+                    fail={f}
+                    skippable={!c.required}
+                  />
+                ) : (
+                  <span className="text-sm text-muted-foreground">
+                    ระบบตัดสินให้
+                  </span>
+                )}
+                {childNote && (
+                  <FieldRow label="หมายเหตุ">
+                    {c.note !== "off" ? (
+                      <Input placeholder="—" />
+                    ) : (
+                      <span className="text-sm text-muted-foreground">—</span>
+                    )}
+                  </FieldRow>
+                )}
+              </PreviewCardShell>
+            );
+          })}
+        </div>
       ) : (
-        /* ตารางเดียวรองรับได้ทั้ง คีย์ค่า / ติ๊ก / ทั้งสองอย่าง */
-        <Card className="py-0">
-          <CardContent className="px-0">
-            <Table>
-              <TableHeader className={HEAD_TALL}>
-                <TableRow>
-                  {item.repeatable && (
-                    <TableHead className="w-20 pl-4">ครั้ง</TableHead>
-                  )}
+        /* มาถึงตรงนี้ได้คือ item.repeatable ต้องเป็น false เสมอ (ไม่งั้น FormPreview
+           ระดับบนสุดจะดักไปรวมกับ SharedRoundsPreview ตั้งแต่แรกแล้ว) จึงมีแค่ชุดข้อมูลเดียวเสมอ
+           การ์ดใบเดียวทุกจอ ไม่มีตาราง ไม่มีแนวคิด "ครั้งที่" ให้ต้องพับเก็บ */
+        <div className="space-y-3 rounded-lg border border-border bg-card p-4">
+          {item.fields.map((f) => (
+            <FieldRow
+              key={f.id}
+              label={
+                f.type === "number" && f.unit
+                  ? `${f.label || "—"} (${f.unit})`
+                  : f.label || "—"
+              }
+            >
+              <FieldInput field={f} />
+            </FieldRow>
+          ))}
 
-                  {item.fields.map((f, ci) => (
-                    <TableHead
-                      key={f.id}
-                      className={cellPad(
-                        f.type === "number" ? "min-w-32 text-right" : "min-w-48",
-                        !item.repeatable && ci === 0
-                      )}
-                    >
-                      {f.label || "—"}
-                      {f.type === "number" && f.unit && (
-                        <span className="block font-normal text-muted-foreground">
-                          ({f.unit})
-                        </span>
-                      )}
-                    </TableHead>
-                  ))}
+          {item.withDate && (
+            <FieldRow label="วันที่ตรวจ">
+              <Input type="date" className="tabular-nums" />
+            </FieldRow>
+          )}
 
-                  {item.withDate && (
-                    <TableHead className="w-40">วันที่ตรวจ</TableHead>
-                  )}
+          {item.withTime && (
+            <FieldRow label="เวลาที่ตรวจ">
+              <TimeField aria-label="เวลาที่ตรวจ" />
+            </FieldRow>
+          )}
 
-                  {item.withTime && (
-                    <TableHead className="w-32 text-right">เวลาที่ตรวจ</TableHead>
-                  )}
+          {tick && (
+            <FieldRow label="ผลการตรวจ · ผู้ตรวจติ๊กเอง">
+              <VerdictCardChoice
+                id={`${item.id}-0`}
+                pass={pass}
+                fail={fail}
+                skippable={!item.required}
+              />
+            </FieldRow>
+          )}
 
-                  {tick && (
-                    <TableHead
-                      className={cellPad(
-                        "w-48",
-                        !item.repeatable &&
-                          item.fields.length === 0 &&
-                          !item.withDate &&
-                          !item.withTime
-                      )}
-                    >
-                      ผลการตรวจ
-                      <span className="block font-normal text-muted-foreground">
-                        ผู้ตรวจติ๊กเอง
-                      </span>
-                    </TableHead>
-                  )}
+          {item.note !== "off" && (
+            <FieldRow label={`หมายเหตุ · ${NOTE_COLUMN_HINT[item.note]}`}>
+              <Input placeholder="—" />
+            </FieldRow>
+          )}
 
-                  {item.note !== "off" && (
-                    <TableHead className="min-w-48">
-                      หมายเหตุ
-                      <span className="block font-normal text-muted-foreground">
-                        {NOTE_COLUMN_HINT[item.note]}
-                      </span>
-                    </TableHead>
-                  )}
-
-                  {autoStatus && (
-                    <TableHead className="w-32 pr-4 text-center">
-                      สถานะ
-                      <span className="block font-normal text-muted-foreground">
-                        ระบบคำนวณ
-                      </span>
-                    </TableHead>
-                  )}
-                </TableRow>
-              </TableHeader>
-
-              <TableBody>
-                {Array.from({ length: rounds }, (_, r) => (
-                  <TableRow key={r}>
-                    {item.repeatable && (
-                      <TableCell className="pl-4 tabular-nums">{r + 1}</TableCell>
-                    )}
-
-                    {item.fields.map((f, ci) => (
-                      <TableCell
-                        key={f.id}
-                        className={cellPad("", !item.repeatable && ci === 0)}
-                      >
-                        {f.type === "number" ? (
-                          <Input
-                            type="number"
-                            className="text-right tabular-nums"
-                            placeholder="0.00"
-                          />
-                        ) : (
-                          <Input placeholder="—" />
-                        )}
-                      </TableCell>
-                    ))}
-
-                    {item.withDate && (
-                      <TableCell>
-                        <Input type="date" className="tabular-nums" />
-                      </TableCell>
-                    )}
-
-                    {item.withTime && (
-                      <TableCell>
-                        {/* ไม่ส่ง value มา ช่องจึงเก็บค่าเอง — หน้านี้เป็นตัวอย่าง
-                            ไม่มีที่เก็บค่าจริง แต่ช่องที่กดแล้วไม่ขยับอ่านว่าพัง */}
-                        <TimeField aria-label="เวลาที่ตรวจ" />
-                      </TableCell>
-                    )}
-
-                    {tick && (
-                      <TableCell
-                        className={cellPad(
-                          "",
-                          !item.repeatable &&
-                          item.fields.length === 0 &&
-                          !item.withDate &&
-                          !item.withTime
-                        )}
-                      >
-                        <TickChoice
-                          id={`${item.id}-${r}`}
-                          pass={pass}
-                          fail={fail}
-                        />
-                      </TableCell>
-                    )}
-
-                    {item.note !== "off" && (
-                      <TableCell>
-                        <Input placeholder="—" />
-                      </TableCell>
-                    )}
-
-                    {autoStatus && (
-                      <TableCell className="pr-4 text-center">
-                        <span
-                          className="inline-flex items-center gap-1 text-sm text-muted-foreground"
-                          title="ยังไม่ได้คีย์ค่า"
-                        >
-                          <CircleDashedIcon className="size-4" />
-                          รอค่า
-                        </span>
-                      </TableCell>
-                    )}
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
+          {autoStatus && (
+            <FieldRow label="สถานะ · ระบบคำนวณ">
+              <span
+                className="inline-flex items-center gap-1 text-sm text-muted-foreground"
+                title="ยังไม่ได้คีย์ค่า"
+              >
+                <CircleDashedIcon className="size-4" />
+                รอค่า
+              </span>
+            </FieldRow>
+          )}
+        </div>
       )}
 
       {tick && autoStatus && (
@@ -553,22 +499,473 @@ function ItemPreview({ item, index }: { item: QcItem; index: number }) {
   );
 }
 
-/** ช่องแรกของแถวต้องมี pl-4 ให้เสมอกับหัวข้ออื่น */
-function cellPad(base: string, isFirst: boolean) {
-  return isFirst ? `${base} pl-4`.trim() : base;
+/**
+ * "รายครั้ง" ของทั้งใบ — ไม่ใช่ของข้อใดข้อหนึ่ง
+ *
+ * กดเพิ่มรอบทีเดียว ทุกข้อที่ตั้งไว้ว่าตรวจซ้ำได้ขึ้นพร้อมกันในการ์ดเดียวกัน ตรงกับของจริง
+ * ที่ใบตรวจรับสินค้าใช้ (RoundCard ใน @/components/qc/round-card.tsx) — ไม่ใช่ข้อใครข้อมัน
+ * มีปุ่มเพิ่ม/การ์ดของตัวเอง เพราะรอบตรวจเป็นแนวคิดของ "ไปตรวจหนึ่งเที่ยว" ไม่ใช่ของแต่ละข้อ
+ *
+ * ข้อที่ตรวจครั้งเดียว (ไม่ repeatable) ก็ยังอยู่ในการ์ดรอบเดียวกัน แค่ตอบได้แค่รอบแรก
+ * รอบหลังโชว์เป็นแถวอ่านอย่างเดียว — ไม่งั้นผู้ตรวจจะสงสัยว่าข้อนั้นหายไปไหน
+ *
+ * ลบรอบได้ (ต่างจากของจริงที่ไม่ให้ลบ เพราะรอบคือประวัติที่เกิดขึ้นจริงแล้ว) เพราะที่นี่
+ * เป็นแค่ตัวอย่างให้คนตั้งฟอร์มลองกดเล่น ไม่ใช่ข้อมูลจริงที่ต้องเก็บไว้
+ */
+function SharedRoundsPreview({
+  items,
+}: {
+  items: { item: QcItem; index: number }[];
+}) {
+  const [rounds, setRounds] = React.useState<number[]>([0]);
+  const nextId = React.useRef(1);
+  // id ที่มีอยู่ตั้งแต่เปิดใบ — รอบที่กดเพิ่มทีหลังไม่อยู่ในเซตนี้ จึงต้องกางทันที
+  const [initialIds] = React.useState(() => new Set(rounds));
+
+  const quota = Math.max(
+    1,
+    ...items.map(({ item }) => (item.repeatable ? item.maxRounds : 1))
+  );
+  const canAdd = items.some(
+    ({ item }) => item.repeatable && item.maxRounds > rounds.length
+  );
+
+  return (
+    <div className="space-y-3">
+      {rounds.map((id, r) => (
+        <RoundPreviewCard
+          key={id}
+          index={r}
+          openInitially={!initialIds.has(id)}
+          onRemove={
+            rounds.length > 1
+              ? () => setRounds((x) => x.filter((v) => v !== id))
+              : undefined
+          }
+        >
+          <div className="space-y-3">
+            {items.map(({ item, index }) => (
+              <RoundItemRow
+                key={item.id}
+                item={item}
+                index={index}
+                roundKey={id}
+                editable={r === 0 || item.repeatable}
+              />
+            ))}
+          </div>
+        </RoundPreviewCard>
+      ))}
+
+      {/* ปุ่มเพิ่มอยู่ล่างกลางเสมอ — ตำแหน่งเดียวกับ RowsItemPreview ไม่ว่าจะเป็นรายครั้งหรือรายข้อมูล */}
+      <div className="flex flex-col items-center gap-1.5">
+        <Button
+          variant="outline-primary"
+          size="sm"
+          disabled={!canAdd}
+          onClick={() => {
+            setRounds((r) => [...r, nextId.current]);
+            nextId.current += 1;
+          }}
+        >
+          <PlusIcon />
+          เพิ่มครั้งที่ตรวจ
+        </Button>
+        <span className="text-sm text-muted-foreground tabular-nums">
+          {rounds.length} / {quota} ครั้ง
+        </span>
+      </div>
+    </div>
+  );
 }
 
+/** หนึ่งข้อภายในการ์ดของรอบหนึ่ง — โครงเดียวกับ ItemBlock ของ RoundCard จริง */
+function RoundItemRow({
+  item,
+  index,
+  roundKey,
+  editable,
+}: {
+  item: QcItem;
+  index: number;
+  roundKey: number;
+  editable: boolean;
+}) {
+  const ruleText = describeItemRules(item);
+  const [pass, fail] = VERDICT_WORDS[item.verdictWording];
+  const tick = showsTick(item);
+  const autoStatus = showsAutoStatus(item);
+
+  // ข้อที่ตรวจครั้งเดียวและตอบไปแล้ว — ยังโชว์อยู่แต่แก้ไม่ได้ ไม่ใช่ซ่อนหายไป
+  // ไม่งั้นผู้ตรวจจะสงสัยว่าข้อนี้หายไปไหนตอนเปิดรอบถัดมา (เหมือนของจริงเป๊ะ)
+  if (!editable) {
+    return (
+      <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-dashed border-border px-4 py-3">
+        <span className="text-sm text-muted-foreground">
+          {index + 1}. {item.title || "—"} — ตรวจครั้งเดียว
+        </span>
+        <span className="text-sm text-muted-foreground">ยังไม่ได้ตรวจ</span>
+      </div>
+    );
+  }
+
+  return (
+    <div className="rounded-lg border border-border bg-card p-4">
+      <p className="text-sm">
+        <span className="font-semibold">
+          {index + 1}. {item.title || "ยังไม่ได้ตั้งชื่อหัวข้อ"}
+        </span>
+        {(item.criteria || ruleText) && (
+          <span className="ml-2 text-muted-foreground">
+            เกณฑ์: {item.criteria || ruleText}
+          </span>
+        )}
+      </p>
+
+      <div className="@container">
+        {item.fields.length > 0 && (
+          <div className="mt-3 grid gap-3 @lg:grid-cols-2">
+            {item.fields.map((f) => (
+              <FieldRow
+                key={f.id}
+                label={
+                  f.type === "number" && f.unit
+                    ? `${f.label || "—"} (${f.unit})`
+                    : f.label || "—"
+                }
+              >
+                <FieldInput field={f} />
+              </FieldRow>
+            ))}
+          </div>
+        )}
+
+        <div className="mt-3 grid gap-3 @lg:grid-cols-2">
+          {item.withDate && (
+            <FieldRow label="วันที่ตรวจ">
+              <Input type="date" className="tabular-nums" />
+            </FieldRow>
+          )}
+
+          {item.withTime && (
+            <FieldRow label="เวลาที่ตรวจ">
+              <TimeField aria-label="เวลาที่ตรวจ" />
+            </FieldRow>
+          )}
+
+          {tick && (
+            <FieldRow label="ผลการตรวจ · ผู้ตรวจติ๊กเอง">
+              <VerdictCardChoice
+                id={`${item.id}-r${roundKey}`}
+                pass={pass}
+                fail={fail}
+                skippable={!item.required}
+              />
+            </FieldRow>
+          )}
+
+          {item.note !== "off" && (
+            <FieldRow label={`หมายเหตุ · ${NOTE_COLUMN_HINT[item.note]}`}>
+              <Input placeholder="—" />
+            </FieldRow>
+          )}
+
+          {autoStatus && (
+            <FieldRow label="สถานะ · ระบบคำนวณ">
+              <span
+                className="inline-flex items-center gap-1 text-sm text-muted-foreground"
+                title="ยังไม่ได้คีย์ค่า"
+              >
+                <CircleDashedIcon className="size-4" />
+                รอค่า
+              </span>
+            </FieldRow>
+          )}
+        </div>
+      </div>
+
+      {tick && autoStatus && (
+        <p className="mt-2 text-sm text-muted-foreground">
+          ระบบจะขึ้นผลที่คำนวณจากเกณฑ์ในคอลัมน์สถานะ แต่ผลที่บันทึกจริงคือช่องที่ผู้ตรวจติ๊ก
+        </p>
+      )}
+    </div>
+  );
+}
+
+/**
+ * ตารางที่ผู้ตรวจกดเพิ่มแถวเองตอนตรวจ
+ *
+ * ต่างจากข้อที่ตรวจซ้ำหลายครั้ง ตรงที่ตรงนั้นทุกครั้งพูดถึงของชิ้นเดิม
+ * เลขครั้งจึงมีความหมาย ส่วนตรงนี้แต่ละแถวคือของคนละชิ้น เลขแถวเป็นแค่ลำดับ
+ * คอลัมน์แรกที่ดึงจากระบบต่างหากที่บอกว่าแถวนี้พูดถึงอะไร
+ *
+ * ลบแถวได้ทุกแถว ไม่มีแถวที่ลบไม่ได้ เพราะการเปิดใบมาแล้วเจอแถวที่เอาออกไม่ได้
+ * คือการบังคับให้กรอกของที่วันนี้อาจไม่ได้ตรวจ
+ */
+function RowsItemPreview({ item, index }: { item: QcItem; index: number }) {
+  const [rows, setRows] = React.useState(() =>
+    Array.from({ length: Math.max(1, item.defaultRounds) }, (_, i) => i)
+  );
+  const nextId = React.useRef(rows.length);
+  // id ที่มีอยู่ตั้งแต่เปิดใบ — แถวที่กดเพิ่มทีหลังไม่อยู่ในเซตนี้ จึงต้องกางทันที
+  // เป็น state ไม่ใช่ ref เพราะอ่านค่าตอน render ด้วย (ref อ่านตอน render ไม่ได้)
+  const [initialIds] = React.useState(() => new Set(rows));
+
+  const [pass, fail] = VERDICT_WORDS[item.verdictWording];
+  const tick = showsTick(item);
+  const autoStatus = showsAutoStatus(item);
+  const full = rows.length >= item.maxRounds;
+
+  return (
+    <section className="space-y-3">
+      <div>
+        <h3 className="text-base font-semibold">
+          {index + 1}. {item.title || "ยังไม่ได้ตั้งชื่อหัวข้อ"}
+        </h3>
+        {item.description && (
+          <p className="mt-0.5 text-sm text-muted-foreground">
+            {item.description}
+          </p>
+        )}
+      </div>
+
+      {/* "รายข้อมูล" — แต่ละใบคือของคนละชิ้น ไม่ใช่ของเดิมตรวจซ้ำ (นั่นคือ "รายครั้ง"
+          ของหัวข้อที่ item.repeatable แทน) ทั้งสองแบบจึงใช้การ์ดพับ/กางแบบเดียวกัน
+          (RoundPreviewCard) หน้าตาตรงกับตอนตรวจจริง ต่างแค่ตรงนี้ลบได้เพราะกดเพิ่มเอง */}
+      <div className="space-y-3">
+        {rows.map((id, r) => (
+          <RoundPreviewCard
+            key={id}
+            index={r}
+            openInitially={!initialIds.has(id)}
+            onRemove={() => setRows((x) => x.filter((v) => v !== id))}
+          >
+            {/* @container ผูกกับความกว้างจริงของการ์ดใบนี้ ให้ฟิลด์ข้างในกางสองคอลัมน์ได้
+                เมื่อการ์ดเต็มความกว้างคอนเทนเนอร์ (จอกว้าง) แต่ยุบเหลือคอลัมน์เดียวเมื่อจอแคบ (มือถือ) */}
+            <div className="@container">
+              <div className="grid gap-3 @lg:grid-cols-2">
+                {item.withDate && (
+                  <FieldRow label="วันที่">
+                    <Input type="date" className="tabular-nums" />
+                  </FieldRow>
+                )}
+                {item.withTime && (
+                  <FieldRow label="เวลา">
+                    <TimeField aria-label="เวลา" />
+                  </FieldRow>
+                )}
+                {item.fields.map((f) => (
+                  <FieldRow
+                    key={f.id}
+                    label={
+                      f.type === "number" && f.unit
+                        ? `${f.label || "—"} (${f.unit})`
+                        : f.label || "—"
+                    }
+                  >
+                    <FieldInput field={f} />
+                  </FieldRow>
+                ))}
+                {tick && (
+                  <FieldRow label="ผลการตรวจ · ผู้ตรวจติ๊กเอง">
+                    <VerdictCardChoice
+                      id={`${item.id}-row-${id}`}
+                      pass={pass}
+                      fail={fail}
+                      skippable={!item.required}
+                    />
+                  </FieldRow>
+                )}
+                {item.note !== "off" && (
+                  <FieldRow label={`หมายเหตุ · ${NOTE_COLUMN_HINT[item.note]}`}>
+                    <Input placeholder="—" />
+                  </FieldRow>
+                )}
+                {autoStatus && (
+                  <FieldRow label="สถานะ · ระบบคำนวณ">
+                    <span
+                      className="inline-flex items-center gap-1 text-sm text-muted-foreground"
+                      title="ยังไม่ได้คีย์ค่า"
+                    >
+                      <CircleDashedIcon className="size-4" />
+                      รอค่า
+                    </span>
+                  </FieldRow>
+                )}
+              </div>
+            </div>
+          </RoundPreviewCard>
+        ))}
+      </div>
+
+      {/* ปุ่มเพิ่มอยู่ล่างกลางเสมอ ไม่ว่าจะเป็นรายครั้งหรือรายข้อมูล — กวาดตาลงมาเจอ
+          ปุ่มเดิมทุกครั้งหลังดูใบสุดท้าย ไม่ต้องเลื่อนย้อนขึ้นไปหาปุ่มบนหัวข้อ */}
+      <div className="flex flex-col items-center gap-1.5">
+        <Button
+          variant="outline-primary"
+          size="sm"
+          disabled={full}
+          onClick={() => {
+            nextId.current += 1;
+            setRows((r) => [...r, nextId.current]);
+          }}
+        >
+          <PlusIcon />
+          เพิ่มข้อมูลที่ตรวจ
+        </Button>
+        <span className="text-sm text-muted-foreground tabular-nums">
+          {rows.length} / {item.maxRounds} รายการ
+        </span>
+      </div>
+    </section>
+  );
+}
+
+/**
+ * การ์ดพับ/กางได้หนึ่งใบต่อหนึ่ง "ข้อมูลตรวจ" — หน้าตาเดียวกับ RoundCard ที่ผู้ตรวจ
+ * ใช้จริงตอนตรวจ (ใบตรวจวัตถุดิบในถัง) เพื่อให้ตัวอย่างฟอร์มตรงกับของจริง
+ * ไม่ใช่แค่คล้าย ๆ กัน — คนตั้งฟอร์มจะได้เห็นเลยว่าตรวจจริงหน้าตาเป็นแบบนี้
+ *
+ * ใช้ร่วมกันทั้งสองแบบที่หัวข้อทำซ้ำได้ — "รายครั้ง" (ตรวจของเดิมซ้ำหลายรอบ)
+ * กับ "รายข้อมูล" (แต่ละใบคือของคนละชิ้น ผู้ตรวจกดเพิ่มเอง) ทั้งสองแบบคือแนวคิดเดียวกัน
+ * ต่างกันแค่ว่ากำหนดจำนวนไว้ล่วงหน้า หรือกดเพิ่มเองระหว่างตรวจ — onRemove จึงมีเฉพาะแบบหลัง
+ *
+ * เปิดไว้ตอนเริ่มต้นเฉพาะใบแรกให้เห็นตัวอย่างทันทีโดยไม่ต้องกดกาง ใบถัดไปที่มีมาแต่แรกเก็บพับไว้ก่อน
+ * ส่วนใบที่กดเพิ่มเองระหว่างดู (openInitially) ต้องกางทันที — เพิ่งกดเพิ่มแล้วต้องกดกางอีกทีมากดซ้ำ
+ * ป้าย "รอตรวจ" ตายตัวเสมอ เพราะหน้านี้เป็น preview ไม่มีคำตอบจริงให้คำนวณสถานะ
+ */
+function RoundPreviewCard({
+  index,
+  openInitially = false,
+  onRemove,
+  children,
+}: {
+  index: number;
+  /** true เมื่อใบนี้เพิ่งถูกเพิ่มด้วยปุ่ม (ไม่ใช่ใบที่มีอยู่แต่แรก) */
+  openInitially?: boolean;
+  /** มีให้ลบได้เฉพาะแบบ "รายข้อมูล" ที่ผู้ตรวจกดเพิ่มเอง — รอบตรวจซ้ำมีจำนวนตายตัว ลบไม่ได้ */
+  onRemove?: () => void;
+  children: React.ReactNode;
+}) {
+  const [open, setOpen] = React.useState(index === 0 || openInitially);
+  return (
+    <Collapsible
+      open={open}
+      onOpenChange={setOpen}
+      className="overflow-hidden rounded-xl border border-border bg-card"
+    >
+      <div className="flex items-center">
+        <CollapsibleTrigger className="flex flex-1 items-center gap-3 px-4 py-4 text-left transition-colors hover:bg-accent-hover">
+          <p className="flex-1 font-semibold">ข้อมูลตรวจที่ {index + 1}</p>
+          <Badge tone="warning" appearance="soft">
+            <TriangleAlertIcon />
+            รอตรวจ
+          </Badge>
+          <ChevronDownIcon
+            className={cn(
+              "size-4 shrink-0 text-muted-foreground transition-transform",
+              open && "rotate-180"
+            )}
+          />
+        </CollapsibleTrigger>
+        {onRemove && (
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            className="mr-3 shrink-0"
+            aria-label={`ลบข้อมูลตรวจที่ ${index + 1}`}
+            onClick={onRemove}
+          >
+            <Trash2Icon />
+          </Button>
+        )}
+      </div>
+      <CollapsibleContent>
+        <div className="border-t border-border p-4">{children}</div>
+      </CollapsibleContent>
+    </Collapsible>
+  );
+}
+
+/**
+ * การ์ดหนึ่งใบแทนหนึ่งแถวตารางบนมือถือ — ใช้ร่วมกันทั้งตารางแบบติ๊กอย่างเดียว
+ * และตารางหัวข้อย่อย ที่มีคอลัมน์ "ลำดับ / ชื่อ / เกณฑ์" เหมือนกัน
+ * ต่างกันแค่เนื้อหาส่วนผลตรวจข้างล่าง จึงแยกเป็น children แทนที่จะทำสอง component
+ */
+function PreviewCardShell({
+  eyebrow,
+  title,
+  description,
+  criteria,
+  children,
+}: {
+  eyebrow?: string;
+  title: string;
+  description?: string;
+  criteria?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="rounded-lg border border-border bg-card p-4">
+      <p className="font-medium">
+        {eyebrow && (
+          <span className="mr-1.5 text-muted-foreground tabular-nums">
+            {eyebrow}
+          </span>
+        )}
+        {title}
+      </p>
+      {description && (
+        <p className="mt-0.5 text-sm text-muted-foreground">{description}</p>
+      )}
+      {criteria !== undefined && (
+        <p className="mt-0.5 text-sm text-muted-foreground">
+          เกณฑ์: {criteria}
+        </p>
+      )}
+      <div className="mt-3 space-y-3">{children}</div>
+    </div>
+  );
+}
+
+/** แถวคีย์-ค่าหนึ่งช่องในการ์ด — ป้ายชื่ออยู่บน ช่องกรอกเต็มความกว้างข้างล่าง
+ * เอาไว้แทนหัวคอลัมน์ตารางที่การ์ดไม่มีที่ให้ */
+function FieldRow({
+  label,
+  children,
+}: {
+  label: React.ReactNode;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="space-y-1.5">
+      <p className="text-sm text-muted-foreground">{label}</p>
+      {children}
+    </div>
+  );
+}
+
+/**
+ * ช่องติ๊กผลตรวจ
+ *
+ * ข้อที่ข้ามได้มีตัวเลือกที่สามว่า "ไม่ได้ตรวจ" — ไม่ใช่ปล่อยให้เว้นว่าง
+ * เพราะเว้นว่างแยกไม่ออกระหว่าง "ตั้งใจข้าม" กับ "ลืมกรอก" ซึ่งเป็นคนละเรื่องกัน
+ * เรื่องเดียวกับที่ปฏิทินต้องขึ้นวันครบทั้งเดือน — ช่องว่างต้องแปลได้ความหมายเดียว
+ */
 function TickChoice({
   id,
   pass,
   fail,
+  skippable = false,
 }: {
   id: string;
   pass: string;
   fail: string;
+  skippable?: boolean;
 }) {
   return (
-    <RadioGroup className="flex items-center gap-4">
+    <RadioGroup className="flex flex-wrap items-center gap-x-4 gap-y-2">
       <Label htmlFor={`${id}-p`} className="flex items-center gap-2 font-normal">
         <RadioGroupItem id={`${id}-p`} value="pass" />
         {pass}
@@ -577,8 +974,114 @@ function TickChoice({
         <RadioGroupItem id={`${id}-f`} value="fail" />
         {fail}
       </Label>
+      {skippable && (
+        <Label
+          htmlFor={`${id}-s`}
+          className="flex items-center gap-2 font-normal text-muted-foreground"
+        >
+          <RadioGroupItem id={`${id}-s`} value="skip" />
+          ไม่ได้ตรวจ
+        </Label>
+      )}
     </RadioGroup>
   );
+}
+
+/**
+ * ผลตรวจในการ์ดมือถือ — ปุ่มใหญ่สีเขียว/แดงแบบเดียวกับใบตรวจวัตถุดิบจริง (RoundCard)
+ * แทนวิทยุตัวเล็กของ TickChoice ที่ใช้ในตารางเดสก์ท็อป เพราะปุ่มเล็กกดแม่นยากบนมือถือ
+ * ที่นี่เป็นแค่ preview ไม่มีที่เก็บค่าจริง จึงเก็บว่าเลือกอะไรไว้ในตัวเอง
+ */
+function VerdictCardChoice({
+  id,
+  pass,
+  fail,
+  skippable = false,
+}: {
+  id: string;
+  pass: string;
+  fail: string;
+  skippable?: boolean;
+}) {
+  const [value, setValue] = React.useState<"pass" | "fail" | "skip" | null>(
+    null
+  );
+  return (
+    <div className="grid grid-cols-2 gap-2">
+      <VerdictChoice
+        id={`${id}-p`}
+        label={pass}
+        on={value === "pass"}
+        tone="pass"
+        onClick={() => setValue("pass")}
+      />
+      <VerdictChoice
+        id={`${id}-f`}
+        label={fail}
+        on={value === "fail"}
+        tone="fail"
+        onClick={() => setValue("fail")}
+      />
+      {skippable && (
+        <VerdictChoice
+          id={`${id}-s`}
+          label="ไม่ได้ตรวจ"
+          on={value === "skip"}
+          tone="skip"
+          onClick={() => setValue("skip")}
+          className="col-span-2"
+        />
+      )}
+    </div>
+  );
+}
+
+/** ช่องกรอกหนึ่งช่องในใบตรวจ — หน้าตาตามประเภทที่ตั้งไว้ในตัวสร้าง */
+function FieldInput({ field: f }: { field: QcField }) {
+  if (f.type === "number") {
+    return (
+      <Input type="number" className="text-right tabular-nums" placeholder="0.00" />
+    );
+  }
+
+  if (f.type === "choice") {
+    return (
+      <Select>
+        <SelectTrigger className="w-full" aria-label={f.label || "เลือก"}>
+          <SelectValue placeholder="เลือก" />
+        </SelectTrigger>
+        <SelectContent>
+          {f.options.length === 0 ? (
+            <SelectItem value="none" disabled>
+              ยังไม่ได้ตั้งตัวเลือก
+            </SelectItem>
+          ) : (
+            f.options.map((o, i) => (
+              <SelectItem key={`${f.id}-${i}`} value={o || `opt-${i}`}>
+                {o || `ตัวเลือกที่ ${i + 1}`}
+              </SelectItem>
+            ))
+          )}
+        </SelectContent>
+      </Select>
+    );
+  }
+
+  if (f.type === "ref") {
+    return (
+      <Select>
+        <SelectTrigger className="w-full" aria-label={f.label || "เลือกจากระบบ"}>
+          <SelectValue placeholder={`เลือกจาก${f.source || "ระบบ"}`} />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="sample-1">ตัวอย่างรายการที่ 1</SelectItem>
+          <SelectItem value="sample-2">ตัวอย่างรายการที่ 2</SelectItem>
+        </SelectContent>
+      </Select>
+    );
+  }
+
+  return <Input placeholder="—" />;
 }
 
 function HeaderFieldPreview({ field }: { field: HeaderField }) {

@@ -48,13 +48,17 @@ import {
 } from "@peckey954/ui/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@peckey954/ui/components/ui/tabs";
 import { toast } from "sonner";
+import { ChipGroup } from "@/components/chip-group";
 import { MultiSelectChips } from "@/components/multi-select-chips";
 import { FailActionsEditor } from "@/components/qc/fail-actions-editor";
 import { FormPreview } from "@/components/qc/form-preview";
 import { HeaderFieldsEditor } from "@/components/qc/header-fields-editor";
+import { ScheduleEditor } from "@/components/qc/schedule-editor";
 import { ItemEditor } from "@/components/qc/item-editor";
 import { VersionPreviewDialog } from "@/components/qc/version-preview-dialog";
+import { Stepper } from "@/components/stepper";
 import {
+  ITEM_KIND_HINT,
   QC_TEMPLATES,
   ROLE_OPTIONS,
   STATUS_LABEL,
@@ -66,6 +70,7 @@ import {
   newItem,
   nextRevisionLabel,
   uid,
+  type ItemKind,
   type ItemSettings,
   type QcItem,
   type QcTemplate,
@@ -138,6 +143,22 @@ function QcTemplateEditor({ family }: { family: QcTemplateFamily }) {
     patch({
       items: tpl.items.map((it) => (it.id === id ? { ...it, ...p } : it)),
     });
+
+  /**
+   * จำนวนในการตรวจ (ประเภทการตรวจ + จำนวนครั้ง/แถว) ตั้งทีเดียวให้ทั้งฟอร์ม ไม่ใช่ทีละหัวข้อ
+   *
+   * ฟอร์มส่วนใหญ่ทุกหัวข้อหลักตั้งแบบเดียวกันหมดทั้งใบอยู่แล้ว — จะสุ่มตรวจของหลายชิ้น
+   * ("รายข้อมูล") ก็ทุกหัวข้อเป็นแบบนั้น จะตรวจซ้ำหลายรอบ ("รายครั้ง") ก็ทุกหัวข้อเป็นแบบนั้น
+   * ให้ตั้งทีละข้อแล้วต้องไล่กดยี่สิบรอบเพื่อค่าเดียวกัน จึงยกมาไว้จุดเดียวแทน
+   * มีผลเฉพาะหัวข้อหลัก ไม่แตะหัวข้อย่อย เพราะหัวข้อย่อยไม่ได้ตรวจซ้ำพร้อมหัวข้อหลักเสมอไป
+   */
+  const patchAllItems = (p: Partial<QcItem>) =>
+    patch({ items: tpl.items.map((it) => ({ ...it, ...p })) });
+
+  // ตัวแทนค่าปัจจุบัน — อ่านจากหัวข้อแรก เพราะหลัง patchAllItems ทุกหัวข้อหลักค่าตรงกันเสมอ
+  const repKind: ItemKind = tpl.items[0]?.kind ?? "check";
+  const repDefaultRounds = tpl.items[0]?.defaultRounds ?? 1;
+  const repMaxRounds = tpl.items[0]?.maxRounds ?? 1;
 
   const moveItem = (i: number, dir: -1 | 1) => {
     const j = i + dir;
@@ -536,10 +557,76 @@ function QcTemplateEditor({ family }: { family: QcTemplateFamily }) {
               </CardContent>
             </Card>
 
-            {/* ---- 4. เมื่อผลตรวจไม่ผ่าน ---- */}
+            {/* ---- 4. จำนวนในการตรวจ ---- */}
             <Card>
               <CardHeader>
-                <CardTitle>4. เมื่อผลตรวจไม่ผ่าน</CardTitle>
+                <CardTitle>4. จำนวนในการตรวจ</CardTitle>
+                <CardDescription>
+                  กำหนดจำนวนครั้งในการตรวจสอบ
+                  <span className="mt-1 block">
+                    ตั้งครั้งเดียวมีผลกับทุกหัวข้อหลักในฟอร์มนี้พร้อมกัน ไม่ต้องไล่ตั้งทีละหัวข้อ
+                  </span>
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {tpl.items.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">
+                    ยังไม่มีหัวข้อตรวจ — เพิ่มหัวข้อในขั้นตอนที่ 3 ก่อน จึงจะตั้งจำนวนตรงนี้ได้
+                  </p>
+                ) : (
+                  <>
+                    <div className="space-y-2">
+                      <Label>ประเภทการตรวจ</Label>
+                      <ChipGroup
+                        label="ประเภทการตรวจ"
+                        options={(["check", "rows"] as ItemKind[]).map((k) => ({
+                          id: k,
+                          label: k === "check" ? "รายครั้ง" : "รายข้อมูล",
+                          disabled:
+                            k === "rows" &&
+                            tpl.items.some((it) => it.children.length > 0),
+                          hint: "มีหัวข้อที่มีหัวข้อย่อยอยู่ เปลี่ยนเป็นตารางไม่ได้ ต้องลบหัวข้อย่อยก่อน",
+                        }))}
+                        value={repKind}
+                        onChange={(kind) => patchAllItems({ kind })}
+                      />
+                      <p className="text-sm text-muted-foreground">
+                        {ITEM_KIND_HINT[repKind]}
+                      </p>
+                    </div>
+
+                    {/* ไม่มีสวิตช์ "ครั้งเดียว/หลายครั้ง" แยกอีกชั้น — จำนวนขั้นต่ำ/สูงสุด
+                        ตอบเรื่องนี้อยู่แล้วในตัวเอง ตั้งเป็น 1/1 ก็คือครั้งเดียว ไม่ต้องมีสวิตช์
+                        คู่ขนานที่พูดเรื่องเดียวกันซ้ำ — ค่าเริ่มต้นเป็น 1/1 (ครั้งเดียว) เสมอ
+                        repeatable ในข้อมูลก็ยังอยู่ ใช้จริงตอนตรวจ แค่อนุมานจาก maxRounds > 1
+                        แทนที่จะมีสวิตช์ให้ตั้งเองซ้ำกับตัวเลข */}
+                    <div className="grid gap-3 @2xl:grid-cols-2">
+                      <Stepper
+                        label="จำนวนขั้นต่ำ"
+                        value={repDefaultRounds}
+                        min={1}
+                        max={repMaxRounds}
+                        onChange={(defaultRounds) => patchAllItems({ defaultRounds })}
+                      />
+                      <Stepper
+                        label="เพิ่มได้สูงสุด"
+                        value={repMaxRounds}
+                        min={repDefaultRounds}
+                        max={99}
+                        onChange={(maxRounds) =>
+                          patchAllItems({ maxRounds, repeatable: maxRounds > 1 })
+                        }
+                      />
+                    </div>
+                  </>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* ---- 5. เมื่อผลตรวจไม่ผ่าน ---- */}
+            <Card>
+              <CardHeader>
+                <CardTitle>5. เมื่อผลตรวจไม่ผ่าน</CardTitle>
                 <CardDescription>
                   ตัวเลือกที่ผู้ตรวจต้องติ๊กว่าจะจัดการสินค้าที่ไม่ผ่านอย่างไร แก้ข้อความได้เอง
                 </CardDescription>
@@ -565,43 +652,26 @@ function QcTemplateEditor({ family }: { family: QcTemplateFamily }) {
               </CardContent>
             </Card>
 
-            {/* ---- 5. การลงชื่อ ---- */}
+            {/* ---- 6. รอบการตรวจ ---- */}
             <Card>
               <CardHeader>
-                <CardTitle>5. การลงชื่อเมื่อตรวจเสร็จ</CardTitle>
+                <CardTitle>6. รอบการตรวจ</CardTitle>
                 <CardDescription>
-                  ทุกใบตรวจจะบันทึกผู้ทำและเวลาเสมอ ปิดสองอย่างนี้ไม่ได้
+                  ฟอร์มนี้เปิดใบเมื่อมีเรื่องให้ตรวจ หรือต้องตรวจทุกวันตามช่วงเวลา
+                  <span className="mt-1 block">
+                    ตัวนี้เป็นตัวเดียวที่ตัดสินว่าฟอร์มดูเป็นปฏิทินและตารางทั้งเดือนได้ไหม
+                    ไม่มีติ๊กเปิดปฏิทินแยก เพราะฟอร์มที่เปิดใบตามเหตุ ช่องว่างในปฏิทินแปลอะไรไม่ได้
+                  </span>
                 </CardDescription>
               </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex items-start justify-between gap-4">
-                  <div className="space-y-0.5">
-                    <Label>ลงชื่อผู้ตรวจ + เวลาที่ตรวจเสร็จ</Label>
-                    <p className="text-sm text-muted-foreground">
-                      ดึงจากผู้ใช้ที่ล็อกอินและเวลาที่กดยืนยัน แก้ย้อนหลังไม่ได้
-                    </p>
-                  </div>
-                  <Badge tone="success" appearance="soft">
-                    บังคับเสมอ
-                  </Badge>
-                </div>
-                <div className="flex items-start justify-between gap-4">
-                  <div className="space-y-0.5">
-                    <Label htmlFor="sig-approver">ต้องมีผู้อนุมัติอีกชั้น</Label>
-                    <p className="text-sm text-muted-foreground">
-                      เปิดเมื่อฟอร์มนี้ต้องให้หัวหน้ากดอนุมัติหลังผู้ตรวจส่ง
-                    </p>
-                  </div>
-                  <Switch
-                    id="sig-approver"
-                    checked={tpl.signature.approver}
-                    onCheckedChange={(c) =>
-                      patch({ signature: { ...tpl.signature, approver: c } })
-                    }
-                  />
-                </div>
+              <CardContent>
+                <ScheduleEditor
+                  schedule={tpl.schedule}
+                  onChange={(schedule) => patch({ schedule })}
+                />
               </CardContent>
             </Card>
+
           </TabsContent>
 
           {/* ================= ตัวอย่างฟอร์ม ================= */}

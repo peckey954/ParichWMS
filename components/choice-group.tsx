@@ -12,8 +12,9 @@ import { cn } from "@peckey954/ui/lib/utils";
 
    เปลี่ยนเป็นชิปแยกอัน กว้างตามเนื้อหาของตัวเอง ตกบรรทัดใหม่ได้เมื่อแถวไม่พอที่
    — อ่านได้เต็มคำเสมอไม่ว่าจะมีกี่ตัวเลือกหรือจอแคบแค่ไหน
-   ยังไม่ใช่ CheckChip (ปุ่มกลมมีไอคอนติ๊ก ใช้เลือกได้หลายอัน) เพราะที่นี่เหลี่ยมมน
-   ไม่มีไอคอน สื่อว่าเลือกได้แค่อันเดียวเหมือนเดิม
+   ทรงกลมมนเต็ม (pill) เหมือน ChipGroup ให้หน้าตาตรงกันทั้งแอป
+   ต่างจาก ChipGroup แค่ตรงใช้ปุ่ม DS (Button) แทน button ดิบ ไม่มีไอคอนติ๊ก
+   สื่อว่าเลือกได้แค่อันเดียวเหมือนเดิม
 ------------------------------------------------------------------ */
 
 export type Choice<T extends string> = {
@@ -50,7 +51,7 @@ export function ChoiceGroup<T extends string>({
             title={o.disabled ? o.disabledHint : undefined}
             onClick={() => onChange(o.id)}
             className={cn(
-              "h-10 px-3 font-normal",
+              "h-10 rounded-full px-4 font-normal",
               on && "border-primary bg-brand font-semibold text-primary hover:bg-brand"
             )}
           >
