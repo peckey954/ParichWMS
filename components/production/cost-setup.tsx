@@ -24,7 +24,6 @@ import {
 } from "@peckey954/ui/components/ui/select";
 import { cn } from "@peckey954/ui/lib/utils";
 import { toast } from "sonner";
-import { useRecipeRun } from "@/components/production/recipe-run";
 import { RECIPE_GROUP_LABEL } from "@/lib/recipe";
 import {
   COST_FIELDS,
@@ -54,25 +53,22 @@ import { CostTable } from "./cost-table";
 const GROUP_ORDER: FieldGroup[] = ["cost", "rate", "budget", "price"];
 
 export function CostSetup() {
-  // แก้ต้นทุนแล้วผลคำนวณที่หน้าสูตรที่เหมาะสมเก่าไปทันที
-  const { markInput } = useRecipeRun();
+  // ต้นทุนต่อถุง/ราคาขายชุดนี้คนละคำนวณกับหน้า "สูตรที่เหมาะสม" (ซึ่งใช้แค่
+  // ต้นทุน+ธาตุอาหารจากตั้งค่าข้อมูล) แก้ที่นี่จึงไม่ต้องผ่านระบบร่าง/เผยแพร่
   const [rows, setRows] = React.useState<CostRow[]>(COST_ROWS);
   const [query, setQuery] = React.useState("");
   const [openId, setOpenId] = React.useState<string | null>(null);
 
-  const patch = (id: string, key: FieldKey, value: string) => (
-    markInput(),
+  const patch = (id: string, key: FieldKey, value: string) =>
     setRows((prev) =>
       prev.map((r) => (r.id === id ? { ...r, [key]: value } : r))
-    )
-  );
+    );
 
   const visible = rows.filter((r) => matchesCost(r, query));
 
   /** เติมค่าเดียวกันให้ทุกสูตรที่กำลังแสดงอยู่ ไม่ใช่ทุกสูตรในระบบ
       ถ้ากรองอยู่แล้วเติมทั้งหมด จะไปทับสูตรที่มองไม่เห็นโดยไม่รู้ตัว */
   const fillDown = (key: FieldKey, value: string) => {
-    markInput();
     const ids = new Set(visible.map((r) => r.id));
     setRows((prev) =>
       prev.map((r) => (ids.has(r.id) ? { ...r, [key]: value } : r))
@@ -250,7 +246,8 @@ function RowList({
         return (
           <React.Fragment key={row.id}>
             {row.group !== prev && (
-              <p className="bg-surface px-4 py-2 text-sm font-medium text-muted-foreground">
+              // สีเดียวกับแถบหัวกลุ่มในตารางจอกว้าง (ดูเหตุผลที่ group-header-row.tsx)
+              <p className="border-l-4 border-l-primary bg-chip-orange px-4 py-1.5 text-sm font-semibold text-primary">
                 {RECIPE_GROUP_LABEL[row.group]}
               </p>
             )}

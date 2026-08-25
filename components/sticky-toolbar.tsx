@@ -62,12 +62,21 @@ export function StickyToolbar({
 export function BackToTop({
   show,
   onClick,
+  className,
 }: {
   show: boolean;
   onClick: () => void;
+  /** ปรับระยะห่างจากขอบล่างได้ — หน้าที่มีแถบปุ่มตรึงล่างของตัวเองต้องยกสูงขึ้น
+      กันปุ่มนี้ไปทับแถบปุ่ม (ค่าเริ่มต้น bottom-6 ใช้ได้กับหน้าที่ไม่มีแถบล่าง) */
+  className?: string;
 }) {
   return (
-    <div className="pointer-events-none sticky bottom-6 z-30 flex h-0 items-end justify-end">
+    <div
+      className={cn(
+        "pointer-events-none sticky bottom-6 z-30 flex h-0 items-end justify-end",
+        className
+      )}
+    >
       <Button
         size="icon"
         aria-label="กลับขึ้นบนสุด"

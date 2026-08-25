@@ -27,7 +27,6 @@ import {
 } from "@/components/stock/doc-parts";
 import {
   NUTRIENTS,
-  RAW_MATERIALS,
   type NutrientKey,
   type RawMaterialDraft,
   displayNumber,
@@ -67,29 +66,22 @@ const HEAD_TRASH =
   "w-12 @3xl:right-0 @3xl:z-30! @3xl:border-l @3xl:border-border";
 
 export function InputSetup() {
-  const { markInput } = useRecipeRun();
-  const [rows, setRows] = React.useState<RawMaterialDraft[]>(RAW_MATERIALS);
+  // แก้ที่นี่คือแก้ "ร่าง" เท่านั้น หน้าสูตรที่เหมาะสมจริงยังไม่เห็นจนกว่าจะเผยแพร่
+  const { draftMaterials: rows, setDraftMaterials: setRows } = useRecipeRun();
   const [query, setQuery] = React.useState("");
   // ช่องที่เคอร์เซอร์อยู่ตอนนี้ — ช่องนั้นโชว์ค่าดิบ ที่เหลือโชว์แบบมีลูกน้ำ
   const [editing, setEditing] = React.useState<string | null>(null);
   const seq = React.useRef(0);
 
-  // แก้ตรงไหนก็ตาม ผลคำนวณที่หน้าสูตรที่เหมาะสมเก่าไปทันที
-  const touch = () => markInput();
+  const patch = (id: string, next: Partial<RawMaterialDraft>) =>
+    setRows((prev) => prev.map((r) => (r.id === id ? { ...r, ...next } : r)));
 
-  const patch = (id: string, next: Partial<RawMaterialDraft>) => (
-    touch(),
-    setRows((prev) => prev.map((r) => (r.id === id ? { ...r, ...next } : r)))
-  );
-
-  const setNutrient = (id: string, key: NutrientKey, v: string) => (
-    touch(),
+  const setNutrient = (id: string, key: NutrientKey, v: string) =>
     setRows((prev) =>
       prev.map((r) =>
         r.id === id ? { ...r, nutrients: { ...r.nutrients, [key]: v } } : r
       )
-    )
-  );
+    );
 
   /**
    * แถวใหม่ขึ้นบนสุด ไม่ใช่ต่อท้าย
@@ -97,7 +89,6 @@ export function InputSetup() {
    * กดปุ่มแล้วไม่เห็นอะไรเกิดขึ้น เลยดูเหมือนปุ่มเสีย
    */
   const addRow = () => {
-    touch();
     seq.current += 1;
     setRows((prev) => [emptyMaterial(`new-${seq.current}`), ...prev]);
     // เคลียร์คำค้นไว้ ไม่งั้นแถวที่เพิ่งเพิ่มอาจโดนกรองออกจนดูเหมือนปุ่มเสีย
@@ -105,7 +96,6 @@ export function InputSetup() {
   };
 
   const removeRow = (id: string) => {
-    touch();
     setRows((prev) => prev.filter((r) => r.id !== id));
   };
 

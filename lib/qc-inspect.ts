@@ -24,7 +24,9 @@ import {
 // ---------------------------------------------------------------
 
 const base = {
+  kind: "check" as const,
   description: "",
+  required: true,
   verdict: "manual" as const,
   verdictWording: "passFail" as const,
   note: "optional" as const,
@@ -66,6 +68,8 @@ export const INSPECT_TEMPLATE: Pick<
           type: "number",
           unit: "Kg",
           rule: { op: "gte", min: 50.2, max: null },
+          options: [],
+          source: "",
         },
       ],
       repeatable: true,
@@ -96,6 +100,8 @@ export const INSPECT_TEMPLATE: Pick<
           type: "number",
           unit: "Kg",
           rule: { op: "gte", min: 0.4, max: null },
+          options: [],
+          source: "",
         },
       ],
       repeatable: true,

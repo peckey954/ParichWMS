@@ -241,6 +241,12 @@
   --color-chip-green-foreground: var(--chip-green-foreground);
   --color-chip-yellow-foreground: var(--chip-yellow-foreground);
   --color-chip-red-foreground: var(--chip-red-foreground);
+  /* chip-orange มีค่าตัวแปรดิบอยู่แล้ว (ทั้งโหมดสว่าง/มืด) แต่ไม่เคยถูกลงทะเบียน
+     เป็นคลาส Tailwind มาก่อน — bg-chip-orange/border-chip-orange-foreground ที่ใช้
+     อยู่แล้วในแบนเนอร์ร่าง/พรีวิวก่อนหน้านี้จึงไม่เคยขึ้นสีจริง (คอมไพล์แล้วหายเงียบ ๆ)
+     เพิ่มให้ครบคู่เหมือน chip-yellow ด้านบน จะได้ใช้เป็นสีเน้น "กลุ่มสูตร" ได้ */
+  --color-chip-orange: var(--chip-orange);
+  --color-chip-orange-foreground: var(--chip-orange-foreground);
 
   --color-tone-blue: var(--tone-blue);
   --color-tone-blue-foreground: var(--tone-blue-foreground);

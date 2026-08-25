@@ -21,6 +21,10 @@ import {
   TablePager,
   paginate,
 } from "@/components/stock/doc-parts";
+import {
+  GroupHeaderRow,
+  useGroupStickyTop,
+} from "@/components/production/group-header-row";
 import { NUTRIENTS, type NutrientKey } from "@/lib/recipe-input";
 import { nutritionByRecipe } from "@/lib/recipe-optimized";
 import {
@@ -41,7 +45,9 @@ import {
    จอแคบ  — การ์ด ใช้หัวคั่นกลุ่มแทนการซ้ำชื่อกลุ่มในทุกใบ
 ------------------------------------------------------------------ */
 
-const PAGE_SIZE = 10;
+// เหมือนหน้าสูตรที่เหมาะสม — ตั้งสูงกว่าจำนวนสูตรมอคทั้งหมด (33 แถว/3 กลุ่ม)
+// ทั้ง 3 กลุ่มจะได้อยู่หน้าเดียว เลื่อนทดสอบแถบหัวกลุ่มตรึงผ่านได้รวดเดียว
+const PAGE_SIZE = 40;
 
 type Cell = { label: string; value?: number; digits: number };
 
@@ -76,6 +82,8 @@ export function RecipeTable({
   view: RecipeView;
 }) {
   const [page, setPage] = React.useState(1);
+  // วัดความสูงจริงของแถวหัวตาราง ไว้ตรึงแถวหัวกลุ่มให้อยู่ใต้หัวตารางพอดี
+  const { headRef, top: groupTop } = useGroupStickyTop();
 
   // เปลี่ยนคำค้นแล้วกลับหน้าแรก ปรับตอนเรนเดอร์ ไม่ใช้ effect
   const key = `${rows.length}:${rows[0]?.id ?? ""}`;
@@ -133,9 +141,8 @@ export function RecipeTable({
         <TableFrame>
           <Table>
             <TableHeader className={STICKY_HEAD}>
-              <TableRow>
-                <TableHead className={HEAD_FIRST}>กลุ่มสูตร</TableHead>
-                <TableHead>สูตร</TableHead>
+              <TableRow ref={headRef}>
+                <TableHead className={HEAD_FIRST}>สูตร</TableHead>
                 <TableHead className="text-right whitespace-nowrap">
                   บรรจุภัณฑ์
                 </TableHead>
@@ -160,41 +167,42 @@ export function RecipeTable({
             </TableHeader>
             <TableBody>
               {slice.map((r, i) => {
-                // ชื่อกลุ่มขึ้นเฉพาะแถวแรกของกลุ่ม แถวถัดไปเป็นขีด
-                // จะได้เห็นว่ากลุ่มเริ่มตรงไหนโดยไม่ต้องอ่านซ้ำทุกบรรทัด
+                // กลุ่มขึ้นเป็นแถวคั่นเต็มความกว้างเฉพาะแถวแรกของกลุ่ม
+                // แถวถัดไปในกลุ่มเดียวกันไม่ต้องอ่านซ้ำทุกบรรทัด
                 const first = i === 0 || slice[i - 1].group !== r.group;
                 return (
-                  <TableRow key={r.id}>
-                    <TableCell className={cn(COL_FIRST, "whitespace-nowrap")}>
-                      {first ? (
-                        <span className="font-medium">
-                          {RECIPE_GROUP_LABEL[r.group]}
-                        </span>
-                      ) : (
-                        <span className="text-muted-foreground">-</span>
-                      )}
-                    </TableCell>
-                    <TableCell className="whitespace-nowrap">{r.sku}</TableCell>
-                    <TableCell className="text-right whitespace-nowrap tabular-nums">
-                      {r.size} Kg
-                    </TableCell>
-                    <TableCell>
-                      <CoatMark on={r.coatNitro} label="เคลือบ Nitro" />
-                    </TableCell>
-                    <TableCell>
-                      <CoatMark on={r.coatPower} label="เคลือบ Power" />
-                    </TableCell>
-                    {cells(r).map((c) => (
-                      <TableCell key={c.label} className="text-right">
-                        <Num v={c.value} digits={c.digits} />
+                  <React.Fragment key={r.id}>
+                    {first && (
+                      <GroupHeaderRow
+                        label={RECIPE_GROUP_LABEL[r.group]}
+                        top={groupTop}
+                      />
+                    )}
+                    <TableRow>
+                      <TableCell className={cn(COL_FIRST, "whitespace-nowrap")}>
+                        <span className="font-medium">{r.sku}</span>
                       </TableCell>
-                    ))}
-                    <TableCell className="max-w-56 truncate" title={r.note}>
-                      {r.note ?? (
-                        <span className="text-muted-foreground">-</span>
-                      )}
-                    </TableCell>
-                  </TableRow>
+                      <TableCell className="text-right whitespace-nowrap tabular-nums">
+                        {r.size} Kg
+                      </TableCell>
+                      <TableCell>
+                        <CoatMark on={r.coatNitro} label="เคลือบ Nitro" />
+                      </TableCell>
+                      <TableCell>
+                        <CoatMark on={r.coatPower} label="เคลือบ Power" />
+                      </TableCell>
+                      {cells(r).map((c) => (
+                        <TableCell key={c.label} className="text-right">
+                          <Num v={c.value} digits={c.digits} />
+                        </TableCell>
+                      ))}
+                      <TableCell className="max-w-56 truncate" title={r.note}>
+                        {r.note ?? (
+                          <span className="text-muted-foreground">-</span>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  </React.Fragment>
                 );
               })}
             </TableBody>
