@@ -61,7 +61,7 @@ export const MODULES: ModuleItem[] = [
     icon: "squareCheck",
     href: "/pr",
   },
-  { id: "po", group: "purchase", label: "สั่งซื้อ PO", code: "FM-ST-01-05", icon: "cart" },
+  { id: "po", group: "purchase", label: "สั่งซื้อ PO", code: "FM-ST-01-05", icon: "cart", href: "/po" },
   { id: "approve", group: "purchase", label: "อนุมัติ", code: "FM-PD-01-03", icon: "circleCheck", pending: 12 },
   {
     id: "weighing",

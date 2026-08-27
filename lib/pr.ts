@@ -233,6 +233,8 @@ export type PrDoc = {
   requester: string;
   /** มีค่าเฉพาะใบที่เคยถูกแก้ไขหลังสร้าง ไม่ใช่ทุกใบจะมี */
   editedBy?: string;
+  /** ต้องการสินค้าด่วนกว่าปกติ — ใช้กรองในหน้าสั่งซื้อ PO */
+  urgent?: boolean;
   status: PrStatus;
   /** ประวัติเฉพาะขั้นที่ถึงแล้ว เรียงเก่าสุดก่อน ใช้วาดเส้นทางสถานะ */
   timeline: PrTimelineEntry[];
@@ -387,6 +389,7 @@ function morePr(count = 30): PrDoc[] {
       neededDate: `${pad(1 + Math.floor(rnd() * 28))}/${pad(1 + Math.floor(rnd() * 12))}/2026`,
       requester,
       editedBy: rnd() < 0.35 ? pick(PR_REQUESTERS, rnd) : undefined,
+      urgent: rnd() < 0.3,
       status,
       ...buildTimeline(status, requester, rnd),
     } satisfies PrDoc;
