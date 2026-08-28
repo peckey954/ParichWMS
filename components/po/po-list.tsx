@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { PlusIcon, Trash2Icon } from "lucide-react";
+import { Trash2Icon } from "lucide-react";
 import { Badge } from "@peckey954/ui/components/ui/badge";
 import { Button } from "@peckey954/ui/components/ui/button";
 import { Checkbox } from "@peckey954/ui/components/ui/checkbox";
@@ -20,6 +20,7 @@ import {
   formatPrQty,
   formatReasons,
   PR_CATEGORY_LABEL,
+  type PrCategoryId,
   type PrDoc,
 } from "@/lib/pr";
 import {
@@ -41,6 +42,12 @@ import {
    ใบสั่งซื้อเดียวกัน) เฉพาะใบที่ยัง "ส่งคำขอแล้ว" เท่านั้นที่เลือก/ลบ/สร้าง
    ใบสั่งซื้อได้ — ใบที่ "ยกเลิก" ไปแล้วเป็นแค่ประวัติ ไม่มีอะไรให้ทำต่อ
 
+   รวมใบขอซื้อหลายใบเป็นใบสั่งซื้อเดียวกันได้เฉพาะ "ประเภทสินค้า" เดียวกัน —
+   เลือกใบแรกแล้วประเภทนั้นจะถูกล็อกไว้ (lockedCategory) ใบอื่นที่คนละประเภท
+   ทั้งกล่องติ๊กและปุ่ม "สร้างใบสั่งซื้อ" ของใบนั้นจะกดไม่ได้จนกว่าจะล้างการเลือก
+   กล่องติ๊กยังต้องอยู่ครบทุกแถวเสมอ (ไม่ใช่ซ่อนตอนกดไม่ได้) เพื่อให้แนวคอลัมน์
+   ตรงกันทั้งตาราง — ใช้ disabled แทนการซ่อน
+
    จอกว้าง — ตาราง จอแคบ — การ์ด ใช้ชิ้นส่วนร่วมจาก components/stock/doc-parts
 ------------------------------------------------------------------ */
 
@@ -60,15 +67,16 @@ function isActionable(d: PrDoc) {
 export function PoList({
   docs,
   selected,
+  lockedCategory,
   onToggleOne,
-  onToggleAll,
   onCreate,
   onDeleteRequest,
 }: {
   docs: PrDoc[];
   selected: Set<string>;
+  /** ประเภทสินค้าที่ล็อกไว้จากใบแรกที่เลือก — null แปลว่ายังไม่ได้เลือกอะไรเลย */
+  lockedCategory: PrCategoryId | null;
   onToggleOne: (id: string, checked: boolean) => void;
-  onToggleAll: (ids: string[], checked: boolean) => void;
   onCreate: (doc: PrDoc) => void;
   onDeleteRequest: (doc: PrDoc) => void;
 }) {
@@ -78,12 +86,6 @@ export function PoList({
   if (docs.length === 0) {
     return <EmptyDocs title="ไม่พบใบขอซื้อ" hint="ลองใช้คำค้นสั้นลง" />;
   }
-
-  const selectableIds = slice.filter(isActionable).map((d) => d.id);
-  const selectedOnPage = selectableIds.filter((id) => selected.has(id));
-  const allOnPageSelected =
-    selectableIds.length > 0 && selectedOnPage.length === selectableIds.length;
-  const someOnPageSelected = selectedOnPage.length > 0 && !allOnPageSelected;
 
   return (
     <>
@@ -95,6 +97,7 @@ export function PoList({
               key={d.id}
               doc={d}
               checked={selected.has(d.id)}
+              categoryLocked={lockedCategory !== null && d.categoryId !== lockedCategory}
               onToggle={(checked) => onToggleOne(d.id, checked)}
               onCreate={() => onCreate(d)}
               onDeleteRequest={() => onDeleteRequest(d)}
@@ -110,51 +113,36 @@ export function PoList({
           <Table>
             <TableHeader className={STICKY_HEAD}>
               <TableRow>
-                <TableHead className={cn(HEAD_FIRST, "w-64")}>
-                  <div className="flex items-center gap-3">
-                    <Checkbox
-                      aria-label="เลือกทั้งหมดในหน้านี้"
-                      checked={
-                        allOnPageSelected
-                          ? true
-                          : someOnPageSelected
-                            ? "indeterminate"
-                            : false
-                      }
-                      disabled={selectableIds.length === 0}
-                      onCheckedChange={(v) => onToggleAll(selectableIds, v !== false)}
-                    />
-                    <span>เลขที่ใบขอซื้อ</span>
-                  </div>
-                </TableHead>
-                <TableHead>ประเภท</TableHead>
-                <TableHead>หมวด</TableHead>
+                {/* กว้างพอให้วันเวลาไม่ตัดคำ ("1/16/2026 | 10:42:52" ยาวกว่าที่
+                    คอลัมน์แคบๆ จะพอ) */}
+                <TableHead className={cn(HEAD_FIRST, "min-w-48")}>เลขที่ใบขอซื้อ</TableHead>
+                {/* รวมประเภท/หมวด/บรรจุภัณฑ์ไว้ในคอลัมน์เดียวกับสินค้า — เดิมสี่
+                    คอลัมน์แยกกันบีบพื้นที่คอลัมน์อื่นจนอ่านยาก ข้อมูลกลุ่มนี้
+                    เป็นป้ายกำกับของสินค้าตัวเดียวกัน อยู่รวมกันอ่านง่ายกว่า */}
                 <TableHead>สินค้า</TableHead>
-                <TableHead>บรรจุภัณฑ์</TableHead>
                 <TableHead className="text-right">ขอซื้อ</TableHead>
                 <TableHead>เหตุผลการซื้อ</TableHead>
                 <TableHead>วันที่ต้องการสินค้า</TableHead>
                 <TableHead>ผู้ขอซื้อ</TableHead>
-                <TableHead className={HEAD_LAST}>การดำเนินการ</TableHead>
+                {/* ไม่มีหัวคอลัมน์ — คอลัมน์นี้มีแต่ปุ่ม บอกตัวเองอยู่แล้วว่าทำอะไร */}
+                <TableHead className={HEAD_LAST} />
               </TableRow>
             </TableHeader>
             <TableBody>
               {slice.map((d) => {
                 const actionable = isActionable(d);
+                const categoryLocked = lockedCategory !== null && d.categoryId !== lockedCategory;
                 return (
                   <TableRow key={d.id}>
                     <TableCell className={COL_FIRST}>
                       <div className="flex items-start gap-3">
-                        {actionable ? (
-                          <Checkbox
-                            aria-label={`เลือก ${d.code}`}
-                            className="mt-0.5"
-                            checked={selected.has(d.id)}
-                            onCheckedChange={(v) => onToggleOne(d.id, v !== false)}
-                          />
-                        ) : (
-                          <span className="mt-0.5 size-4 shrink-0" aria-hidden />
-                        )}
+                        <Checkbox
+                          aria-label={`เลือก ${d.code}`}
+                          className="mt-0.5"
+                          checked={selected.has(d.id)}
+                          disabled={!actionable || categoryLocked}
+                          onCheckedChange={(v) => onToggleOne(d.id, v !== false)}
+                        />
                         <div>
                           <Link
                             href={`/pr/${d.id}`}
@@ -162,28 +150,21 @@ export function PoList({
                           >
                             {d.code}
                           </Link>
-                          <span className="block text-sm text-muted-foreground">
+                          <span className="block text-sm whitespace-nowrap text-muted-foreground">
                             {d.createdAt}
                           </span>
                         </div>
                       </div>
                     </TableCell>
-                    <TableCell className="whitespace-nowrap">
-                      {PR_CATEGORY_LABEL[d.categoryId]}
-                    </TableCell>
-                    <TableCell className="whitespace-nowrap">{d.group}</TableCell>
                     <TableCell>
                       <span className="block font-medium whitespace-nowrap">
                         {d.productName}
+                        {d.productSub && ` ${d.productSub}`}
                       </span>
-                      {d.productSub && (
-                        <span className="block text-sm text-muted-foreground">
-                          {d.productSub}
-                        </span>
-                      )}
-                    </TableCell>
-                    <TableCell className="whitespace-nowrap">
-                      {d.packing ?? "-"}
+                      <span className="block text-sm whitespace-nowrap text-muted-foreground">
+                        {PR_CATEGORY_LABEL[d.categoryId]} · {d.group}
+                        {d.packing && ` · ${d.packing}`}
+                      </span>
                     </TableCell>
                     <TableCell className="text-right whitespace-nowrap tabular-nums">
                       {formatPrQty(d.qty)} {d.unit}
@@ -195,11 +176,14 @@ export function PoList({
                       {formatReasons(d.reasons)}
                     </TableCell>
                     <TableCell className="whitespace-nowrap">
-                      {d.neededDate}
+                      <span className="block">{d.neededDate}</span>
                       {d.urgent && (
-                        <span className="block text-sm font-medium text-primary">
+                        <Badge
+                          appearance="soft"
+                          className={cn("mt-1 [--bdg-border:transparent] font-semibold", URGENT_CHIP)}
+                        >
                           เร่งด่วน
-                        </span>
+                        </Badge>
                       )}
                     </TableCell>
                     <TableCell>
@@ -227,10 +211,9 @@ export function PoList({
                           <Button
                             variant="outline-primary"
                             size="sm"
-                            className="rounded-full"
+                            disabled={categoryLocked}
                             onClick={() => onCreate(d)}
                           >
-                            <PlusIcon />
                             สร้างใบสั่งซื้อ
                           </Button>
                           <Button
@@ -261,12 +244,15 @@ export function PoList({
 function PoCard({
   doc: d,
   checked,
+  categoryLocked,
   onToggle,
   onCreate,
   onDeleteRequest,
 }: {
   doc: PrDoc;
   checked: boolean;
+  /** ล็อกจากประเภทของใบแรกที่เลือกไว้ — ใบนี้คนละประเภทเลยกดเลือก/สร้างไม่ได้ */
+  categoryLocked: boolean;
   onToggle: (checked: boolean) => void;
   onCreate: () => void;
   onDeleteRequest: () => void;
@@ -275,34 +261,33 @@ function PoCard({
 
   return (
     <div className="rounded-xl border border-border bg-card p-4">
-      <div className="flex items-baseline justify-between gap-2">
-        <div className="flex min-w-0 items-baseline gap-3">
-          {actionable && (
-            <Checkbox
-              aria-label={`เลือก ${d.code}`}
-              checked={checked}
-              onCheckedChange={(v) => onToggle(v !== false)}
-            />
-          )}
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex min-w-0 items-center gap-3">
+          <Checkbox
+            aria-label={`เลือก ${d.code}`}
+            checked={checked}
+            disabled={!actionable || categoryLocked}
+            onCheckedChange={(v) => onToggle(v !== false)}
+          />
           <Link href={`/pr/${d.id}`} className="font-semibold hover:underline">
             {d.code}
           </Link>
         </div>
-        <div className="flex shrink-0 items-center gap-2">
-          <span className="text-sm text-muted-foreground">{d.createdAt}</span>
-          {actionable && (
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              aria-label={`ลบ ${d.code}`}
-              className="text-muted-foreground hover:text-destructive"
-              onClick={onDeleteRequest}
-            >
-              <Trash2Icon />
-            </Button>
-          )}
-        </div>
+        {/* ปุ่มลบอยู่บนสุดคู่กับเลขที่ใบ — ไม่ใช่ลงไปอยู่แถวล่างสุดกับปุ่มอื่น */}
+        {actionable && (
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            aria-label={`ลบ ${d.code}`}
+            className="shrink-0 text-muted-foreground hover:text-destructive"
+            onClick={onDeleteRequest}
+          >
+            <Trash2Icon />
+          </Button>
+        )}
       </div>
+      {/* วันที่อยู่บรรทัดของตัวเอง ใต้เลขที่ใบ ไม่ใช่แถวเดียวกับปุ่มลบ */}
+      <p className="mt-1 text-sm text-muted-foreground">{d.createdAt}</p>
 
       <CardBox className="mt-3">
         <p className="font-medium">
@@ -331,29 +316,29 @@ function PoCard({
         )}
       </dl>
 
-      {(d.urgent || !actionable) && (
-        <>
-          <Separator className="mt-3" />
-          <div className="mt-3 flex justify-end">
-            {!actionable ? (
-              <Badge appearance="soft" className={cn("[--bdg-border:transparent] font-semibold", CANCELLED_CHIP)}>
-                ยกเลิก
-              </Badge>
-            ) : (
+      {/* สถานะซ้าย ปุ่มขวา แถวเดียวกันเสมอ — ไม่ใช่ปุ่มเต็มความกว้างแยกแถวล่างสุด
+          ไม่มีสถานะให้โชว์ก็ปล่อยฝั่งซ้ายว่างไว้ ปุ่มยังอยู่ขวาเหมือนเดิม */}
+      <Separator className="mt-3" />
+      <div className="mt-3 flex items-center justify-between gap-2">
+        <div className="min-w-0">
+          {!actionable ? (
+            <Badge appearance="soft" className={cn("[--bdg-border:transparent] font-semibold", CANCELLED_CHIP)}>
+              ยกเลิก
+            </Badge>
+          ) : (
+            d.urgent && (
               <Badge appearance="soft" className={cn("[--bdg-border:transparent] font-semibold", URGENT_CHIP)}>
                 เร่งด่วน
               </Badge>
-            )}
-          </div>
-        </>
-      )}
-
-      {actionable && (
-        <Button className="mt-3 w-full" variant="outline-primary" onClick={onCreate}>
-          <PlusIcon />
-          สร้างใบสั่งซื้อ
-        </Button>
-      )}
+            )
+          )}
+        </div>
+        {actionable && (
+          <Button variant="outline-primary" disabled={categoryLocked} onClick={onCreate}>
+            สร้างใบสั่งซื้อ
+          </Button>
+        )}
+      </div>
     </div>
   );
 }
