@@ -3,7 +3,17 @@
 import * as React from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { ChevronDownIcon } from "lucide-react";
+import { ChevronDownIcon, EllipsisVerticalIcon } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@peckey954/ui/components/ui/alert-dialog";
 import { Badge } from "@peckey954/ui/components/ui/badge";
 import {
   Breadcrumb,
@@ -20,6 +30,12 @@ import {
   CollapsibleTrigger,
 } from "@peckey954/ui/components/ui/collapsible";
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@peckey954/ui/components/ui/dropdown-menu";
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -35,6 +51,7 @@ import {
   TableRow,
 } from "@peckey954/ui/components/ui/table";
 import { cn } from "@peckey954/ui/lib/utils";
+import { toast } from "sonner";
 import {
   CardBox,
   CardRow,
@@ -117,6 +134,7 @@ export default function PoOrderDetailPage() {
   const po = React.useMemo(() => getPoOrder(params.id), [params.id]);
   const [subTab, setSubTab] = React.useState<SubTab>("rounds");
   const [productFilter, setProductFilter] = React.useState<string>("all");
+  const [cancelOpen, setCancelOpen] = React.useState(false);
 
   if (!po) {
     return (
@@ -138,22 +156,58 @@ export default function PoOrderDetailPage() {
   const visibleRounds =
     productFilter === "all" ? allRounds : allRounds.filter((r) => r.item.id === productFilter);
 
+  function handleCancel() {
+    setCancelOpen(false);
+    toast.success(`ยกเลิกใบสั่งซื้อ ${po!.code} แล้ว`);
+    router.push("/po");
+  }
+
   return (
     <div className="flex min-h-[calc(100vh-3.5rem)] flex-col">
       <main className="mx-auto w-full max-w-6xl flex-1 px-4 pt-6 pb-6 sm:px-6">
         <Crumbs code={po.code} />
 
-        <div className="mt-4 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-          <h1 className="text-2xl font-semibold tracking-tight">ใบสั่งซื้อ {po.code}</h1>
-          <Badge
-            tone={cancelled ? "danger" : "neutral"}
-            appearance="soft"
-            className="font-semibold"
-          >
-            {cancelled ? PO_STATUS_LABEL.cancelled : PO_PROGRESS_LABEL[poProgress(po)]}
-          </Badge>
+        <div className="mt-4 flex items-start justify-between gap-3">
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight">ใบสั่งซื้อ {po.code}</h1>
+            <p className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted-foreground">
+              {po.createdAt}
+              <Badge
+                tone={cancelled ? "danger" : "neutral"}
+                appearance="soft"
+                className="font-semibold"
+              >
+                {cancelled ? PO_STATUS_LABEL.cancelled : PO_PROGRESS_LABEL[poProgress(po)]}
+              </Badge>
+            </p>
+          </div>
+
+          {!cancelled && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  aria-label={`ตัวเลือกเพิ่มเติมสำหรับใบสั่งซื้อ ${po.code}`}
+                  className="shrink-0"
+                >
+                  <EllipsisVerticalIcon />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="min-w-40">
+                <DropdownMenuItem onSelect={() => setSubTab("edits")}>
+                  แก้ไขข้อมูลสั่งซื้อ
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  variant="destructive"
+                  onSelect={() => setCancelOpen(true)}
+                >
+                  ยกเลิกใบสั่งซื้อ
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
         </div>
-        <p className="mt-1.5 text-sm text-muted-foreground">{po.createdAt}</p>
 
         {cancelled && (
           <div className="mt-4 rounded-xl border border-danger-border bg-danger px-4 py-3 text-sm">
@@ -162,8 +216,9 @@ export default function PoOrderDetailPage() {
           </div>
         )}
 
-        {/* ---------- ข้อมูลใบสั่งซื้อ — พับ/กางได้ เปิดไว้เป็นค่าเริ่มต้น ---------- */}
-        <Collapsible defaultOpen className="mt-5 rounded-xl border border-border bg-card">
+        {/* ---------- ข้อมูลใบสั่งซื้อ — หุบไว้เป็นค่าเริ่มต้น เห็นแค่การ์ดราคา/
+            วันที่เล็กๆ พอ กดกางถึงเห็นผู้สั่งซื้อ/ผู้แก้ไข/หมายเหตุ/ผู้อนุมัติ ---------- */}
+        <Collapsible className="mt-5 rounded-xl border border-border bg-card">
           <CollapsibleTrigger asChild>
             <button
               type="button"
@@ -171,12 +226,13 @@ export default function PoOrderDetailPage() {
             >
               <span className="font-semibold">ข้อมูลใบสั่งซื้อ</span>
               <span className="flex items-center gap-3">
-                <span className="text-sm">{po.company}</span>
+                <span className="text-sm">บริษัท {po.company}</span>
                 <ChevronDownIcon className="size-5 shrink-0 text-muted-foreground transition-transform group-data-[state=open]:rotate-180" />
               </span>
             </button>
           </CollapsibleTrigger>
-          <CollapsibleContent className="px-4 pb-4">
+
+          <div className="px-4 pb-4">
             <div className="grid gap-4 rounded-lg bg-brand p-4 @lg:grid-cols-2">
               <Stat label="ราคารวมทั้งหมด (บาท)" value={formatPoBaht(poTotalPrice(po))} />
               <Stat
@@ -184,12 +240,25 @@ export default function PoOrderDetailPage() {
                 value={`${po.expectedFrom} - ${po.expectedTo}`}
               />
             </div>
+          </div>
+
+          {/* ---------- ใครสั่ง/แก้ไข/อนุมัติใบนี้ — ระดับทั้งใบ ไม่ใช่ต่อรายการ ---------- */}
+          <CollapsibleContent className="px-4 pb-4">
+            <div className="grid grid-cols-2 gap-4 text-sm @2xl:grid-cols-4">
+              <MetaField label="ผู้สั่งซื้อ" value={po.requester} />
+              <MetaField label="ผู้แก้ไขสั่งซื้อล่าสุด" value={po.editedBy ?? "-"} />
+              <MetaField label="หมายเหตุ" value={po.note ?? "-"} />
+              <MetaField label="ผู้อนุมัติ" value={po.approver ?? "-"} />
+            </div>
           </CollapsibleContent>
         </Collapsible>
 
         {/* ---------- รายการสินค้า — แถวเดียวต่อสินค้า ไม่ต้องกาง ---------- */}
         <div className="mt-6">
-          <LineItemsTable po={po} />
+          <h2 className="text-base font-semibold">รายการสินค้า</h2>
+          <div className="mt-3">
+            <LineItemsTable po={po} />
+          </div>
         </div>
 
         {/* ---------- ชิปสลับมุมมองย่อย ---------- */}
@@ -220,7 +289,7 @@ export default function PoOrderDetailPage() {
         {subTab === "rounds" ? (
           <div className="mt-4">
             <div className="flex flex-wrap items-center justify-between gap-3">
-              <h2 className="text-lg font-semibold">รอบการรับสินค้า</h2>
+              <h2 className="text-base font-semibold">รอบการรับสินค้า</h2>
               {/* ดรอปดาวน์กรองตามสินค้า — ค่าเริ่มต้น "สินค้าทั้งหมด" เห็นทุกรอบ
                   รวมกัน เลือกสินค้าเจาะจงแล้วเหลือแค่รอบของสินค้านั้น */}
               <Select value={productFilter} onValueChange={setProductFilter}>
@@ -259,6 +328,21 @@ export default function PoOrderDetailPage() {
           </Button>
         </div>
       </div>
+
+      <AlertDialog open={cancelOpen} onOpenChange={setCancelOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>ยกเลิกใบสั่งซื้อนี้ใช่ไหม?</AlertDialogTitle>
+            <AlertDialogDescription>
+              เอกสารจะเปลี่ยนเป็นสถานะยกเลิก แก้ไขกลับไม่ได้
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>ไม่ยกเลิก</AlertDialogCancel>
+            <AlertDialogAction onClick={handleCancel}>ยืนยันยกเลิก</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
@@ -289,7 +373,16 @@ function Stat({ label, value }: { label: string; value: string }) {
   return (
     <div>
       <p className="text-sm text-muted-foreground">{label}</p>
-      <p className="mt-1 text-lg font-semibold tabular-nums">{value}</p>
+      <p className="mt-1 text-base font-semibold tabular-nums">{value}</p>
+    </div>
+  );
+}
+
+function MetaField({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <p className="text-muted-foreground">{label}</p>
+      <p className="mt-0.5 font-medium">{value}</p>
     </div>
   );
 }
@@ -319,6 +412,7 @@ function LineItemsTable({ po }: { po: PoDoc }) {
             <TableHeader className={STICKY_HEAD}>
               <TableRow>
                 <TableHead className={HEAD_FIRST}>สินค้า</TableHead>
+                <TableHead>บรรจุภัณฑ์</TableHead>
                 <TableHead className="text-right">สั่งซื้อ</TableHead>
                 <TableHead className="text-right">รับเข้า</TableHead>
                 <TableHead className="text-right">ค้างรับ</TableHead>
@@ -335,16 +429,16 @@ function LineItemsTable({ po }: { po: PoDoc }) {
                 const stocked = lineItemStockedQty(item);
                 return (
                   <TableRow key={item.id}>
-                    <TableCell className={COL_FIRST}>
-                      <span className="block font-medium whitespace-nowrap">
+                    <TableCell className={cn(COL_FIRST, "whitespace-nowrap")}>
+                      <span className="font-medium">
                         {item.productName}
                         {item.productSub && ` ${item.productSub}`}
                       </span>
-                      <span className="block text-sm whitespace-nowrap text-muted-foreground">
-                        {item.group}
-                        {item.packing && ` · ${item.packing}`}
-                        {item.urgent && <UrgentChip />}
-                      </span>
+                      <span className="text-muted-foreground"> {item.group}</span>
+                      {item.urgent && <UrgentChip />}
+                    </TableCell>
+                    <TableCell className="whitespace-nowrap text-muted-foreground">
+                      {item.packing ?? "-"}
                     </TableCell>
                     <TableCell className="text-right whitespace-nowrap tabular-nums">
                       {formatPoQty(item.orderedQty)}
@@ -409,15 +503,13 @@ function LineItemCard({
         <p className="font-medium">
           {item.productName}
           {item.productSub && ` ${item.productSub}`}
-        </p>
-        <p className="flex flex-wrap items-center gap-x-2 text-sm">
-          <span>{item.group}</span>
-          {item.packing && <span>{item.packing}</span>}
+          <span className="font-normal text-muted-foreground"> {item.group}</span>
           {item.urgent && <UrgentChip />}
         </p>
       </CardBox>
 
       <dl className="mt-3 space-y-1.5 text-sm">
+        <CardRow label="บรรจุภัณฑ์">{item.packing ?? "-"}</CardRow>
         <CardRow label={`สั่งซื้อ (${item.unit})`}>{formatPoQty(item.orderedQty)}</CardRow>
         <CardRow label="รับเข้า">{formatPoQty(received)}</CardRow>
         {!cancelled && pending > 0 && (

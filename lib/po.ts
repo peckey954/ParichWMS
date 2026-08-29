@@ -119,7 +119,13 @@ export type PoDoc = {
   poType: "po" | "poi";
   status: PoStatus;
   cancelReason?: string;
+  /** ผู้สั่งซื้อ — คนที่กดสร้างใบนี้ */
   requester: string;
+  /** มีค่าเฉพาะใบที่เคยถูกแก้ไขหลังสร้าง ไม่ใช่ทุกใบจะมี */
+  editedBy?: string;
+  /** มีค่าเฉพาะใบที่ผ่านการอนุมัติแล้ว */
+  approver?: string;
+  note?: string;
   /** ช่วงวันที่คาดว่าสินค้าจะเข้าครบ — คร่าวๆ ระดับทั้งใบ ไม่ใช่ต่อรายการ */
   expectedFrom: string;
   expectedTo: string;
@@ -301,6 +307,7 @@ function docStamp(seq: number, rnd: () => number) {
 }
 
 const CANCEL_REASON_POOL = ["เอกสารไม่ถูกต้อง", "ซัพพลายเออร์ยกเลิกออเดอร์", "เปลี่ยนแผนการสั่งซื้อ"];
+const NOTE_POOL = ["โทรแจ้งซัพพลายเออร์ก่อนส่งของทุกครั้ง", "แยกส่งเป็นล็อตตามรอบผลิต"];
 
 function buildPoDoc(seq: number, status: PoStatus): PoDoc {
   const rnd = seeded(500 + seq);
@@ -343,6 +350,9 @@ function buildPoDoc(seq: number, status: PoStatus): PoDoc {
     status,
     cancelReason: status === "cancelled" ? pick(CANCEL_REASON_POOL, rnd) : undefined,
     requester: pick(PR_REQUESTERS, rnd),
+    editedBy: rnd() < 0.6 ? pick(PR_REQUESTERS, rnd) : undefined,
+    approver: status === "cancelled" ? undefined : rnd() < 0.8 ? pick(PR_REQUESTERS, rnd) : undefined,
+    note: rnd() < 0.25 ? pick(NOTE_POOL, rnd) : undefined,
     expectedFrom: `01/${pad(fromMonth)}/2026`,
     expectedTo: `01/${pad(toMonth)}/2026`,
     lineItems,

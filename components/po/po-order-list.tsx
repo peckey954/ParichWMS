@@ -128,15 +128,9 @@ function PoOrderPanel({
   return (
     <div
       onClick={goToDoc}
-      className={cn(
-        "cursor-pointer overflow-hidden rounded-xl border border-border bg-card",
-        // ทั้งการ์ดไปหน้าเดียวกันหมดทั้งแท่ง (รวมแถวสินค้าข้างในตอนกางอยู่)
-        // ฟีดแบ็กตอนชี้จึงเป็นการยกทั้งการ์ดขึ้นนิดหนึ่งเหมือนการ์ดเมนูหลัก
-        // ไม่ใช่ไฮไลต์สีพื้นหลังทีละแถว ซึ่งจะดูเหมือนแต่ละแถวกดแล้วไปคนละที่
-        "transition-[transform,box-shadow] duration-150",
-        "hover:shadow-md motion-safe:hover:-translate-y-0.5",
-        "motion-safe:active:translate-y-0 active:shadow-sm"
-      )}
+      // ทั้งการ์ดไปหน้าเดียวกันหมดทั้งแท่ง (รวมแถวสินค้าข้างในตอนกางอยู่) — กดได้
+      // แต่ไม่ต้องมีฟีดแบ็กตอนชี้เลย ไม่ใช่ทั้งไฮไลต์สีพื้นหลังและไม่ต้องขยับ/ยกการ์ด
+      className="cursor-pointer overflow-hidden rounded-xl border border-border bg-card"
     >
       <div className="flex items-start justify-between gap-3 px-4 py-3.5">
         {/* วันที่แยกบรรทัดของตัวเองบนจอแคบ (ไม่พอที่จะอยู่แถวเดียวกับเลขที่ใบ)
