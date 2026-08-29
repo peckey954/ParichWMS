@@ -45,10 +45,10 @@ import {
 import { Textarea } from "@peckey954/ui/components/ui/textarea";
 import { cn } from "@peckey954/ui/lib/utils";
 import { toast } from "sonner";
-import { DateRangeSelect, DateSelect, formatDateSlash, parseDateSlash, type DateRange } from "@/components/date-select";
+import { DateRangeSelect, type DateRange } from "@/components/date-select";
 import { useNumberField } from "@/components/number-field";
 import { PR_CATEGORIES, PR_CATEGORY_LABEL, PR_PRODUCTS, type PrCategoryId, type PrDoc, type PrProduct } from "@/lib/pr";
-import { COMPANY_POOL, formatPoBaht, PO_QUEUE_DOCS } from "@/lib/po";
+import { COMPANY_POOL, formatPoBaht, formatPoQty, PO_QUEUE_DOCS } from "@/lib/po";
 
 /* ------------------------------------------------------------------
    สร้างใบสั่งซื้อ — มาจากปุ่ม "สร้างใบสั่งซื้อ" ในแท็บ "ขอซื้อ" เสมอ พาสรหัส
@@ -76,6 +76,14 @@ type DraftLine = {
   orderedQty: number;
   pricePerUnit: number;
   handlingPerUnit: number;
+  /** ย้อนไปดูใบขอซื้อต้นทางได้ — มีเฉพาะแถวที่มาจากใบขอซื้อจริง
+   *  แถวที่กด "เพิ่มสินค้า" เองในหน้านี้ไม่มีใบขอซื้อรองรับ จึงไม่มีข้อมูลชุดนี้ */
+  prRef?: {
+    code: string;
+    requestedQty: number;
+    requester: string;
+    editedBy?: string;
+  };
 };
 
 function toDraftLine(pr: PrDoc): DraftLine {
@@ -97,6 +105,12 @@ function toDraftLine(pr: PrDoc): DraftLine {
     orderedQty: pr.qty,
     pricePerUnit: 0,
     handlingPerUnit: 0,
+    prRef: {
+      code: pr.code,
+      requestedQty: pr.qty,
+      requester: pr.requester,
+      editedBy: pr.editedBy,
+    },
   };
 }
 
@@ -186,19 +200,22 @@ function CreatePoForm() {
 
   return (
     <>
-      <main className="mx-auto w-full max-w-4xl px-4 pt-6 pb-24 sm:px-6">
+      <main className="@container mx-auto w-full max-w-4xl px-4 pt-6 pb-24 sm:px-6">
         <Crumbs />
 
         <h1 className="mt-2 text-2xl font-semibold tracking-tight">สร้างใบสั่งซื้อ</h1>
 
-        {/* ---------- หัวใบ ---------- */}
-        <div className="mt-4 rounded-xl border border-border bg-card p-4">
+        {/* ---------- หัวใบ ----------
+             ประเภทการสั่งซื้อแยกเป็นแถวของตัวเองเสมอ ไม่ได้อยู่ในกริด 3 คอลัมน์กับอีกสองช่อง
+             เพราะช่อง PO/POI มีสองปุ่มซ้อนกันอยู่แล้ว ถ้าไปแบ่งพื้นที่กับบริษัท+วันที่อีก
+             จะเหลือที่ต่อปุ่มไม่พอให้ตัวหนังสือ "POI - ต่างประเทศ" ขึ้นเต็มคำ */}
+        <div className="mt-4 space-y-4">
           <div className="space-y-1.5">
             <Label>ประเภทการสั่งซื้อ</Label>
             <RadioGroup
               value={poType}
               onValueChange={(v) => setPoType(v as "po" | "poi")}
-              className="grid gap-3 @lg:grid-cols-2"
+              className="grid grid-cols-2 gap-3"
             >
               <RadioBox id="po-type-po" value="po">
                 PO - ในประเทศ
@@ -209,7 +226,7 @@ function CreatePoForm() {
             </RadioGroup>
           </div>
 
-          <div className="mt-4 grid gap-4 @lg:grid-cols-2">
+          <div className="grid gap-4 @lg:grid-cols-2">
             <div className="space-y-1.5">
               <Label htmlFor="po-company">บริษัทที่ทำการสั่งซื้อ</Label>
               <Select value={company} onValueChange={setCompany}>
@@ -225,6 +242,7 @@ function CreatePoForm() {
                 </SelectContent>
               </Select>
             </div>
+
             <div className="space-y-1.5">
               <Label htmlFor="po-expected">
                 คาดการณ์ช่วงวันที่สินค้าจะเข้า{" "}
@@ -252,7 +270,7 @@ function CreatePoForm() {
         </div>
 
         {/* ---------- สรุปราคารวม ---------- */}
-        <div className="mt-3 rounded-lg bg-brand px-4 py-3.5">
+        <div className="mt-3 rounded-lg border border-border bg-brand px-4 py-3.5">
           <p className="text-sm text-muted-foreground">ราคารวมทั้งหมด (บาท)</p>
           <p className="mt-1 text-lg font-semibold tabular-nums">
             {lines.length > 0 ? formatPoBaht(totalPrice) : "-"}
@@ -362,11 +380,9 @@ function ProductCard({
   onChange: (patch: Partial<DraftLine>) => void;
   onRemove: () => void;
 }) {
-  const neededDate = line.neededDate ? parseDateSlash(line.neededDate) : undefined;
-
   return (
     <Collapsible defaultOpen className="rounded-xl border border-border bg-card">
-      <div className="flex flex-wrap items-start justify-between gap-3 p-4">
+      <div className="flex flex-wrap items-start justify-between gap-3 p-4 pb-0">
         <div className="min-w-0">
           <p className="font-medium">
             {line.productName}
@@ -379,24 +395,18 @@ function ProductCard({
         </div>
 
         <div className="flex shrink-0 items-center gap-2">
-          <DateSelect
-            value={neededDate}
-            onValueChange={(d) => onChange({ neededDate: d ? formatDateSlash(d) : "" })}
-            placeholder="วันที่ต้องการ"
-            className="w-40"
-          />
-          <button
-            type="button"
-            onClick={() => onChange({ urgent: !line.urgent })}
-            className={cn(
-              "inline-flex shrink-0 items-center rounded-full border px-3 py-1 text-xs font-semibold whitespace-nowrap transition-colors",
-              line.urgent
-                ? "border-transparent [--bdg-surface:var(--chip-orange)] [--bdg-text:var(--chip-orange-foreground)] bg-(--bdg-surface) text-(--bdg-text)"
-                : "border-border text-muted-foreground hover:bg-accent-hover"
-            )}
-          >
-            เร่งด่วน
-          </button>
+          {/* วันที่มาจากใบขอซื้อที่คนขอกรอกไว้แล้ว — ดูอย่างเดียว แก้ไม่ได้ในหน้านี้ */}
+          <span className="text-sm whitespace-nowrap text-muted-foreground">
+            วันที่ต้องการสินค้า:{" "}
+            <span className="font-medium text-foreground tabular-nums">
+              {line.neededDate || "-"}
+            </span>
+          </span>
+          {line.urgent && (
+            <span className="inline-flex shrink-0 items-center rounded-full border border-transparent px-3 py-1 text-xs font-semibold whitespace-nowrap [--bdg-surface:var(--chip-orange)] [--bdg-text:var(--chip-orange-foreground)] bg-(--bdg-surface) text-(--bdg-text)">
+              เร่งด่วน
+            </span>
+          )}
           <Button variant="ghost" size="icon" aria-label="ลบสินค้านี้" onClick={onRemove}>
             <Trash2Icon />
           </Button>
@@ -408,45 +418,44 @@ function ProductCard({
         </div>
       </div>
 
-      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 border-t border-border px-4 py-3 text-sm">
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 px-4 pt-1.5 pb-3 text-sm">
         <span className="text-muted-foreground">
           ราคารวมต่อ{line.unit} (บาท):{" "}
           <span className="font-medium text-foreground tabular-nums">
-            {formatPoBaht(lineUnitPrice(line))}
+            {lineUnitPrice(line) > 0 ? formatPoBaht(lineUnitPrice(line)) : "-"}
           </span>
         </span>
         <span className="text-muted-foreground">
           ราคารวมทั้งหมด (บาท):{" "}
           <span className="font-medium text-foreground tabular-nums">
-            {formatPoBaht(lineTotalPrice(line))}
+            {lineTotalPrice(line) > 0 ? formatPoBaht(lineTotalPrice(line)) : "-"}
           </span>
         </span>
       </div>
 
       <CollapsibleContent className="border-t border-border px-4 pt-4 pb-4">
-        <div className="space-y-1.5">
-          <Label>บรรจุภัณฑ์</Label>
-          {line.packingOptions.length > 0 ? (
-            <Select value={line.packing} onValueChange={(v) => onChange({ packing: v })}>
-              <SelectTrigger className="w-full bg-card">
-                <SelectValue placeholder="เลือกบรรจุภัณฑ์" />
-              </SelectTrigger>
-              <SelectContent>
-                {line.packingOptions.map((p) => (
-                  <SelectItem key={p} value={p}>
-                    {p}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          ) : (
-            <p className="flex h-9 items-center rounded-md border border-border bg-card px-3 text-sm text-muted-foreground">
-              {line.packing ?? "-"}
-            </p>
-          )}
-        </div>
-
-        <div className="mt-4 grid gap-4 @lg:grid-cols-3">
+        <div className="grid gap-4 @lg:grid-cols-4">
+          <div className="space-y-1.5">
+            <Label>บรรจุภัณฑ์</Label>
+            {line.packingOptions.length > 0 ? (
+              <Select value={line.packing} onValueChange={(v) => onChange({ packing: v })}>
+                <SelectTrigger className="w-full bg-card">
+                  <SelectValue placeholder="เลือกบรรจุภัณฑ์" />
+                </SelectTrigger>
+                <SelectContent>
+                  {line.packingOptions.map((p) => (
+                    <SelectItem key={p} value={p}>
+                      {p}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            ) : (
+              <p className="flex h-9 items-center rounded-md border border-border bg-card px-3 text-sm text-muted-foreground">
+                {line.packing ?? "-"}
+              </p>
+            )}
+          </div>
           <div className="space-y-1.5">
             <Label>สั่งซื้อ ({line.unit})</Label>
             <NumberStepper
@@ -471,6 +480,35 @@ function ProductCard({
             />
           </div>
         </div>
+
+        {/* ---------- อ้างอิงใบขอซื้อต้นทาง ----------
+             ดูอย่างเดียว ไม่มีปุ่มแก้ ไม่ใช่ข้อมูลที่ต้องตัดสินใจอะไรตรงนี้ต่อ
+             แค่เผื่อต้องย้อนไปดูว่าใบขอซื้อใบไหนขอมา ขอไว้เท่าไหร่ ใครขอ ใครแก้ล่าสุด
+             เว้นระยะห่างจากช่องกรอกด้านบนด้วยเส้นคั่น ให้รู้ว่าเป็นข้อมูลอ้างอิง
+             ไม่ใช่ส่วนหนึ่งของแบบฟอร์มที่ต้องกรอก แถวนี้จึงไม่มี Select/Stepper เลย
+             มีเฉพาะรายการที่มาจากใบขอซื้อจริง (prRef) เท่านั้น กดเพิ่มสินค้าเองไม่มีใบขอซื้อรองรับ */}
+        {line.prRef && (
+          <div className="mt-4 grid gap-4 border-t border-border pt-4 @lg:grid-cols-4">
+            <div className="space-y-1.5">
+              <p className="text-sm text-muted-foreground">เลขที่ใบขอซื้อ</p>
+              <p className="text-sm font-medium">{line.prRef.code}</p>
+            </div>
+            <div className="space-y-1.5">
+              <p className="text-sm text-muted-foreground">ขอซื้อ ({line.unit})</p>
+              <p className="text-sm font-medium tabular-nums">
+                {formatPoQty(line.prRef.requestedQty)}
+              </p>
+            </div>
+            <div className="space-y-1.5">
+              <p className="text-sm text-muted-foreground">ผู้ขอซื้อ</p>
+              <p className="text-sm font-medium">{line.prRef.requester}</p>
+            </div>
+            <div className="space-y-1.5">
+              <p className="text-sm text-muted-foreground">ผู้แก้ไขขอซื้อล่าสุด</p>
+              <p className="text-sm font-medium">{line.prRef.editedBy ?? "-"}</p>
+            </div>
+          </div>
+        )}
       </CollapsibleContent>
     </Collapsible>
   );
