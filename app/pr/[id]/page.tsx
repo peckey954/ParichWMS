@@ -3,7 +3,13 @@
 import * as React from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { ChevronDownIcon, CircleXIcon, EllipsisVerticalIcon } from "lucide-react";
+import {
+  ChevronDownIcon,
+  CircleXIcon,
+  EllipsisVerticalIcon,
+  PencilIcon,
+  Trash2Icon,
+} from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -132,7 +138,7 @@ export default function PrDetailPage() {
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button
-                  variant="ghost"
+                  variant="outline"
                   size="icon"
                   aria-label={`ตัวเลือกเพิ่มเติมสำหรับใบขอซื้อ ${doc.code}`}
                   className="shrink-0"
@@ -142,12 +148,13 @@ export default function PrDetailPage() {
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="min-w-40">
                 <DropdownMenuItem asChild>
-                  <Link href={`/pr/${doc.id}/edit`}>แก้ไข</Link>
+                  <Link href={`/pr/${doc.id}/edit`}>
+                    <PencilIcon />
+                    แก้ไข
+                  </Link>
                 </DropdownMenuItem>
-                <DropdownMenuItem
-                  variant="destructive"
-                  onSelect={() => setCancelOpen(true)}
-                >
+                <DropdownMenuItem onSelect={() => setCancelOpen(true)}>
+                  <Trash2Icon />
                   ยกเลิกเอกสาร
                 </DropdownMenuItem>
               </DropdownMenuContent>
@@ -228,7 +235,7 @@ export default function PrDetailPage() {
       </main>
 
       {/* ---------- แถบปุ่มล่าง ---------- */}
-      <div className="sticky bottom-0 z-30 border-t border-border bg-background">
+      <div className="sticky bottom-0 z-30 border-t border-border bg-surface">
         <div className="mx-auto flex w-full max-w-3xl items-center px-4 py-3 sm:px-6">
           <Button variant="outline-primary" onClick={() => router.back()}>
             ย้อนกลับ

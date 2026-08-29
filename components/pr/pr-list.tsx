@@ -31,6 +31,7 @@ import {
   EmptyDocs,
   HEAD_FIRST,
   HEAD_LAST,
+  ROW_HOVER_NAV,
   STICKY_HEAD,
   TableFrame,
   TablePager,
@@ -100,9 +101,9 @@ export function PrList({ docs }: { docs: PrDoc[] }) {
             <TableHeader className={STICKY_HEAD}>
               <TableRow>
                 <TableHead className={HEAD_FIRST}>เลขที่ใบขอซื้อ</TableHead>
+                <TableHead>สินค้า</TableHead>
                 <TableHead>ประเภท</TableHead>
                 <TableHead>หมวด</TableHead>
-                <TableHead>สินค้า</TableHead>
                 <TableHead>บรรจุภัณฑ์</TableHead>
                 <TableHead className="text-right">ขอซื้อ</TableHead>
                 <TableHead>เหตุผลการซื้อ</TableHead>
@@ -118,7 +119,7 @@ export function PrList({ docs }: { docs: PrDoc[] }) {
                   // ทั้งแถวกดได้ ไม่ใช่เฉพาะตัวอักษรเลขที่ใบ — เป้าเล็กแค่คำเดียว
                   // ในแถวสูง 65px คือกดพลาดตลอด ยังเป็น <a> จริงในเซลล์แรกด้วย
                   onClick={() => router.push(`/pr/${d.id}`)}
-                  className="cursor-pointer"
+                  className={cn("cursor-pointer", ROW_HOVER_NAV)}
                 >
                   <TableCell className={COL_FIRST}>
                     <Link
@@ -131,10 +132,6 @@ export function PrList({ docs }: { docs: PrDoc[] }) {
                       {d.createdAt}
                     </span>
                   </TableCell>
-                  <TableCell className="whitespace-nowrap">
-                    {PR_CATEGORY_LABEL[d.categoryId]}
-                  </TableCell>
-                  <TableCell className="whitespace-nowrap">{d.group}</TableCell>
                   <TableCell>
                     <span className="block font-medium whitespace-nowrap">
                       {d.productName}
@@ -145,6 +142,10 @@ export function PrList({ docs }: { docs: PrDoc[] }) {
                       </span>
                     )}
                   </TableCell>
+                  <TableCell className="whitespace-nowrap">
+                    {PR_CATEGORY_LABEL[d.categoryId]}
+                  </TableCell>
+                  <TableCell className="whitespace-nowrap">{d.group}</TableCell>
                   <TableCell className="whitespace-nowrap">{d.packing ?? "-"}</TableCell>
                   <TableCell className="text-right whitespace-nowrap tabular-nums">
                     {formatPrQty(d.qty)} {d.unit}

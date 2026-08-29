@@ -427,7 +427,7 @@ export function OptimizedFormulaView({
          กว้างเต็มพื้นที่เสมอ ไม่ผูกกับ max-w-7xl ของเนื้อหาด้านบน เหมือนหน้า
          ตั้งค่าอื่น ๆ ในกลุ่มนี้ */}
     {isPreview && (
-      <div className="sticky bottom-0 z-30 border-t border-border bg-background">
+      <div className="sticky bottom-0 z-30 border-t border-border bg-surface">
         <div className="flex w-full items-center justify-between gap-3 px-4 py-3 sm:px-6">
           <Button variant="outline-primary" onClick={() => router.back()}>
             ย้อนกลับ

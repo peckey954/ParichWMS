@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import type { CSSProperties } from "react";
 import { Sarabun } from "next/font/google";
 import { Toaster } from "@peckey954/ui/components/ui/sonner";
 import { AppShell } from "@/components/app-shell";
@@ -37,7 +38,31 @@ export default function RootLayout({
       <body className="min-h-screen bg-background text-foreground font-sans antialiased">
         <ThemeProvider>
           <AppShell>{children}</AppShell>
-          <Toaster />
+          {/* toast สำเร็จ (success) ทั้งแอปใช้สีแบรนด์ส้มอ่อนแทนเขียว semantic
+              เริ่มต้นของ DS — ต้องเปิด richColors ด้วยไม่งั้นตัวแปรสีพวกนี้ไม่มีผล
+              และต้องยกค่าตัวอื่น (--normal-*, --warning-*, --error-*) มาด้วยครบ
+              เพราะ prop style ที่ส่งจากตรงนี้แทนที่ style เดิมของ DS ทั้งก้อน
+              ไม่ได้ merge ทีละตัวแปร */}
+          <Toaster
+            richColors
+            style={
+              {
+                "--normal-bg": "var(--popover)",
+                "--normal-text": "var(--popover-foreground)",
+                "--normal-border": "var(--border)",
+                "--border-radius": "var(--radius)",
+                "--success-bg": "var(--brand)",
+                "--success-text": "var(--foreground)",
+                "--success-border": "var(--primary)",
+                "--warning-bg": "var(--warning)",
+                "--warning-text": "var(--warning-foreground)",
+                "--warning-border": "var(--warning-border)",
+                "--error-bg": "var(--danger)",
+                "--error-text": "var(--danger-foreground)",
+                "--error-border": "var(--danger-border)",
+              } as CSSProperties
+            }
+          />
         </ThemeProvider>
       </body>
     </html>

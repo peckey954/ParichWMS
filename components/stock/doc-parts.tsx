@@ -228,12 +228,27 @@ export const STICKY_HEAD = "[&_th]:sticky [&_th]:top-0 [&_th]:z-20 [&_th]:bg-car
 /**
  * คอลัมน์แรกตรึงซ้าย คอลัมน์สุดท้ายตรึงขวา เลื่อนแนวนอนได้เฉพาะตรงกลาง
  * เส้นขอบบางบอกจุดตรึง — เส้นเดียวกับที่คั่นแถว/คอลัมน์อื่นในตาราง ไม่ใช่เงา
+ *
+ * มีพื้นหลังทึบของตัวเอง (bg-card) เพื่อบังเนื้อหาที่เลื่อนลอดใต้คอลัมน์ตรึง —
+ * แต่นั่นทำให้ hover ของทั้งแถว (ที่ทาสีผ่าน tr) โผล่ไม่ถึงเซลล์นี้ ต้องสลับสี
+ * เองตอน hover ด้วย group-hover (แถวที่อยากให้ตรงนี้ hover ด้วยต้องมี
+ * className="group" กำกับไว้ที่ TableRow — ถ้าไม่มีก็แค่เฉยๆ ไม่กระทบอะไร)
  */
-export const COL_FIRST = "sticky left-0 z-10 border-r border-border bg-card";
-export const COL_LAST = "sticky right-0 z-10 border-l border-border bg-card";
+export const COL_FIRST =
+  "sticky left-0 z-10 border-r border-border bg-card group-hover:bg-surface";
+export const COL_LAST =
+  "sticky right-0 z-10 border-l border-border bg-card group-hover:bg-surface";
 /** เซลล์หัวที่เป็นคอลัมน์ตรึงด้วย ต้องอยู่เหนือทั้งสองชั้น */
 export const HEAD_FIRST = "left-0 z-30! border-r border-border";
 export const HEAD_LAST = "right-0 z-30! border-l border-border";
+
+/** สี hover ของแถวตารางที่กดแล้วนำทางไปหน้าอื่นได้ หรือแถวที่อยากให้ทั้งแถว
+    (รวมคอลัมน์ที่ตรึงไว้ซ้าย/ขวาผ่าน group-hover ของ COL_FIRST/COL_LAST
+    ข้างบน) สว่างขึ้นพร้อมกันตอนชี้เมาส์ — ใช้ bg-surface สีเดียวกับแถบเครื่องมือ
+    ที่ตรึงไว้บนสุดของหน้ารายการ (sticky-toolbar) ให้ทุกตารางแบบนี้ hover เป็น
+    สีเดียวกันทั่วแอป แทนสีเทา hover:bg-muted/50 ที่เป็นค่าเริ่มต้นของ DS —
+    ต้องใส่คู่กับ className="group" เสมอ ไม่งั้นคอลัมน์ตรึงจะไม่ hover ตามด้วย */
+export const ROW_HOVER_NAV = "group hover:bg-surface";
 
 /**
  * แบ่งหน้า — ใช้ Button ของ DS ไม่ใช่ Pagination

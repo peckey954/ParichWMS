@@ -27,6 +27,7 @@ import {
   EmptyDocs,
   HEAD_FIRST,
   HEAD_LAST,
+  ROW_HOVER_NAV,
   STICKY_HEAD,
   TableFrame,
   TablePager,
@@ -215,7 +216,7 @@ export function PackingOrders({
                   // เป้าเล็กแค่คำเดียวในแถวสูง 50px คือกดพลาดตลอด
                   // ยังเป็น <a> จริงอยู่ในเซลล์แรก เปิดแท็บใหม่/คัดลอกลิงก์ได้เหมือนเดิม
                   onClick={() => router.push(`/production/packing/${o.id}`)}
-                  className="cursor-pointer"
+                  className={cn("cursor-pointer", ROW_HOVER_NAV)}
                 >
                   <TableCell className={COL_FIRST}>
                     <Link

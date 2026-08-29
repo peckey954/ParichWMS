@@ -74,6 +74,13 @@ export default function CreatePrPage() {
   const [neededDate, setNeededDate] = React.useState<Date | undefined>();
   const [confirmLeaveOpen, setConfirmLeaveOpen] = React.useState(false);
 
+  // เพิ่มทีละ 1 ทุกครั้งที่ "บันทึกและเพิ่มรายการถัดไป" — ใช้เป็น key บังคับ
+  // ให้ Select ตัวเลือกสินค้า remount ใหม่ ไม่งั้นพอเซ็ต productId กลับเป็น
+  // undefined เฉยๆ ตัว Select ยังค้างโชว์ชื่อสินค้าตัวเก่าอยู่ (ไม่ขึ้น
+  // placeholder ให้เอง เป็นเรื่องปกติของ Select ที่ค่า controlled หายไปโดย
+  // ไม่ได้มาจากการเลือกใหม่ของผู้ใช้เอง)
+  const [productFieldKey, setProductFieldKey] = React.useState(0);
+
   const products = categoryId ? productsOf(categoryId) : [];
   const product: PrProduct | undefined = products.find((p) => p.id === productId);
 
@@ -95,6 +102,21 @@ export default function CreatePrPage() {
       description: `${product.name}${product.sub ? ` ${product.sub}` : ""} — ${formatPrQty(qty)} ${product.unit} ต้องการ ${formatDateSlash(neededDate)}`,
     });
     router.back();
+  }
+
+  /** บันทึกใบนี้แล้วเปิดว่างสำหรับสินค้าตัวถัดไปทันที ไม่พากลับหน้ารายการ —
+   *  เก็บประเภทสินค้า/เหตุผลการซื้อ/วันที่ต้องการสินค้าไว้เหมือนเดิม เพราะของจริง
+   *  มักสั่งหลายสินค้าในประเภทเดียวกัน เหตุผลเดียวกัน วันที่ต้องการเดียวกัน
+   *  รอบเดียว ล้างแค่สินค้า/บรรจุภัณฑ์/จำนวนที่ผูกกับตัวที่เพิ่งบันทึกไปเท่านั้น */
+  function handleSaveAndNext() {
+    if (!canSave || !product || !neededDate) return;
+    toast.success("สร้างใบขอซื้อแล้ว", {
+      description: `${product.name}${product.sub ? ` ${product.sub}` : ""} — ${formatPrQty(qty)} ${product.unit} ต้องการ ${formatDateSlash(neededDate)}`,
+    });
+    setProductId(undefined);
+    setPacking(undefined);
+    setQty(0);
+    setProductFieldKey((k) => k + 1);
   }
 
   return (
@@ -151,6 +173,7 @@ export default function CreatePrPage() {
             <div className="space-y-1.5">
               <Label htmlFor="product">สินค้าขอซื้อ</Label>
               <Select
+                key={productFieldKey}
                 value={productId}
                 onValueChange={(v) => {
                   setProductId(v);
@@ -244,15 +267,55 @@ export default function CreatePrPage() {
       {/* ---------- แถบปุ่มล่าง ----------
            ปุ่มชิดขอบซ้าย-ขวาของแถบเต็มความกว้างจริง ไม่ผูกความกว้างกับ
            max-w-3xl ของฟอร์มด้านบน — ฟอร์มแคบเพื่อให้อ่านง่าย แต่แถบปุ่ม
-           กว้างเต็มพื้นที่เนื้อหาเสมอ */}
-      <div className="sticky bottom-0 z-30 border-t border-border bg-background">
-        <div className="flex w-full items-center justify-between gap-3 px-4 py-3 sm:px-6">
+           กว้างเต็มพื้นที่เนื้อหาเสมอ
+
+           จอแคบ vs จอกว้างเป็นคนละเลย์เอาต์ตั้งใจ — "บันทึกและเพิ่มรายการ
+           ถัดไป" ป้ายยาว อยู่แถวเดียวกับอีกสองปุ่มบนจอมือถือไม่พอดี (ล้น/
+           บีบจนกดยาก) จอแคบเลยซ้อน 2 แถวแทน: แถวบนปุ่มนี้กว้างเต็ม แถวล่าง
+           ย้อนกลับ/บันทึกแบ่งครึ่งเท่ากัน — จอกว้างมีที่พอ อยู่แถวเดียวได้
+
+           ใช้ container query (@lg:) ไม่ใช่ sm: — ทั้งแอปวัดความกว้าง "มือถือ/
+           แท็บเล็ต/เดสก์ท็อป" จากกล่อง @container ของ DeviceFrame
+           (components/device-preview.tsx) ไม่ใช่ขนาดหน้าต่างจริง ปุ่มลองดู
+           จอมือถือที่หัวแอปถึงจะมีผลกับ media query ธรรมดา sm:/lg: ไม่ได้เลย
+           เพราะกรอบจำลองแค่บีบกล่อง ไม่ได้ย่อหน้าต่างเบราว์เซอร์จริง */}
+      <div className="sticky bottom-0 z-30 border-t border-border bg-surface">
+        {/* ---------- จอแคบ: ซ้อน 2 แถว ---------- */}
+        <div className="flex w-full flex-col gap-3 px-4 py-3 @lg:hidden">
+          {/* ของจริงมักสั่งหลายสินค้าในประเภท/เหตุผล/วันที่ต้องการเดียวกันรอบเดียว
+              ปุ่มนี้บันทึกใบปัจจุบันแล้วเปิดว่างสำหรับสินค้าตัวถัดไปต่อเลย
+              ไม่ต้องเลือกประเภท/เหตุผล/วันที่ซ้ำ — โผล่เฉพาะตอนกรอกจนกดบันทึกได้
+              แล้วเท่านั้น ไม่ใช่ปุ่มถาวรที่กดไม่ได้เฉยๆ ตั้งแต่หน้ายังว่าง */}
+          {canSave && (
+            <Button variant="outline-primary" onClick={handleSaveAndNext} className="w-full">
+              บันทึกและเพิ่มรายการถัดไป
+            </Button>
+          )}
+          <div className="flex items-center gap-3">
+            <Button variant="outline-primary" onClick={goBack} className="flex-1">
+              ย้อนกลับ
+            </Button>
+            <Button disabled={!canSave} onClick={handleSave} className="flex-1">
+              บันทึก
+            </Button>
+          </div>
+        </div>
+
+        {/* ---------- จอกว้าง: แถวเดียว ---------- */}
+        <div className="hidden w-full items-center justify-between gap-3 px-6 py-3 @lg:flex">
           <Button variant="outline-primary" onClick={goBack}>
             ย้อนกลับ
           </Button>
-          <Button disabled={!canSave} onClick={handleSave}>
-            บันทึก
-          </Button>
+          <div className="flex items-center gap-2">
+            {canSave && (
+              <Button variant="outline-primary" onClick={handleSaveAndNext}>
+                บันทึกและเพิ่มรายการถัดไป
+              </Button>
+            )}
+            <Button disabled={!canSave} onClick={handleSave}>
+              บันทึก
+            </Button>
+          </div>
         </div>
       </div>
 

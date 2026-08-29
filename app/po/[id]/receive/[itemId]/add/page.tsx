@@ -69,14 +69,15 @@ function AddPoRoundForm() {
     [searchParams]
   );
 
-  const [arriveDate, setArriveDate] = React.useState<Date | undefined>(
-    prefillArrive
-      ? (() => {
-          const [d, m, y] = prefillArrive.split("/").map(Number);
-          return d && m && y ? new Date(y, m - 1, d) : undefined;
-        })()
-      : undefined
-  );
+  // ค่าเริ่มต้นเป็นวันนี้เสมอถ้าไม่มีวันที่ส่งต่อมาจากรถคันเดียวกัน — ผู้ใช้
+  // ส่วนใหญ่คีย์ข้อมูลตอนรถมาถึงจริง วันที่รถเข้าจึงมักเป็นวันนี้อยู่แล้ว
+  const [arriveDate, setArriveDate] = React.useState<Date | undefined>(() => {
+    if (prefillArrive) {
+      const [d, m, y] = prefillArrive.split("/").map(Number);
+      if (d && m && y) return new Date(y, m - 1, d);
+    }
+    return new Date();
+  });
   const [plate, setPlate] = React.useState(prefillPlate);
   const [containerNo, setContainerNo] = React.useState(prefillContainer);
   const [receivedQty, setReceivedQty] = React.useState(0);
@@ -137,38 +138,35 @@ function AddPoRoundForm() {
   }
 
   return (
-    <>
-      <main className="mx-auto w-full max-w-4xl px-4 pt-6 pb-24 sm:px-6">
-        <Crumbs poId={po.id} poCode={po.code} productName={item.productName} />
+    <div className="flex min-h-[calc(100vh-3.5rem)] flex-col">
+      <main className="mx-auto w-full max-w-4xl flex-1 px-4 pt-6 pb-6 sm:px-6">
+        <Crumbs poId={po.id} />
 
         <h1 className="mt-2 text-2xl font-semibold tracking-tight">
-          เพิ่มการรับเข้าสินค้า{code}
+          เพิ่มการรับเข้าสินค้า {code}
         </h1>
 
-        {/* ---------- หัวรายการ ---------- */}
-        <div className="mt-4 rounded-xl border border-border bg-card p-4">
-          <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-            <p className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-              <span className="font-semibold">
-                {item.productName}
-                {item.productSub && ` ${item.productSub}`}
-              </span>
-              <span className="text-sm text-muted-foreground">
-                {PR_CATEGORY_LABEL[item.categoryId]}
-              </span>
-              {item.packing && (
-                <>
-                  <span className="text-border" aria-hidden>|</span>
-                  <span className="text-sm text-muted-foreground">{item.packing}</span>
-                </>
-              )}
-            </p>
-            <p className="text-sm">{po.company}</p>
-          </div>
+        {/* ---------- หัวรายการ — บรรจุภัณฑ์แยกบรรทัดของตัวเองเสมอ ไม่ปนแถว
+            เดียวกับชื่อ/ประเภท เพราะรวมกันแล้วยาวจนตัดคำ อ่านเป็นก้อนเดียวยาก
+            (เว้นระยะระหว่างบรรทัดให้มากขึ้นด้วย — เดิมชิดกันจนดูแคบ) ---------- */}
+        <div className="mt-5 rounded-xl border border-border bg-card p-5">
+          <p className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+            <span className="font-semibold">
+              {item.productName}
+              {item.productSub && ` ${item.productSub}`}
+            </span>
+            <span className="text-sm text-muted-foreground">
+              {PR_CATEGORY_LABEL[item.categoryId]}
+            </span>
+          </p>
+          {item.packing && (
+            <p className="mt-1.5 text-sm text-muted-foreground">{item.packing}</p>
+          )}
+          <p className="mt-3 text-sm">{po.company}</p>
         </div>
 
         {/* ---------- วันที่ / ทะเบียนรถ / เบอร์ตู้ ---------- */}
-        <div className="mt-6 grid gap-4 @lg:grid-cols-3">
+        <div className="mt-8 grid gap-5 @lg:grid-cols-3">
           <div className="space-y-1.5">
             <Label htmlFor="arrive-date">วันที่รถจะเข้า</Label>
             <DateSelect id="arrive-date" value={arriveDate} onValueChange={setArriveDate} />
@@ -201,7 +199,7 @@ function AddPoRoundForm() {
         </div>
 
         {/* ---------- ปริมาณ ---------- */}
-        <div className="mt-4 space-y-1.5">
+        <div className="mt-8 space-y-1.5">
           <Label htmlFor="received-qty">
             ปริมาณจะรับเข้า ({item.unit}){" "}
             <span className="font-normal text-muted-foreground">(ไม่บังคับ)</span>
@@ -209,7 +207,7 @@ function AddPoRoundForm() {
           <QtyStepper id="received-qty" value={receivedQty} onValueChange={setReceivedQty} />
         </div>
 
-        <div className="mt-4 space-y-1.5">
+        <div className="mt-8 space-y-1.5">
           <Label htmlFor="note">
             หมายเหตุ <span className="font-normal text-muted-foreground">(ไม่บังคับ)</span>
           </Label>
@@ -227,7 +225,7 @@ function AddPoRoundForm() {
              โผล่เฉพาะตอนใบนี้ยังมีรายการอื่นที่ยังไม่ได้คีย์ในเชนนี้ —
              ใบที่มีรายการเดียว หรือคีย์ครบทุกรายการแล้วไม่ต้องโชว์ */}
         {remainingOthers.length > 0 && (
-          <div className="mt-6 flex items-start gap-3 rounded-xl border border-border bg-brand px-4 py-3.5">
+          <div className="mt-8 flex items-start gap-3 rounded-xl border border-border bg-brand px-4 py-3.5">
             <TruckIcon className="mt-0.5 size-4 shrink-0 text-primary" />
             <div className="min-w-0 flex-1">
               <Label htmlFor="same-truck" className="text-sm font-medium">
@@ -250,7 +248,7 @@ function AddPoRoundForm() {
       </main>
 
       {/* ---------- แถบปุ่มล่าง ---------- */}
-      <div className="sticky bottom-0 z-30 border-t border-border bg-background">
+      <div className="sticky bottom-0 z-30 border-t border-border bg-surface">
         <div className="mx-auto flex w-full max-w-4xl items-center justify-between gap-3 px-4 py-3 sm:px-6">
           <Button variant="outline-primary" onClick={() => router.back()}>
             ย้อนกลับ
@@ -260,19 +258,11 @@ function AddPoRoundForm() {
           </Button>
         </div>
       </div>
-    </>
+    </div>
   );
 }
 
-function Crumbs({
-  poId,
-  poCode,
-  productName,
-}: {
-  poId?: string;
-  poCode?: string;
-  productName?: string;
-}) {
+function Crumbs({ poId }: { poId?: string }) {
   return (
     <Breadcrumb>
       <BreadcrumbList>
@@ -285,23 +275,19 @@ function Crumbs({
         </BreadcrumbItem>
         <BreadcrumbSeparator />
         {poId ? (
-          <BreadcrumbItem>
-            <BreadcrumbLink href={`/po/${poId}`}>ใบสั่งซื้อ {poCode}</BreadcrumbLink>
-          </BreadcrumbItem>
+          <>
+            <BreadcrumbItem>
+              <BreadcrumbLink href={`/po/${poId}`}>ใบสั่งซื้อ</BreadcrumbLink>
+            </BreadcrumbItem>
+            <BreadcrumbSeparator />
+            <BreadcrumbItem>
+              <BreadcrumbPage className="text-primary">รอบการรับสินค้า</BreadcrumbPage>
+            </BreadcrumbItem>
+          </>
         ) : (
           <BreadcrumbItem>
             <BreadcrumbPage className="text-primary">เพิ่มการรับเข้าสินค้า</BreadcrumbPage>
           </BreadcrumbItem>
-        )}
-        {poId && (
-          <>
-            <BreadcrumbSeparator />
-            <BreadcrumbItem>
-              <BreadcrumbPage className="text-primary">
-                เพิ่มการรับเข้าสินค้า{productName ? ` — ${productName}` : ""}
-              </BreadcrumbPage>
-            </BreadcrumbItem>
-          </>
         )}
       </BreadcrumbList>
     </Breadcrumb>

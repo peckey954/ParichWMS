@@ -19,9 +19,11 @@ import {
   formatPrQty,
   PR_DOCS,
   PR_PRODUCTS,
+  PR_REASONS,
   PR_REQUESTERS,
   type PrCategoryId,
   type PrDoc,
+  type PrReason,
 } from "./pr";
 
 export type PoQueueDoc = PrDoc;
@@ -106,8 +108,21 @@ export type PoLineItem = {
   unit: string;
   orderedQty: number;
   pricePerUnit: number;
+  /** ค่าจัดการต่อหน่วย — บวกกับราคาสั่งต่อหน่วยแล้วได้ราคารวมต่อหน่วยที่แท้จริง */
+  handlingPerUnit: number;
   neededDate: string;
   urgent?: boolean;
+  /** เลขที่ใบขอซื้อ (PR) ต้นทางของรายการนี้ — หนึ่งใบสั่งซื้ออาจรวมมาจาก
+      หลายใบขอซื้อคนละคนกัน จึงเก็บที่ระดับรายการ ไม่ใช่ระดับทั้งใบสั่งซื้อ */
+  prCode: string;
+  /** ผู้ขอซื้อของรายการนี้โดยเฉพาะ — อาจคนละคนกับ PoDoc.requester (คนที่กด
+      สร้างใบสั่งซื้อ) เพราะรวมมาจากคำขอของหลายคนได้ */
+  requester: string;
+  /** มีค่าเฉพาะรายการที่เคยถูกแก้ไขคำขอซื้อหลังส่งคำขอ ไม่ใช่ทุกรายการจะมี */
+  editedBy?: string;
+  reason: PrReason;
+  /** เหตุผลตอนแก้ไขข้อมูลสั่งซื้อภายหลัง — มีค่าเฉพาะรายการที่เคยถูกแก้ไข */
+  changeReason?: string;
   rounds: PoRound[];
 };
 
@@ -151,8 +166,13 @@ export function lineItemPendingQty(item: PoLineItem): number {
   return Math.max(0, item.orderedQty - lineItemReceivedQty(item));
 }
 
+/** ราคารวมต่อหน่วย = ราคาสั่งต่อหน่วย + ค่าจัดการต่อหน่วย */
+export function lineItemUnitPrice(item: PoLineItem): number {
+  return item.pricePerUnit + item.handlingPerUnit;
+}
+
 export function lineItemTotalPrice(item: PoLineItem): number {
-  return item.orderedQty * item.pricePerUnit;
+  return item.orderedQty * lineItemUnitPrice(item);
 }
 
 export function poOrderedTotal(doc: PoDoc): number {
@@ -195,6 +215,34 @@ export function matchesPoOrder(d: PoDoc, q: string): boolean {
     ...d.lineItems.map((i) => i.productName),
     ...d.lineItems.map((i) => i.productSub ?? ""),
   ].some((v) => v.toLowerCase().includes(s));
+}
+
+// ============================================================
+// หน้า "อนุมัติ" — รีวิวใบสั่งซื้อก่อนอนุมัติ ใช้ข้อมูลชุดเดียวกับแท็บ "สั่งซื้อ"
+// (PO_ORDER_DOCS) แค่มุมมอง/ชิปกรองต่างออกไปเป็นสามชิปแบบเดียวกับแท็บ "ขอซื้อ"
+// (รอดำเนินการ/เร่งด่วน/ยกเลิก) แทนที่จะเป็นสถานะการรับเข้า
+// ============================================================
+
+export type ApproveChip = "all" | "urgent" | "cancelled";
+
+export const APPROVE_CHIP_LABEL: Record<ApproveChip, string> = {
+  all: "รอดำเนินการ",
+  urgent: "เร่งด่วน",
+  cancelled: "ยกเลิก",
+};
+
+/** เร่งด่วนระดับใบ = มีอย่างน้อยหนึ่งรายการสินค้าในใบที่ติดธงเร่งด่วนไว้ */
+export function poHasUrgentItem(doc: PoDoc): boolean {
+  return doc.lineItems.some((i) => i.urgent);
+}
+
+/** กติกาเดียวกับ matchesPoQueueChip — ใบที่ยกเลิกไปแล้วไม่โผล่ในชิป "รอดำเนินการ"
+ *  หรือ "เร่งด่วน" อีกต่อไป ต้องเปิดชิป "ยกเลิก" เท่านั้นถึงจะเห็น */
+export function matchesApproveChip(d: PoDoc, chip: ApproveChip): boolean {
+  if (chip === "cancelled") return d.status === "cancelled";
+  if (d.status === "cancelled") return false;
+  if (chip === "urgent") return poHasUrgentItem(d);
+  return true;
 }
 
 export const formatPoQty = formatPrQty;
@@ -308,6 +356,7 @@ function docStamp(seq: number, rnd: () => number) {
 
 const CANCEL_REASON_POOL = ["เอกสารไม่ถูกต้อง", "ซัพพลายเออร์ยกเลิกออเดอร์", "เปลี่ยนแผนการสั่งซื้อ"];
 const NOTE_POOL = ["โทรแจ้งซัพพลายเออร์ก่อนส่งของทุกครั้ง", "แยกส่งเป็นล็อตตามรอบผลิต"];
+const CHANGE_REASON_POOL = ["ปรับจำนวนตามสต๊อกคงเหลือ", "ซัพพลายเออร์แจ้งราคาใหม่"];
 
 function buildPoDoc(seq: number, status: PoStatus): PoDoc {
   const rnd = seeded(500 + seq);
@@ -321,6 +370,7 @@ function buildPoDoc(seq: number, status: PoStatus): PoDoc {
     const product = pick(PR_PRODUCTS, rnd);
     const orderedQty = Math.round((150 + rnd() * 700) / 10) * 10;
     const lineCode = `${code}/${pad(i + 1)}`;
+    const editedBy = rnd() < 0.4 ? pick(PR_REQUESTERS, rnd) : undefined;
     return {
       id: `${id}-li${i + 1}`,
       poId: id,
@@ -332,8 +382,15 @@ function buildPoDoc(seq: number, status: PoStatus): PoDoc {
       unit: product.unit,
       orderedQty,
       pricePerUnit: Math.round((1200 + rnd() * 1800) / 10) * 10,
+      handlingPerUnit: Math.round((30 + rnd() * 70) / 10) * 10,
       neededDate: `${pad(1 + Math.floor(rnd() * 28))}/${pad(1 + Math.floor(rnd() * 12))}/2026`,
       urgent: rnd() < 0.3,
+      // เลขที่ใบขอซื้อ (PR) ต้นทาง — คนละเลขกับใบสั่งซื้อ (PO) ที่รวมมา
+      prCode: `PR2601${pad(day)}/${pad(i + 1)}`,
+      requester: pick(PR_REQUESTERS, rnd),
+      editedBy,
+      reason: pick<PrReason>(PR_REASONS, rnd),
+      changeReason: editedBy ? pick(CHANGE_REASON_POOL, rnd) : undefined,
       rounds: status === "cancelled" ? [] : buildRounds(lineCode, orderedQty, rnd),
     } satisfies PoLineItem;
   });

@@ -31,6 +31,7 @@ import {
   COL_FIRST,
   EmptyDocs,
   HEAD_FIRST,
+  ROW_HOVER_NAV,
   STICKY_HEAD,
   TableFrame,
   TablePager,
@@ -177,7 +178,7 @@ function ReceivingTable({ docs }: { docs: ReceivingDoc[] }) {
                 key={d.id}
                 // ทั้งแถวกดได้ ไม่ใช่แค่ตัวเลขที่เป็นลิงก์
                 onClick={() => router.push(href)}
-                className="cursor-pointer"
+                className={cn("cursor-pointer", ROW_HOVER_NAV)}
               >
                 <TableCell className={COL_FIRST}>
                   <Link href={href} className="font-medium hover:underline">

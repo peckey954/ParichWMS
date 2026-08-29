@@ -31,6 +31,7 @@ import {
   EmptyDocs,
   HEAD_FIRST,
   HEAD_LAST,
+  ROW_HOVER_NAV,
   STICKY_HEAD,
   TableFrame,
   TablePager,
@@ -116,10 +117,12 @@ export function PoList({
                 {/* กว้างพอให้วันเวลาไม่ตัดคำ ("1/16/2026 | 10:42:52" ยาวกว่าที่
                     คอลัมน์แคบๆ จะพอ) */}
                 <TableHead className={cn(HEAD_FIRST, "min-w-48")}>เลขที่ใบขอซื้อ</TableHead>
-                {/* รวมประเภท/หมวด/บรรจุภัณฑ์ไว้ในคอลัมน์เดียวกับสินค้า — เดิมสี่
-                    คอลัมน์แยกกันบีบพื้นที่คอลัมน์อื่นจนอ่านยาก ข้อมูลกลุ่มนี้
-                    เป็นป้ายกำกับของสินค้าตัวเดียวกัน อยู่รวมกันอ่านง่ายกว่า */}
+                {/* แยกประเภท/หมวด/บรรจุภัณฑ์เป็นคอลัมน์ของตัวเอง ตามหน้าขอซื้อ PR
+                    (components/pr/pr-list.tsx) แต่สลับให้สินค้าขึ้นก่อน */}
                 <TableHead>สินค้า</TableHead>
+                <TableHead>ประเภท</TableHead>
+                <TableHead>หมวด</TableHead>
+                <TableHead>บรรจุภัณฑ์</TableHead>
                 <TableHead className="text-right">ขอซื้อ</TableHead>
                 <TableHead>เหตุผลการซื้อ</TableHead>
                 <TableHead>วันที่ต้องการสินค้า</TableHead>
@@ -133,7 +136,7 @@ export function PoList({
                 const actionable = isActionable(d);
                 const categoryLocked = lockedCategory !== null && d.categoryId !== lockedCategory;
                 return (
-                  <TableRow key={d.id}>
+                  <TableRow key={d.id} className={ROW_HOVER_NAV}>
                     <TableCell className={COL_FIRST}>
                       <div className="flex items-start gap-3">
                         <Checkbox
@@ -161,11 +164,12 @@ export function PoList({
                         {d.productName}
                         {d.productSub && ` ${d.productSub}`}
                       </span>
-                      <span className="block text-sm whitespace-nowrap text-muted-foreground">
-                        {PR_CATEGORY_LABEL[d.categoryId]} · {d.group}
-                        {d.packing && ` · ${d.packing}`}
-                      </span>
                     </TableCell>
+                    <TableCell className="whitespace-nowrap">
+                      {PR_CATEGORY_LABEL[d.categoryId]}
+                    </TableCell>
+                    <TableCell className="whitespace-nowrap">{d.group}</TableCell>
+                    <TableCell className="whitespace-nowrap">{d.packing ?? "-"}</TableCell>
                     <TableCell className="text-right whitespace-nowrap tabular-nums">
                       {formatPrQty(d.qty)} {d.unit}
                     </TableCell>
@@ -286,8 +290,6 @@ function PoCard({
           </Button>
         )}
       </div>
-      {/* วันที่อยู่บรรทัดของตัวเอง ใต้เลขที่ใบ ไม่ใช่แถวเดียวกับปุ่มลบ */}
-      <p className="mt-1 text-sm text-muted-foreground">{d.createdAt}</p>
 
       <CardBox className="mt-3">
         <p className="font-medium">

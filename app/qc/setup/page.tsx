@@ -26,7 +26,9 @@ import {
   TableHeader,
   TableRow,
 } from "@peckey954/ui/components/ui/table";
+import { cn } from "@peckey954/ui/lib/utils";
 import { ChipGroup } from "@/components/chip-group";
+import { ROW_HOVER_NAV } from "@/components/stock/doc-parts";
 import {
   QC_TEMPLATES,
   SHAPE_HINT,
@@ -245,7 +247,7 @@ export default function QcTemplateListPage() {
                           key={family.id}
                           // ทั้งแถวกดได้ ไม่ใช่แค่ตัวอักษรชื่อฟอร์ม
                           onClick={() => router.push(href)}
-                          className="cursor-pointer"
+                          className={cn("cursor-pointer", ROW_HOVER_NAV)}
                         >
                           <TableCell className="pl-4">
                             <Link

@@ -3,7 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { ChevronDownIcon, EllipsisVerticalIcon } from "lucide-react";
+import { ChevronDownIcon, EllipsisVerticalIcon, PencilIcon, Trash2Icon } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -52,14 +52,15 @@ import {
 } from "@peckey954/ui/components/ui/table";
 import { cn } from "@peckey954/ui/lib/utils";
 import { toast } from "sonner";
+import { PoLineItemDetailDialog } from "@/components/po/line-item-detail-dialog";
 import {
-  CardBox,
   CardRow,
   COL_FIRST,
   COL_LAST,
   EmptyDocs,
   HEAD_FIRST,
   HEAD_LAST,
+  ROW_HOVER_NAV,
   STICKY_HEAD,
   TableFrame,
 } from "@/components/stock/doc-parts";
@@ -71,6 +72,8 @@ import {
   lineItemPendingQty,
   lineItemReceivedQty,
   lineItemStockedQty,
+  lineItemTotalPrice,
+  lineItemUnitPrice,
   PO_PROGRESS_LABEL,
   PO_ROUND_STATUS_LABEL,
   PO_STATUS_LABEL,
@@ -81,6 +84,7 @@ import {
   type PoRound,
   type PoRoundStatus,
 } from "@/lib/po";
+import { PR_CATEGORY_LABEL } from "@/lib/pr";
 
 /* ------------------------------------------------------------------
    ใบสั่งซื้อ — โครงตามไฟล์ออกแบบ: กล่อง "ข้อมูลใบสั่งซื้อ" พับ/กางได้ (ราคารวม
@@ -186,7 +190,7 @@ export default function PoOrderDetailPage() {
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button
-                  variant="ghost"
+                  variant="outline"
                   size="icon"
                   aria-label={`ตัวเลือกเพิ่มเติมสำหรับใบสั่งซื้อ ${po.code}`}
                   className="shrink-0"
@@ -196,12 +200,11 @@ export default function PoOrderDetailPage() {
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="min-w-40">
                 <DropdownMenuItem onSelect={() => setSubTab("edits")}>
+                  <PencilIcon />
                   แก้ไขข้อมูลสั่งซื้อ
                 </DropdownMenuItem>
-                <DropdownMenuItem
-                  variant="destructive"
-                  onSelect={() => setCancelOpen(true)}
-                >
+                <DropdownMenuItem onSelect={() => setCancelOpen(true)}>
+                  <Trash2Icon />
                   ยกเลิกใบสั่งซื้อ
                 </DropdownMenuItem>
               </DropdownMenuContent>
@@ -222,13 +225,17 @@ export default function PoOrderDetailPage() {
           <CollapsibleTrigger asChild>
             <button
               type="button"
-              className="group flex w-full items-center justify-between gap-3 px-4 py-3.5 text-left"
+              className="group flex w-full items-start justify-between gap-3 px-4 py-3.5 text-left"
             >
-              <span className="font-semibold">ข้อมูลใบสั่งซื้อ</span>
-              <span className="flex items-center gap-3">
-                <span className="text-sm">บริษัท {po.company}</span>
-                <ChevronDownIcon className="size-5 shrink-0 text-muted-foreground transition-transform group-data-[state=open]:rotate-180" />
-              </span>
+              {/* จอแคบ: ชื่อบริษัทยาวเกินอยู่แถวเดียวกับหัวข้อ ตัดลงมาเป็น
+                  บรรทัดของตัวเอง — จอกว้าง (@lg) มีที่พอ กลับไปอยู่แถวเดียวกัน */}
+              <div className="min-w-0 flex-1 @lg:flex @lg:items-center @lg:gap-3">
+                <span className="block font-semibold">ข้อมูลใบสั่งซื้อ</span>
+                <span className="mt-0.5 block text-sm text-muted-foreground @lg:mt-0">
+                  บริษัท {po.company}
+                </span>
+              </div>
+              <ChevronDownIcon className="mt-0.5 size-5 shrink-0 text-muted-foreground transition-transform group-data-[state=open]:rotate-180" />
             </button>
           </CollapsibleTrigger>
 
@@ -255,7 +262,7 @@ export default function PoOrderDetailPage() {
 
         {/* ---------- รายการสินค้า — แถวเดียวต่อสินค้า ไม่ต้องกาง ---------- */}
         <div className="mt-6">
-          <h2 className="text-base font-semibold">รายการสินค้า</h2>
+          <h2 className="text-base font-semibold">รายการสินค้า ({po.lineItems.length} รายการ)</h2>
           <div className="mt-3">
             <LineItemsTable po={po} />
           </div>
@@ -321,7 +328,7 @@ export default function PoOrderDetailPage() {
         )}
       </main>
 
-      <div className="sticky bottom-0 z-30 border-t border-border bg-background">
+      <div className="sticky bottom-0 z-30 border-t border-border bg-surface">
         <div className="mx-auto flex w-full max-w-6xl items-center px-4 py-3 sm:px-6">
           <Button variant="outline-primary" onClick={() => router.back()}>
             ย้อนกลับ
@@ -389,8 +396,18 @@ function MetaField({ label, value }: { label: string; value: string }) {
 
 /** ตารางรายการสินค้า — แถวเดียวต่อสินค้า ไม่มีการกาง เพราะประวัติรอบเต็มอยู่
     ในตาราง "รอบการรับสินค้า" ข้างล่างอยู่แล้ว ตรงนี้บอกแค่ยอดรวมต่อสินค้า */
+/** เลข PO แยกตามรายการสินค้า — เลขที่ใบ + ตัวอักษรเรียงตามลำดับสินค้าในใบ
+    (A ตัวแรก, B ตัวที่สอง, ...) ใช้อ้างอิงรายการนี้แยกจากรายการอื่นในใบเดียวกัน
+    เหมือนกับที่ใช้ในแผงรายการของหน้ารายการ (po-order-list.tsx) */
+function lineItemCode(po: PoDoc, index: number): string {
+  return `${po.code}${String.fromCharCode(65 + index)}`;
+}
+
 function LineItemsTable({ po }: { po: PoDoc }) {
   const cancelled = po.status === "cancelled";
+  // กดที่แถว/การ์ดรายการไหนก็ได้เพื่อดูรายละเอียดเต็มของสินค้านั้น — ยกเว้น
+  // ปุ่ม "เพิ่มรอบ" ที่กันคลิกลอยไว้ (พาไปคนละหน้า ไม่ใช่เปิด modal)
+  const [selected, setSelected] = React.useState<PoLineItem | null>(null);
 
   if (po.lineItems.length === 0) {
     return <EmptyDocs title="ไม่มีรายการสินค้า" hint="" />;
@@ -398,10 +415,39 @@ function LineItemsTable({ po }: { po: PoDoc }) {
 
   return (
     <>
-      {/* ---------- จอแคบ: การ์ด ---------- */}
-      <div className="space-y-3 @3xl:hidden">
-        {po.lineItems.map((item) => (
-          <LineItemCard key={item.id} po={po} item={item} cancelled={cancelled} />
+      {/* ---------- จอแคบ: ลิสต์เดียวคั่นเส้นบางๆ ไม่ใส่ตัวเลข — เอาไว้แค่ระบุ
+          สินค้า+ปุ่มเพิ่มรอบ ตัวเลขเต็มดูได้จากตาราง "รอบการรับสินค้า" ข้างล่าง
+          (กรองตามสินค้านี้ได้จากดรอปดาวน์ตรงนั้น) หรือกดที่การ์ดเพื่อดูรายละเอียด
+          เต็มของสินค้านั้นในทันที ---------- */}
+      <div className="divide-y divide-border rounded-xl border border-border bg-card @3xl:hidden">
+        {po.lineItems.map((item, index) => (
+          <div
+            key={item.id}
+            onClick={() => setSelected(item)}
+            className="flex cursor-pointer items-center justify-between gap-3 px-4 py-3"
+          >
+            <div className="min-w-0 flex-1 text-sm">
+              <p className="font-medium">
+                {item.productName}
+                {item.productSub && ` ${item.productSub}`}
+              </p>
+              <p className="mt-1 text-muted-foreground">
+                {PR_CATEGORY_LABEL[item.categoryId]} | {item.group}
+                {item.packing && ` | ${item.packing}`}
+              </p>
+              <p className="mt-1 font-medium">
+                {lineItemCode(po, index)}
+                {item.urgent && <UrgentChip />}
+              </p>
+            </div>
+            {!cancelled && (
+              <div onClick={(e) => e.stopPropagation()} className="shrink-0">
+                <Button asChild variant="outline-primary" size="sm">
+                  <Link href={`/po/${po.id}/receive/${item.id}/add`}>เพิ่มรอบ</Link>
+                </Button>
+              </div>
+            )}
+          </div>
         ))}
       </div>
 
@@ -412,58 +458,82 @@ function LineItemsTable({ po }: { po: PoDoc }) {
             <TableHeader className={STICKY_HEAD}>
               <TableRow>
                 <TableHead className={HEAD_FIRST}>สินค้า</TableHead>
-                <TableHead>บรรจุภัณฑ์</TableHead>
+                <TableHead>เลขที่ใบสั่งซื้อ</TableHead>
                 <TableHead className="text-right">สั่งซื้อ</TableHead>
                 <TableHead className="text-right">รับเข้า</TableHead>
-                <TableHead className="text-right">ค้างรับ</TableHead>
                 <TableHead className="text-right">ไม่ผ่าน</TableHead>
                 <TableHead className="text-right">เข้าคลัง</TableHead>
+                <TableHead className="text-right">ราคาสั่งต่อหน่วย (บาท)</TableHead>
+                <TableHead className="text-right">ค่าจัดการต่อหน่วย (บาท)</TableHead>
+                <TableHead className="text-right">ราคารวมต่อหน่วย (บาท)</TableHead>
+                <TableHead className="text-right">ราคารวมทั้งหมด (บาท)</TableHead>
                 <TableHead className={HEAD_LAST} />
               </TableRow>
             </TableHeader>
             <TableBody>
-              {po.lineItems.map((item) => {
+              {po.lineItems.map((item, index) => {
                 const received = lineItemReceivedQty(item);
                 const pending = lineItemPendingQty(item);
                 const failed = lineItemFailedQty(item);
                 const stocked = lineItemStockedQty(item);
                 return (
-                  <TableRow key={item.id}>
+                  <TableRow
+                    key={item.id}
+                    onClick={() => setSelected(item)}
+                    className={cn("cursor-pointer", ROW_HOVER_NAV)}
+                  >
                     <TableCell className={cn(COL_FIRST, "whitespace-nowrap")}>
                       <span className="font-medium">
                         {item.productName}
                         {item.productSub && ` ${item.productSub}`}
                       </span>
-                      <span className="text-muted-foreground"> {item.group}</span>
                       {item.urgent && <UrgentChip />}
+                      <span className="mt-1 block text-sm text-muted-foreground">
+                        {PR_CATEGORY_LABEL[item.categoryId]} | {item.group}
+                        {item.packing && ` | ${item.packing}`}
+                      </span>
                     </TableCell>
-                    <TableCell className="whitespace-nowrap text-muted-foreground">
-                      {item.packing ?? "-"}
-                    </TableCell>
-                    <TableCell className="text-right whitespace-nowrap tabular-nums">
-                      {formatPoQty(item.orderedQty)}
-                    </TableCell>
-                    <TableCell className="text-right whitespace-nowrap tabular-nums">
-                      {formatPoQty(received)}
+                    <TableCell className="whitespace-nowrap">
+                      <span className="font-medium">{lineItemCode(po, index)}</span>
                     </TableCell>
                     <TableCell className="text-right whitespace-nowrap tabular-nums">
-                      {!cancelled && pending > 0 ? (
-                        <span className="font-medium text-danger-strong">{formatPoQty(pending)}</span>
-                      ) : (
-                        <span className="text-muted-foreground">-</span>
+                      {formatPoQty(item.orderedQty)} {item.unit}
+                    </TableCell>
+                    <TableCell className="text-right whitespace-nowrap tabular-nums">
+                      {formatPoQty(received)} {item.unit}
+                      {/* ค้างรับ — ซ้อนใต้ยอดรับเข้าแทนแยกคอลัมน์ เพราะเป็น
+                          ส่วนขยายของตัวเลขเดียวกัน (สั่งซื้อ − รับเข้าแล้ว) */}
+                      {!cancelled && pending > 0 && (
+                        <span className="block text-sm font-normal text-danger-strong">
+                          ค้างรับ: {formatPoQty(pending)} {item.unit}
+                        </span>
                       )}
                     </TableCell>
                     <TableCell className="text-right whitespace-nowrap tabular-nums">
                       {failed > 0 ? (
-                        <span className="font-medium text-danger-strong">- {formatPoQty(failed)}</span>
+                        <span className="font-medium text-danger-strong">
+                          - {formatPoQty(failed)} {item.unit}
+                        </span>
                       ) : (
                         <span className="text-muted-foreground">-</span>
                       )}
                     </TableCell>
                     <TableCell className="text-right whitespace-nowrap tabular-nums">
-                      {formatPoQty(stocked)}
+                      {formatPoQty(stocked)} {item.unit}
                     </TableCell>
-                    <TableCell className={COL_LAST}>
+                    <TableCell className="text-right whitespace-nowrap tabular-nums">
+                      {formatPoBaht(item.pricePerUnit)}
+                    </TableCell>
+                    <TableCell className="text-right whitespace-nowrap tabular-nums">
+                      {formatPoBaht(item.handlingPerUnit)}
+                    </TableCell>
+                    <TableCell className="text-right whitespace-nowrap tabular-nums">
+                      {formatPoBaht(lineItemUnitPrice(item))}
+                    </TableCell>
+                    <TableCell className="text-right whitespace-nowrap font-medium tabular-nums">
+                      {formatPoBaht(lineItemTotalPrice(item))}
+                    </TableCell>
+                    <TableCell className={COL_LAST} onClick={(e) => e.stopPropagation()}>
                       {!cancelled && (
                         <Button asChild variant="outline-primary" size="sm">
                           <Link href={`/po/${po.id}/receive/${item.id}/add`}>
@@ -479,60 +549,14 @@ function LineItemsTable({ po }: { po: PoDoc }) {
           </Table>
         </TableFrame>
       </div>
+
+      <PoLineItemDetailDialog
+        po={po}
+        item={selected}
+        open={selected !== null}
+        onOpenChange={(v) => !v && setSelected(null)}
+      />
     </>
-  );
-}
-
-function LineItemCard({
-  po,
-  item,
-  cancelled,
-}: {
-  po: PoDoc;
-  item: PoLineItem;
-  cancelled: boolean;
-}) {
-  const received = lineItemReceivedQty(item);
-  const pending = lineItemPendingQty(item);
-  const failed = lineItemFailedQty(item);
-  const stocked = lineItemStockedQty(item);
-
-  return (
-    <div className="rounded-xl border border-border bg-card p-4">
-      <CardBox>
-        <p className="font-medium">
-          {item.productName}
-          {item.productSub && ` ${item.productSub}`}
-          <span className="font-normal text-muted-foreground"> {item.group}</span>
-          {item.urgent && <UrgentChip />}
-        </p>
-      </CardBox>
-
-      <dl className="mt-3 space-y-1.5 text-sm">
-        <CardRow label="บรรจุภัณฑ์">{item.packing ?? "-"}</CardRow>
-        <CardRow label={`สั่งซื้อ (${item.unit})`}>{formatPoQty(item.orderedQty)}</CardRow>
-        <CardRow label="รับเข้า">{formatPoQty(received)}</CardRow>
-        {!cancelled && pending > 0 && (
-          <CardRow label="ค้างรับ" className="text-danger-strong">
-            {formatPoQty(pending)}
-          </CardRow>
-        )}
-        {failed > 0 && (
-          <CardRow label="ไม่ผ่าน" className="text-danger-strong">
-            - {formatPoQty(failed)}
-          </CardRow>
-        )}
-        <CardRow label="เข้าคลัง">{formatPoQty(stocked)}</CardRow>
-      </dl>
-
-      {!cancelled && (
-        <Button asChild variant="outline-primary" className="mt-3 w-full">
-          <Link href={`/po/${po.id}/receive/${item.id}/add`}>
-            เพิ่มรอบ
-          </Link>
-        </Button>
-      )}
-    </div>
   );
 }
 
@@ -546,7 +570,9 @@ function RoundsTable({ rows }: { rows: { round: PoRound; item: PoLineItem }[] })
 
   return (
     <>
-      {/* ---------- จอแคบ: การ์ด ---------- */}
+      {/* ---------- จอแคบ: การ์ดเรียบๆ — เอาแค่ทะเบียนรถ/รับเข้า/สถานะพอ ที่เหลือ
+          (บรรจุภัณฑ์/ไม่ผ่าน/ผลตรวจสอบ QC/เข้าคลัง) โผล่เฉพาะรอบที่มีค่าจริงแล้ว
+          เท่านั้น ไม่งั้นการ์ดรกด้วยข้อมูลที่ยังไม่เกิดขึ้น (เช่นรอบที่ยังไม่ตรวจ QC) ---------- */}
       <div className="space-y-3 @3xl:hidden">
         {rows.map(({ round: r, item }) => (
           <div key={r.id} className="rounded-xl border border-border bg-card p-4">
@@ -554,30 +580,29 @@ function RoundsTable({ rows }: { rows: { round: PoRound; item: PoLineItem }[] })
               <span className="font-semibold">{r.code}</span>
               <span className="text-sm text-muted-foreground">{r.arriveDate}</span>
             </div>
-            <CardBox className="mt-3">
-              <p className="font-medium">
-                {item.productName}
-                {item.productSub && ` ${item.productSub}`}
-              </p>
-              <p className="text-sm">
-                {r.plate}
-                {r.containerNo && ` · ${r.containerNo}`}
-              </p>
-            </CardBox>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {r.plate}
+              {r.containerNo && ` · ${r.containerNo}`}
+            </p>
             <dl className="mt-3 space-y-1.5 text-sm">
-              <CardRow label="บรรจุภัณฑ์">{item.packing ?? "-"}</CardRow>
-              <CardRow label="รับเข้า">{r.receivedTon != null ? formatPoQty(r.receivedTon) : "-"}</CardRow>
+              <CardRow label="รับเข้า">
+                {r.receivedTon != null ? `${formatPoQty(r.receivedTon)} ${item.unit}` : "-"}
+              </CardRow>
               {r.failedTon != null && (
                 <CardRow label="ไม่ผ่าน" className="text-danger-strong">
-                  - {formatPoQty(r.failedTon)}
+                  - {formatPoQty(r.failedTon)} {item.unit}
                 </CardRow>
               )}
-              <CardRow label="ผลตรวจสอบ QC">{r.qcResult ?? "-"}</CardRow>
-              <CardRow label="เข้าคลัง">{r.stockedTon != null ? formatPoQty(r.stockedTon) : "-"}</CardRow>
+              {r.qcResult && <CardRow label="ผลตรวจสอบ QC">{r.qcResult}</CardRow>}
+              {r.stockedTon != null && (
+                <CardRow label="เข้าคลัง">
+                  {formatPoQty(r.stockedTon)} {item.unit}
+                </CardRow>
+              )}
+              <CardRow label="สถานะ">
+                <RoundStatusChip status={r.status} />
+              </CardRow>
             </dl>
-            <div className="mt-3 flex justify-end">
-              <RoundStatusChip status={r.status} />
-            </div>
           </div>
         ))}
       </div>
@@ -595,16 +620,19 @@ function RoundsTable({ rows }: { rows: { round: PoRound; item: PoLineItem }[] })
                 <TableHead>วันที่รถจะเข้า</TableHead>
                 <TableHead>เบอร์ตู้คอนเทนเนอร์</TableHead>
                 <TableHead>บรรจุภัณฑ์</TableHead>
-                <TableHead className="text-right">รับเข้า (ตัน)</TableHead>
-                <TableHead className="text-right">ไม่ผ่าน (ตัน)</TableHead>
+                {/* ไม่ใส่หน่วยไว้ที่หัวตาราง เพราะรอบรับในใบเดียวกันอาจเป็นคนละสินค้า
+                    คนละหน่วยกันได้ (ตัน/กก./ลิตร ฯลฯ) หน่วยจึงต้องอยู่ติดกับตัวเลข
+                    ในแต่ละแถวแทน ไม่ใช่ค่าตายตัวที่หัวตาราง */}
+                <TableHead className="text-right">รับเข้า</TableHead>
+                <TableHead className="text-right">ไม่ผ่าน</TableHead>
                 <TableHead>ผลตรวจสอบ QC</TableHead>
-                <TableHead className="text-right">เข้าคลัง (ตัน)</TableHead>
+                <TableHead className="text-right">เข้าคลัง</TableHead>
                 <TableHead className={HEAD_LAST}>สถานะ</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {rows.map(({ round: r, item }) => (
-                <TableRow key={r.id}>
+                <TableRow key={r.id} className={ROW_HOVER_NAV}>
                   <TableCell className={COL_FIRST}>
                     <span className="block font-medium whitespace-nowrap">{r.code}</span>
                     <span className="block text-sm text-muted-foreground">{r.arriveDate}</span>
@@ -621,11 +649,17 @@ function RoundsTable({ rows }: { rows: { round: PoRound; item: PoLineItem }[] })
                   <TableCell className="whitespace-nowrap">{r.containerNo ?? "-"}</TableCell>
                   <TableCell className="whitespace-nowrap">{item.packing ?? "-"}</TableCell>
                   <TableCell className="text-right whitespace-nowrap tabular-nums">
-                    {r.receivedTon != null ? formatPoQty(r.receivedTon) : <span className="text-muted-foreground">-</span>}
+                    {r.receivedTon != null ? (
+                      `${formatPoQty(r.receivedTon)} ${item.unit}`
+                    ) : (
+                      <span className="text-muted-foreground">-</span>
+                    )}
                   </TableCell>
                   <TableCell className="text-right whitespace-nowrap tabular-nums">
                     {r.failedTon != null ? (
-                      <span className="text-danger-strong">- {formatPoQty(r.failedTon)}</span>
+                      <span className="text-danger-strong">
+                        - {formatPoQty(r.failedTon)} {item.unit}
+                      </span>
                     ) : (
                       <span className="text-muted-foreground">-</span>
                     )}
@@ -634,7 +668,11 @@ function RoundsTable({ rows }: { rows: { round: PoRound; item: PoLineItem }[] })
                     {r.qcResult ?? <span className="text-muted-foreground">-</span>}
                   </TableCell>
                   <TableCell className="text-right whitespace-nowrap tabular-nums">
-                    {r.stockedTon != null ? formatPoQty(r.stockedTon) : <span className="text-muted-foreground">-</span>}
+                    {r.stockedTon != null ? (
+                      `${formatPoQty(r.stockedTon)} ${item.unit}`
+                    ) : (
+                      <span className="text-muted-foreground">-</span>
+                    )}
                   </TableCell>
                   <TableCell className={COL_LAST}>
                     <RoundStatusChip status={r.status} />

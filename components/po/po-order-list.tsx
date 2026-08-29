@@ -25,6 +25,7 @@ import {
   type PoLineItem,
 } from "@/lib/po";
 import { EmptyDocs, TablePager, paginate } from "@/components/stock/doc-parts";
+import { PR_CATEGORY_LABEL } from "@/lib/pr";
 
 /* ------------------------------------------------------------------
    รายการใบสั่งซื้อ — แต่ละใบเป็นการ์ด/แผงของตัวเอง (ไม่ใช่แถวร่วมตารางเดียวกัน
@@ -144,13 +145,16 @@ function PoOrderPanel({
             </span>
           </span>
           <span className="block text-sm text-muted-foreground @3xl:hidden">{d.createdAt}</span>
-          <span className="mt-0.5 block truncate text-sm font-semibold text-foreground">
+          <span className="mt-0.5 block text-sm font-semibold text-foreground">
             {d.company}
           </span>
         </div>
 
         {/* กันคลิกลอยไม่ให้ทะลุไปนำทางทั้งใบ — โซนนี้แค่ดูสถานะ/สลับมุมมอง */}
         <div className="flex shrink-0 items-center gap-3" onClick={(e) => e.stopPropagation()}>
+          <span className="text-sm whitespace-nowrap text-muted-foreground">
+            {d.lineItems.length} รายการ
+          </span>
           <StatusChip doc={d} />
           <button
             type="button"
@@ -195,15 +199,32 @@ const COL_HEAD =
 const COL_BODY = "[&_td]:px-4 [&_td]:py-3";
 const COL_LAST_PAD = "[&_th:last-child]:pr-6 [&_td:last-child]:pr-6";
 
-/** ป้ายกำกับสินค้า — ชื่อ + หมวด (เช่น Bulk/PNR) + บรรจุภัณฑ์ ไม่ใส่ประเภท
-    สินค้าเต็ม (เช่น "วัตถุดิบปุ๋ยกระสอบ") อีกต่อไป ยาวเกินไม่จำเป็น หมวดสั้นกว่า
-    บอกพอแล้วว่าเป็นสินค้ากลุ่มไหน — จอแคบ (stacked) แยกชื่อกับหมวด/บรรจุภัณฑ์
-    เป็นคนละบรรทัด เพราะพื้นที่แคบใส่รวมบรรทัดเดียวจะยาวจนตัดคำ */
-function ProductLabel({ item, stacked }: { item: PoLineItem; stacked?: boolean }) {
+/** เลข PO แยกตามรายการสินค้า — เลขที่ใบ + ตัวอักษรเรียงตามลำดับสินค้าในใบ
+    (A ตัวแรก, B ตัวที่สอง, ...) ใช้อ้างอิงรายการนี้แยกจากรายการอื่นในใบเดียวกัน */
+function lineItemCode(po: PoDoc, index: number): string {
+  return `${po.code}${String.fromCharCode(65 + index)}`;
+}
+
+/** ป้ายกำกับสินค้า — ชื่อ + ประเภทสินค้า (เช่น "วัตถุดิบปุ๋ยกระสอบ") + หมวด
+    (เช่น Bulk/PNR) + บรรจุภัณฑ์ คั่นแต่ละส่วนด้วยเส้น "|" ตามแบบ — จอแคบ
+    (stacked) แยกชื่อกับประเภท/หมวด/บรรจุภัณฑ์เป็นคนละบรรทัด เพราะพื้นที่แคบ
+    ใส่รวมบรรทัดเดียวจะยาวจนตัดคำ
+
+    บรรทัดเลข PO ย่อยอยู่ใต้สุดเสมอ เว้นระยะห่างจากบรรทัดชื่อ/หมวดพอสมควร
+    (ไม่ใช่ mt-0 ชิดกันจนอ่านเป็นก้อนเดียว) */
+function ProductLabel({
+  item,
+  code,
+  stacked,
+}: {
+  item: PoLineItem;
+  code: string;
+  stacked?: boolean;
+}) {
   const meta = (
     <>
-      {item.group}
-      {item.packing && ` · ${item.packing}`}
+      {PR_CATEGORY_LABEL[item.categoryId]} | {item.group}
+      {item.packing && ` | ${item.packing}`}
     </>
   );
 
@@ -214,8 +235,9 @@ function ProductLabel({ item, stacked }: { item: PoLineItem; stacked?: boolean }
           {item.productName}
           {item.productSub && ` ${item.productSub}`}
         </span>
-        <span className="block truncate text-sm text-muted-foreground">
-          {meta}
+        <span className="mt-1 block truncate text-sm text-muted-foreground">{meta}</span>
+        <span className="mt-1 block truncate text-sm font-medium">
+          {code}
           {item.urgent && <UrgentChip />}
         </span>
       </>
@@ -227,7 +249,10 @@ function ProductLabel({ item, stacked }: { item: PoLineItem; stacked?: boolean }
       <span className="font-medium">{item.productName}</span>
       {item.productSub && <span className="text-muted-foreground"> {item.productSub}</span>}
       <span className="text-muted-foreground"> · {meta}</span>
-      {item.urgent && <UrgentChip />}
+      <span className="mt-1 block text-sm font-medium">
+        {code}
+        {item.urgent && <UrgentChip />}
+      </span>
     </>
   );
 }
@@ -249,13 +274,13 @@ function ProductTable({ po, onNavigate }: { po: PoDoc; onNavigate: () => void })
         </TableRow>
       </TableHeader>
       <TableBody>
-        {po.lineItems.map((item) => {
+        {po.lineItems.map((item, index) => {
           const received = lineItemReceivedQty(item);
           const pending = lineItemPendingQty(item);
           return (
             <TableRow key={item.id} onClick={onNavigate} className="cursor-pointer hover:bg-transparent">
               <TableCell className="truncate">
-                <ProductLabel item={item} />
+                <ProductLabel item={item} code={lineItemCode(po, index)} />
               </TableCell>
               <TableCell className="text-right whitespace-nowrap tabular-nums">
                 {formatPoQty(item.orderedQty)} {item.unit}
@@ -296,14 +321,14 @@ function ProductListSimple({ po, onNavigate }: { po: PoDoc; onNavigate: () => vo
   const cancelled = po.status === "cancelled";
   return (
     <div className="divide-y divide-border">
-      {po.lineItems.map((item) => (
+      {po.lineItems.map((item, index) => (
         <div
           key={item.id}
           onClick={onNavigate}
           className="flex cursor-pointer items-center justify-between gap-3 px-4 py-3"
         >
           <div className="min-w-0 flex-1 text-sm">
-            <ProductLabel item={item} stacked />
+            <ProductLabel item={item} code={lineItemCode(po, index)} stacked />
           </div>
           {!cancelled && (
             <div onClick={(e) => e.stopPropagation()} className="shrink-0">

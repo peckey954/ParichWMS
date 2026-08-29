@@ -24,6 +24,7 @@ import {
   EmptyDocs,
   HEAD_FIRST,
   HEAD_LAST,
+  ROW_HOVER_NAV,
   STICKY_HEAD,
   TableFrame,
   TablePager,
@@ -84,7 +85,7 @@ export function WeighingList({ docs }: { docs: WeighingDoc[] }) {
                   // ทั้งแถวกดได้ ไม่ใช่เฉพาะตัวอักษรเลขที่ใบ — เป้าเล็กแค่คำเดียว
                   // ในแถวสูง 65px คือกดพลาดตลอด ยังเป็น <a> จริงในเซลล์แรกด้วย
                   onClick={() => router.push(`/weighing/${d.id}`)}
-                  className="cursor-pointer"
+                  className={cn("cursor-pointer", ROW_HOVER_NAV)}
                 >
                   <TableCell className={COL_FIRST}>
                     <Link
