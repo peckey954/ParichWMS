@@ -8,7 +8,6 @@ import {
   LockIcon,
   MinusIcon,
   PlusIcon,
-  XIcon,
 } from "lucide-react";
 import {
   Breadcrumb,
@@ -27,6 +26,13 @@ import {
 } from "@peckey954/ui/components/ui/input-group";
 import { Label } from "@peckey954/ui/components/ui/label";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@peckey954/ui/components/ui/select";
+import {
   Table,
   TableBody,
   TableCell,
@@ -36,7 +42,6 @@ import {
 } from "@peckey954/ui/components/ui/table";
 import { cn } from "@peckey954/ui/lib/utils";
 import { toast } from "sonner";
-import { DRAG_ITEM_ATTR, DragHandle } from "@/components/drag-handle";
 import { FileUpload, useDocUpload, type DocFile } from "@/components/file-upload";
 import { FileViewer, type ViewerFile } from "@/components/file-viewer";
 import { useNumberField } from "@/components/number-field";
@@ -70,15 +75,15 @@ import {
    ส่วน "ต้นแบบ — รถหนึ่งคันมีหลายสินค้า" สำหรับที่มาของโมเดลข้อมูล)
 
    หน้านี้แบ่งเป็นสองช่วง:
-   1) ตั้งค่าก่อนชั่ง (setup) — เลือกว่ารถคันนี้ขนสินค้าตัวไหนบ้างจากใบสั่งซื้อ
-      (1 PO อาจมีได้หลายรายการ แต่รถคันหนึ่งไม่จำเป็นต้องขนครบทุกตัว) แล้ว
-      เรียงลำดับว่าจะลงตัวไหนก่อนหลัง — ลำดับนี้กำหนดว่าจุดชั่งไหนคู่กับ
-      สินค้าไหนตอนคำนวณน้ำหนัก จึงต้องให้แก้ได้อิสระ ไม่ใช่ลำดับตายตัวตามที่
-      เรียงในใบสั่งซื้อ (ใบสั่งซื้ออาจเรียง A/B/C แต่หน้างานจริงอาจลง C ก่อน)
-   2) ชั่งจริง (weighing) — ขั้นบันไดทีละจุดชั่งตามลำดับที่ตั้งค่าไว้ ล็อกขั้น
-      ที่ยังไม่ถึงคิว แก้รายการสินค้าย้อนกลับไม่ได้แล้วถ้าเริ่มชั่งจุดแรกไปแล้ว
-      (มีลิงก์ "แก้ไขรายการสินค้า" ให้กดย้อนกลับไปตั้งค่าใหม่ได้เฉพาะตอนที่
-      ยังไม่ได้บันทึกจุดชั่งเข้าเลยเท่านั้น)
+   1) ตั้งค่าก่อนชั่ง (setup) — คีย์แค่ "จำนวนสินค้าในรถคันนี้" เฉยๆ ไม่ให้เลือก
+      ว่าเป็นสินค้าตัวไหน/เรียงลำดับยังไงล่วงหน้า เพราะหน้างานจริงมักไม่รู้ก่อน
+      ว่าจะลงตัวไหนก่อนหลัง (คนขับ/พขร. ตัดสินใจหน้างานตามที่จอดสะดวก) รู้แค่
+      "รถคันนี้มีของกี่ตัว" ล่วงหน้าเท่านั้น
+   2) ชั่งจริง (weighing) — ขั้นบันไดทีละจุดชั่งตามลำดับที่ลงจริงหน้างาน แต่ละ
+      จุดมีดรอปดาวให้เลือกว่า "ตัวที่กำลังลงตอนนี้คือสินค้าตัวไหน" (เลือกได้
+      เฉพาะตัวที่ยังไม่ถูกเลือกไปแล้วในจุดก่อนหน้า) ค่อยตัดสินใจตอนถึงจุดนั้น
+      จริงๆ ไม่ต้องเดาล่วงหน้าตั้งแต่ต้น ล็อกขั้นที่ยังไม่ถึงคิว แก้จำนวนสินค้า
+      ย้อนกลับไม่ได้แล้วถ้าเริ่มชั่งจุดแรกไปแล้ว
 
    เอกสารอ้างอิงต่อสินค้า (ตามที่ต้องมี): ใบชั่งของพาริช (ระบบสร้างเลขที่ให้
    อัตโนมัติทันทีที่บันทึกน้ำหนักตัวนั้นสำเร็จ — ไม่ต้องกรอกเอง), ใบชั่งของ
@@ -114,33 +119,24 @@ function toViewer(files: DocFile[], group: string): ViewerFile[] {
     });
 }
 
-/** สลับตำแหน่งในลิสต์ทีละขั้น — คู่กับ DragHandle (ดูที่มาที่ components/qc/item-editor.tsx) */
-function moveIn<T>(list: T[], i: number, dir: -1 | 1): T[] {
-  const j = i + dir;
-  if (j < 0 || j >= list.length) return list;
-  const next = [...list];
-  [next[i], next[j]] = [next[j], next[i]];
-  return next;
-}
-
 const round = MULTI_PRODUCT_DEMO_ROUND;
 
 export default function MultiProductWeighingDemoPage() {
   const router = useRouter();
 
   const [phase, setPhase] = React.useState<"setup" | "weighing">("setup");
-  // เริ่มจากว่างเปล่าเสมอ — ไม่ตั้งสินค้า/ลำดับล่วงหน้าให้ ต้องเลือกเองตั้งแต่ต้น
-  const [selected, setSelected] = React.useState<TruckProduct[]>([]);
+  const [count, setCount] = React.useState(1);
 
   const [checkpoints, setCheckpoints] = React.useState<WeighCheckpoint[]>([]);
-  const [products, setProducts] = React.useState<TruckProduct[]>([]);
+  // แต่ละช่อง — undefined จนกว่าจะเลือกจากดรอปดาวตอนถึงจุดชั่งนั้นจริงๆ
+  const [slots, setSlots] = React.useState<(TruckProduct | undefined)[]>([]);
 
   // จุดแรกที่ยังไม่ถูกบันทึก = ขั้นที่กำลังทำงานอยู่ตอนนี้ — ก่อนหน้านั้นคือ
   // "เสร็จแล้ว" หลังจากนั้นคือ "ล็อกไว้" ยังกรอกไม่ได้
   const activeSeq = checkpoints.findIndex((c) => c.ton == null);
   const allDone = phase === "weighing" && activeSeq === -1;
-  // ยังไม่ได้บันทึกจุดชั่งเข้าเลย — แก้รายการสินค้าย้อนกลับได้อยู่
-  const canEditProducts = checkpoints[0]?.ton == null;
+  // ยังไม่ได้บันทึกจุดชั่งเข้าเลย — แก้จำนวนสินค้าย้อนกลับได้อยู่
+  const canEditCount = checkpoints[0]?.ton == null;
 
   const parichDocs = useDocUpload(
     seedDocs("wp", ["ใบชั่งเข้า-PO260130-09.pdf", "ใบชั่งออก-PO260130-09.pdf"])
@@ -157,10 +153,8 @@ export default function MultiProductWeighingDemoPage() {
   ];
 
   function startWeighing() {
-    setProducts(selected);
-    setCheckpoints(
-      Array.from({ length: selected.length + 1 }, (_, i) => ({ seq: i }))
-    );
+    setCheckpoints(Array.from({ length: count + 1 }, (_, i) => ({ seq: i })));
+    setSlots(Array.from({ length: count }, () => undefined));
     setPhase("weighing");
   }
 
@@ -170,21 +164,17 @@ export default function MultiProductWeighingDemoPage() {
     );
   }
 
-  function saveProductMeta(
+  function saveSlot(
     index: number,
+    product: TruckProduct,
     supplierTon: number,
     supplierSlipNo: string
   ) {
-    setProducts((prev) =>
-      prev.map((p, i) =>
+    setSlots((prev) =>
+      prev.map((s, i) =>
         i === index
-          ? {
-              ...p,
-              supplierTon,
-              supplierSlipNo,
-              parichSlipNo: parichSlipNo(round.receiptCode, index),
-            }
-          : p
+          ? { ...product, supplierTon, supplierSlipNo, parichSlipNo: parichSlipNo(round.receiptCode, index) }
+          : s
       )
     );
   }
@@ -215,8 +205,8 @@ export default function MultiProductWeighingDemoPage() {
         </h1>
         <p className="mt-1.5 max-w-2xl text-sm text-muted-foreground">
           {phase === "setup"
-            ? "เลือกสินค้าที่รถคันนี้ขนมาจากใบสั่งซื้อ (ไม่จำเป็นต้องครบทุกรายการ) แล้วเรียงลำดับตามที่จะลงของจริงหน้างาน"
-            : "ลองกรอกได้จริงตั้งแต่จุดแรก — แต่ละจุดชั่งบันทึกแยกกันตามลำดับที่ตั้งไว้ กรอกจุดที่ N ได้ก็ต่อเมื่อจุดที่ N-1 บันทึกแล้วเท่านั้น"}
+            ? "ระบุแค่จำนวนสินค้าที่รถคันนี้ขนมา ยังไม่ต้องรู้ว่าเป็นตัวไหน — ค่อยเลือกตอนถึงจุดชั่งนั้นจริงๆ"
+            : "ลองกรอกได้จริงตั้งแต่จุดแรก — ถึงคิวไหนค่อยเลือกว่าตัวที่กำลังลงคือสินค้าตัวไหน กรอกจุดที่ N ได้ก็ต่อเมื่อจุดที่ N-1 บันทึกแล้วเท่านั้น"}
         </p>
 
         {/* ---------- หัวใบ: รถ + PO (คงที่ ไม่ให้แก้ในต้นแบบนี้) ---------- */}
@@ -235,8 +225,9 @@ export default function MultiProductWeighingDemoPage() {
 
         {phase === "setup" ? (
           <SetupSection
-            selected={selected}
-            onChangeSelected={setSelected}
+            count={count}
+            max={PO_LINE_ITEMS_POOL.length}
+            onChangeCount={setCount}
             onStart={startWeighing}
           />
         ) : (
@@ -244,33 +235,38 @@ export default function MultiProductWeighingDemoPage() {
             <div className="mt-5 rounded-lg bg-brand p-4">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <p className="text-sm text-muted-foreground">
-                  ลำดับสินค้าที่จะลง ({products.length} รายการ)
+                  รถคันนี้ขนมา {slots.length} รายการ — ลงแล้ว{" "}
+                  {slots.filter((s) => s != null).length}/{slots.length}
                 </p>
-                {canEditProducts && (
+                {canEditCount && (
                   <button
                     type="button"
                     onClick={() => setPhase("setup")}
                     className="flex items-center gap-1 text-sm font-medium text-primary hover:underline"
                   >
                     <ChevronLeftIcon className="size-3.5" />
-                    แก้ไขรายการสินค้า
+                    แก้ไขจำนวนสินค้า
                   </button>
                 )}
               </div>
-              <ol className="mt-2 flex flex-wrap gap-2">
-                {products.map((p, i) => (
-                  <li
-                    key={p.id}
-                    className="flex items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1 text-sm"
-                  >
-                    <span className="font-semibold text-primary">{i + 1}.</span>
-                    <span className="font-medium">{p.productName}</span>
-                    {p.productSub && (
-                      <span className="text-muted-foreground">{p.productSub}</span>
-                    )}
-                  </li>
-                ))}
-              </ol>
+              {slots.some((s) => s != null) && (
+                <ol className="mt-2 flex flex-wrap gap-2">
+                  {slots.map((s, i) =>
+                    s ? (
+                      <li
+                        key={s.id}
+                        className="flex items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1 text-sm"
+                      >
+                        <span className="font-semibold text-primary">{i + 1}.</span>
+                        <span className="font-medium">{s.productName}</span>
+                        {s.productSub && (
+                          <span className="text-muted-foreground">{s.productSub}</span>
+                        )}
+                      </li>
+                    ) : null
+                  )}
+                </ol>
+              )}
             </div>
 
             {/* ---------- ขั้นตอนการชั่ง ---------- */}
@@ -280,9 +276,9 @@ export default function MultiProductWeighingDemoPage() {
               {/* จุดที่ 0 — ชั่งเข้ารถพร้อมสินค้าทั้งหมด ไม่ผูกกับสินค้าตัวใดตัวหนึ่ง */}
               <WeighStepCard
                 state={activeSeq === -1 || activeSeq > 0 ? "done" : activeSeq === 0 ? "active" : "locked"}
-                title={`ชั่งเข้า (รถ + สินค้าทั้งหมด ${products.length} รายการ)`}
+                title={`ชั่งเข้า (รถ + สินค้าทั้งหมด ${slots.length} รายการ)`}
                 checkpoint={checkpoints[0]}
-                onSave={(ton, at) => {
+                onSaveGross={(ton, at) => {
                   saveCheckpoint(0, ton, at);
                   toast.success("บันทึกชั่งเข้าแล้ว", {
                     description: `${round.plate} — ${formatTon(ton)} ตัน`,
@@ -290,9 +286,9 @@ export default function MultiProductWeighingDemoPage() {
                 }}
               />
 
-              {products.map((p, i) => {
+              {slots.map((slot, i) => {
                 const seq = i + 1;
-                const isLast = i === products.length - 1;
+                const isLast = i === slots.length - 1;
                 const state =
                   activeSeq === -1 || activeSeq > seq
                     ? "done"
@@ -300,24 +296,32 @@ export default function MultiProductWeighingDemoPage() {
                       ? "active"
                       : "locked";
                 const prevTon = checkpoints[i]?.ton;
+                // เลือกได้เฉพาะสินค้าที่ยังไม่ถูกเลือกไปแล้วในจุดอื่น
+                const takenIds = new Set(
+                  slots.filter((s, si) => si !== i && s).map((s) => s!.id)
+                );
+                const availableProducts = PO_LINE_ITEMS_POOL.filter(
+                  (p) => !takenIds.has(p.id)
+                );
 
                 return (
                   <WeighStepCard
-                    key={p.id}
+                    key={i}
                     state={state}
                     title={
                       isLast
-                        ? `ลงสินค้าสุดท้าย: ${p.productName}${p.productSub ? ` ${p.productSub}` : ""} (ชั่งเสร็จ = รถเปล่า)`
-                        : `ลงสินค้าที่ ${seq}: ${p.productName}${p.productSub ? ` ${p.productSub}` : ""}`
+                        ? `ลงสินค้าสุดท้าย (ชั่งเสร็จ = รถเปล่า)`
+                        : `ลงสินค้าที่ ${seq}`
                     }
                     checkpoint={checkpoints[seq]}
                     prevTon={prevTon}
-                    product={p}
-                    onSave={(ton, at, supplierTon, supplierSlipNo) => {
+                    slot={slot}
+                    availableProducts={availableProducts}
+                    onSaveProduct={(product, ton, at, supplierTon, supplierSlipNo) => {
                       saveCheckpoint(seq, ton, at);
-                      saveProductMeta(i, supplierTon, supplierSlipNo);
+                      saveSlot(i, product, supplierTon, supplierSlipNo);
                       const net = prevTon != null ? Math.round((prevTon - ton) * 100) / 100 : null;
-                      toast.success(`บันทึกน้ำหนัก ${p.productName} แล้ว`, {
+                      toast.success(`บันทึกน้ำหนัก ${product.productName} แล้ว`, {
                         description:
                           net != null
                             ? `เลขที่ใบชั่งพาริช ${parichSlipNo(round.receiptCode, i)} — สินค้าจริง ${formatTon(net)} ตัน`
@@ -355,59 +359,71 @@ export default function MultiProductWeighingDemoPage() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {products.map((p, i) => {
-                        const net = computeNet(checkpoints, i);
-                        const diff =
-                          net != null && p.supplierTon != null
-                            ? Math.round((net - p.supplierTon) * 100) / 100
-                            : null;
-                        return (
-                          <TableRow key={p.id}>
-                            <TableCell className={COL_FIRST}>
-                              <span className="block font-medium whitespace-nowrap">
-                                {p.productName}
-                                {p.productSub && ` ${p.productSub}`}
-                              </span>
-                            </TableCell>
-                            <TableCell className="whitespace-nowrap">
-                              {p.parichSlipNo ?? <span className="text-muted-foreground">-</span>}
-                            </TableCell>
-                            <TableCell className="whitespace-nowrap">
-                              {p.supplierSlipNo || (
-                                <span className="text-muted-foreground">-</span>
-                              )}
-                            </TableCell>
-                            <TableCell className="text-right whitespace-nowrap tabular-nums">
-                              {net != null ? (
-                                formatTon(net)
-                              ) : (
-                                <span className="text-muted-foreground">-</span>
-                              )}
-                            </TableCell>
-                            <TableCell className="text-right whitespace-nowrap tabular-nums">
-                              {p.supplierTon != null ? (
-                                formatTon(p.supplierTon)
-                              ) : (
-                                <span className="text-muted-foreground">-</span>
-                              )}
-                            </TableCell>
-                            <TableCell className={cn(COL_LAST, "text-right whitespace-nowrap tabular-nums")}>
-                              {diff != null ? (
-                                <span
-                                  className={cn(
-                                    "font-medium",
-                                    diff < 0 && "text-danger-strong"
-                                  )}
-                                >
-                                  {formatSignedTon(diff)}
+                      {slots.filter((s): s is TruckProduct => s != null).length === 0 ? (
+                        <TableRow>
+                          <TableCell
+                            colSpan={6}
+                            className="py-6 text-center text-sm text-muted-foreground"
+                          >
+                            ยังไม่มีสินค้าที่ชั่งเสร็จ
+                          </TableCell>
+                        </TableRow>
+                      ) : (
+                        slots.map((s, i) => {
+                          if (!s) return null;
+                          const net = computeNet(checkpoints, i);
+                          const diff =
+                            net != null && s.supplierTon != null
+                              ? Math.round((net - s.supplierTon) * 100) / 100
+                              : null;
+                          return (
+                            <TableRow key={s.id}>
+                              <TableCell className={COL_FIRST}>
+                                <span className="block font-medium whitespace-nowrap">
+                                  {s.productName}
+                                  {s.productSub && ` ${s.productSub}`}
                                 </span>
-                              ) : (
-                                <span className="text-muted-foreground">-</span>
-                              )}
-                            </TableCell>
-                          </TableRow>
-                        );
-                      })}
+                              </TableCell>
+                              <TableCell className="whitespace-nowrap">
+                                {s.parichSlipNo ?? <span className="text-muted-foreground">-</span>}
+                              </TableCell>
+                              <TableCell className="whitespace-nowrap">
+                                {s.supplierSlipNo || (
+                                  <span className="text-muted-foreground">-</span>
+                                )}
+                              </TableCell>
+                              <TableCell className="text-right whitespace-nowrap tabular-nums">
+                                {net != null ? (
+                                  formatTon(net)
+                                ) : (
+                                  <span className="text-muted-foreground">-</span>
+                                )}
+                              </TableCell>
+                              <TableCell className="text-right whitespace-nowrap tabular-nums">
+                                {s.supplierTon != null ? (
+                                  formatTon(s.supplierTon)
+                                ) : (
+                                  <span className="text-muted-foreground">-</span>
+                                )}
+                              </TableCell>
+                              <TableCell className={cn(COL_LAST, "text-right whitespace-nowrap tabular-nums")}>
+                                {diff != null ? (
+                                  <span
+                                    className={cn(
+                                      "font-medium",
+                                      diff < 0 && "text-danger-strong"
+                                    )}
+                                  >
+                                    {formatSignedTon(diff)}
+                                  </span>
+                                ) : (
+                                  <span className="text-muted-foreground">-</span>
+                                )}
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })
+                      )}
                     </TableBody>
                   </Table>
                 </TableFrame>
@@ -460,116 +476,59 @@ export default function MultiProductWeighingDemoPage() {
   );
 }
 
-/** ตั้งค่าก่อนชั่ง — เลือกสินค้าจากใบสั่งซื้อ (สระด้านซ้าย/บน) มาต่อคิว
-    (รายการที่เลือกแล้วทางขวา/ล่าง) แล้วเรียงลำดับด้วยปุ่มลากเดียวกับที่ใช้
-    จัดลำดับหัวข้อ QC — เลือกได้ไม่ครบทุกตัวก็ได้ (รถคันหนึ่งไม่จำเป็นต้องขน
-    ครบทุกรายการในใบสั่งซื้อ) */
+/** ตั้งค่าก่อนชั่ง — คีย์แค่จำนวนสินค้าที่รถคันนี้ขนมา ไม่ถามว่าเป็นตัวไหน/
+    เรียงลำดับยังไง เพราะหน้างานจริงมักไม่รู้ล่วงหน้าว่าจะลงตัวไหนก่อน
+    ค่อยเลือกตัวตอนถึงจุดชั่งนั้นจริงๆ (ดูดรอปดาวในแต่ละขั้นของ WeighStepCard) */
 function SetupSection({
-  selected,
-  onChangeSelected,
+  count,
+  max,
+  onChangeCount,
   onStart,
 }: {
-  selected: TruckProduct[];
-  onChangeSelected: (next: TruckProduct[]) => void;
+  count: number;
+  max: number;
+  onChangeCount: (next: number) => void;
   onStart: () => void;
 }) {
-  const selectedIds = new Set(selected.map((p) => p.id));
-  const available = PO_LINE_ITEMS_POOL.filter((p) => !selectedIds.has(p.id));
+  const clamp = (n: number) => Math.min(max, Math.max(1, n));
 
   return (
-    <div className="mt-5 grid gap-4 @2xl:grid-cols-2">
-      {/* ---------- สินค้าในใบสั่งซื้อที่ยังไม่ได้เลือก ---------- */}
-      <div className="rounded-xl border border-border bg-card p-4">
-        <p className="font-medium">สินค้าในใบสั่งซื้อ ({PO_LINE_ITEMS_POOL.length} รายการ)</p>
-        <p className="mt-0.5 text-sm text-muted-foreground">
-          กดเพื่อเพิ่มเข้ารายการที่รถคันนี้ขนมา
-        </p>
-        <div className="mt-3 space-y-2">
-          {available.length === 0 ? (
-            <p className="rounded-lg border border-dashed border-border px-3 py-6 text-center text-sm text-muted-foreground">
-              เลือกครบทุกรายการแล้ว
-            </p>
-          ) : (
-            available.map((p) => (
-              <button
-                key={p.id}
-                type="button"
-                onClick={() => onChangeSelected([...selected, p])}
-                className="flex w-full items-center gap-3 rounded-lg border border-border px-3 py-2.5 text-left transition-colors hover:border-primary hover:bg-brand"
-              >
-                <span className="flex size-7 shrink-0 items-center justify-center rounded-full border border-dashed border-muted-foreground text-muted-foreground">
-                  <PlusIcon className="size-3.5" />
-                </span>
-                <span className="min-w-0 flex-1">
-                  <span className="block font-medium">
-                    {p.productName}
-                    {p.productSub && ` ${p.productSub}`}
-                  </span>
-                  <span className="block text-sm text-muted-foreground">
-                    {p.category}
-                    {p.packing && ` · ${p.packing}`}
-                  </span>
-                </span>
-              </button>
-            ))
-          )}
-        </div>
+    <div className="mt-5 max-w-sm rounded-xl border border-border bg-card p-4">
+      <Label htmlFor="truck-count">จำนวนสินค้าในรถคันนี้</Label>
+      <p className="mt-0.5 text-sm text-muted-foreground">
+        ใบสั่งซื้อนี้มีทั้งหมด {max} รายการ — รถคันนี้ไม่จำเป็นต้องขนมาครบทุกตัว
+      </p>
+      <div className="mt-3">
+        <InputGroup className="bg-card">
+          <InputGroupAddon align="inline-start">
+            <InputGroupButton
+              size="icon-xs"
+              aria-label="ลดจำนวน"
+              onClick={() => onChangeCount(clamp(count - 1))}
+            >
+              <MinusIcon />
+            </InputGroupButton>
+          </InputGroupAddon>
+          <InputGroupInput
+            id="truck-count"
+            readOnly
+            value={count}
+            className="text-center tabular-nums"
+          />
+          <InputGroupAddon align="inline-end">
+            <InputGroupButton
+              size="icon-xs"
+              aria-label="เพิ่มจำนวน"
+              onClick={() => onChangeCount(clamp(count + 1))}
+            >
+              <PlusIcon />
+            </InputGroupButton>
+          </InputGroupAddon>
+        </InputGroup>
       </div>
 
-      {/* ---------- รายการที่รถคันนี้ขนมา + ลำดับ ---------- */}
-      <div className="rounded-xl border border-border bg-card p-4">
-        <p className="font-medium">รถคันนี้ขนมา ({selected.length} รายการ)</p>
-        <p className="mt-0.5 text-sm text-muted-foreground">
-          ลากปุ่ม <span aria-hidden>⠿</span> เพื่อเรียงลำดับที่จะลงของจริงหน้างาน
-        </p>
-        <div className="mt-3 space-y-2">
-          {selected.length === 0 ? (
-            <p className="rounded-lg border border-dashed border-border px-3 py-6 text-center text-sm text-muted-foreground">
-              ยังไม่ได้เลือกสินค้า — กดเลือกจากฝั่งซ้าย
-            </p>
-          ) : (
-            selected.map((p, i) => (
-              <div
-                key={p.id}
-                {...{ [DRAG_ITEM_ATTR]: "" }}
-                className="flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-2.5"
-              >
-                <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-brand text-sm font-semibold text-primary">
-                  {i + 1}
-                </span>
-                <span className="min-w-0 flex-1">
-                  <span className="block font-medium">
-                    {p.productName}
-                    {p.productSub && ` ${p.productSub}`}
-                  </span>
-                  <span className="block text-sm text-muted-foreground">
-                    {p.category}
-                    {p.packing && ` · ${p.packing}`}
-                  </span>
-                </span>
-                <DragHandle
-                  label={`ลำดับของ ${p.productName}`}
-                  onMove={(dir) => onChangeSelected(moveIn(selected, i, dir))}
-                />
-                <Button
-                  variant="ghost"
-                  size="icon-sm"
-                  aria-label={`เอา ${p.productName} ออกจากรายการ`}
-                  className="shrink-0 text-muted-foreground hover:text-destructive"
-                  onClick={() => onChangeSelected(selected.filter((x) => x.id !== p.id))}
-                >
-                  <XIcon />
-                </Button>
-              </div>
-            ))
-          )}
-        </div>
-
-        <div className="mt-4 flex justify-end">
-          <Button disabled={selected.length === 0} onClick={onStart}>
-            เริ่มชั่ง
-          </Button>
-        </div>
+      <div className="mt-4 flex justify-end">
+        <Button onClick={onStart}>เริ่มชั่ง</Button>
       </div>
     </div>
   );
@@ -585,29 +544,47 @@ function computeNet(checkpoints: WeighCheckpoint[], index: number): number | nul
 }
 
 /** การ์ดหนึ่งขั้นตอนการชั่ง — สามสถานะ: เสร็จแล้ว (เขียว, พับเก็บ)/กำลังทำ
-    (ฟอร์มกรอกเปิดอยู่)/ล็อกไว้ (เทา, กรอกไม่ได้จนกว่าขั้นก่อนหน้าจะเสร็จ) */
+    (ฟอร์มกรอกเปิดอยู่ มีดรอปดาวเลือกสินค้าด้วยถ้าเป็นขั้นที่ผูกกับสินค้า)/
+    ล็อกไว้ (เทา, กรอกไม่ได้จนกว่าขั้นก่อนหน้าจะเสร็จ) */
 function WeighStepCard({
   state,
   title,
   checkpoint,
   prevTon,
-  product,
-  onSave,
+  slot,
+  availableProducts,
+  onSaveGross,
+  onSaveProduct,
 }: {
   state: "done" | "active" | "locked";
   title: string;
   checkpoint: WeighCheckpoint;
   /** น้ำหนักจุดก่อนหน้า — ใช้โชว์เป็นข้อมูลอ้างอิงตอนกรอก และคำนวณน้ำหนักสด */
   prevTon?: number;
-  /** มีเฉพาะขั้นที่ผูกกับสินค้าตัวหนึ่ง (ไม่ใช่ขั้น "ชั่งเข้า" แรกสุด) */
-  product?: TruckProduct;
-  onSave: (ton: number, at: string, supplierTon: number, supplierSlipNo: string) => void;
+  /** มีเฉพาะขั้นที่ผูกกับสินค้าตัวหนึ่ง (ไม่ใช่ขั้น "ชั่งเข้า" แรกสุด) —
+      undefined จนกว่าจะเลือกจากดรอปดาวแล้วบันทึกสำเร็จ */
+  slot?: TruckProduct;
+  /** ตัวเลือกในดรอปดาว — เฉพาะขั้นที่ผูกกับสินค้า (ไม่ส่งมาก็แปลว่าไม่ใช่ขั้นนั้น) */
+  availableProducts?: TruckProduct[];
+  /** ขั้น "ชั่งเข้า" แรกสุด — ไม่ผูกกับสินค้า */
+  onSaveGross?: (ton: number, at: string) => void;
+  /** ขั้นที่ผูกกับสินค้าหนึ่งตัว — ต้องเลือกจากดรอปดาวก่อนถึงจะบันทึกได้ */
+  onSaveProduct?: (
+    product: TruckProduct,
+    ton: number,
+    at: string,
+    supplierTon: number,
+    supplierSlipNo: string
+  ) => void;
 }) {
   const [ton, setTon] = React.useState(0);
   const [at, setAt] = React.useState("11:00");
   const [supplierTon, setSupplierTon] = React.useState(0);
   const [supplierSlipNo, setSupplierSlipNo] = React.useState("");
+  const [productId, setProductId] = React.useState<string | undefined>(undefined);
 
+  const isProductStep = availableProducts !== undefined;
+  const chosenProduct = availableProducts?.find((p) => p.id === productId);
   const liveNet = prevTon != null ? Math.max(0, Math.round((prevTon - ton) * 100) / 100) : null;
 
   if (state === "locked") {
@@ -629,22 +606,24 @@ function WeighStepCard({
         <div className="flex flex-wrap items-center justify-between gap-3">
           <p className="flex items-center gap-2 text-sm font-medium">
             <CheckIcon className="size-4 shrink-0 text-success-strong" />
-            {title}
+            {slot
+              ? `${title}: ${slot.productName}${slot.productSub ? ` ${slot.productSub}` : ""}`
+              : title}
           </p>
           <p className="text-sm text-muted-foreground">
             {checkpoint.ton != null && formatTon(checkpoint.ton)} ตัน
             {checkpoint.at && ` · ${checkpoint.at}`}
           </p>
         </div>
-        {product && (
+        {slot && (
           <div className="mt-2 grid grid-cols-2 gap-3 pl-6 text-sm @lg:grid-cols-4">
             <MetaField label="น้ำหนักจริง" value={net != null ? `${formatTon(net)} ตัน` : "-"} />
             <MetaField
               label="ตามผู้ขาย"
-              value={product.supplierTon != null ? `${formatTon(product.supplierTon)} ตัน` : "-"}
+              value={slot.supplierTon != null ? `${formatTon(slot.supplierTon)} ตัน` : "-"}
             />
-            <MetaField label="เลขที่ใบชั่งพาริช" value={product.parichSlipNo ?? "-"} />
-            <MetaField label="เลขที่ใบชั่งผู้จำหน่าย" value={product.supplierSlipNo || "-"} />
+            <MetaField label="เลขที่ใบชั่งพาริช" value={slot.parichSlipNo ?? "-"} />
+            <MetaField label="เลขที่ใบชั่งผู้จำหน่าย" value={slot.supplierSlipNo || "-"} />
           </div>
         )}
       </div>
@@ -661,6 +640,25 @@ function WeighStepCard({
         </p>
       )}
 
+      {isProductStep && (
+        <div className="mt-3 space-y-1.5">
+          <Label htmlFor={`product-${title}`}>สินค้าที่กำลังลงตอนนี้</Label>
+          <Select value={productId} onValueChange={setProductId}>
+            <SelectTrigger id={`product-${title}`} className="w-full bg-card">
+              <SelectValue placeholder="เลือกสินค้าที่ลง" />
+            </SelectTrigger>
+            <SelectContent>
+              {(availableProducts ?? []).map((p) => (
+                <SelectItem key={p.id} value={p.id}>
+                  {p.productName}
+                  {p.productSub && ` ${p.productSub}`}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      )}
+
       <div className="mt-3 grid gap-4 @lg:grid-cols-2">
         <div className="space-y-1.5">
           <Label htmlFor={`ton-${title}`}>น้ำหนักที่ชั่งได้ (ตัน)</Label>
@@ -672,7 +670,7 @@ function WeighStepCard({
         </div>
       </div>
 
-      {product && (
+      {isProductStep && (
         <>
           {liveNet != null && (
             <div className="mt-3 rounded-lg bg-brand p-3">
@@ -702,8 +700,15 @@ function WeighStepCard({
 
       <div className="mt-4 flex justify-end">
         <Button
-          disabled={ton <= 0}
-          onClick={() => onSave(ton, at, supplierTon, supplierSlipNo)}
+          disabled={ton <= 0 || (isProductStep && !chosenProduct)}
+          onClick={() => {
+            if (isProductStep) {
+              if (!chosenProduct) return;
+              onSaveProduct?.(chosenProduct, ton, at, supplierTon, supplierSlipNo);
+            } else {
+              onSaveGross?.(ton, at);
+            }
+          }}
         >
           บันทึกจุดนี้
         </Button>
