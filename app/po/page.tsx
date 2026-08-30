@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { ListFilterIcon, RotateCcwIcon, SearchIcon } from "lucide-react";
 import {
   AlertDialog,
@@ -71,11 +71,26 @@ import {
 const CHIPS: PoQueueChip[] = ["all", "urgent", "cancelled"];
 
 export default function PoPage() {
+  return (
+    <React.Suspense fallback={null}>
+      <PoPageContent />
+    </React.Suspense>
+  );
+}
+
+function PoPageContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { framed } = useDevicePreview();
   const { hidden, showTop, scrollToTop, scrollIntoTop } = useScrollState();
 
-  const [tab, setTab] = React.useState<"queue" | "po" | "done">("po");
+  // เปิดแท็บตามที่ query param "tab" ระบุไว้ถ้ามี (เช่น กลับจากสร้างใบสั่งซื้อ
+  // ในแท็บ "ขอซื้อ" สำเร็จแล้ว ควรกลับมาที่แท็บ "ขอซื้อ" ต่อ ไม่ใช่รีเซ็ตไปแท็บ
+  // เริ่มต้นเสมอ) ไม่ระบุมาก็ใช้ค่าเริ่มต้นเดิม
+  const initialTab = searchParams.get("tab");
+  const [tab, setTab] = React.useState<"queue" | "po" | "done">(
+    initialTab === "queue" || initialTab === "done" ? initialTab : "po"
+  );
 
   // ลบแบบเดโม — เอาออกจากรายการที่หน้านี้ถือไว้เอง ไม่ได้แตะข้อมูลต้นทาง
   const [removedIds, setRemovedIds] = React.useState<Set<string>>(new Set());

@@ -14,11 +14,13 @@ import {
 } from "@peckey954/ui/components/ui/table";
 import { cn } from "@peckey954/ui/lib/utils";
 import {
+  APPROVAL_OUTCOME_LABEL,
   formatPoBaht,
   formatPoQty,
   lineItemUnitPrice,
   lineItemTotalPrice,
   poTotalPrice,
+  type ApprovalOutcome,
   type PoDoc,
   type PoLineItem,
 } from "@/lib/po";
@@ -43,9 +45,18 @@ import { EmptyDocs, TablePager, paginate } from "@/components/stock/doc-parts";
 ------------------------------------------------------------------ */
 const PAGE_SIZE = 15;
 
+/** ใช้ทั้งแท็บ "รออนุมัติ" (PoDoc เฉยๆ ไม่มี approvalStatus) และแท็บ "ประวัติ"
+ *  (PoApprovalHistoryDoc มี approvalStatus เสมอ) — เป็น optional ที่นี่เพื่อให้
+ *  ส่ง docs ทั้งสองแบบเข้าคอมโพเนนต์เดียวกันได้ ไม่ต้องแยกไฟล์ซ้ำ */
+type ApprovableDoc = PoDoc & { approvalStatus?: ApprovalOutcome };
+
 // เขียนคลาสเต็มทุกตัว ห้ามประกอบชื่อด้วย template string
 const URGENT_CHIP =
   "[--bdg-surface:var(--chip-orange)] [--bdg-text:var(--chip-orange-foreground)]";
+const APPROVAL_STATUS_CHIP: Record<ApprovalOutcome, string> = {
+  approved: "[--bdg-surface:var(--chip-green)] [--bdg-text:var(--chip-green-foreground)]",
+  rejected: "[--bdg-surface:var(--chip-red)] [--bdg-text:var(--chip-red-foreground)]",
+};
 
 function UrgentChip() {
   return (
@@ -55,7 +66,21 @@ function UrgentChip() {
   );
 }
 
-export function ApproveList({ docs }: { docs: PoDoc[] }) {
+/** ชิปผลอนุมัติ — เฉพาะแท็บ "ประวัติ" เท่านั้นที่มี ใบในแท็บ "รออนุมัติ" ยังไม่มีผล
+ *  ให้โชว์เลยไม่ต้องมีชิปสถานะซ้ำอะไร (สถานะของมันคือ "รออนุมัติ" อยู่แล้วตาม
+ *  ชื่อแท็บ ไม่ต้องพูดซ้ำที่การ์ด) */
+function ApprovalStatusChip({ status }: { status: ApprovalOutcome }) {
+  return (
+    <Badge
+      appearance="soft"
+      className={cn("[--bdg-border:transparent] font-semibold whitespace-nowrap", APPROVAL_STATUS_CHIP[status])}
+    >
+      {APPROVAL_OUTCOME_LABEL[status]}
+    </Badge>
+  );
+}
+
+export function ApproveList({ docs }: { docs: ApprovableDoc[] }) {
   const [page, setPage] = React.useState(1);
   const { pages, safe, slice } = paginate(docs, page, PAGE_SIZE);
 
@@ -91,7 +116,7 @@ function ApprovePanel({
   open,
   onToggle,
 }: {
-  doc: PoDoc;
+  doc: ApprovableDoc;
   open: boolean;
   onToggle: () => void;
 }) {
@@ -120,6 +145,11 @@ function ApprovePanel({
             <span className="text-sm text-muted-foreground">ราคารวมทั้งหมด (บาท):</span>
             <span className="text-sm font-semibold tabular-nums">{formatPoBaht(poTotalPrice(d))}</span>
           </div>
+          {d.approvalStatus && (
+            <span className="hidden @3xl:inline-flex">
+              <ApprovalStatusChip status={d.approvalStatus} />
+            </span>
+          )}
           <button
             type="button"
             onClick={onToggle}
@@ -135,7 +165,10 @@ function ApprovePanel({
           flex-1 เดียวกับเลขที่ใบ) เพื่อให้กล่องพื้นเน้นบนจอแคบยาวเต็มการ์ด
           เว้นระยะจากขอบการ์ดเท่ากับที่อื่นทุกจุด (px-4) ไม่ใช่แค่กว้างเท่า
           ความยาวชื่อบริษัทเหมือนก่อนหน้านี้ */}
-      <div className="px-4 pt-1.5 pb-3.5 @3xl:hidden">
+      {/* pb เว้นน้อยลงตอนกางอยู่ (open) เพราะรายการสินค้าต่อท้ายทันที มีระยะเว้น
+          ของตัวเองอยู่แล้ว รวมกันแล้วไม่ควรเกิน ~16px — ตอนปิดยังเว้นเท่าเดิม
+          (เหมือน po-order-list.tsx) */}
+      <div className={cn("px-4 pt-1.5 @3xl:hidden", open ? "pb-1" : "pb-3.5")}>
         <div className="rounded-md bg-brand px-3 py-2">
           <span className="block text-sm font-medium text-foreground">{d.company}</span>
           <span className="mt-0.5 block text-sm text-muted-foreground">
@@ -143,7 +176,7 @@ function ApprovePanel({
           </span>
         </div>
       </div>
-      <div className="hidden px-4 pt-1 pb-3.5 @3xl:block">
+      <div className={cn("hidden px-4 pt-1 @3xl:block", open ? "pb-1" : "pb-3.5")}>
         <span className="text-sm font-semibold text-foreground">{d.company}</span>
       </div>
 
@@ -167,7 +200,10 @@ function ApprovePanel({
           คั่นระหว่างรายการสินค้า ไม่ใช่เส้นเต็มขอบแบบก่อนหน้านี้ */}
       <div className="mx-4 flex items-center justify-between gap-2 border-t border-border py-3 @3xl:hidden">
         <span className="text-sm text-muted-foreground">รวมทั้งหมด (บาท):</span>
-        <span className="text-sm font-semibold tabular-nums">{formatPoBaht(poTotalPrice(d))}</span>
+        <span className="flex items-center gap-2">
+          <span className="text-sm font-semibold tabular-nums">{formatPoBaht(poTotalPrice(d))}</span>
+          {d.approvalStatus && <ApprovalStatusChip status={d.approvalStatus} />}
+        </span>
       </div>
     </div>
   );

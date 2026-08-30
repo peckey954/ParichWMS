@@ -44,13 +44,10 @@ export default function RootLayout({
               เพราะ prop style ที่ส่งจากตรงนี้แทนที่ style เดิมของ DS ทั้งก้อน
               ไม่ได้ merge ทีละตัวแปร
 
-              ตำแหน่งขวาบน ให้ต่อเนื่องกับปุ่มกระดิ่งแจ้งเตือนบนหัวเรื่อง (แทน
-              ค่าเริ่มต้นของ sonner ที่โผล่มุมล่างขวา) เว้น offset บนพ้นหัวเรื่อง
-              สูง 56px (h-14) แล้วเว้นระยะห่างอีกนิด ไม่ให้ทับกัน */}
+              ตำแหน่ง — ไม่ระบุ position/offset เอง ปล่อยเป็นค่าเริ่มต้นของ
+              sonner (มุมล่างขวา) ตามที่ขอกลับมาใช้แบบเดิม */}
           <Toaster
             richColors
-            position="top-right"
-            offset={{ top: 72, right: 16 }}
             style={
               {
                 "--normal-bg": "var(--popover)",

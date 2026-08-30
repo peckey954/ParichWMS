@@ -178,7 +178,10 @@ function PoOrderPanel({
           เท่ากับจุดอื่นทุกที่ (px-4) แยกออกมาจากแถวหัวแผงด้านบน มีจำนวนรายการ
           สินค้าเป็นอีกบรรทัดในกล่องเดียวกัน (จอแคบไม่มีที่ให้โชว์ตรงหัวแผงแบบ
           จอกว้าง เลยย้ายมาไว้ตรงนี้แทน) */}
-      <div className="px-4 pt-1.5 pb-3.5 @3xl:hidden">
+      {/* pb เว้นน้อยลงตอนกางอยู่ (open) เพราะรายการสินค้าต่อท้ายทันที มีระยะเว้น
+          ของตัวเองอยู่แล้ว (py-3 ของแถวแรก) รวมกันแล้วไม่ควรเกิน ~16px — ตอนปิด
+          (ไม่มีรายการสินค้าต่อท้าย ถัดไปคือเส้นคั่นก่อนชิปสถานะ) ยังเว้นเท่าเดิม */}
+      <div className={cn("px-4 pt-1.5 @3xl:hidden", open ? "pb-1" : "pb-3.5")}>
         <div className="rounded-md bg-brand px-3 py-2">
           <span className="block text-sm font-medium text-foreground">{d.company}</span>
           <span className="mt-0.5 block text-sm text-muted-foreground">
@@ -360,7 +363,8 @@ function ProductListSimple({ po, onNavigate }: { po: PoDoc; onNavigate: () => vo
         <div
           key={item.id}
           onClick={onNavigate}
-          className="flex cursor-pointer items-start justify-between gap-3 py-3"
+          // items-center ให้ปุ่ม "เพิ่มรอบ" อยู่กึ่งกลางความสูงของแถว ไม่ใช่ชิดบน
+          className="flex cursor-pointer items-center justify-between gap-3 py-3"
         >
           <div className="min-w-0 flex-1 text-sm">
             <ProductLabel item={item} code={lineItemCode(po, index)} stacked />

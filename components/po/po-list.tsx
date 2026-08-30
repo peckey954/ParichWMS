@@ -265,18 +265,27 @@ function PoCard({
 
   return (
     <div className="rounded-xl border border-border bg-card p-4">
-      <div className="flex items-center justify-between gap-2">
-        <div className="flex min-w-0 items-center gap-3">
+      {/* items-start (ไม่ใช่ items-center) เพราะเลขที่ใบ/วันที่แยกเป็นสองบรรทัด
+          ตอนนี้ — เดิมอยู่แถวเดียวกันหมด (เช็คบ็อกซ์+เลขที่ใบ+วันที่+ปุ่มลบ)
+          อัดแน่นเกินไปจนวันที่ตัดคำ แยกวันที่ลงบรรทัดใหม่ใต้เลขที่ใบแทน
+          (เหมือนคอลัมน์แรกของตารางจอกว้างด้านบนอยู่แล้ว) */}
+      <div className="flex items-start justify-between gap-2">
+        <div className="flex min-w-0 items-start gap-3">
           <Checkbox
             aria-label={`เลือก ${d.code}`}
+            className="mt-0.5"
             checked={checked}
             disabled={!actionable || categoryLocked}
             onCheckedChange={(v) => onToggle(v !== false)}
           />
-          <Link href={`/pr/${d.id}`} className="font-semibold hover:underline">
-            {d.code}
-          </Link>
-          <span className="text-sm whitespace-nowrap text-muted-foreground">{d.createdAt}</span>
+          <div className="min-w-0">
+            <Link href={`/pr/${d.id}`} className="block font-semibold hover:underline">
+              {d.code}
+            </Link>
+            <span className="block text-sm whitespace-nowrap text-muted-foreground">
+              {d.createdAt}
+            </span>
+          </div>
         </div>
         {/* ปุ่มลบอยู่บนสุดคู่กับเลขที่ใบ — ไม่ใช่ลงไปอยู่แถวล่างสุดกับปุ่มอื่น
             ใช้ outline-primary แบบเดียวกับปุ่มไอคอนอื่นในแอป (เช่นปุ่มตัวกรอง)
@@ -299,10 +308,11 @@ function PoCard({
           {d.productName}
           {d.productSub && ` ${d.productSub}`}
         </p>
-        <p className="flex flex-wrap items-center gap-x-2 text-sm">
-          <span>{PR_CATEGORY_LABEL[d.categoryId]}</span>
-          <span>{d.group}</span>
-          {d.packing && <span>{d.packing}</span>}
+        {/* เส้นคั่น "|" ระหว่างประเภท/หมวด/บรรจุภัณฑ์ — ตามแบบเดียวกับ
+            ProductLabel ของหน้าสั่งซื้อ/อนุมัติ (po-order-list.tsx, approve-list.tsx) */}
+        <p className="text-sm">
+          {PR_CATEGORY_LABEL[d.categoryId]} | {d.group}
+          {d.packing && ` | ${d.packing}`}
         </p>
       </CardBox>
 

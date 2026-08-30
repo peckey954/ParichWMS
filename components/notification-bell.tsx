@@ -1,6 +1,5 @@
 "use client";
 
-import * as React from "react";
 import Link from "next/link";
 import { BellIcon } from "lucide-react";
 import { Button } from "@peckey954/ui/components/ui/button";
@@ -19,16 +18,16 @@ import { useNotifications } from "@/components/notifications-provider";
 ------------------------------------------------------------------ */
 
 export function NotificationBell() {
-  const { notifications, unreadCount, isRead, markRead } = useNotifications();
-  const [open, setOpen] = React.useState(false);
+  const { notifications, unreadCount, isRead, markRead, bellOpen, setBellOpen } =
+    useNotifications();
 
   function handleNavigate(id: string) {
     markRead(id);
-    setOpen(false);
+    setBellOpen(false);
   }
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover open={bellOpen} onOpenChange={setBellOpen}>
       <PopoverTrigger asChild>
         <Button
           variant="ghost"
@@ -66,7 +65,7 @@ export function NotificationBell() {
             asChild
             variant="ghost"
             className="w-full justify-center text-primary"
-            onClick={() => setOpen(false)}
+            onClick={() => setBellOpen(false)}
           >
             <Link href="/notifications">ดูการแจ้งเตือนทั้งหมด</Link>
           </Button>

@@ -4,7 +4,7 @@ import * as React from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter, usePathname } from "next/navigation";
-import { MenuIcon, XIcon } from "lucide-react";
+import { CheckIcon, MenuIcon, XIcon } from "lucide-react";
 import { Avatar, AvatarFallback } from "@peckey954/ui/components/ui/avatar";
 import { Button } from "@peckey954/ui/components/ui/button";
 import {
@@ -36,6 +36,17 @@ import {
   modulesOf,
   type ModuleItem,
 } from "@/lib/modules";
+import type { AppNotification } from "@/lib/notifications";
+
+/** ไอคอนของ toast แจ้งเตือน — ไม่มีกล่องพื้นสีเหมือนในลิสต์ (ที่นี่แค่สัญลักษณ์
+    เล็กๆ ต้นหัวข้อ) ปล่อยให้สืบสีส้มจาก toast เอง (currentColor) แทน ปกติเป็น
+    ไอคอนเมนูที่เกี่ยวข้อง ยกเว้นเป็นผลลัพธ์ชัดเจน (อนุมัติ/ไม่อนุมัติ) ถึงใช้
+    เครื่องหมายถูก/กากบาทแทน */
+function ToastNotificationIcon({ n }: { n: AppNotification }) {
+  if (n.outcome === "fail") return <XIcon className="size-4" />;
+  if (n.outcome === "success") return <CheckIcon className="size-4" />;
+  return <ModuleIcon name={n.moduleIcon} className="size-4" />;
+}
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   return (
@@ -58,12 +69,20 @@ function Shell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   // ค่าเริ่มต้นคือหุบ — เปิดหน้าไหนก็เห็นเนื้อหาเต็มความกว้างไว้ก่อน
   const [expanded, setExpanded] = React.useState(false);
-  const { unreadCount } = useNotifications();
+  const { notifications, unreadCount, isRead, markRead, setBellOpen } = useNotifications();
 
   // แจ้งจำนวนแจ้งเตือนที่ยังไม่อ่านทันทีที่เข้าเว็บ (โหลดหน้าใหม่ทั้งหน้า) —
   // effect นี้อยู่ใน Shell ซึ่งอยู่นอก {children} จึงไม่ remount ตอนเปลี่ยน
   // หน้าแบบ client-side, [] ว่างเปล่าเลยขึ้นแค่ครั้งเดียวต่อการโหลดจริงหนึ่งครั้ง
   // ไม่ใช่ทุกครั้งที่กดลิงก์เปลี่ยนหน้าในแอป
+  //
+  // มีแจ้งเตือนเดียว — โชว์ชื่อ/รายละเอียดของอันนั้นตรงๆ กดปุ่มแล้วพาไปหน้า
+  // เอกสารนั้นทันที ไม่ต้องผ่านรายการก่อน
+  // มีมากกว่าหนึ่ง — โชว์แค่จำนวนรวม กดปุ่มแล้ว:
+  //   จอกว้าง — เปิด popover กระดิ่งตัวเดิม (เหมือนกดกระดิ่งเอง ไม่ใช่สร้าง
+  //   หน้าต่างแยกใหม่ — ของเดิมที่มีอยู่แล้วถูกที่สุด แค่เปิดจากปุ่มนี้ได้ด้วย)
+  //   จอแคบ — ไปหน้า /notifications เต็มหน้าตรงๆ (มือถือไม่มีที่พอให้ popover
+  //   ลอยแบบจอกว้าง เต็มหน้าอ่านง่ายกว่า)
   React.useEffect(() => {
     if (unreadCount === 0) return;
     // หน่วงเล็กน้อยก่อนยิง toast — <Toaster> (คนละ component, อยู่ถัดจาก
@@ -72,15 +91,46 @@ function Shell({ children }: { children: React.ReactNode }) {
     // หายเงียบ ๆ ไม่ขึ้นอะไรเลย (เจอบั๊กนี้จริงตอนพัฒนา) หน่วง 1 tick ก็พอ
     // แต่ใส่ไว้สัก 400ms เผื่อจังหวะ เพราะรู้สึกเป็นธรรมชาติกว่าโผล่ทันทีที่วาดจอ
     const timer = setTimeout(() => {
-      // .success ไม่ใช่เพราะมีอะไร "สำเร็จ" แต่เพื่อให้ได้สีส้มแบรนด์เดียวกับ
-      // toast สำเร็จอื่น ๆ ทั้งแอป (ตั้งไว้ผ่าน --success-* ใน app/layout.tsx)
-      toast.success(`มีการแจ้งเตือนใหม่ ${unreadCount} รายการ`, {
-        description: "กดเพื่อไปดูรายละเอียดที่หน้าการแจ้งเตือน",
-        action: {
-          label: "ดูการแจ้งเตือน",
-          onClick: () => router.push("/notifications"),
-        },
-      });
+      const unread = notifications.filter((n) => !isRead(n.id));
+      // หัวข้อตัวหนาแค่นั้นพอ (ไม่ขยาย font-size — ลองแล้วดูใหญ่เกินไป)
+      // ปุ่ม action ของ toast นี้ปรับเป็น outline ส้ม (พื้นขาว/ใส ขอบ+ตัวอักษร
+      // ส้ม) แทนปุ่มพื้นทึบเริ่มต้นของ sonner ให้เข้าธีมปุ่มรองของทั้งแอป —
+      // ต้องใส่ ! เพราะกฎ [data-button] ของ sonner specificity สูงกว่า
+      const classNames = {
+        title: "font-semibold",
+        actionButton: "bg-transparent! text-primary! border! border-primary!",
+      };
+
+      if (unread.length === 1) {
+        const n = unread[0];
+        // .success ไม่ใช่เพราะมีอะไร "สำเร็จ" แต่เพื่อให้ได้สีส้มแบรนด์เดียวกับ
+        // toast สำเร็จอื่น ๆ ทั้งแอป (ตั้งไว้ผ่าน --success-* ใน app/layout.tsx)
+        toast.success(n.title, {
+          description: n.description,
+          icon: <ToastNotificationIcon n={n} />,
+          classNames,
+          action: {
+            label: "ไปดู",
+            onClick: () => {
+              markRead(n.id);
+              router.push(n.href);
+            },
+          },
+        });
+      } else {
+        toast.success(`มีการแจ้งเตือนใหม่ ${unread.length} รายการ`, {
+          description: "กดเพื่อดูรายการแจ้งเตือนทั้งหมด",
+          classNames,
+          action: {
+            label: "ดูการแจ้งเตือน",
+            onClick: () => {
+              const isDesktop = window.matchMedia("(min-width: 640px)").matches;
+              if (isDesktop) setBellOpen(true);
+              else router.push("/notifications");
+            },
+          },
+        });
+      }
     }, 400);
     return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps

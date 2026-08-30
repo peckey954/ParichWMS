@@ -4,16 +4,6 @@ import * as React from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { ChevronDownIcon } from "lucide-react";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@peckey954/ui/components/ui/alert-dialog";
 import { Badge } from "@peckey954/ui/components/ui/badge";
 import {
   Breadcrumb,
@@ -30,6 +20,16 @@ import {
   CollapsibleTrigger,
 } from "@peckey954/ui/components/ui/collapsible";
 import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@peckey954/ui/components/ui/dialog";
+import { Label } from "@peckey954/ui/components/ui/label";
+import {
   Table,
   TableBody,
   TableCell,
@@ -37,6 +37,7 @@ import {
   TableHeader,
   TableRow,
 } from "@peckey954/ui/components/ui/table";
+import { Textarea } from "@peckey954/ui/components/ui/textarea";
 import { cn } from "@peckey954/ui/lib/utils";
 import { toast } from "sonner";
 import {
@@ -51,12 +52,14 @@ import {
   TableFrame,
 } from "@/components/stock/doc-parts";
 import {
+  APPROVAL_OUTCOME_LABEL,
   formatPoBaht,
   formatPoQty,
-  getPoOrder,
+  getApprovalDoc,
   lineItemTotalPrice,
   lineItemUnitPrice,
   poTotalPrice,
+  type ApprovalOutcome,
   type PoDoc,
 } from "@/lib/po";
 
@@ -67,6 +70,14 @@ import {
    ฯลฯ) เปิดเป็นหน้าแยกเสมอ ไม่เคยเป็น modal — มี breadcrumb/URL ของตัวเอง
    กด back ของเบราว์เซอร์ได้ตรงไปตรงมา ทำแบบเดียวกันเพื่อความสม่ำเสมอ
 
+   หน้านี้เปิดได้ทั้งจากคิว "รออนุมัติ" และแท็บ "ประวัติ" (getApprovalDoc หาทั้ง
+   สองที่) — ใบที่มาจากประวัติตัดสินใจไปแล้ว (มี approvalStatus) จึงไม่มีปุ่ม
+   อนุมัติ/ไม่อนุมัติให้กดซ้ำ แค่ดูอย่างเดียว มีชิปผลลัพธ์ + เหตุผลไม่อนุมัติ (ถ้ามี)
+   แทนที่แถบปุ่มล่าง
+
+   กดไม่อนุมัติต้องกรอกเหตุผลก่อนถึงจะยืนยันได้ — ใช้ Dialog ธรรมดา ไม่ใช่
+   AlertDialog เพราะมีช่องกรอกข้อมูลอยู่ข้างใน
+
    ไม่มี backend จริง — กดอนุมัติ/ไม่อนุมัติแล้วขึ้น toast แล้วพากลับไปหน้ารายการ
    ไม่ได้เขียนผลจริงลงในข้อมูลตัวอย่าง (เหมือนปุ่มอื่นๆ ทั้งแอปนี้)
 ------------------------------------------------------------------ */
@@ -74,11 +85,27 @@ import {
 // เขียนคลาสเต็มทุกตัว ห้ามประกอบชื่อด้วย template string
 const URGENT_CHIP =
   "[--bdg-surface:var(--chip-orange)] [--bdg-text:var(--chip-orange-foreground)]";
+const APPROVAL_STATUS_CHIP: Record<ApprovalOutcome, string> = {
+  approved: "[--bdg-surface:var(--chip-green)] [--bdg-text:var(--chip-green-foreground)]",
+  rejected: "[--bdg-surface:var(--chip-red)] [--bdg-text:var(--chip-red-foreground)]",
+};
 
 function UrgentChip() {
   return (
     <Badge appearance="soft" className={cn("[--bdg-border:transparent] ml-2 font-semibold", URGENT_CHIP)}>
       เร่งด่วน
+    </Badge>
+  );
+}
+
+/** ชิปผลอนุมัติ — โผล่เฉพาะใบที่มาจากแท็บ "ประวัติ" (ตัดสินใจไปแล้ว) */
+function ApprovalStatusChip({ status }: { status: ApprovalOutcome }) {
+  return (
+    <Badge
+      appearance="soft"
+      className={cn("[--bdg-border:transparent] font-semibold", APPROVAL_STATUS_CHIP[status])}
+    >
+      {APPROVAL_OUTCOME_LABEL[status]}
     </Badge>
   );
 }
@@ -92,8 +119,9 @@ function lineItemCode(po: PoDoc, index: number): string {
 export default function ApproveDetailPage() {
   const router = useRouter();
   const params = useParams<{ id: string }>();
-  const po = React.useMemo(() => getPoOrder(params.id), [params.id]);
+  const po = React.useMemo(() => getApprovalDoc(params.id), [params.id]);
   const [rejectOpen, setRejectOpen] = React.useState(false);
+  const [rejectReason, setRejectReason] = React.useState("");
 
   if (!po) {
     return (
@@ -110,12 +138,21 @@ export default function ApproveDetailPage() {
     );
   }
 
+  // ใบที่มาจากแท็บ "ประวัติ" มี approvalStatus ติดมาด้วยเสมอ — ใบจากคิว
+  // "รออนุมัติ" ไม่มีฟิลด์นี้เลย ใช้ตัดสินว่าตัดสินใจไปแล้วหรือยัง
+  const decided = "approvalStatus" in po ? po.approvalStatus : undefined;
+  const rejectedReasonText = "rejectReason" in po ? po.rejectReason : undefined;
+
   function handleApprove() {
     toast.success(`อนุมัติใบสั่งซื้อ ${po!.code} แล้ว`);
     router.push("/approve");
   }
 
   function handleReject() {
+    if (!rejectReason.trim()) {
+      toast.error("กรุณาระบุเหตุผลการไม่อนุมัติ");
+      return;
+    }
     setRejectOpen(false);
     toast.success(`ไม่อนุมัติใบสั่งซื้อ ${po!.code} แล้ว`);
     router.push("/approve");
@@ -127,11 +164,24 @@ export default function ApproveDetailPage() {
         <Crumbs code={po.code} />
 
         <h1 className="mt-2 text-2xl font-semibold tracking-tight">ใบอนุมัติ {po.code}</h1>
-        <p className="mt-1.5 text-sm text-muted-foreground">{po.createdAt}</p>
+        <p className="mt-1.5 flex items-center gap-2 text-sm text-muted-foreground">
+          {po.createdAt}
+          {decided && <ApprovalStatusChip status={decided} />}
+        </p>
 
-        {/* ---------- ข้อมูลใบสั่งซื้อ — เปิดไว้เป็นค่าเริ่มต้น ผู้อนุมัติต้องเห็น
-            ราคา/วันที่ทันทีที่เข้าหน้า ไม่ต้องกดกางก่อนถึงจะตัดสินใจได้ ---------- */}
-        <Collapsible defaultOpen className="mt-5 rounded-xl border border-border bg-card">
+        {decided === "rejected" && rejectedReasonText && (
+          <div className="mt-4 rounded-xl border border-danger-border bg-danger px-4 py-3 text-sm">
+            <span className="text-muted-foreground">เหตุผลที่ไม่อนุมัติ: </span>
+            {rejectedReasonText}
+          </div>
+        )}
+
+        {/* ---------- ข้อมูลใบสั่งซื้อ — หุบไว้เป็นค่าเริ่มต้น มีแค่ราคารวม/วันที่
+            (กล่องพื้นสีแบรนด์) ที่เห็นตลอดไม่ว่าจะหุบหรือกาง เพราะเป็นตัวเลขหลัก
+            ที่ต้องใช้ตัดสินใจทันทีที่เข้าหน้า ส่วนผู้สั่งซื้อ/ผู้แก้ไข/หมายเหตุ/
+            ผู้อนุมัติเป็นแค่ข้อมูลอ้างอิงเพิ่มเติม ไม่ต้องโชว์ตั้งแต่แรกก็ได้
+            ---------- */}
+        <Collapsible className="mt-5 rounded-xl border border-border bg-card">
           <CollapsibleTrigger asChild>
             <button
               type="button"
@@ -146,7 +196,8 @@ export default function ApproveDetailPage() {
               <ChevronDownIcon className="mt-0.5 size-5 shrink-0 text-muted-foreground transition-transform group-data-[state=open]:rotate-180" />
             </button>
           </CollapsibleTrigger>
-          <CollapsibleContent className="px-4 pb-4">
+
+          <div className="px-4 pb-4">
             <div className="grid gap-4 rounded-lg bg-brand p-4 @lg:grid-cols-2">
               <Stat label="ราคารวมทั้งหมด (บาท)" value={formatPoBaht(poTotalPrice(po))} />
               <Stat
@@ -154,7 +205,10 @@ export default function ApproveDetailPage() {
                 value={`${po.expectedFrom} - ${po.expectedTo}`}
               />
             </div>
-            <div className="mt-4 grid grid-cols-2 gap-4 text-sm @2xl:grid-cols-4">
+          </div>
+
+          <CollapsibleContent className="px-4 pb-4">
+            <div className="grid grid-cols-2 gap-4 text-sm @2xl:grid-cols-4">
               <MetaField label="ผู้สั่งซื้อ" value={po.requester} />
               <MetaField label="ผู้แก้ไขสั่งซื้อล่าสุด" value={po.editedBy ?? "-"} />
               <MetaField label="หมายเหตุ" value={po.note ?? "-"} />
@@ -172,39 +226,65 @@ export default function ApproveDetailPage() {
         </div>
       </main>
 
-      {/* ---------- แถบปุ่มล่าง ---------- */}
+      {/* ---------- แถบปุ่มล่าง — ใบที่ตัดสินใจไปแล้ว (จากแท็บ "ประวัติ") เหลือ
+          แค่ปุ่มย้อนกลับ ไม่มีปุ่มอนุมัติ/ไม่อนุมัติให้กดซ้ำ ---------- */}
       <div className="sticky bottom-0 z-30 border-t border-border bg-surface">
         <div className="mx-auto flex w-full max-w-6xl items-center justify-between gap-3 px-4 py-3 sm:px-6">
           <Button variant="outline-primary" onClick={() => router.back()}>
             ย้อนกลับ
           </Button>
-          <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              className="border-destructive/40 text-destructive hover:bg-destructive/10"
-              onClick={() => setRejectOpen(true)}
-            >
-              ไม่อนุมัติ
-            </Button>
-            <Button onClick={handleApprove}>อนุมัติ</Button>
-          </div>
+          {!decided && (
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                className="border-destructive/40 text-destructive hover:bg-destructive/10"
+                onClick={() => setRejectOpen(true)}
+              >
+                ไม่อนุมัติ
+              </Button>
+              <Button onClick={handleApprove}>อนุมัติ</Button>
+            </div>
+          )}
         </div>
       </div>
 
-      <AlertDialog open={rejectOpen} onOpenChange={setRejectOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>ไม่อนุมัติใบสั่งซื้อนี้ใช่ไหม?</AlertDialogTitle>
-            <AlertDialogDescription>
-              เอกสารจะถูกตีกลับให้แก้ไข การดำเนินการนี้แก้ไขกลับไม่ได้
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>ยกเลิก</AlertDialogCancel>
-            <AlertDialogAction onClick={handleReject}>ยืนยันไม่อนุมัติ</AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      {/* ---------- ยืนยันไม่อนุมัติ — ต้องกรอกเหตุผลก่อนถึงจะกดยืนยันได้
+          (Dialog ธรรมดา ไม่ใช่ AlertDialog เพราะมีช่องกรอกข้อมูลอยู่ข้างใน) ---------- */}
+      <Dialog
+        open={rejectOpen}
+        onOpenChange={(next) => {
+          setRejectOpen(next);
+          if (!next) setRejectReason("");
+        }}
+      >
+        <DialogContent>
+          <DialogHeader className="text-left">
+            <DialogTitle>คุณต้องการไม่อนุมัติการสั่งซื้อสินค้าใช่ไหม?</DialogTitle>
+            <DialogDescription>กรุณาระบุเหตุผลการไม่อนุมัติ</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-1.5">
+            <Label htmlFor="reject-reason">เหตุผลการไม่อนุมัติ</Label>
+            <Textarea
+              id="reject-reason"
+              className="bg-card"
+              rows={4}
+              placeholder="ระบุเหตุผล"
+              value={rejectReason}
+              onChange={(e) => setRejectReason(e.target.value)}
+            />
+          </div>
+          <DialogFooter>
+            <DialogClose asChild>
+              <Button variant="outline-primary" className="flex-1">
+                ย้อนกลับ
+              </Button>
+            </DialogClose>
+            <Button className="flex-1" onClick={handleReject}>
+              ไม่อนุมัติ
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -443,3 +443,51 @@ export function getPoLineItem(
   if (!po || !item) return undefined;
   return { po, item };
 }
+
+// ============================================================
+// หน้า "อนุมัติ" แท็บ "ประวัติ" — ใบที่ผ่านการอนุมัติ/ไม่อนุมัติไปแล้ว คนละชุด
+// ข้อมูลกับ PO_ORDER_DOCS (นั่นคือคิวที่ "รอ" อนุมัติ) เพราะผลอนุมัติเป็นคนละ
+// มิติกับ PoStatus (pending/cancelled ที่ใช้ตัดสินความคืบหน้าการรับเข้าสินค้า)
+// ============================================================
+
+export type ApprovalOutcome = "approved" | "rejected";
+
+export const APPROVAL_OUTCOME_LABEL: Record<ApprovalOutcome, string> = {
+  approved: "อนุมัติ",
+  rejected: "ไม่อนุมัติ",
+};
+
+export type PoApprovalHistoryDoc = PoDoc & {
+  approvalStatus: ApprovalOutcome;
+  /** มีค่าเฉพาะใบที่ไม่อนุมัติ — เหตุผลที่ผู้อนุมัติกรอกไว้ตอนกดไม่อนุมัติ */
+  rejectReason?: string;
+};
+
+const REJECT_REASON_POOL = [
+  "ราคาสูงเกินงบที่อนุมัติไว้",
+  "ข้อมูลซัพพลายเออร์ไม่ครบ",
+  "ขอให้เทียบราคาเพิ่มก่อนอนุมัติ",
+];
+
+/** สิบสี่ใบ สลับผลอนุมัติ/ไม่อนุมัติ — ใช้ seq ตั้งแต่ 100 ขึ้นไป กันชนกับ
+ *  PO_ORDER_DOCS (seq 1-10) เพราะ buildPoDoc ใช้ seq คำนวณทั้งเลขที่ใบและ
+ *  seed สุ่ม — สถานะรับเข้า (pending) ไม่มีผลต่อหน้านี้ ไม่ได้ใช้แสดงอะไรเลย */
+export const PO_APPROVAL_HISTORY_DOCS: PoApprovalHistoryDoc[] = Array.from(
+  { length: 14 },
+  (_, i) => {
+    const approvalStatus: ApprovalOutcome = i % 3 === 0 ? "rejected" : "approved";
+    const rnd = seeded(700 + i);
+    return {
+      ...buildPoDoc(100 + i, "pending"),
+      approvalStatus,
+      rejectReason: approvalStatus === "rejected" ? pick(REJECT_REASON_POOL, rnd) : undefined,
+    };
+  }
+);
+
+/** ใบสั่งซื้อสำหรับหน้าอนุมัติ — หาทั้งในคิว "รออนุมัติ" (PO_ORDER_DOCS) และ
+ *  "ประวัติ" (PO_APPROVAL_HISTORY_DOCS) เพราะหน้าใบอนุมัติ (/approve/[id]) เปิด
+ *  ได้จากทั้งสองที่ ไอดีไม่ชนกันเพราะ seq คนละช่วง (1-10 vs 100+) */
+export function getApprovalDoc(id: string): PoApprovalHistoryDoc | PoDoc | undefined {
+  return PO_ORDER_DOCS.find((d) => d.id === id) ?? PO_APPROVAL_HISTORY_DOCS.find((d) => d.id === id);
+}

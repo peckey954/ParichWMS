@@ -195,7 +195,9 @@ function CreatePoForm() {
     toast.success("สร้างใบสั่งซื้อแล้ว", {
       description: `${company} — ${lines.length} รายการ · ${formatPoBaht(totalPrice)} บาท`,
     });
-    router.push("/po");
+    // กลับไปแท็บ "ขอซื้อ" (ที่มาของหน้านี้เสมอ) ไม่ใช่แท็บเริ่มต้น — เผื่อทำ
+    // รายการสร้างใบสั่งซื้อถัดไปต่อได้เลย
+    router.push("/po?tab=queue");
   }
 
   return (
@@ -381,41 +383,65 @@ function ProductCard({
   onRemove: () => void;
 }) {
   return (
-    <Collapsible defaultOpen className="rounded-xl border border-border bg-card">
-      <div className="flex flex-wrap items-start justify-between gap-3 p-4 pb-0">
-        <div className="min-w-0">
-          <p className="font-medium">
-            {line.productName}
-            {line.productSub && ` ${line.productSub}`}
-          </p>
-          <p className="mt-0.5 text-sm whitespace-nowrap text-muted-foreground">
-            {PR_CATEGORY_LABEL[line.categoryId]} · {line.group}
-            {line.packing && ` · ${line.packing}`}
-          </p>
+    // ไม่ defaultOpen — การ์ดสินค้าเริ่มต้นหุบไว้เสมอ กางเมื่อกดดูข้อมูลอ้างอิง
+    // ใบขอซื้อเท่านั้น (ช่องกรอกจำนวน/ราคาด้านล่างไม่ได้อยู่ใน Collapsible เลย
+    // เห็นได้ตลอดไม่ว่าหุบ/กาง)
+    <Collapsible className="rounded-xl border border-border bg-card">
+      <div className="p-4 pb-0">
+        {/* บรรทัดชื่อสินค้า — ปุ่มลบ/หุบกางอยู่มุมขวาบนแถวเดียวกับชื่อเสมอ
+            ไม่ปล่อยให้ตกไปแถวใหม่ตอนจอแคบเหมือนก่อนหน้านี้ (ตอนนั้นอยู่รวมกับ
+            วันที่/ชิปเร่งด่วนในกลุ่มเดียวกัน พอ flex-wrap แล้วหลุดไปบรรทัดถัดไป) */}
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <p className="font-medium">
+              {line.productName}
+              {line.productSub && ` ${line.productSub}`}
+            </p>
+            <p className="mt-0.5 text-sm whitespace-nowrap text-muted-foreground">
+              {PR_CATEGORY_LABEL[line.categoryId]} · {line.group}
+              {line.packing && ` · ${line.packing}`}
+            </p>
+          </div>
+
+          <div className="flex shrink-0 items-center gap-2">
+            <Button variant="ghost" size="icon" aria-label="ลบสินค้านี้" onClick={onRemove}>
+              <Trash2Icon />
+            </Button>
+            {/* ไม่มี prRef (สินค้าที่กดเพิ่มเองในหน้านี้ ไม่ได้มาจากใบขอซื้อ) ก็ไม่มี
+                อะไรให้กางดู เลยไม่ต้องมีปุ่มหุบ/กางเลย */}
+            {line.prRef && (
+              <CollapsibleTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  aria-label="แสดง/ซ่อนข้อมูลอ้างอิงใบขอซื้อ"
+                  className="group"
+                >
+                  <ChevronDownIcon className="transition-transform group-data-[state=open]:rotate-180" />
+                </Button>
+              </CollapsibleTrigger>
+            )}
+          </div>
         </div>
 
-        <div className="flex shrink-0 items-center gap-2">
-          {/* วันที่มาจากใบขอซื้อที่คนขอกรอกไว้แล้ว — ดูอย่างเดียว แก้ไม่ได้ในหน้านี้ */}
-          <span className="text-sm whitespace-nowrap text-muted-foreground">
-            วันที่ต้องการสินค้า:{" "}
-            <span className="font-medium text-foreground tabular-nums">
-              {line.neededDate || "-"}
+        {/* วันที่มาจากใบขอซื้อที่คนขอกรอกไว้แล้ว — ดูอย่างเดียว แก้ไม่ได้ในหน้านี้
+            แยกลงมาเป็นบรรทัดของตัวเอง (ไม่ใช่แถวเดียวกับปุ่มลบ/หุบกางแบบเดิม)
+            ปล่อยให้ wrap ร่วมกับชิปเร่งด่วนได้อิสระโดยไม่กระทบตำแหน่งปุ่มด้านบน */}
+        {(line.neededDate || line.urgent) && (
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            <span className="text-sm whitespace-nowrap text-muted-foreground">
+              วันที่ต้องการสินค้า:{" "}
+              <span className="font-medium text-foreground tabular-nums">
+                {line.neededDate || "-"}
+              </span>
             </span>
-          </span>
-          {line.urgent && (
-            <span className="inline-flex shrink-0 items-center rounded-full border border-transparent px-3 py-1 text-xs font-semibold whitespace-nowrap [--bdg-surface:var(--chip-orange)] [--bdg-text:var(--chip-orange-foreground)] bg-(--bdg-surface) text-(--bdg-text)">
-              เร่งด่วน
-            </span>
-          )}
-          <Button variant="ghost" size="icon" aria-label="ลบสินค้านี้" onClick={onRemove}>
-            <Trash2Icon />
-          </Button>
-          <CollapsibleTrigger asChild>
-            <Button variant="ghost" size="icon" aria-label="แสดง/ซ่อนรายละเอียด" className="group">
-              <ChevronDownIcon className="transition-transform group-data-[state=open]:rotate-180" />
-            </Button>
-          </CollapsibleTrigger>
-        </div>
+            {line.urgent && (
+              <span className="inline-flex shrink-0 items-center rounded-full border border-transparent px-3 py-1 text-xs font-semibold whitespace-nowrap [--bdg-surface:var(--chip-orange)] [--bdg-text:var(--chip-orange-foreground)] bg-(--bdg-surface) text-(--bdg-text)">
+                เร่งด่วน
+              </span>
+            )}
+          </div>
+        )}
       </div>
 
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1 px-4 pt-1.5 pb-3 text-sm">
@@ -433,62 +459,64 @@ function ProductCard({
         </span>
       </div>
 
-      <CollapsibleContent className="border-t border-border px-4 pt-4 pb-4">
-        <div className="grid gap-4 @lg:grid-cols-4">
-          <div className="space-y-1.5">
-            <Label>บรรจุภัณฑ์</Label>
-            {line.packingOptions.length > 0 ? (
-              <Select value={line.packing} onValueChange={(v) => onChange({ packing: v })}>
-                <SelectTrigger className="w-full bg-card">
-                  <SelectValue placeholder="เลือกบรรจุภัณฑ์" />
-                </SelectTrigger>
-                <SelectContent>
-                  {line.packingOptions.map((p) => (
-                    <SelectItem key={p} value={p}>
-                      {p}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            ) : (
-              <p className="flex h-9 items-center rounded-md border border-border bg-card px-3 text-sm text-muted-foreground">
-                {line.packing ?? "-"}
-              </p>
-            )}
-          </div>
-          <div className="space-y-1.5">
-            <Label>สั่งซื้อ ({line.unit})</Label>
-            <NumberStepper
-              value={line.orderedQty}
-              onValueChange={(v) => onChange({ orderedQty: v })}
-            />
-          </div>
-          <div className="space-y-1.5">
-            <Label>ราคาสั่งต่อ{line.unit} (บาท)</Label>
-            <NumberStepper
-              value={line.pricePerUnit}
-              onValueChange={(v) => onChange({ pricePerUnit: v })}
-              step={10}
-            />
-          </div>
-          <div className="space-y-1.5">
-            <Label>ค่าการจัดการต่อ{line.unit} (บาท)</Label>
-            <NumberStepper
-              value={line.handlingPerUnit}
-              onValueChange={(v) => onChange({ handlingPerUnit: v })}
-              step={10}
-            />
-          </div>
+      {/* ช่องกรอกจำนวน/ราคา — เห็นตลอดไม่ว่าการ์ดจะหุบหรือกางอยู่ ไม่ได้ซ่อนใน
+          Collapsible เพราะเป็นข้อมูลที่ต้องกรอกก่อนบันทึกใบ ไม่ใช่แค่ดูอ้างอิง */}
+      <div className="grid gap-4 border-t border-border px-4 pt-4 pb-4 @lg:grid-cols-4">
+        <div className="space-y-1.5">
+          <Label>บรรจุภัณฑ์</Label>
+          {line.packingOptions.length > 0 ? (
+            <Select value={line.packing} onValueChange={(v) => onChange({ packing: v })}>
+              <SelectTrigger className="w-full bg-card">
+                <SelectValue placeholder="เลือกบรรจุภัณฑ์" />
+              </SelectTrigger>
+              <SelectContent>
+                {line.packingOptions.map((p) => (
+                  <SelectItem key={p} value={p}>
+                    {p}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          ) : (
+            <p className="flex h-9 items-center rounded-md border border-border bg-card px-3 text-sm text-muted-foreground">
+              {line.packing ?? "-"}
+            </p>
+          )}
         </div>
+        <div className="space-y-1.5">
+          <Label>สั่งซื้อ ({line.unit})</Label>
+          <NumberStepper
+            value={line.orderedQty}
+            onValueChange={(v) => onChange({ orderedQty: v })}
+          />
+        </div>
+        <div className="space-y-1.5">
+          <Label>ราคาสั่งต่อ{line.unit} (บาท)</Label>
+          <NumberStepper
+            value={line.pricePerUnit}
+            onValueChange={(v) => onChange({ pricePerUnit: v })}
+            step={10}
+          />
+        </div>
+        <div className="space-y-1.5">
+          <Label>ค่าการจัดการต่อ{line.unit} (บาท)</Label>
+          <NumberStepper
+            value={line.handlingPerUnit}
+            onValueChange={(v) => onChange({ handlingPerUnit: v })}
+            step={10}
+          />
+        </div>
+      </div>
 
-        {/* ---------- อ้างอิงใบขอซื้อต้นทาง ----------
-             ดูอย่างเดียว ไม่มีปุ่มแก้ ไม่ใช่ข้อมูลที่ต้องตัดสินใจอะไรตรงนี้ต่อ
-             แค่เผื่อต้องย้อนไปดูว่าใบขอซื้อใบไหนขอมา ขอไว้เท่าไหร่ ใครขอ ใครแก้ล่าสุด
-             เว้นระยะห่างจากช่องกรอกด้านบนด้วยเส้นคั่น ให้รู้ว่าเป็นข้อมูลอ้างอิง
-             ไม่ใช่ส่วนหนึ่งของแบบฟอร์มที่ต้องกรอก แถวนี้จึงไม่มี Select/Stepper เลย
-             มีเฉพาะรายการที่มาจากใบขอซื้อจริง (prRef) เท่านั้น กดเพิ่มสินค้าเองไม่มีใบขอซื้อรองรับ */}
-        {line.prRef && (
-          <div className="mt-4 grid gap-4 border-t border-border pt-4 @lg:grid-cols-4">
+      {/* ---------- อ้างอิงใบขอซื้อต้นทาง ----------
+           ดูอย่างเดียว ไม่มีปุ่มแก้ ไม่ใช่ข้อมูลที่ต้องตัดสินใจอะไรตรงนี้ต่อ
+           แค่เผื่อต้องย้อนไปดูว่าใบขอซื้อใบไหนขอมา ขอไว้เท่าไหร่ ใครขอ ใครแก้ล่าสุด
+           ส่วนเดียวที่อยู่ใน Collapsible จริงๆ — การ์ดเริ่มต้นหุบไว้ กดกางถึงจะ
+           เห็น ไม่ต้องรกตาตั้งแต่แรกเข้าหน้า มีเฉพาะรายการที่มาจากใบขอซื้อจริง
+           (prRef) เท่านั้น กดเพิ่มสินค้าเองไม่มีใบขอซื้อรองรับ */}
+      {line.prRef && (
+        <CollapsibleContent className="border-t border-border px-4 pt-4 pb-4">
+          <div className="grid gap-4 @lg:grid-cols-4">
             <div className="space-y-1.5">
               <p className="text-sm text-muted-foreground">เลขที่ใบขอซื้อ</p>
               <p className="text-sm font-medium">{line.prRef.code}</p>
@@ -508,8 +536,8 @@ function ProductCard({
               <p className="text-sm font-medium">{line.prRef.editedBy ?? "-"}</p>
             </div>
           </div>
-        )}
-      </CollapsibleContent>
+        </CollapsibleContent>
+      )}
     </Collapsible>
   );
 }

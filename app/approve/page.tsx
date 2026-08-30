@@ -27,10 +27,14 @@ import { Label } from "@peckey954/ui/components/ui/label";
 import { Tabs, TabsList, TabsTrigger } from "@peckey954/ui/components/ui/tabs";
 import { DateRangeSelect, DateSelect, parseDateSlash, type DateRange } from "@/components/date-select";
 import { useScrollState } from "@/components/device-preview";
-import { EmptyDocs } from "@/components/stock/doc-parts";
 import { BackToTop, StickyToolbar } from "@/components/sticky-toolbar";
 import { ApproveList } from "@/components/approve/approve-list";
-import { matchesApproveChip, matchesPoOrder, PO_ORDER_DOCS } from "@/lib/po";
+import {
+  matchesApproveChip,
+  matchesPoOrder,
+  PO_APPROVAL_HISTORY_DOCS,
+  PO_ORDER_DOCS,
+} from "@/lib/po";
 
 /* ------------------------------------------------------------------
    อนุมัติสั่งซื้อ — รีวิวใบสั่งซื้อก่อนอนุมัติ ใช้ข้อมูลชุดเดียวกับแท็บ "สั่งซื้อ"
@@ -39,7 +43,10 @@ import { matchesApproveChip, matchesPoOrder, PO_ORDER_DOCS } from "@/lib/po";
    ค่าเริ่มต้นอยู่แล้ว ตอนนี้กลายเป็นพฤติกรรมเดียวตายตัว ไม่มีชิป "ยกเลิก" ให้
    สลับไปดูอีกที) กรองได้แค่คำค้นหา + ช่วงวันที่ (กล่องตัวกรอง/วันที่ด่วน)
 
-   แท็บ "ประวัติ" ยังไม่เปิดใช้งาน รอไฟล์ออกแบบ (เหมือนแท็บ "ซื้อแล้ว" ของ /po)
+   แท็บ "ประวัติ" — ใบที่อนุมัติ/ไม่อนุมัติไปแล้ว คนละชุดข้อมูลกับคิวรออนุมัติ
+   (PO_APPROVAL_HISTORY_DOCS ไม่ใช่ PO_ORDER_DOCS) มีตัวกรอง/ค้นหาของตัวเอง
+   แยกจากแท็บ "รออนุมัติ" ใช้ ApproveList การ์ด/ตารางชุดเดียวกัน แค่มีชิปผล
+   อนุมัติเพิ่มเข้ามา (docs มี approvalStatus ส่วนคิวรออนุมัติไม่มี)
 ------------------------------------------------------------------ */
 
 export default function ApprovePage() {
@@ -68,6 +75,29 @@ export default function ApprovePage() {
 
     const from = quickDate ?? dateRange?.from;
     const to = dateRange?.to;
+    if (from || to) {
+      const poFrom = parseDateSlash(d.expectedFrom);
+      const poTo = parseDateSlash(d.expectedTo);
+      if (!poFrom || !poTo) return false;
+      if (from && poTo < from) return false;
+      if (to && poFrom > to) return false;
+    }
+
+    return true;
+  });
+
+  // ---------- แท็บ "ประวัติ" ----------
+  const [historyQuery, setHistoryQuery] = React.useState("");
+  const [historyQuickDate, setHistoryQuickDate] = React.useState<Date>();
+  const [historyDateRange, setHistoryDateRange] = React.useState<DateRange>();
+  const [historyFilterOpen, setHistoryFilterOpen] = React.useState(false);
+  const historyFilterActive = !!historyDateRange?.from;
+
+  const visibleHistory = PO_APPROVAL_HISTORY_DOCS.filter((d) => {
+    if (!matchesPoOrder(d, historyQuery)) return false;
+
+    const from = historyQuickDate ?? historyDateRange?.from;
+    const to = historyDateRange?.to;
     if (from || to) {
       const poFrom = parseDateSlash(d.expectedFrom);
       const poTo = parseDateSlash(d.expectedTo);
@@ -177,9 +207,64 @@ export default function ApprovePage() {
           )}
 
           {tab === "history" && (
-            <div className="mt-4">
-              <EmptyDocs title="แท็บประวัติยังไม่เปิดใช้งาน" hint="อยู่ระหว่างออกแบบหน้านี้ กลับมาดูใหม่อีกครั้ง" />
-            </div>
+            <>
+              <StickyToolbar hidden={hidden} barRef={stickyRef}>
+                <div className="flex items-center gap-2">
+                  <InputGroup className="min-w-0 flex-1 bg-card">
+                    <InputGroupAddon align="inline-start">
+                      <SearchIcon />
+                    </InputGroupAddon>
+                    <InputGroupInput
+                      placeholder="ค้นหา..."
+                      value={historyQuery}
+                      onChange={(e) => setHistoryQuery(e.target.value)}
+                    />
+                  </InputGroup>
+
+                  <DateSelect
+                    value={historyQuickDate}
+                    onValueChange={setHistoryQuickDate}
+                    placeholder="วันที่"
+                    className="hidden w-44 shrink-0 sm:flex"
+                  />
+
+                  <Dialog open={historyFilterOpen} onOpenChange={setHistoryFilterOpen}>
+                    <DialogTrigger asChild>
+                      <Button
+                        variant="outline-primary"
+                        size="icon"
+                        aria-label="ตัวกรองใบสั่งซื้อ"
+                        className="relative shrink-0"
+                      >
+                        <ListFilterIcon />
+                        {historyFilterActive && (
+                          <span className="absolute top-1 right-1 size-2 rounded-full bg-primary" />
+                        )}
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent
+                      aria-describedby={undefined}
+                      className="gap-0 p-0 sm:max-w-md [&_[data-slot=dialog-close]]:focus:ring-0 [&_[data-slot=dialog-close]]:focus:ring-offset-0 [&_[data-slot=dialog-close]]:focus-visible:ring-2 [&_[data-slot=dialog-close]]:focus-visible:ring-ring [&_[data-slot=dialog-close]]:focus-visible:ring-offset-2"
+                    >
+                      <DialogHeader className="px-4 pt-4 text-left">
+                        <DialogTitle>ตัวกรองและการแสดงผล</DialogTitle>
+                      </DialogHeader>
+                      <ApproveFilter
+                        value={historyDateRange}
+                        onApply={(next) => {
+                          setHistoryDateRange(next);
+                          setHistoryFilterOpen(false);
+                        }}
+                      />
+                    </DialogContent>
+                  </Dialog>
+                </div>
+              </StickyToolbar>
+
+              <div className="mt-4">
+                <ApproveList docs={visibleHistory} />
+              </div>
+            </>
           )}
 
           <BackToTop show={showTop} onClick={scrollToTop} />

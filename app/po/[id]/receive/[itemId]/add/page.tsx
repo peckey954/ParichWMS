@@ -2,8 +2,8 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { useParams, useRouter, useSearchParams } from "next/navigation";
-import { MinusIcon, PlusIcon, TruckIcon } from "lucide-react";
+import { useParams, useRouter } from "next/navigation";
+import { MinusIcon, PlusIcon } from "lucide-react";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -20,10 +20,9 @@ import {
   InputGroupInput,
 } from "@peckey954/ui/components/ui/input-group";
 import { Label } from "@peckey954/ui/components/ui/label";
-import { Switch } from "@peckey954/ui/components/ui/switch";
 import { Textarea } from "@peckey954/ui/components/ui/textarea";
 import { toast } from "sonner";
-import { DateSelect, formatDateSlash } from "@/components/date-select";
+import { DateSelect } from "@/components/date-select";
 import { useNumberField } from "@/components/number-field";
 import { PR_CATEGORY_LABEL } from "@/lib/pr";
 import { formatPoQty, getPoLineItem } from "@/lib/po";
@@ -31,15 +30,10 @@ import { formatPoQty, getPoLineItem } from "@/lib/po";
 /* ------------------------------------------------------------------
    เพิ่มรอบรับเข้า — หนึ่งหน้าต่อรอบหนึ่งรอบของ "รายการสินค้าหนึ่งรายการ"
    เท่านั้น เข้ามาจากปุ่ม "เพิ่มรอบรับเข้า" ใต้การ์ดรายการนั้นในหน้าใบสั่งซื้อ
+   กรอกแค่รายการเดียวจบในหน้านี้ — ไม่มีการพาไปกรอกรายการถัดไปต่อเนื่องกัน
 
-   รถหนึ่งคันส่งได้หลายสินค้าพร้อมกัน แต่ยอดรับต้องแยกบันทึกทีละสินค้าเสมอ —
-   สวิตช์ "รถคันนี้ส่งสินค้าอื่นในใบนี้ด้วย" คือทางลัดของกรณีนั้น บันทึกรอบนี้
-   เสร็จแล้วพาไปหน้ากรอกของรายการถัดไปทันที พร้อมดึงวันที่/ทะเบียนรถ/เบอร์ตู้
-   คอนเทนเนอร์ (ของรถคันเดียวกัน ไม่เปลี่ยน) มาเติมให้ ไม่ต้องพิมพ์ซ้ำ — ไล่ไป
-   ทีละรายการที่ยังไม่ได้คีย์ในเชนเดียวกัน (ส่งต่อผ่าน query param "visited")
-   จนกว่าจะครบทุกรายการในใบ หรือกดปิดสวิตช์ไว้เมื่อไหร่ก็จบเชนแค่นั้น
-
-   ไม่มี backend จริงตามธรรมชาติของแอปนี้ — บันทึกแล้วขึ้น toast แล้วพาไปขั้นต่อไป
+   ไม่มี backend จริงตามธรรมชาติของแอปนี้ — บันทึกแล้วขึ้น toast แล้วพากลับไป
+   หน้าใบสั่งซื้อ
 ------------------------------------------------------------------ */
 
 export default function AddPoRoundPage() {
@@ -53,36 +47,19 @@ export default function AddPoRoundPage() {
 function AddPoRoundForm() {
   const router = useRouter();
   const params = useParams<{ id: string; itemId: string }>();
-  const searchParams = useSearchParams();
 
   const found = React.useMemo(
     () => getPoLineItem(params.id, params.itemId),
     [params.id, params.itemId]
   );
 
-  // ค่าที่ส่งต่อมาจากรอบก่อนหน้าของรถคันเดียวกัน (ถ้ามี) — เติมให้ทันทีไม่ต้องพิมพ์ซ้ำ
-  const prefillPlate = searchParams.get("plate") ?? "";
-  const prefillArrive = searchParams.get("arrive");
-  const prefillContainer = searchParams.get("container") ?? "";
-  const visitedIds = React.useMemo(
-    () => new Set((searchParams.get("visited") ?? "").split(",").filter(Boolean)),
-    [searchParams]
-  );
-
-  // ค่าเริ่มต้นเป็นวันนี้เสมอถ้าไม่มีวันที่ส่งต่อมาจากรถคันเดียวกัน — ผู้ใช้
-  // ส่วนใหญ่คีย์ข้อมูลตอนรถมาถึงจริง วันที่รถเข้าจึงมักเป็นวันนี้อยู่แล้ว
-  const [arriveDate, setArriveDate] = React.useState<Date | undefined>(() => {
-    if (prefillArrive) {
-      const [d, m, y] = prefillArrive.split("/").map(Number);
-      if (d && m && y) return new Date(y, m - 1, d);
-    }
-    return new Date();
-  });
-  const [plate, setPlate] = React.useState(prefillPlate);
-  const [containerNo, setContainerNo] = React.useState(prefillContainer);
+  // ค่าเริ่มต้นเป็นวันนี้เสมอ — ผู้ใช้ส่วนใหญ่คีย์ข้อมูลตอนรถมาถึงจริง
+  // วันที่รถเข้าจึงมักเป็นวันนี้อยู่แล้ว
+  const [arriveDate, setArriveDate] = React.useState<Date | undefined>(() => new Date());
+  const [plate, setPlate] = React.useState("");
+  const [containerNo, setContainerNo] = React.useState("");
   const [receivedQty, setReceivedQty] = React.useState(0);
   const [note, setNote] = React.useState("");
-  const [sameTruck, setSameTruck] = React.useState(true);
 
   if (!found) {
     return (
@@ -103,12 +80,6 @@ function AddPoRoundForm() {
   const seq = String(item.rounds.length + 1).padStart(2, "0");
   const code = `${po.code}/${item.id.split("-li")[1] ?? "01"}-${seq}`;
 
-  // รายการอื่นในใบเดียวกันที่ยังไม่ถูกคีย์ในเชนรถคันนี้ — ใช้ตัดสินว่าจะโชว์
-  // สวิตช์ "รถคันนี้ส่งของอื่นด้วย" ไหม และถ้าติ๊กไว้จะพาไปรายการไหนต่อ
-  const remainingOthers = po.lineItems.filter(
-    (i) => i.id !== item.id && !visitedIds.has(i.id)
-  );
-
   function handleSave() {
     if (!plate.trim()) {
       toast.error("กรุณาระบุทะเบียนรถ");
@@ -120,19 +91,6 @@ function AddPoRoundForm() {
         receivedQty > 0 ? ` · รับเข้า ${formatPoQty(receivedQty)} ${item.unit}` : ""
       }`,
     });
-
-    if (sameTruck && remainingOthers.length > 0) {
-      const next = remainingOthers[0];
-      const nextVisited = [...visitedIds, item.id].join(",");
-      const qp = new URLSearchParams({
-        plate: plate.trim(),
-        container: containerNo.trim(),
-        visited: nextVisited,
-      });
-      if (arriveDate) qp.set("arrive", formatDateSlash(arriveDate));
-      router.push(`/po/${po.id}/receive/${next.id}/add?${qp.toString()}`);
-      return;
-    }
 
     router.push(`/po/${po.id}`);
   }
@@ -146,23 +104,35 @@ function AddPoRoundForm() {
           เพิ่มการรับเข้าสินค้า {code}
         </h1>
 
-        {/* ---------- หัวรายการ — บรรจุภัณฑ์แยกบรรทัดของตัวเองเสมอ ไม่ปนแถว
-            เดียวกับชื่อ/ประเภท เพราะรวมกันแล้วยาวจนตัดคำ อ่านเป็นก้อนเดียวยาก
-            (เว้นระยะระหว่างบรรทัดให้มากขึ้นด้วย — เดิมชิดกันจนดูแคบ) ---------- */}
-        <div className="mt-5 rounded-xl border border-border bg-card p-5">
-          <p className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-            <span className="font-semibold">
+        {/* ---------- หัวรายการ — กล่องพื้นสีแบรนด์ (ตามแบบ) ไม่ใช่การ์ดขาวเฉยๆ
+            จอแคบ: 3 บรรทัดซ้อนกัน (ชื่อ / ประเภท·หมวด·บรรจุภัณฑ์ / บริษัท)
+            จอกว้าง: ยุบเหลือบรรทัดเดียว — ชื่อ+รายละเอียดชิดซ้าย บริษัทชิดขวา
+            (ตามแบบ) ---------- */}
+        <div className="mt-5 rounded-xl border border-border bg-brand px-4 py-3.5">
+          <div className="@3xl:hidden">
+            <p className="font-semibold">
               {item.productName}
               {item.productSub && ` ${item.productSub}`}
-            </span>
-            <span className="text-sm text-muted-foreground">
-              {PR_CATEGORY_LABEL[item.categoryId]}
-            </span>
-          </p>
-          {item.packing && (
-            <p className="mt-1.5 text-sm text-muted-foreground">{item.packing}</p>
-          )}
-          <p className="mt-3 text-sm">{po.company}</p>
+            </p>
+            <p className="mt-1.5 text-sm text-muted-foreground">
+              {PR_CATEGORY_LABEL[item.categoryId]} | {item.group}
+              {item.packing && ` | ${item.packing}`}
+            </p>
+            <p className="mt-3 text-sm">{po.company}</p>
+          </div>
+          <div className="hidden @3xl:flex @3xl:items-baseline @3xl:justify-between @3xl:gap-4">
+            <p className="min-w-0 truncate">
+              <span className="font-semibold">
+                {item.productName}
+                {item.productSub && ` ${item.productSub}`}
+              </span>
+              <span className="ml-3 text-sm text-muted-foreground">
+                {PR_CATEGORY_LABEL[item.categoryId]} | {item.group}
+                {item.packing && ` | ${item.packing}`}
+              </span>
+            </p>
+            <p className="shrink-0 text-sm">{po.company}</p>
+          </div>
         </div>
 
         {/* ---------- วันที่ / ทะเบียนรถ / เบอร์ตู้ ---------- */}
@@ -220,31 +190,6 @@ function AddPoRoundForm() {
             onChange={(e) => setNote(e.target.value)}
           />
         </div>
-
-        {/* ---------- สวิตช์รถคันเดียวส่งหลายสินค้า ----------
-             โผล่เฉพาะตอนใบนี้ยังมีรายการอื่นที่ยังไม่ได้คีย์ในเชนนี้ —
-             ใบที่มีรายการเดียว หรือคีย์ครบทุกรายการแล้วไม่ต้องโชว์ */}
-        {remainingOthers.length > 0 && (
-          <div className="mt-8 flex items-start gap-3 rounded-xl border border-border bg-brand px-4 py-3.5">
-            <TruckIcon className="mt-0.5 size-4 shrink-0 text-primary" />
-            <div className="min-w-0 flex-1">
-              <Label htmlFor="same-truck" className="text-sm font-medium">
-                รถคันนี้ส่งสินค้าอื่นในใบสั่งซื้อนี้ด้วยไหม
-              </Label>
-              <p className="mt-0.5 text-sm text-muted-foreground">
-                ติ๊กไว้แล้วกด &quot;บันทึกแล้วไปรายการถัดไป&quot; — ระบบพาไปกรอกรอบของ{" "}
-                <span className="font-medium text-foreground">{remainingOthers[0].productName}</span>{" "}
-                ทันที พร้อมดึงทะเบียนรถ/เบอร์ตู้คันนี้มาเติมให้ ไม่ต้องพิมพ์ซ้ำ
-              </p>
-            </div>
-            <Switch
-              id="same-truck"
-              checked={sameTruck}
-              onCheckedChange={setSameTruck}
-              className="mt-0.5 shrink-0"
-            />
-          </div>
-        )}
       </main>
 
       {/* ---------- แถบปุ่มล่าง ---------- */}
@@ -253,9 +198,7 @@ function AddPoRoundForm() {
           <Button variant="outline-primary" onClick={() => router.back()}>
             ย้อนกลับ
           </Button>
-          <Button onClick={handleSave}>
-            {sameTruck && remainingOthers.length > 0 ? "บันทึกแล้วไปรายการถัดไป" : "บันทึก"}
-          </Button>
+          <Button onClick={handleSave}>บันทึก</Button>
         </div>
       </div>
     </div>
