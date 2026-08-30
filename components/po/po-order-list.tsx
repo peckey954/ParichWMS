@@ -133,10 +133,9 @@ function PoOrderPanel({
       // แต่ไม่ต้องมีฟีดแบ็กตอนชี้เลย ไม่ใช่ทั้งไฮไลต์สีพื้นหลังและไม่ต้องขยับ/ยกการ์ด
       className="cursor-pointer overflow-hidden rounded-xl border border-border bg-card"
     >
-      <div className="flex items-start justify-between gap-3 px-4 py-3.5">
+      <div className="flex items-start justify-between gap-3 px-4 pt-3.5 @3xl:pb-3.5">
         {/* วันที่แยกบรรทัดของตัวเองบนจอแคบ (ไม่พอที่จะอยู่แถวเดียวกับเลขที่ใบ)
-            แต่จอกว้างยังอยู่แถวเดียวกันได้สบายๆ — บริษัทเป็นตัวหนา (semibold)
-            ทั้งสองขนาดจอ แยกบรรทัดของตัวเองอยู่แล้วเหมือนเดิม */}
+            แต่จอกว้างยังอยู่แถวเดียวกันได้สบายๆ */}
         <div className="min-w-0 flex-1">
           <span className="block">
             <span className="font-semibold hover:underline">{d.code}</span>
@@ -145,17 +144,23 @@ function PoOrderPanel({
             </span>
           </span>
           <span className="block text-sm text-muted-foreground @3xl:hidden">{d.createdAt}</span>
-          <span className="mt-0.5 block text-sm font-semibold text-foreground">
+          {/* จอกว้างเท่านั้น — ตัวหนังสือธรรมดา จอแคบย้ายไปเป็นกล่องเต็มความกว้าง
+              แยกต่างหากด้านล่าง (ไม่ซ้อนอยู่ในคอลัมน์ flex-1 นี้ เพราะจะถูกบีบ
+              ด้วยพื้นที่ของชิปสถานะ/ลูกศรฝั่งขวา ทำให้กล่องไม่เต็มความกว้างจริง) */}
+          <span className="mt-0.5 hidden text-sm font-semibold text-foreground @3xl:block">
             {d.company}
           </span>
         </div>
 
-        {/* กันคลิกลอยไม่ให้ทะลุไปนำทางทั้งใบ — โซนนี้แค่ดูสถานะ/สลับมุมมอง */}
+        {/* กันคลิกลอยไม่ให้ทะลุไปนำทางทั้งใบ — โซนนี้แค่ดูสถานะ/สลับมุมมอง
+            จอแคบเหลือแค่ลูกศร — จำนวนรายการ/ชิปสถานะย้ายไปท้ายการ์ดแทน */}
         <div className="flex shrink-0 items-center gap-3" onClick={(e) => e.stopPropagation()}>
-          <span className="text-sm whitespace-nowrap text-muted-foreground">
+          <span className="hidden text-sm whitespace-nowrap text-foreground @3xl:inline">
             {d.lineItems.length} รายการ
           </span>
-          <StatusChip doc={d} />
+          <span className="hidden @3xl:inline-flex">
+            <StatusChip doc={d} />
+          </span>
           <button
             type="button"
             onClick={onToggle}
@@ -169,6 +174,19 @@ function PoOrderPanel({
         </div>
       </div>
 
+      {/* จอแคบเท่านั้น — กล่องพื้นเน้นชื่อบริษัทเต็มความกว้าง เว้นระยะขอบ
+          เท่ากับจุดอื่นทุกที่ (px-4) แยกออกมาจากแถวหัวแผงด้านบน มีจำนวนรายการ
+          สินค้าเป็นอีกบรรทัดในกล่องเดียวกัน (จอแคบไม่มีที่ให้โชว์ตรงหัวแผงแบบ
+          จอกว้าง เลยย้ายมาไว้ตรงนี้แทน) */}
+      <div className="px-4 pt-1.5 pb-3.5 @3xl:hidden">
+        <div className="rounded-md bg-brand px-3 py-2">
+          <span className="block text-sm font-medium text-foreground">{d.company}</span>
+          <span className="mt-0.5 block text-sm text-muted-foreground">
+            สินค้า {d.lineItems.length} รายการ
+          </span>
+        </div>
+      </div>
+
       {/* เส้นคั่นบางๆ พอ ไม่ใช่กล่องซ้อนกล่อง — พื้นหลัง/ระยะขอบเดียวกับแผงนอก
           ทั้งหมด ตารางย่อยข้างในจึงต้องเผื่อ padding แนวนอนเท่าหัวแผง (px-4)
           เองผ่าน className ของ Table แทนที่จะครอบด้วย div กล่องอีกชั้น
@@ -176,17 +194,30 @@ function PoOrderPanel({
           จอแคบ vs จอกว้างเป็นคนละแบบตรงนี้ตั้งใจ — จอกว้างมีที่พอโชว์ตัวเลข
           สั่งซื้อ/รับเข้า/ค้างรับ จอแคบเอาแค่ชื่อสินค้า+ปุ่มพอ ไม่ใส่ตัวเลข
           เพราะพื้นที่แคบ ใส่ตัวเลขแล้วอ่านยากกว่าเดิม ตัวเลขเต็มไปดูที่หน้า
-          ใบสั่งซื้อได้อยู่แล้ว (กดที่แผงนี้เองก็ไปถึงได้) */}
+          ใบสั่งซื้อได้อยู่แล้ว (กดที่แผงนี้เองก็ไปถึงได้)
+
+          เส้นคั่นบนของจอกว้าง (border-t) เอาไว้แค่จอกว้างเท่านั้น — จอแคบไม่มี
+          เส้นเต็มขอบระหว่างกล่องบริษัทกับรายการสินค้า (ตามแบบ) */}
       {open && (
-        <div className="border-t border-border">
-          <div className="hidden @3xl:block">
+        <>
+          <div className="hidden border-t border-border @3xl:block">
             <ProductTable po={d} onNavigate={goToDoc} />
           </div>
           <div className="@3xl:hidden">
             <ProductListSimple po={d} onNavigate={goToDoc} />
           </div>
-        </div>
+        </>
       )}
+
+      {/* จอแคบเท่านั้น — ชิปสถานะย้ายมาไว้ท้ายการ์ดชิดขวา (จอกว้างอยู่ที่หัวแผง
+          แล้วไม่ต้องซ้ำ) อยู่นอก {open &&} เพราะสถานะต้องเห็นได้แม้ยุบรายการ
+          สินค้าอยู่ก็ตาม — เส้นคั่นด้านบนใช้ mx-4 (ระยะขอบ) แทน px-4 (แค่
+          padding ภายใน) เพราะ border-top ยึดตามกรอบนอกของกล่องเสมอ ไม่สนใจ
+          padding ข้างใน ต้องใช้ margin เส้นถึงจะสั้นกว่าตัวกล่องจริง ไม่ใช่
+          เส้นเต็มขอบ */}
+      <div className="mx-4 flex justify-end border-t border-border py-3 @3xl:hidden">
+        <StatusChip doc={d} />
+      </div>
     </div>
   );
 }
@@ -316,16 +347,20 @@ function ProductTable({ po, onNavigate }: { po: PoDoc; onNavigate: () => void })
 
 /** จอแคบ — แค่รายชื่อสินค้า (สองบรรทัด) + ปุ่มเพิ่มรอบ ไม่มีตัวเลข ที่แคบไม่พอ
     ให้ตัวเลขสามคอลัมน์อ่านง่าย ตัวเลขเต็มดูได้จากหน้าใบสั่งซื้อ (กดที่แถวก็ไป
-    ถึงได้เหมือนกัน) */
+    ถึงได้เหมือนกัน)
+
+    เส้นคั่นระหว่างรายการเว้นระยะจากขอบการ์ดซ้าย/ขวา ~16px ไม่ใช่เส้นเต็มขอบ —
+    ย้าย padding แนวนอนไปไว้ที่กล่องนอก (px-4) แล้วให้ divide-y ตีเส้นบนตัว
+    "แถว" เอง (ความกว้างเท่าพื้นที่ในกรอบ padding พอดี ไม่ใช่เต็มความกว้างการ์ด) */
 function ProductListSimple({ po, onNavigate }: { po: PoDoc; onNavigate: () => void }) {
   const cancelled = po.status === "cancelled";
   return (
-    <div className="divide-y divide-border">
+    <div className="divide-y divide-border px-4">
       {po.lineItems.map((item, index) => (
         <div
           key={item.id}
           onClick={onNavigate}
-          className="flex cursor-pointer items-center justify-between gap-3 px-4 py-3"
+          className="flex cursor-pointer items-start justify-between gap-3 py-3"
         >
           <div className="min-w-0 flex-1 text-sm">
             <ProductLabel item={item} code={lineItemCode(po, index)} stacked />

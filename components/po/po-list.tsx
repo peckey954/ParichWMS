@@ -221,10 +221,10 @@ export function PoList({
                             สร้างใบสั่งซื้อ
                           </Button>
                           <Button
-                            variant="ghost"
+                            variant="outline-primary"
                             size="icon"
                             aria-label={`ลบ ${d.code}`}
-                            className="shrink-0 text-muted-foreground hover:text-destructive"
+                            className="shrink-0"
                             onClick={() => onDeleteRequest(d)}
                           >
                             <Trash2Icon />
@@ -276,14 +276,17 @@ function PoCard({
           <Link href={`/pr/${d.id}`} className="font-semibold hover:underline">
             {d.code}
           </Link>
+          <span className="text-sm whitespace-nowrap text-muted-foreground">{d.createdAt}</span>
         </div>
-        {/* ปุ่มลบอยู่บนสุดคู่กับเลขที่ใบ — ไม่ใช่ลงไปอยู่แถวล่างสุดกับปุ่มอื่น */}
+        {/* ปุ่มลบอยู่บนสุดคู่กับเลขที่ใบ — ไม่ใช่ลงไปอยู่แถวล่างสุดกับปุ่มอื่น
+            ใช้ outline-primary แบบเดียวกับปุ่มไอคอนอื่นในแอป (เช่นปุ่มตัวกรอง)
+            ไม่ใช่ ghost เฉยๆ ตามแบบ */}
         {actionable && (
           <Button
-            variant="ghost"
-            size="icon-sm"
+            variant="outline-primary"
+            size="icon"
             aria-label={`ลบ ${d.code}`}
-            className="shrink-0 text-muted-foreground hover:text-destructive"
+            className="shrink-0"
             onClick={onDeleteRequest}
           >
             <Trash2Icon />

@@ -3,8 +3,8 @@
 import * as React from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { usePathname } from "next/navigation";
-import { BellIcon, MenuIcon, XIcon } from "lucide-react";
+import { useRouter, usePathname } from "next/navigation";
+import { MenuIcon, XIcon } from "lucide-react";
 import { Avatar, AvatarFallback } from "@peckey954/ui/components/ui/avatar";
 import { Button } from "@peckey954/ui/components/ui/button";
 import {
@@ -17,12 +17,15 @@ import {
 } from "@peckey954/ui/components/ui/sheet";
 import { TooltipProvider } from "@peckey954/ui/components/ui/tooltip";
 import { cn } from "@peckey954/ui/lib/utils";
+import { toast } from "sonner";
 import {
   DeviceFrame,
   DevicePreviewProvider,
   DevicePreviewToggle,
 } from "@/components/device-preview";
 import { LightTooltip } from "@/components/light-tooltip";
+import { NotificationBell } from "@/components/notification-bell";
+import { NotificationsProvider, useNotifications } from "@/components/notifications-provider";
 import { RecipeRunProvider } from "@/components/production/recipe-run";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { ModuleIcon } from "@/components/modules/module-icon";
@@ -40,16 +43,48 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       {/* สถานะการคำนวณสูตรอยู่ที่นี่ เพราะต้องข้ามหน้าได้
           หน้าตั้งค่าแก้ข้อมูล แล้วหน้าผลลัพธ์ต้องรู้ว่าผลที่แสดงอยู่เก่าไปแล้ว */}
       <RecipeRunProvider>
-        <Shell>{children}</Shell>
+        {/* เหมือนกัน — สถานะอ่านแล้ว/ยังไม่อ่านต้องข้ามหน้าได้ (กระดิ่งกับ
+            หน้า /notifications ต้องเห็นค่าเดียวกัน) */}
+        <NotificationsProvider>
+          <Shell>{children}</Shell>
+        </NotificationsProvider>
       </RecipeRunProvider>
     </DevicePreviewProvider>
   );
 }
 
 function Shell({ children }: { children: React.ReactNode }) {
+  const router = useRouter();
   const pathname = usePathname();
   // ค่าเริ่มต้นคือหุบ — เปิดหน้าไหนก็เห็นเนื้อหาเต็มความกว้างไว้ก่อน
   const [expanded, setExpanded] = React.useState(false);
+  const { unreadCount } = useNotifications();
+
+  // แจ้งจำนวนแจ้งเตือนที่ยังไม่อ่านทันทีที่เข้าเว็บ (โหลดหน้าใหม่ทั้งหน้า) —
+  // effect นี้อยู่ใน Shell ซึ่งอยู่นอก {children} จึงไม่ remount ตอนเปลี่ยน
+  // หน้าแบบ client-side, [] ว่างเปล่าเลยขึ้นแค่ครั้งเดียวต่อการโหลดจริงหนึ่งครั้ง
+  // ไม่ใช่ทุกครั้งที่กดลิงก์เปลี่ยนหน้าในแอป
+  React.useEffect(() => {
+    if (unreadCount === 0) return;
+    // หน่วงเล็กน้อยก่อนยิง toast — <Toaster> (คนละ component, อยู่ถัดจาก
+    // AppShell ใน layout.tsx) ยัง mount ไม่เสร็จตอน effect นี้ทำงาน ถ้าเรียก
+    // toast() ทันทีจะยิงไปก่อนที่ตัว Toaster จะ subscribe รับค่า ข้อความเลย
+    // หายเงียบ ๆ ไม่ขึ้นอะไรเลย (เจอบั๊กนี้จริงตอนพัฒนา) หน่วง 1 tick ก็พอ
+    // แต่ใส่ไว้สัก 400ms เผื่อจังหวะ เพราะรู้สึกเป็นธรรมชาติกว่าโผล่ทันทีที่วาดจอ
+    const timer = setTimeout(() => {
+      // .success ไม่ใช่เพราะมีอะไร "สำเร็จ" แต่เพื่อให้ได้สีส้มแบรนด์เดียวกับ
+      // toast สำเร็จอื่น ๆ ทั้งแอป (ตั้งไว้ผ่าน --success-* ใน app/layout.tsx)
+      toast.success(`มีการแจ้งเตือนใหม่ ${unreadCount} รายการ`, {
+        description: "กดเพื่อไปดูรายละเอียดที่หน้าการแจ้งเตือน",
+        action: {
+          label: "ดูการแจ้งเตือน",
+          onClick: () => router.push("/notifications"),
+        },
+      });
+    }, 400);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -111,9 +146,7 @@ function Shell({ children }: { children: React.ReactNode }) {
             {/* เครื่องมือรีวิวดีไซน์ ซ่อนบนจอแคบเพราะจอแคบก็คือมือถืออยู่แล้ว */}
             <DevicePreviewToggle className="mr-1 hidden md:flex" />
             <ThemeToggle />
-            <Button variant="ghost" size="icon" aria-label="การแจ้งเตือน">
-              <BellIcon />
-            </Button>
+            <NotificationBell />
             <Avatar className="ml-1 size-8">
               <AvatarFallback className="text-xs">CN</AvatarFallback>
             </Avatar>

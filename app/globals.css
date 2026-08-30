@@ -218,6 +218,27 @@
   max-height: calc(var(--frame-h) - 2rem);
 }
 
+/* ============================================================
+   toast สำเร็จ (success) — ตัวหนังสือคำอธิบายให้เป็นสีส้มแบรนด์ด้วย ไม่ใช่แค่
+   หัวข้อ
+
+   sonner (@peckey954/ui/components/ui/sonner.tsx) ตั้ง class คำอธิบายไว้ตายตัว
+   เป็น "text-popover-foreground/90!" (มี !important ติดมาจาก Tailwind) จึงต้อง
+   ชนด้วย !important + selector เจาะจงกว่าถึงจะทับสีได้ — ไอคอนไม่ต้องกำหนดสีเพิ่ม
+   เพราะ svg ของ lucide ใช้ currentColor อยู่แล้ว ไล่สีตาม --success-text ที่ตั้ง
+   ไว้ที่ <Toaster> ให้เองโดยอัตโนมัติ
+   ============================================================ */
+[data-sonner-toast][data-type="success"] [data-description] {
+  color: var(--primary) !important;
+}
+
+/* ไอคอนชิดขอบบนของหัวข้อ ไม่ใช่กึ่งกลางทั้งก้อน — ค่าเดิมของ sonner
+   (align-items:center บน [data-sonner-toast]) ทำให้ไอคอนลอยลงมาอยู่กึ่งกลาง
+   ระหว่างหัวข้อกับคำอธิบายตอนมีสองบรรทัด ดูเหมือนไอคอนไม่ตรงแถวกับหัวข้อ */
+[data-sonner-toast][data-styled="true"] {
+  align-items: flex-start !important;
+}
+
 @theme inline {
   --color-brand-hover: var(--brand-hover);
   --color-surface: var(--surface);

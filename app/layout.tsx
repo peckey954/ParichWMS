@@ -42,9 +42,15 @@ export default function RootLayout({
               เริ่มต้นของ DS — ต้องเปิด richColors ด้วยไม่งั้นตัวแปรสีพวกนี้ไม่มีผล
               และต้องยกค่าตัวอื่น (--normal-*, --warning-*, --error-*) มาด้วยครบ
               เพราะ prop style ที่ส่งจากตรงนี้แทนที่ style เดิมของ DS ทั้งก้อน
-              ไม่ได้ merge ทีละตัวแปร */}
+              ไม่ได้ merge ทีละตัวแปร
+
+              ตำแหน่งขวาบน ให้ต่อเนื่องกับปุ่มกระดิ่งแจ้งเตือนบนหัวเรื่อง (แทน
+              ค่าเริ่มต้นของ sonner ที่โผล่มุมล่างขวา) เว้น offset บนพ้นหัวเรื่อง
+              สูง 56px (h-14) แล้วเว้นระยะห่างอีกนิด ไม่ให้ทับกัน */}
           <Toaster
             richColors
+            position="top-right"
+            offset={{ top: 72, right: 16 }}
             style={
               {
                 "--normal-bg": "var(--popover)",
@@ -52,7 +58,7 @@ export default function RootLayout({
                 "--normal-border": "var(--border)",
                 "--border-radius": "var(--radius)",
                 "--success-bg": "var(--brand)",
-                "--success-text": "var(--foreground)",
+                "--success-text": "var(--primary)",
                 "--success-border": "var(--primary)",
                 "--warning-bg": "var(--warning)",
                 "--warning-text": "var(--warning-foreground)",

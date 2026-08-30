@@ -25,60 +25,45 @@ import {
 } from "@peckey954/ui/components/ui/input-group";
 import { Label } from "@peckey954/ui/components/ui/label";
 import { Tabs, TabsList, TabsTrigger } from "@peckey954/ui/components/ui/tabs";
-import { cn } from "@peckey954/ui/lib/utils";
 import { DateRangeSelect, DateSelect, parseDateSlash, type DateRange } from "@/components/date-select";
-import { useDevicePreview, useScrollState } from "@/components/device-preview";
+import { useScrollState } from "@/components/device-preview";
 import { EmptyDocs } from "@/components/stock/doc-parts";
 import { BackToTop, StickyToolbar } from "@/components/sticky-toolbar";
 import { ApproveList } from "@/components/approve/approve-list";
-import {
-  APPROVE_CHIP_LABEL,
-  matchesApproveChip,
-  matchesPoOrder,
-  PO_ORDER_DOCS,
-  type ApproveChip,
-} from "@/lib/po";
+import { matchesApproveChip, matchesPoOrder, PO_ORDER_DOCS } from "@/lib/po";
 
 /* ------------------------------------------------------------------
    อนุมัติสั่งซื้อ — รีวิวใบสั่งซื้อก่อนอนุมัติ ใช้ข้อมูลชุดเดียวกับแท็บ "สั่งซื้อ"
-   ของหน้า /po (PO_ORDER_DOCS) แค่มุมมองเป็นสามชิปแบบเดียวกับแท็บ "ขอซื้อ"
-   (รอดำเนินการ/เร่งด่วน/ยกเลิก) แทนสถานะรับเข้า เพราะใบพวกนี้ยังไม่เริ่มรับเข้า
-   สิ่งที่ต้องตัดสินใจคือราคา ไม่ใช่ความคืบหน้า
+   ของหน้า /po (PO_ORDER_DOCS) ไม่มีชิปกรองสถานะเหมือนหน้าอื่น (ตามแบบ) — ใบที่
+   ยกเลิกไปแล้วกรองออกไปเลยเสมอ (เดิมเป็นพฤติกรรมของชิป "รอดำเนินการ" ที่เป็น
+   ค่าเริ่มต้นอยู่แล้ว ตอนนี้กลายเป็นพฤติกรรมเดียวตายตัว ไม่มีชิป "ยกเลิก" ให้
+   สลับไปดูอีกที) กรองได้แค่คำค้นหา + ช่วงวันที่ (กล่องตัวกรอง/วันที่ด่วน)
 
    แท็บ "ประวัติ" ยังไม่เปิดใช้งาน รอไฟล์ออกแบบ (เหมือนแท็บ "ซื้อแล้ว" ของ /po)
 ------------------------------------------------------------------ */
 
-const CHIPS: ApproveChip[] = ["all", "urgent", "cancelled"];
-
 export default function ApprovePage() {
-  const { framed } = useDevicePreview();
-  const { hidden, showTop, scrollToTop, scrollIntoTop } = useScrollState();
+  const { hidden, showTop, scrollToTop } = useScrollState();
 
   const [tab, setTab] = React.useState<"pending" | "history">("pending");
-  const [chip, setChip] = React.useState<ApproveChip>("all");
   const [query, setQuery] = React.useState("");
   const [quickDate, setQuickDate] = React.useState<Date>();
   const [dateRange, setDateRange] = React.useState<DateRange>();
   const [filterOpen, setFilterOpen] = React.useState(false);
   const filterActive = !!dateRange?.from;
 
-  const chipRowRef = React.useRef<HTMLDivElement>(null);
-  const chipRefs = React.useRef<Record<string, HTMLButtonElement | null>>({});
   const stickyRef = React.useRef<HTMLDivElement>(null);
-  const listRef = React.useRef<HTMLDivElement>(null);
 
-  const counts = React.useMemo(() => {
-    const c: Record<ApproveChip, number> = { all: 0, urgent: 0, cancelled: 0 };
-    for (const d of PO_ORDER_DOCS) {
-      if (matchesApproveChip(d, "all")) c.all += 1;
-      if (matchesApproveChip(d, "urgent")) c.urgent += 1;
-      if (matchesApproveChip(d, "cancelled")) c.cancelled += 1;
-    }
-    return c;
-  }, []);
+  // ไม่มีชิปให้สลับแล้ว แต่ยังต้องกรองใบที่ยกเลิกไปแล้วออกจากคิวรออนุมัติเสมอ
+  // (เดิมคือพฤติกรรมของชิป "รอดำเนินการ" ซึ่งเป็นค่าเริ่มต้น) นับจำนวนไว้โชว์
+  // ที่ป้ายแท็บด้วย ไม่ใช้ PO_ORDER_DOCS.length ตรงๆ เพราะนั่นรวมใบที่ยกเลิกด้วย
+  const pendingCount = React.useMemo(
+    () => PO_ORDER_DOCS.filter((d) => matchesApproveChip(d, "all")).length,
+    []
+  );
 
   const visible = PO_ORDER_DOCS.filter((d) => {
-    if (!matchesApproveChip(d, chip)) return false;
+    if (!matchesApproveChip(d, "all")) return false;
     if (!matchesPoOrder(d, query)) return false;
 
     const from = quickDate ?? dateRange?.from;
@@ -93,28 +78,6 @@ export default function ApprovePage() {
 
     return true;
   });
-
-  const changeChip = (next: ApproveChip) => {
-    setChip(next);
-    const list = listRef.current;
-    if (!list) return;
-    const bar = stickyRef.current?.offsetHeight ?? 0;
-    scrollIntoTop(list, bar + (framed ? 0 : 56));
-  };
-
-  React.useEffect(() => {
-    const row = chipRowRef.current;
-    const el = chipRefs.current[chip];
-    if (!row || !el) return;
-    const rowBox = row.getBoundingClientRect();
-    const elBox = el.getBoundingClientRect();
-    const pad = 12;
-    if (elBox.left < rowBox.left) {
-      row.scrollBy({ left: elBox.left - rowBox.left - pad, behavior: "smooth" });
-    } else if (elBox.right > rowBox.right) {
-      row.scrollBy({ left: elBox.right - rowBox.right + pad, behavior: "smooth" });
-    }
-  }, [chip]);
 
   return (
     <main className="mx-auto w-full max-w-7xl">
@@ -144,7 +107,7 @@ export default function ApprovePage() {
           >
             <TabsList className="w-full">
               <TabsTrigger value="pending" className="flex-1">
-                รออนุมัติ ({PO_ORDER_DOCS.length})
+                รออนุมัติ ({pendingCount})
               </TabsTrigger>
               <TabsTrigger value="history" className="flex-1">
                 ประวัติ (99+)
@@ -155,43 +118,7 @@ export default function ApprovePage() {
           {tab === "pending" && (
             <>
               <StickyToolbar hidden={hidden} barRef={stickyRef}>
-                <div className="flex items-center gap-2 pt-2">
-                  <div
-                    ref={chipRowRef}
-                    className={cn(
-                      "flex min-w-0 flex-1 items-center gap-2 overflow-x-auto",
-                      "flex-nowrap [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-                    )}
-                  >
-                    <div role="tablist" aria-label="สถานะใบสั่งซื้อ" className="flex shrink-0 items-center gap-2">
-                      {CHIPS.map((c) => {
-                        const on = chip === c;
-                        return (
-                          <button
-                            key={c}
-                            type="button"
-                            role="tab"
-                            ref={(el) => {
-                              chipRefs.current[c] = el;
-                            }}
-                            onClick={() => changeChip(c)}
-                            aria-selected={on}
-                            className={cn(
-                              "shrink-0 rounded-full border px-3 py-1 text-sm whitespace-nowrap transition-colors",
-                              on
-                                ? "border-primary bg-brand font-medium text-primary"
-                                : "border-border text-foreground hover:bg-accent-hover"
-                            )}
-                          >
-                            {APPROVE_CHIP_LABEL[c]} ({counts[c]})
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="mt-3 flex items-center gap-2">
+                <div className="flex items-center gap-2">
                   <InputGroup className="min-w-0 flex-1 bg-card">
                     <InputGroupAddon align="inline-start">
                       <SearchIcon />
@@ -243,11 +170,7 @@ export default function ApprovePage() {
                 </div>
               </StickyToolbar>
 
-              <div
-                ref={listRef}
-                key={chip}
-                className="mt-4 animate-in slide-in-from-bottom-3 fade-in duration-300"
-              >
+              <div className="mt-4">
                 <ApproveList docs={visible} />
               </div>
             </>
