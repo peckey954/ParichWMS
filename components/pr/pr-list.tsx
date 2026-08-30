@@ -196,8 +196,13 @@ function PrCard({ doc: d }: { doc: PrDoc }) {
         {/* เส้นคั่น "|" ระหว่างประเภท/หมวด/บรรจุภัณฑ์ — ตามแบบเดียวกับ
             ProductLabel ของหน้าสั่งซื้อ/อนุมัติ (po-order-list.tsx, approve-list.tsx) */}
         <p className="mt-2 text-sm">
-          {PR_CATEGORY_LABEL[d.categoryId]} | {d.group}
-          {d.packing && ` | ${d.packing}`}
+          {PR_CATEGORY_LABEL[d.categoryId]} <span className="text-border" aria-hidden>|</span> {d.group}
+          {d.packing && (
+            <>
+              {" "}
+              <span className="text-border" aria-hidden>|</span> {d.packing}
+            </>
+          )}
         </p>
       </CardBox>
 

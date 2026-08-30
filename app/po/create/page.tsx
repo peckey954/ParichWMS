@@ -76,11 +76,17 @@ type DraftLine = {
   orderedQty: number;
   pricePerUnit: number;
   handlingPerUnit: number;
+  /** เหตุผลตอนแก้บรรจุภัณฑ์/จำนวนสั่งซื้อไปจากที่ขอไว้เดิม — กรอกได้เสมอ แต่
+   *  ช่องนี้โผล่ให้เห็นเฉพาะตอนค่าจริงต่างจากที่ขอไว้เท่านั้น (ดู ProductCard) */
+  changeReason: string;
   /** ย้อนไปดูใบขอซื้อต้นทางได้ — มีเฉพาะแถวที่มาจากใบขอซื้อจริง
    *  แถวที่กด "เพิ่มสินค้า" เองในหน้านี้ไม่มีใบขอซื้อรองรับ จึงไม่มีข้อมูลชุดนี้ */
   prRef?: {
     code: string;
     requestedQty: number;
+    /** บรรจุภัณฑ์ตอนเริ่มต้น (ตามที่ขอไว้) — เก็บแยกจาก line.packing ที่แก้ได้
+     *  เพื่อเทียบว่าค่าปัจจุบันเปลี่ยนไปจากที่ขอไว้หรือยัง */
+    originalPacking?: string;
     requester: string;
     editedBy?: string;
   };
@@ -90,6 +96,7 @@ function toDraftLine(pr: PrDoc): DraftLine {
   const product = PR_PRODUCTS.find(
     (p) => p.category === pr.categoryId && p.name === pr.productName && p.sub === pr.productSub
   );
+  const packing = pr.packing ?? product?.packingOptions[0];
   return {
     key: pr.id,
     productId: product?.id,
@@ -97,7 +104,7 @@ function toDraftLine(pr: PrDoc): DraftLine {
     group: pr.group,
     productName: pr.productName,
     productSub: pr.productSub,
-    packing: pr.packing ?? product?.packingOptions[0],
+    packing,
     packingOptions: product?.packingOptions ?? (pr.packing ? [pr.packing] : []),
     unit: pr.unit,
     neededDate: pr.neededDate,
@@ -105,9 +112,11 @@ function toDraftLine(pr: PrDoc): DraftLine {
     orderedQty: pr.qty,
     pricePerUnit: 0,
     handlingPerUnit: 0,
+    changeReason: "",
     prRef: {
       code: pr.code,
       requestedQty: pr.qty,
+      originalPacking: packing,
       requester: pr.requester,
       editedBy: pr.editedBy,
     },
@@ -178,6 +187,7 @@ function CreatePoForm() {
         orderedQty: 0,
         pricePerUnit: 0,
         handlingPerUnit: 0,
+        changeReason: "",
       },
     ]);
   }
@@ -318,7 +328,7 @@ function CreatePoForm() {
 
       {/* ---------- แถบปุ่มล่าง ---------- */}
       <div className="sticky bottom-0 z-30 border-t border-border bg-surface">
-        <div className="mx-auto flex w-full max-w-4xl items-center justify-between gap-3 px-4 py-3 sm:px-6">
+        <div className="mx-auto flex w-full max-w-4xl items-center justify-between gap-3 px-8 py-3">
           <Button variant="outline-primary" onClick={() => router.back()}>
             ย้อนกลับ
           </Button>
@@ -382,6 +392,13 @@ function ProductCard({
   onChange: (patch: Partial<DraftLine>) => void;
   onRemove: () => void;
 }) {
+  // ค่าจริงต่างจากที่ขอไว้เดิมไหม (บรรจุภัณฑ์ หรือ จำนวนสั่งซื้อ) — ใช้ตัดสิน
+  // ว่าจะโชว์ช่อง "เหตุผลเปลี่ยนข้อมูล" ไหม แถวที่ไม่มี prRef (เพิ่มสินค้าเอง
+  // ในหน้านี้) ไม่มีของเดิมให้เทียบ เลยไม่มีทางเข้าเงื่อนไขนี้ได้เลย
+  const changedFromRequest =
+    !!line.prRef &&
+    (line.orderedQty !== line.prRef.requestedQty || line.packing !== line.prRef.originalPacking);
+
   return (
     // ไม่ defaultOpen — การ์ดสินค้าเริ่มต้นหุบไว้เสมอ กางเมื่อกดดูข้อมูลอ้างอิง
     // ใบขอซื้อเท่านั้น (ช่องกรอกจำนวน/ราคาด้านล่างไม่ได้อยู่ใน Collapsible เลย
@@ -444,24 +461,30 @@ function ProductCard({
         )}
       </div>
 
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 px-4 pt-1.5 pb-3 text-sm">
-        <span className="text-muted-foreground">
-          ราคารวมต่อ{line.unit} (บาท):{" "}
-          <span className="font-medium text-foreground tabular-nums">
-            {lineUnitPrice(line) > 0 ? formatPoBaht(lineUnitPrice(line)) : "-"}
-          </span>
-        </span>
-        <span className="text-muted-foreground">
-          ราคารวมทั้งหมด (บาท):{" "}
-          <span className="font-medium text-foreground tabular-nums">
-            {lineTotalPrice(line) > 0 ? formatPoBaht(lineTotalPrice(line)) : "-"}
-          </span>
-        </span>
+      {/* ราคารวมของรายการนี้ — กล่องพื้นสีแบรนด์ (ตามแบบ) เหมือนกล่องราคารวม
+          ทั้งใบด้านบน ไม่ใช่แค่บรรทัดตัวหนังสือเปล่าๆ แบบเดิม ไม่มีเส้นคั่นด้าน
+          ล่างอีกต่อไป — ตัวกล่องเองทำหน้าที่แบ่งส่วนหัวการ์ดกับช่องกรอกด้านล่าง
+          อยู่แล้ว ไม่ต้องมีเส้น border-t ซ้ำ */}
+      <div className="px-4 pt-3">
+        <div className="grid gap-4 rounded-lg bg-brand p-4 @sm:grid-cols-2">
+          <div>
+            <p className="text-sm text-muted-foreground">ราคารวมต่อ{line.unit} (บาท)</p>
+            <p className="mt-1 font-semibold tabular-nums">
+              {lineUnitPrice(line) > 0 ? formatPoBaht(lineUnitPrice(line)) : "-"}
+            </p>
+          </div>
+          <div>
+            <p className="text-sm text-muted-foreground">ราคารวมทั้งหมด (บาท)</p>
+            <p className="mt-1 font-semibold tabular-nums">
+              {lineTotalPrice(line) > 0 ? formatPoBaht(lineTotalPrice(line)) : "-"}
+            </p>
+          </div>
+        </div>
       </div>
 
       {/* ช่องกรอกจำนวน/ราคา — เห็นตลอดไม่ว่าการ์ดจะหุบหรือกางอยู่ ไม่ได้ซ่อนใน
           Collapsible เพราะเป็นข้อมูลที่ต้องกรอกก่อนบันทึกใบ ไม่ใช่แค่ดูอ้างอิง */}
-      <div className="grid gap-4 border-t border-border px-4 pt-4 pb-4 @lg:grid-cols-4">
+      <div className="grid gap-4 px-4 pt-4 pb-4 @lg:grid-cols-4">
         <div className="space-y-1.5">
           <Label>บรรจุภัณฑ์</Label>
           {line.packingOptions.length > 0 ? (
@@ -507,6 +530,24 @@ function ProductCard({
           />
         </div>
       </div>
+
+      {/* ---------- เหตุผลเปลี่ยนข้อมูล ----------
+           โผล่เฉพาะตอนบรรจุภัณฑ์หรือจำนวนสั่งซื้อจริงต่างจากที่ขอไว้เดิม —
+           ไม่ใช่ช่องตายตัวที่ต้องเห็นทุกครั้ง (แถวที่ยังไม่ได้แก้อะไรเลยไม่ต้อง
+           อธิบายอะไร) เห็นตลอดไม่ว่าการ์ดจะหุบหรือกางอยู่ เพราะเป็นข้อมูลที่ต้อง
+           กรอกก่อนบันทึกใบเหมือนช่องด้านบน ไม่ใช่แค่ดูอ้างอิงเฉยๆ */}
+      {changedFromRequest && (
+        <div className="space-y-1.5 px-4 pb-4">
+          <Label>เหตุผลเปลี่ยนข้อมูลการสั่งซื้อ/บรรจุภัณฑ์</Label>
+          <Textarea
+            className="bg-card"
+            rows={2}
+            placeholder="ระบุเหตุผล"
+            value={line.changeReason}
+            onChange={(e) => onChange({ changeReason: e.target.value })}
+          />
+        </div>
+      )}
 
       {/* ---------- อ้างอิงใบขอซื้อต้นทาง ----------
            ดูอย่างเดียว ไม่มีปุ่มแก้ ไม่ใช่ข้อมูลที่ต้องตัดสินใจอะไรตรงนี้ต่อ

@@ -281,7 +281,7 @@ export default function CreatePrPage() {
            เพราะกรอบจำลองแค่บีบกล่อง ไม่ได้ย่อหน้าต่างเบราว์เซอร์จริง */}
       <div className="sticky bottom-0 z-30 border-t border-border bg-surface">
         {/* ---------- จอแคบ: ซ้อน 2 แถว ---------- */}
-        <div className="flex w-full flex-col gap-3 px-4 py-3 @lg:hidden">
+        <div className="flex w-full flex-col gap-3 px-8 py-3 @lg:hidden">
           {/* ของจริงมักสั่งหลายสินค้าในประเภท/เหตุผล/วันที่ต้องการเดียวกันรอบเดียว
               ปุ่มนี้บันทึกใบปัจจุบันแล้วเปิดว่างสำหรับสินค้าตัวถัดไปต่อเลย
               ไม่ต้องเลือกประเภท/เหตุผล/วันที่ซ้ำ — โผล่เฉพาะตอนกรอกจนกดบันทึกได้
@@ -302,7 +302,7 @@ export default function CreatePrPage() {
         </div>
 
         {/* ---------- จอกว้าง: แถวเดียว ---------- */}
-        <div className="hidden w-full items-center justify-between gap-3 px-6 py-3 @lg:flex">
+        <div className="hidden w-full items-center justify-between gap-3 px-8 py-3 @lg:flex">
           <Button variant="outline-primary" onClick={goBack}>
             ย้อนกลับ
           </Button>

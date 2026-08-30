@@ -221,9 +221,9 @@ export function PoList({
                             สร้างใบสั่งซื้อ
                           </Button>
                           <Button
-                            variant="outline-primary"
+                            variant="ghost"
                             size="icon"
-                            aria-label={`ลบ ${d.code}`}
+                            aria-label={`ยกเลิก ${d.code}`}
                             className="shrink-0"
                             onClick={() => onDeleteRequest(d)}
                           >
@@ -288,13 +288,14 @@ function PoCard({
           </div>
         </div>
         {/* ปุ่มลบอยู่บนสุดคู่กับเลขที่ใบ — ไม่ใช่ลงไปอยู่แถวล่างสุดกับปุ่มอื่น
-            ใช้ outline-primary แบบเดียวกับปุ่มไอคอนอื่นในแอป (เช่นปุ่มตัวกรอง)
-            ไม่ใช่ ghost เฉยๆ ตามแบบ */}
+            ใช้ ghost (ไอคอนดำเฉยๆ hover เทาอ่อน) ไม่ใช่ outline-primary สีส้ม —
+            ลบไม่ใช่การกระทำหลัก ไม่ควรเด่นเท่าปุ่มสีแบรนด์ เหมือนปุ่มลบอื่นๆ
+            ทั้งแอป (photo-upload, file-upload, ตัวแก้ไข QC ฯลฯ) */}
         {actionable && (
           <Button
-            variant="outline-primary"
+            variant="ghost"
             size="icon"
-            aria-label={`ลบ ${d.code}`}
+            aria-label={`ยกเลิก ${d.code}`}
             className="shrink-0"
             onClick={onDeleteRequest}
           >
@@ -311,8 +312,13 @@ function PoCard({
         {/* เส้นคั่น "|" ระหว่างประเภท/หมวด/บรรจุภัณฑ์ — ตามแบบเดียวกับ
             ProductLabel ของหน้าสั่งซื้อ/อนุมัติ (po-order-list.tsx, approve-list.tsx) */}
         <p className="mt-2 text-sm">
-          {PR_CATEGORY_LABEL[d.categoryId]} | {d.group}
-          {d.packing && ` | ${d.packing}`}
+          {PR_CATEGORY_LABEL[d.categoryId]} <span className="text-border" aria-hidden>|</span> {d.group}
+          {d.packing && (
+            <>
+              {" "}
+              <span className="text-border" aria-hidden>|</span> {d.packing}
+            </>
+          )}
         </p>
       </CardBox>
 

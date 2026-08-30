@@ -236,7 +236,7 @@ export default function PrDetailPage() {
 
       {/* ---------- แถบปุ่มล่าง ---------- */}
       <div className="sticky bottom-0 z-30 border-t border-border bg-surface">
-        <div className="mx-auto flex w-full max-w-3xl items-center px-4 py-3 sm:px-6">
+        <div className="mx-auto flex w-full max-w-3xl items-center px-8 py-3">
           <Button variant="outline-primary" onClick={() => router.back()}>
             ย้อนกลับ
           </Button>
@@ -293,7 +293,9 @@ function SummaryStat({ label, value }: { label: string; value: string }) {
 function MetaField({ label, value }: { label: string; value: string }) {
   return (
     <p>
-      <span className="block text-muted-foreground">{label}:</span>
+      {/* ไม่มี ":" ท้ายป้ายกำกับ — ป้ายกับค่าคนละบรรทัดกัน ไม่ใช่บรรทัดเดียวกัน
+          เครื่องหมาย ":" ใช้ตอนป้าย/ค่าอยู่บรรทัดเดียวกันเท่านั้น (เช่น CardRow) */}
+      <span className="block text-muted-foreground">{label}</span>
       <span className="font-medium">{value}</span>
     </p>
   );

@@ -84,8 +84,13 @@ export function PoLineItemDetailDialog({
             {item.productSub && ` ${item.productSub}`}
           </DialogTitle>
           <DialogDescription>
-            {PR_CATEGORY_LABEL[item.categoryId]} | {item.group}
-            {item.packing && ` | ${item.packing}`}
+            {PR_CATEGORY_LABEL[item.categoryId]} <span className="text-border" aria-hidden>|</span> {item.group}
+            {item.packing && (
+              <>
+                {" "}
+                <span className="text-border" aria-hidden>|</span> {item.packing}
+              </>
+            )}
           </DialogDescription>
         </DialogHeader>
 

@@ -292,7 +292,7 @@ export default function EditPrPage() {
            max-w-3xl ของฟอร์มด้านบน — ฟอร์มแคบเพื่อให้อ่านง่าย แต่แถบปุ่ม
            กว้างเต็มพื้นที่เนื้อหาเสมอ */}
       <div className="sticky bottom-0 z-30 border-t border-border bg-surface">
-        <div className="flex w-full items-center justify-between gap-3 px-4 py-3 sm:px-6">
+        <div className="flex w-full items-center justify-between gap-3 px-8 py-3">
           <Button variant="outline-primary" onClick={goBack}>
             ย้อนกลับ
           </Button>

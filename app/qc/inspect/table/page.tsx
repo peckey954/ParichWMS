@@ -312,7 +312,7 @@ export default function QcInspectTablePage() {
       </div>
 
       <div className="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-card/95 backdrop-blur">
-        <div className="mx-auto flex w-full max-w-6xl items-center justify-between gap-3 px-4 py-3 sm:px-6">
+        <div className="mx-auto flex w-full max-w-6xl items-center justify-between gap-3 px-8 py-3">
           <span className="text-sm text-muted-foreground">
             {rounds.length} ครั้ง · {items.length} ข้อตรวจ
           </span>

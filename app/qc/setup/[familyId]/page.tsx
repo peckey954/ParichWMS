@@ -691,7 +691,7 @@ function QcTemplateEditor({ family }: { family: QcTemplateFamily }) {
 
       {/* ---------- แถบปุ่มล่าง ---------- */}
       <div className="sticky bottom-0 border-t border-border bg-surface">
-        <div className="mx-auto flex w-full max-w-6xl items-center justify-between gap-3 px-4 py-3 sm:px-6">
+        <div className="mx-auto flex w-full max-w-6xl items-center justify-between gap-3 px-8 py-3">
           <span className="text-sm text-muted-foreground">
             {tpl.items.length} หัวข้อตรวจ · {tpl.headerFields.length} ฟิลด์ส่วนหัว
           </span>

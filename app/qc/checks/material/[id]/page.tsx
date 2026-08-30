@@ -220,7 +220,7 @@ function SheetEditor({
       </div>
 
       <div className="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-card/95 backdrop-blur">
-        <div className="mx-auto flex w-full max-w-5xl items-center justify-between gap-3 px-4 py-3 sm:px-6">
+        <div className="mx-auto flex w-full max-w-5xl items-center justify-between gap-3 px-8 py-3">
           <Button variant="outline" onClick={() => router.back()}>
             ย้อนกลับ
           </Button>

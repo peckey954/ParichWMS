@@ -229,7 +229,7 @@ export default function ApproveDetailPage() {
       {/* ---------- แถบปุ่มล่าง — ใบที่ตัดสินใจไปแล้ว (จากแท็บ "ประวัติ") เหลือ
           แค่ปุ่มย้อนกลับ ไม่มีปุ่มอนุมัติ/ไม่อนุมัติให้กดซ้ำ ---------- */}
       <div className="sticky bottom-0 z-30 border-t border-border bg-surface">
-        <div className="mx-auto flex w-full max-w-6xl items-center justify-between gap-3 px-4 py-3 sm:px-6">
+        <div className="mx-auto flex w-full max-w-6xl items-center justify-between gap-3 px-8 py-3">
           <Button variant="outline-primary" onClick={() => router.back()}>
             ย้อนกลับ
           </Button>

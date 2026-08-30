@@ -329,7 +329,7 @@ export default function PoOrderDetailPage() {
       </main>
 
       <div className="sticky bottom-0 z-30 border-t border-border bg-surface">
-        <div className="mx-auto flex w-full max-w-6xl items-center px-4 py-3 sm:px-6">
+        <div className="mx-auto flex w-full max-w-6xl items-center px-8 py-3">
           <Button variant="outline-primary" onClick={() => router.back()}>
             ย้อนกลับ
           </Button>
@@ -432,8 +432,13 @@ function LineItemsTable({ po }: { po: PoDoc }) {
                 {item.productSub && ` ${item.productSub}`}
               </p>
               <p className="mt-2 text-muted-foreground">
-                {PR_CATEGORY_LABEL[item.categoryId]} | {item.group}
-                {item.packing && ` | ${item.packing}`}
+                {PR_CATEGORY_LABEL[item.categoryId]} <span className="text-border" aria-hidden>|</span> {item.group}
+                {item.packing && (
+                  <>
+                    {" "}
+                    <span className="text-border" aria-hidden>|</span> {item.packing}
+                  </>
+                )}
               </p>
               <p className="mt-4 font-medium">
                 {lineItemCode(po, index)}
@@ -489,8 +494,13 @@ function LineItemsTable({ po }: { po: PoDoc }) {
                       </span>
                       {item.urgent && <UrgentChip />}
                       <span className="mt-2 block text-sm text-muted-foreground">
-                        {PR_CATEGORY_LABEL[item.categoryId]} | {item.group}
-                        {item.packing && ` | ${item.packing}`}
+                        {PR_CATEGORY_LABEL[item.categoryId]} <span className="text-border" aria-hidden>|</span> {item.group}
+                        {item.packing && (
+                          <>
+                            {" "}
+                            <span className="text-border" aria-hidden>|</span> {item.packing}
+                          </>
+                        )}
                       </span>
                     </TableCell>
                     <TableCell className="whitespace-nowrap">

@@ -320,7 +320,7 @@ export default function ProductionOrderPage() {
 
       {/* ---------- แถบปุ่มล่าง ---------- */}
       <div className="sticky bottom-0 z-30 border-t border-border bg-surface">
-        <div className="mx-auto flex w-full max-w-6xl items-center justify-between gap-3 px-4 py-3 sm:px-6">
+        <div className="mx-auto flex w-full max-w-6xl items-center justify-between gap-3 px-8 py-3">
           <Button asChild variant="outline-primary">
             <Link href="/production/packing">ย้อนกลับ</Link>
           </Button>

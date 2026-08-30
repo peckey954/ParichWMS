@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ListFilterIcon, RotateCcwIcon, SearchIcon } from "lucide-react";
+import { ListFilterIcon, RotateCcwIcon, SearchIcon, XIcon } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -36,6 +36,7 @@ import {
 } from "@peckey954/ui/components/ui/input-group";
 import { Label } from "@peckey954/ui/components/ui/label";
 import { Tabs, TabsList, TabsTrigger } from "@peckey954/ui/components/ui/tabs";
+import { Textarea } from "@peckey954/ui/components/ui/textarea";
 import { cn } from "@peckey954/ui/lib/utils";
 import { toast } from "sonner";
 import { DateRangeSelect, DateSelect, parseDateSlash, type DateRange } from "@/components/date-select";
@@ -108,6 +109,7 @@ function PoPageContent() {
 
   const [selected, setSelected] = React.useState<Set<string>>(new Set());
   const [pendingDelete, setPendingDelete] = React.useState<PrDoc | null>(null);
+  const [cancelReason, setCancelReason] = React.useState("");
 
   // ---------- แท็บ "สั่งซื้อ" ----------
   const [poChip, setPoChip] = React.useState<PoStatus>("pending");
@@ -247,15 +249,18 @@ function PoPageContent() {
   };
 
   const handleDelete = () => {
-    if (!pendingDelete) return;
+    if (!pendingDelete || !cancelReason.trim()) return;
     setRemovedIds((prev) => new Set(prev).add(pendingDelete.id));
     setSelected((prev) => {
       const next = new Set(prev);
       next.delete(pendingDelete.id);
       return next;
     });
-    toast.success("ลบใบขอซื้อแล้ว", { description: pendingDelete.code });
+    toast.success(`ยกเลิกใบขอซื้อ ${pendingDelete.code} แล้ว`, {
+      description: `เหตุผล: ${cancelReason.trim()}`,
+    });
     setPendingDelete(null);
+    setCancelReason("");
   };
 
   return (
@@ -390,15 +395,26 @@ function PoPageContent() {
                 </div>
 
                 {/* แถบสร้างใบสั่งซื้อรวม — โผล่เฉพาะตอนติ๊กเลือกไว้อย่างน้อยหนึ่งใบ
-                    เท่านั้น ไม่ใช่ปุ่มถาวรที่กดไม่ได้เฉยๆ ตอนยังไม่มีอะไรให้รวม */}
+                    เท่านั้น ไม่ใช่ปุ่มถาวรที่กดไม่ได้เฉยๆ ตอนยังไม่มีอะไรให้รวม
+                    ปุ่มหลักเป็น outline (ไม่ใช่พื้นทึบ) ตามแบบ ส่วน "ล้างค่า"
+                    ล้างการติ๊กเลือกทั้งหมด (lockedCategory มาจาก selected เอง
+                    ผ่าน useMemo อยู่แล้ว ล้าง selected อย่างเดียวก็พอ) */}
                 {selected.size > 0 && (
                   <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1.5">
-                    <Button onClick={handleCreateSelected}>
+                    <Button variant="outline-primary" onClick={handleCreateSelected}>
                       สร้างใบสั่งซื้อ
                     </Button>
                     <p className="text-sm text-muted-foreground">
                       วัตถุดิบเดียวกันเลือกรวมใน 1 ใบสั่งซื้อได้
                     </p>
+                    <Button
+                      variant="ghost"
+                      className="ml-auto text-primary"
+                      onClick={() => setSelected(new Set())}
+                    >
+                      <RotateCcwIcon />
+                      ล้างค่า
+                    </Button>
                   </div>
                 )}
               </StickyToolbar>
@@ -521,17 +537,59 @@ function PoPageContent() {
         </div>
       </div>
 
-      <AlertDialog open={!!pendingDelete} onOpenChange={(open) => !open && setPendingDelete(null)}>
-        <AlertDialogContent>
+      {/* ปุ่มถังขยะของคิวขอซื้อ ที่จริงคือ "ยกเลิกเอกสาร" ไม่ใช่ลบทิ้งเงียบๆ —
+          ต้องกรอกเหตุผลก่อนถึงจะยืนยันได้ (ปุ่ม "ยกเลิกเอกสาร" กดไม่ได้จนกว่า
+          จะพิมพ์เหตุผล) ตามแบบ */}
+      <AlertDialog
+        open={!!pendingDelete}
+        onOpenChange={(open) => {
+          if (!open) {
+            setPendingDelete(null);
+            setCancelReason("");
+          }
+        }}
+      >
+        <AlertDialogContent className="relative">
+          <button
+            type="button"
+            onClick={() => {
+              setPendingDelete(null);
+              setCancelReason("");
+            }}
+            aria-label="ปิด"
+            className="absolute top-4 right-4 rounded-xs text-muted-foreground opacity-70 transition-opacity hover:opacity-100 focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:outline-hidden"
+          >
+            <XIcon className="size-4" />
+          </button>
           <AlertDialogHeader>
-            <AlertDialogTitle>ลบใบขอซื้อนี้ใช่ไหม?</AlertDialogTitle>
-            <AlertDialogDescription>
-              {pendingDelete?.code} จะถูกลบออกจากคิวรอสร้างใบสั่งซื้อ
+            <AlertDialogTitle>คุณต้องยกเลิกเอกสารใช่ไหม?</AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <span>
+                <span className="block font-medium text-primary">
+                  ใบขอซื้อ {pendingDelete?.code}
+                </span>
+                หากยกเลิกแล้วจะไม่สามารถกู้คืนข้อมูลได้อีก
+              </span>
             </AlertDialogDescription>
           </AlertDialogHeader>
+
+          <div className="space-y-1.5 text-left">
+            <Label htmlFor="cancel-reason">เหตุผลการยกเลิก</Label>
+            <Textarea
+              id="cancel-reason"
+              className="bg-card"
+              placeholder="เหตุผล..."
+              rows={3}
+              value={cancelReason}
+              onChange={(e) => setCancelReason(e.target.value)}
+            />
+          </div>
+
           <AlertDialogFooter>
-            <AlertDialogCancel>ไม่ลบ</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDelete}>ยืนยันลบ</AlertDialogAction>
+            <AlertDialogCancel>ย้อนกลับ</AlertDialogCancel>
+            <AlertDialogAction disabled={!cancelReason.trim()} onClick={handleDelete}>
+              ยกเลิกเอกสาร
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

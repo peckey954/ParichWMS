@@ -222,8 +222,13 @@ function ProductLabel({ item }: { item: PoLineItem }) {
         {item.urgent && <UrgentChip />}
       </span>
       <span className="mt-2 block truncate text-sm text-muted-foreground">
-        {PR_CATEGORY_LABEL[item.categoryId]} | {item.group}
-        {item.packing && ` | ${item.packing}`}
+        {PR_CATEGORY_LABEL[item.categoryId]} <span className="text-border" aria-hidden>|</span> {item.group}
+        {item.packing && (
+          <>
+            {" "}
+            <span className="text-border" aria-hidden>|</span> {item.packing}
+          </>
+        )}
       </span>
     </>
   );

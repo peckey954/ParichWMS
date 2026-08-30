@@ -149,7 +149,7 @@ export default function RecipeInputSetupPage() {
            ปกติกดไม่ได้อยู่แล้ว ช่วยกันกดพลาดกับ "ย้อนกลับ" ที่อยู่ข้างกันได้พออยู่แล้ว
            โดยไม่ต้องแยกฝั่ง */}
       <div className="sticky bottom-0 z-30 border-t border-border bg-surface">
-        <div className="flex w-full items-center justify-between gap-3 px-4 py-3 sm:px-6">
+        <div className="flex w-full items-center justify-between gap-3 px-8 py-3">
           <div className="flex items-center gap-3">
             <Button variant="outline-primary" onClick={() => router.back()}>
               ย้อนกลับ
