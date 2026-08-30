@@ -65,7 +65,12 @@ import {
 } from "@/lib/weighing";
 
 /* ------------------------------------------------------------------
-   ต้นแบบ — ชั่งน้ำหนักรถคันเดียวที่ขนหลายสินค้า (1-3 รายการ)
+   ชั่งน้ำหนัก Ver 2 — รองรับรถคันเดียวที่ขนหลายสินค้า (1-3 รายการ)
+
+   แยกเป็นหน้า/route ต่างหาก (/weighing/v2) ไม่แตะระบบชั่งน้ำหนักเดิมที่
+   /weighing เลย เพราะยังไม่สรุปว่าจะใช้แบบไหน — ไว้เทียบกันดูก่อนค่อยตัดสินใจ
+   ทีหลังว่าจะรวมเป็นระบบเดียวยังไง (ไม่มีลิงก์เชื่อมจากหน้ารายการ /weighing
+   มาที่นี่ตั้งใจ เข้าถึงได้เฉพาะกดลิงก์ตรงๆ เท่านั้น)
 
    ปัญหาของโมเดลเดิม (WeighingRound): รถหนึ่งคันมีแค่ "ชั่งเข้า" กับ
    "ชั่งออก" สองจุด ใช้ได้ก็ต่อเมื่อรถคันนั้นขนสินค้าเดียว — แต่หน้างานจริง
@@ -193,17 +198,17 @@ export default function MultiProductWeighingDemoPage() {
             </BreadcrumbItem>
             <BreadcrumbSeparator />
             <BreadcrumbItem>
-              <BreadcrumbPage className="text-primary">
-                ต้นแบบ: รถหนึ่งคันหลายสินค้า
-              </BreadcrumbPage>
+              <BreadcrumbPage className="text-primary">ชั่งน้ำหนัก Ver 2</BreadcrumbPage>
             </BreadcrumbItem>
           </BreadcrumbList>
         </Breadcrumb>
 
-        <h1 className="mt-2 text-2xl font-semibold tracking-tight">
-          ต้นแบบ: ชั่งน้ำหนักรถที่มีหลายสินค้า
-        </h1>
+        <h1 className="mt-2 text-2xl font-semibold tracking-tight">ชั่งน้ำหนัก Ver 2</h1>
         <p className="mt-1.5 max-w-2xl text-sm text-muted-foreground">
+          รองรับรถหนึ่งคันขนหลายสินค้า (1-3 รายการ) — แยกไว้คนละหน้ากับระบบ
+          ชั่งน้ำหนักเดิม เพราะยังไม่สรุปว่าจะใช้แบบไหน
+        </p>
+        <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
           {phase === "setup"
             ? "ระบุแค่จำนวนสินค้าที่รถคันนี้ขนมา ยังไม่ต้องรู้ว่าเป็นตัวไหน — ค่อยเลือกตอนถึงจุดชั่งนั้นจริงๆ"
             : "ลองกรอกได้จริงตั้งแต่จุดแรก — ถึงคิวไหนค่อยเลือกว่าตัวที่กำลังลงคือสินค้าตัวไหน กรอกจุดที่ N ได้ก็ต่อเมื่อจุดที่ N-1 บันทึกแล้วเท่านั้น"}
