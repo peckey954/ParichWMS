@@ -449,3 +449,108 @@ export function getWeighingReceipt(id: string): WeighingReceipt | undefined {
   if (!doc) return undefined;
   return buildWeighingReceipt(doc);
 }
+
+// ---------------------------------------------------------------
+// ต้นแบบ — รถหนึ่งคันมีหลายสินค้า (1-3 รายการ) ชั่งต่อเนื่องหลายจุด
+// ---------------------------------------------------------------
+//
+// WeighingRound เดิมข้างบนมีแค่สองจุดชั่ง (เข้า/ออก) เพราะรถหนึ่งคันมีสินค้า
+// เดียวเสมอ — กรณีรถคันเดียวขนหลายสินค้า ต้องชั่งเป็นลำดับ: เข้าเต็มคัน →
+// ลงสินค้าที่ 1 แล้วชั่ง → ลงสินค้าที่ 2 แล้วชั่ง → ... → ลงสินค้าสุดท้ายแล้ว
+// ชั่ง (=รถเปล่า) น้ำหนักของสินค้าแต่ละตัว = ผลต่างระหว่างจุดชั่งที่ติดกัน
+// สองจุด ไม่ใช่ (เข้า − ออก) ตรงๆ เหมือนกรณีสินค้าเดียว
+//
+// จุดชั่ง (checkpoint) มีจำนวน = จำนวนสินค้า + 1 เสมอ:
+//   checkpoint[0]            = ชั่งเข้า (รถ + สินค้าทั้งหมด)
+//   checkpoint[1..N-1]       = ชั่งหลังลงสินค้าที่ 1..N-1
+//   checkpoint[N]            = ชั่งหลังลงสินค้าสุดท้าย = รถเปล่า (tare)
+//   น้ำหนักสินค้าตัวที่ i    = checkpoint[i] − checkpoint[i+1]
+//
+// กรณีสินค้าเดียว (N=1) จุดชั่งเหลือแค่ 2 จุด (เข้า/ออก) ตรงกับ WeighingRound
+// เดิมพอดี — ถือเป็นกรณีพิเศษของโมเดลนี้ ไม่ใช่คนละระบบ
+
+export type WeighCheckpoint = {
+  seq: number;
+  ton?: number;
+  at?: string;
+};
+
+export type TruckProduct = {
+  id: string;
+  productName: string;
+  productSub?: string;
+  category: string;
+  packing?: string;
+  /** น้ำหนักตามใบชั่งของผู้ขาย (ตัน) — คนละใบกับใบชั่งของพาริช เทียบส่วนต่างแบบเดียวกับ WeighingRound เดิม */
+  supplierTon?: number;
+  /** เลขที่ใบชั่งของผู้จำหน่าย — กรอกเอง เพราะเป็นเลขที่ผู้ขายออกใบเอง คนละชุดกับเลขที่ของพาริช */
+  supplierSlipNo?: string;
+  /** เลขที่ใบชั่งของพาริช — ระบบสร้างให้อัตโนมัติทันทีที่บันทึกน้ำหนักสินค้าตัวนี้สำเร็จ (ดู parichSlipNo()) ไม่ต้องกรอกเอง */
+  parichSlipNo?: string;
+};
+
+export type MultiProductRound = {
+  id: string;
+  receiptCode: string;
+  batchId: string;
+  plate: string;
+  arriveDate: string;
+  /** เรียงตามลำดับที่จะลงของจริงหน้างาน — ลำดับนี้กำหนดว่า checkpoint ไหนคู่กับสินค้าไหน */
+  products: TruckProduct[];
+  checkpoints: WeighCheckpoint[];
+};
+
+/** น้ำหนักสินค้าจริงของรายการที่ index (นับจาก 0) — null ถ้ายังไม่ครบสองจุดชั่งที่ติดกัน */
+export function productNetTon(round: MultiProductRound, index: number): number | null {
+  const a = round.checkpoints[index]?.ton;
+  const b = round.checkpoints[index + 1]?.ton;
+  if (a == null || b == null) return null;
+  return Math.round((a - b) * 100) / 100;
+}
+
+/** ส่วนต่างของสินค้าตัวนั้น = ของเรา − ของผู้ขาย เหมือน roundDiffTon เดิม */
+export function productDiffTon(round: MultiProductRound, index: number): number | null {
+  const net = productNetTon(round, index);
+  const supplierTon = round.products[index]?.supplierTon;
+  if (net === null || supplierTon == null) return null;
+  return Math.round((net - supplierTon) * 100) / 100;
+}
+
+/** เลขที่ใบชั่งของพาริชต่อสินค้า — ต่อท้ายเลขที่รับสินค้าด้วยตัวอักษรเรียงตาม
+    ลำดับสินค้า (A, B, C, ...) แบบเดียวกับ lineItemCode ของ PO/ใบสั่งซื้ออื่นๆ */
+export function parichSlipNo(round: MultiProductRound, index: number): string {
+  return `${round.receiptCode}-${String.fromCharCode(65 + index)}`;
+}
+
+/** ต้นแบบสาธิต — รถคันเดียวขน 3 สินค้า ยังไม่ได้ชั่งจุดไหนเลย (ทดลองกรอกได้ตั้งแต่จุดแรก) */
+export const MULTI_PRODUCT_DEMO: MultiProductRound = {
+  id: "wg-multi-demo",
+  receiptCode: "PO260130/09",
+  batchId: "IN-7f3a-9c21",
+  plate: "70 - 4471",
+  arriveDate: "30/01/2026",
+  products: [
+    {
+      id: "wg-multi-demo-p1",
+      productName: "21-0-0",
+      productSub: "ฟูเจียนผง",
+      category: "วัตถุดิบปุ๋ยกระสอบ",
+      packing: "Bulk",
+    },
+    {
+      id: "wg-multi-demo-p2",
+      productName: "46-0-0",
+      productSub: "ยูเรีย เม็ด",
+      category: "วัตถุดิบปุ๋ยกระสอบ",
+      packing: "Bulk",
+    },
+    {
+      id: "wg-multi-demo-p3",
+      productName: "16-20-0",
+      productSub: "เม็ดปั้น",
+      category: "วัตถุดิบปุ๋ยกระสอบ",
+      packing: "50 Kg",
+    },
+  ],
+  checkpoints: [{ seq: 0 }, { seq: 1 }, { seq: 2 }, { seq: 3 }],
+};
