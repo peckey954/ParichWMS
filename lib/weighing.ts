@@ -517,40 +517,49 @@ export function productDiffTon(round: MultiProductRound, index: number): number 
 }
 
 /** เลขที่ใบชั่งของพาริชต่อสินค้า — ต่อท้ายเลขที่รับสินค้าด้วยตัวอักษรเรียงตาม
-    ลำดับสินค้า (A, B, C, ...) แบบเดียวกับ lineItemCode ของ PO/ใบสั่งซื้ออื่นๆ */
-export function parichSlipNo(round: MultiProductRound, index: number): string {
-  return `${round.receiptCode}-${String.fromCharCode(65 + index)}`;
+    ลำดับสินค้า (A, B, C, ...) แบบเดียวกับ lineItemCode ของ PO/ใบสั่งซื้ออื่นๆ
+    รับแค่ receiptCode เฉยๆ ไม่รับทั้ง MultiProductRound เพราะตอนสร้างเลขที่
+    ยังไม่จำเป็นต้องมี products/checkpoints ครบ (เรียกได้ตั้งแต่ตอนตั้งค่า
+    ก่อนเริ่มชั่งจริง) */
+export function parichSlipNo(receiptCode: string, index: number): string {
+  return `${receiptCode}-${String.fromCharCode(65 + index)}`;
 }
 
-/** ต้นแบบสาธิต — รถคันเดียวขน 3 สินค้า ยังไม่ได้ชั่งจุดไหนเลย (ทดลองกรอกได้ตั้งแต่จุดแรก) */
-export const MULTI_PRODUCT_DEMO: MultiProductRound = {
+/** ข้อมูลรถ+ใบสั่งซื้อของต้นแบบนี้ — คงที่ ไม่ให้แก้ในหน้าต้นแบบ จุดที่ให้
+    เลือก/แก้ได้เองคือแค่ "จะเอาสินค้าตัวไหนขึ้นรถคันนี้บ้าง และเรียงลำดับลง
+    ของยังไง" (ดูหน้า /weighing/multi-demo ส่วนตั้งค่าก่อนชั่ง) */
+export const MULTI_PRODUCT_DEMO_ROUND = {
   id: "wg-multi-demo",
   receiptCode: "PO260130/09",
   batchId: "IN-7f3a-9c21",
   plate: "70 - 4471",
   arriveDate: "30/01/2026",
-  products: [
-    {
-      id: "wg-multi-demo-p1",
-      productName: "21-0-0",
-      productSub: "ฟูเจียนผง",
-      category: "วัตถุดิบปุ๋ยกระสอบ",
-      packing: "Bulk",
-    },
-    {
-      id: "wg-multi-demo-p2",
-      productName: "46-0-0",
-      productSub: "ยูเรีย เม็ด",
-      category: "วัตถุดิบปุ๋ยกระสอบ",
-      packing: "Bulk",
-    },
-    {
-      id: "wg-multi-demo-p3",
-      productName: "16-20-0",
-      productSub: "เม็ดปั้น",
-      category: "วัตถุดิบปุ๋ยกระสอบ",
-      packing: "50 Kg",
-    },
-  ],
-  checkpoints: [{ seq: 0 }, { seq: 1 }, { seq: 2 }, { seq: 3 }],
 };
+
+/** สินค้าทั้งหมดที่มีอยู่ในใบสั่งซื้อนี้ — หนึ่ง PO อาจมีได้หลายรายการ
+    (ตัวอย่างนี้มี 3) แต่รถคันหนึ่งไม่จำเป็นต้องขนครบทุกตัว อาจขนมาแค่บางส่วน
+    ก็ได้ (เช่น PO มี 3 แต่รถคันนี้ขนมาแค่ 2) ให้เลือกจากสระนี้เองว่าจะเอา
+    ตัวไหนบ้างและเรียงลำดับการลงของยังไงในหน้าตั้งค่าก่อนเริ่มชั่ง */
+export const PO_LINE_ITEMS_POOL: TruckProduct[] = [
+  {
+    id: "poitem-1",
+    productName: "21-0-0",
+    productSub: "ฟูเจียนผง",
+    category: "วัตถุดิบปุ๋ยกระสอบ",
+    packing: "Bulk",
+  },
+  {
+    id: "poitem-2",
+    productName: "46-0-0",
+    productSub: "ยูเรีย เม็ด",
+    category: "วัตถุดิบปุ๋ยกระสอบ",
+    packing: "Bulk",
+  },
+  {
+    id: "poitem-3",
+    productName: "16-20-0",
+    productSub: "เม็ดปั้น",
+    category: "วัตถุดิบปุ๋ยกระสอบ",
+    packing: "50 Kg",
+  },
+];
