@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import Link from "next/link";
 import { CalendarIcon, ListFilterIcon, SearchIcon } from "lucide-react";
 import {
   Breadcrumb,
@@ -68,11 +69,18 @@ export default function WeighingListPage() {
             </BreadcrumbList>
           </Breadcrumb>
 
-          <div className="mt-2 min-w-0 sm:mt-3">
-            <h1 className="text-2xl font-semibold tracking-tight">ชั่งน้ำหนัก</h1>
-            <p className="mt-1 text-sm text-muted-foreground">
-              จัดการเอกสารชั่งน้ำหนักรถและสินค้า
-            </p>
+          {/* ปุ่มไปต้นแบบ Ver 2 — จุดเดียวในแอปที่ลิงก์ไปหน้านั้น (ตั้งใจไม่ผูก
+              เข้ากับ flow เดิมทั้งระบบ แค่ให้กดเข้าไปดู/ทดลองได้จากตรงนี้) */}
+          <div className="mt-2 flex flex-wrap items-start justify-between gap-3 sm:mt-3">
+            <div className="min-w-0">
+              <h1 className="text-2xl font-semibold tracking-tight">ชั่งน้ำหนัก</h1>
+              <p className="mt-1 text-sm text-muted-foreground">
+                จัดการเอกสารชั่งน้ำหนักรถและสินค้า
+              </p>
+            </div>
+            <Button asChild variant="outline-primary" size="sm" className="shrink-0">
+              <Link href="/weighing/v2">ลองดูต้นแบบ Ver 2</Link>
+            </Button>
           </div>
 
           <Tabs
