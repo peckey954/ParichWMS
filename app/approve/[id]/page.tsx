@@ -347,11 +347,11 @@ function ApproveLineItemsTable({ po }: { po: PoDoc }) {
               {item.urgent && <UrgentChip />}
             </p>
             <div className="mt-2 rounded-lg bg-brand px-3 py-2.5">
-              <p className="font-medium">
+              <p className="text-base font-semibold">
                 {item.productName}
                 {item.productSub && ` ${item.productSub}`}
               </p>
-              <p className="text-sm text-muted-foreground">
+              <p className="mt-2 text-sm text-muted-foreground">
                 {item.group}
                 {item.packing && ` · ${item.packing}`}
               </p>
@@ -386,12 +386,12 @@ function ApproveLineItemsTable({ po }: { po: PoDoc }) {
               {po.lineItems.map((item, index) => (
                 <TableRow key={item.id} className={ROW_HOVER_NAV}>
                   <TableCell className={cn(COL_FIRST, "whitespace-nowrap")}>
-                    <span className="font-medium">
+                    <span className="text-base font-semibold">
                       {item.productName}
                       {item.productSub && ` ${item.productSub}`}
                     </span>
                     {item.urgent && <UrgentChip />}
-                    <span className="block text-sm text-muted-foreground">
+                    <span className="mt-2 block text-sm text-muted-foreground">
                       {item.group}
                       {item.packing && ` · ${item.packing}`}
                     </span>

@@ -239,6 +239,17 @@
   align-items: flex-start !important;
 }
 
+/* ฟอนต์ toast ตามแบบ — 14px ทั้งก้อน (ปกติของ sonner คือ 13px) หัวข้อหนา
+   semibold (ปกติ 500) คำอธิบาย normal อยู่แล้วไม่ต้องแตะ ต้องชน !important
+   เหมือนกฎสีด้านบน เพราะ sonner ตั้งค่าพวกนี้ไว้ตายตัวที่ระดับ selector เอง
+   ไม่ใช่ตัวแปร CSS ที่ยกมาแทนได้จาก <Toaster style={...}> */
+[data-sonner-toast][data-styled="true"] {
+  font-size: 14px !important;
+}
+[data-sonner-toast][data-styled="true"] [data-title] {
+  font-weight: 600 !important;
+}
+
 @theme inline {
   --color-brand-hover: var(--brand-hover);
   --color-surface: var(--surface);

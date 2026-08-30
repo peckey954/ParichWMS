@@ -393,11 +393,11 @@ function ProductCard({
             วันที่/ชิปเร่งด่วนในกลุ่มเดียวกัน พอ flex-wrap แล้วหลุดไปบรรทัดถัดไป) */}
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <p className="font-medium">
+            <p className="text-base font-semibold">
               {line.productName}
               {line.productSub && ` ${line.productSub}`}
             </p>
-            <p className="mt-0.5 text-sm whitespace-nowrap text-muted-foreground">
+            <p className="mt-2 text-sm whitespace-nowrap text-muted-foreground">
               {PR_CATEGORY_LABEL[line.categoryId]} · {line.group}
               {line.packing && ` · ${line.packing}`}
             </p>

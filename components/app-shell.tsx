@@ -93,12 +93,16 @@ function Shell({ children }: { children: React.ReactNode }) {
     const timer = setTimeout(() => {
       const unread = notifications.filter((n) => !isRead(n.id));
       // หัวข้อตัวหนาแค่นั้นพอ (ไม่ขยาย font-size — ลองแล้วดูใหญ่เกินไป)
-      // ปุ่ม action ของ toast นี้ปรับเป็น outline ส้ม (พื้นขาว/ใส ขอบ+ตัวอักษร
-      // ส้ม) แทนปุ่มพื้นทึบเริ่มต้นของ sonner ให้เข้าธีมปุ่มรองของทั้งแอป —
-      // ต้องใส่ ! เพราะกฎ [data-button] ของ sonner specificity สูงกว่า
+      // คำอธิบายบังคับสีส้มด้วย classNames ตรงนี้ (ไม่พึ่งกฎ CSS ใน globals.css
+      // อย่างเดียว) เพราะเชื่อถือได้กว่า — เจอปัญหาสีไม่ติดมาแล้วรอบหนึ่ง
+      // ปุ่ม action ของ toast นี้ปรับเป็น outline ส้ม (พื้นขาวชัดเจน ไม่ใช่ใส/
+      // โปร่งแสงจนเห็นพื้นหลังกล่อง toast ทะลุ — ขอบ+ตัวอักษรส้ม) แทนปุ่มพื้นทึบ
+      // เริ่มต้นของ sonner ให้เข้าธีมปุ่มรองของทั้งแอป — ต้องใส่ ! เพราะกฎ
+      // [data-button]/[data-description] ของ sonner specificity สูงกว่า
       const classNames = {
         title: "font-semibold",
-        actionButton: "bg-transparent! text-primary! border! border-primary!",
+        description: "text-primary!",
+        actionButton: "bg-white! text-primary! border! border-primary!",
       };
 
       if (unread.length === 1) {

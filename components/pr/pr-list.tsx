@@ -189,13 +189,13 @@ function PrCard({ doc: d }: { doc: PrDoc }) {
       <CardHead code={d.code} at={d.createdAt} href={`/pr/${d.id}`} />
 
       <CardBox className="mt-3">
-        <p className="font-medium">
+        <p className="text-base font-semibold">
           {d.productName}
           {d.productSub && ` ${d.productSub}`}
         </p>
         {/* เส้นคั่น "|" ระหว่างประเภท/หมวด/บรรจุภัณฑ์ — ตามแบบเดียวกับ
             ProductLabel ของหน้าสั่งซื้อ/อนุมัติ (po-order-list.tsx, approve-list.tsx) */}
-        <p className="text-sm">
+        <p className="mt-2 text-sm">
           {PR_CATEGORY_LABEL[d.categoryId]} | {d.group}
           {d.packing && ` | ${d.packing}`}
         </p>

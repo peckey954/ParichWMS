@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { CheckIcon, XIcon } from "lucide-react";
+import { CircleCheckIcon, CircleXIcon } from "lucide-react";
 import { Button } from "@peckey954/ui/components/ui/button";
 import { cn } from "@peckey954/ui/lib/utils";
 import { ModuleIcon, TONE_BOX } from "@/components/modules/module-icon";
@@ -11,25 +11,37 @@ import type { AppNotification } from "@/lib/notifications";
    รายการแจ้งเตือน — ใช้ร่วมกันทั้งในกระดิ่งบนหัวเรื่อง (popover) และหน้ารวม
    /notifications หน้าตาเดียวกันเป๊ะ ต่างกันแค่กล่องที่ครอบข้างนอก
 
-   แต่ละแถวมีปุ่ม "ไปหน้าใบขอซื้อ" ของตัวเอง (outline-primary ตามแบบ) แทนที่
-   จะให้ทั้งแถวเป็นลิงก์เดียว — ตั้งใจไว้แบบนี้ตามแบบที่ส่งมา
+   แต่ละแถวมีปุ่ม "ไปหน้าใบขอซื้อ" ของตัวเอง (พื้นทึบสีแบรนด์ — primary ตามแบบ
+   ที่ส่งมา ไม่ใช่ outline) แทนที่จะให้ทั้งแถวเป็นลิงก์เดียว — ตั้งใจไว้แบบนี้
+   ตามแบบที่ส่งมา สีเดียวกันทุกแถวไม่ว่าแจ้งเตือนนั้นจะเป็นผลบวก/ลบ (ไม่มีปุ่ม
+   สีแดงสำหรับแจ้งเตือนที่ถูกยกเลิก)
 ------------------------------------------------------------------ */
 
-/** ไอคอนหน้าแถว — ปกติเป็นไอคอนของเมนูที่เกี่ยวข้อง (สีตามหมวดเดียวกับการ์ด
-    เมนูหน้าแรก) ยกเว้นแจ้งเตือนที่เป็นผลลัพธ์ชัดเจน (อนุมัติ/ไม่อนุมัติ,
-    ยกเลิก) ใช้เครื่องหมายถูก/กากบาทแทน สื่อผลลัพธ์ตรงกว่าไอคอนเมนูเฉยๆ */
+/** สีไอคอนเหลืองมาตรฐานของไอคอนแจ้งเตือน "ใบขอซื้อ" ทุกแบบ (#EAB308 ตามที่
+    ยืนยันมา) — ใช้ตัวเดียวกันทั้งไอคอนผลลัพธ์ (circle-check/circle-x) และ
+    ไอคอนเมนูปกติ (ModuleIcon) ไม่พึ่ง token เดิม (chip-yellow-foreground /
+    cat-yellow-foreground) เพราะสีไม่ตรงเป๊ะกับที่ขอมา ต้องล็อกเป็นค่านี้ตรงๆ
+    เพื่อให้ทุกไอคอนในรายการนี้เหลืองเฉดเดียวกันเป๊ะ ไม่ต่างกันทีละนิด */
+const NOTIFICATION_ICON_COLOR = "text-[#eab308]";
+
+/** ไอคอนหน้าแถว — ปกติเป็นไอคอนของเมนูที่เกี่ยวข้อง (วงกลม พื้นสีตามหมวด
+    TONE_BOX[moduleTone] แต่ตัวไอคอนบังคับเหลือง #eab308 เหมือนกันหมด) ยกเว้น
+    แจ้งเตือนที่เป็นผลลัพธ์ชัดเจน (อนุมัติ/ไม่อนุมัติ, ยกเลิก) ใช้กล่องคนละแบบ —
+    สี่เหลี่ยมมุมโค้งพื้นเหลืองอ่อน (chip-yellow, #fefce8) ไอคอน circle-check/
+    circle-x ของ Lucide ตามดีไซน์ Figma โหนด "Wrap" (node-id 1783:418557) แต่
+    สีไอคอนก็ล็อกเป็น #eab308 เดียวกันกับไอคอนเมนูปกติด้านล่าง ไม่ใช่
+    chip-yellow-foreground เดิม (เข้มไปหน่อย ไม่ตรงเฉดที่ขอ) */
 function NotificationIcon({ n }: { n: AppNotification }) {
-  if (n.outcome === "fail") {
+  if (n.outcome === "fail" || n.outcome === "success") {
+    const Icon = n.outcome === "fail" ? CircleXIcon : CircleCheckIcon;
     return (
-      <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-danger-strong text-white">
-        <XIcon className="size-4" />
-      </span>
-    );
-  }
-  if (n.outcome === "success") {
-    return (
-      <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-success-strong text-white">
-        <CheckIcon className="size-4" />
+      <span
+        className={cn(
+          "flex size-8 shrink-0 items-center justify-center rounded-lg bg-(--chip-yellow) p-2",
+          NOTIFICATION_ICON_COLOR
+        )}
+      >
+        <Icon className="size-4" />
       </span>
     );
   }
@@ -37,7 +49,8 @@ function NotificationIcon({ n }: { n: AppNotification }) {
     <span
       className={cn(
         "flex size-8 shrink-0 items-center justify-center rounded-full",
-        TONE_BOX[n.moduleTone]
+        TONE_BOX[n.moduleTone],
+        NOTIFICATION_ICON_COLOR
       )}
     >
       <ModuleIcon name={n.moduleIcon} className="size-4" />
@@ -79,7 +92,7 @@ export function NotificationList({
               </div>
               <p className="mt-0.5 text-sm text-muted-foreground">{n.description}</p>
               <div className="mt-2 flex items-center justify-between gap-3">
-                <Button asChild variant="outline-primary" size="sm" onClick={() => onNavigate(n.id)}>
+                <Button asChild size="sm" onClick={() => onNavigate(n.id)}>
                   <Link href={n.href}>ไปหน้าใบขอซื้อ</Link>
                 </Button>
                 <span

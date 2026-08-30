@@ -216,12 +216,12 @@ function ApprovePanel({
 function ProductLabel({ item }: { item: PoLineItem }) {
   return (
     <>
-      <span className="block truncate font-medium">
+      <span className="block truncate text-base font-semibold">
         {item.productName}
         {item.productSub && ` ${item.productSub}`}
         {item.urgent && <UrgentChip />}
       </span>
-      <span className="mt-1 block truncate text-sm text-muted-foreground">
+      <span className="mt-2 block truncate text-sm text-muted-foreground">
         {PR_CATEGORY_LABEL[item.categoryId]} | {item.group}
         {item.packing && ` | ${item.packing}`}
       </span>

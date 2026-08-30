@@ -265,12 +265,12 @@ function ProductLabel({
   if (stacked) {
     return (
       <>
-        <span className="block truncate font-medium">
+        <span className="block truncate text-base font-semibold">
           {item.productName}
           {item.productSub && ` ${item.productSub}`}
         </span>
-        <span className="mt-1 block truncate text-sm text-muted-foreground">{meta}</span>
-        <span className="mt-1 block truncate text-sm font-medium">
+        <span className="mt-2 block truncate text-sm text-muted-foreground">{meta}</span>
+        <span className="mt-4 block truncate text-sm font-medium">
           {code}
           {item.urgent && <UrgentChip />}
         </span>
@@ -280,10 +280,10 @@ function ProductLabel({
 
   return (
     <>
-      <span className="font-medium">{item.productName}</span>
+      <span className="text-base font-semibold">{item.productName}</span>
       {item.productSub && <span className="text-muted-foreground"> {item.productSub}</span>}
       <span className="text-muted-foreground"> · {meta}</span>
-      <span className="mt-1 block text-sm font-medium">
+      <span className="mt-4 block text-sm font-medium">
         {code}
         {item.urgent && <UrgentChip />}
       </span>

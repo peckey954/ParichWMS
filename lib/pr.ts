@@ -70,8 +70,8 @@ export type PrCategoryId =
   | "oem";
 
 export const PR_CATEGORY_LABEL: Record<PrCategoryId, string> = {
-  jumboFert: "วัตถุดิบปุ๋ยจัมโบ้",
-  sackFert: "วัตถุดิบปุ๋ยกระสอบ",
+  jumboFert: "ปุ๋ยจัมโบ้",
+  sackFert: "ปุ๋ยกระสอบ",
   sack: "กระสอบ",
   sticker: "สติกเกอร์",
   giveaway: "ของแจกของแถม",

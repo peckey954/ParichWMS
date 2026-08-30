@@ -427,15 +427,15 @@ function LineItemsTable({ po }: { po: PoDoc }) {
             className="flex cursor-pointer items-center justify-between gap-3 px-4 py-3"
           >
             <div className="min-w-0 flex-1 text-sm">
-              <p className="font-medium">
+              <p className="text-base font-semibold">
                 {item.productName}
                 {item.productSub && ` ${item.productSub}`}
               </p>
-              <p className="mt-1 text-muted-foreground">
+              <p className="mt-2 text-muted-foreground">
                 {PR_CATEGORY_LABEL[item.categoryId]} | {item.group}
                 {item.packing && ` | ${item.packing}`}
               </p>
-              <p className="mt-1 font-medium">
+              <p className="mt-4 font-medium">
                 {lineItemCode(po, index)}
                 {item.urgent && <UrgentChip />}
               </p>
@@ -483,12 +483,12 @@ function LineItemsTable({ po }: { po: PoDoc }) {
                     className={cn("cursor-pointer", ROW_HOVER_NAV)}
                   >
                     <TableCell className={cn(COL_FIRST, "whitespace-nowrap")}>
-                      <span className="font-medium">
+                      <span className="text-base font-semibold">
                         {item.productName}
                         {item.productSub && ` ${item.productSub}`}
                       </span>
                       {item.urgent && <UrgentChip />}
-                      <span className="mt-1 block text-sm text-muted-foreground">
+                      <span className="mt-2 block text-sm text-muted-foreground">
                         {PR_CATEGORY_LABEL[item.categoryId]} | {item.group}
                         {item.packing && ` | ${item.packing}`}
                       </span>
