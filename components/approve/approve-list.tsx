@@ -269,9 +269,9 @@ function ApproveTable({ po, onNavigate }: { po: PoDoc; onNavigate: () => void })
             <TableCell className="text-right whitespace-nowrap tabular-nums">
               {formatPoBaht(lineItemUnitPrice(item))}
             </TableCell>
-            {/* ราคารวมต่อรายการ — เน้นหนา ไม่ต้องถึงขนาดสีแบรนด์เหมือนยอดรวมทั้งใบ
-                ที่หัวแผง (ตัวเลขนั้นสรุปทั้งใบ ที่นี่แค่รายรายการ) */}
-            <TableCell className="text-right whitespace-nowrap font-semibold tabular-nums">
+            {/* ราคารวมต่อรายการ — ตัวหนังสือปกติ ไม่หนาเหมือนยอดรวมทั้งใบที่หัวแผง
+                (ตัวเลขนั้นสรุปทั้งใบ ควรเด่นกว่า ที่นี่แค่รายรายการ) */}
+            <TableCell className="text-right whitespace-nowrap tabular-nums">
               {formatPoBaht(lineItemTotalPrice(item))}
             </TableCell>
           </TableRow>

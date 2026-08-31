@@ -31,7 +31,6 @@ import {
   EmptyDocs,
   HEAD_FIRST,
   HEAD_LAST,
-  ROW_HOVER_NAV,
   STICKY_HEAD,
   TableFrame,
   TablePager,
@@ -136,7 +135,12 @@ export function PoList({
                 const actionable = isActionable(d);
                 const categoryLocked = lockedCategory !== null && d.categoryId !== lockedCategory;
                 return (
-                  <TableRow key={d.id} className={ROW_HOVER_NAV}>
+                  // ไม่ใช้ ROW_HOVER_NAV ที่นี่ — แถวนี้กดแล้วไม่พาไปหน้าไหน
+                  // (ต่างจากตารางอื่นที่กดทั้งแถวไปหน้าเอกสาร) มีแต่ปุ่ม/ลิงก์
+                  // ย่อยข้างในที่กดได้ hover ทั้งแถวจึงเป็นสัญญาณหลอกว่ากดได้
+                  // ต้องปิด hover:bg-muted/50 ที่ TableRow ของ DS ติดมาเป็น
+                  // ค่าเริ่มต้นด้วย ไม่ใช่แค่ไม่ใส่ ROW_HOVER_NAV เพิ่ม
+                  <TableRow key={d.id} className="hover:bg-transparent">
                     <TableCell className={COL_FIRST}>
                       <div className="flex items-start gap-3">
                         <Checkbox

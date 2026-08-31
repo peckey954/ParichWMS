@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ChevronDownIcon, MinusIcon, PlusIcon, Trash2Icon } from "lucide-react";
 import {
@@ -17,16 +18,6 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@peckey954/ui/components/ui/collapsible";
-import {
-  Dialog,
-  DialogClose,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@peckey954/ui/components/ui/dialog";
 import {
   InputGroup,
   InputGroupAddon,
@@ -47,7 +38,7 @@ import { cn } from "@peckey954/ui/lib/utils";
 import { toast } from "sonner";
 import { DateRangeSelect, type DateRange } from "@/components/date-select";
 import { useNumberField } from "@/components/number-field";
-import { PR_CATEGORIES, PR_CATEGORY_LABEL, PR_PRODUCTS, type PrCategoryId, type PrDoc, type PrProduct } from "@/lib/pr";
+import { PR_CATEGORY_LABEL, PR_PRODUCTS, type PrCategoryId, type PrDoc } from "@/lib/pr";
 import { COMPANY_POOL, formatPoBaht, formatPoQty, PO_QUEUE_DOCS } from "@/lib/po";
 
 /* ------------------------------------------------------------------
@@ -126,6 +117,36 @@ function toDraftLine(pr: PrDoc): DraftLine {
 const lineUnitPrice = (line: DraftLine) => line.pricePerUnit + line.handlingPerUnit;
 const lineTotalPrice = (line: DraftLine) => lineUnitPrice(line) * line.orderedQty;
 
+/** ป้ายราคาในกล่องพื้นสีแบรนด์ — จอมือถือ/แท็บเล็ต label กับค่าคนละบรรทัดเหมือน
+ *  เดิม (ยังแคบอยู่ วางแนวตั้งอ่านง่ายกว่า) จอเว็บเท่านั้นที่ยุบมาบรรทัดเดียว
+ *  แบบ "label: ค่า" ตามแบบ — มี ":" เฉพาะตอนอยู่บรรทัดเดียวกัน (ไม่ใส่ตอนวาง
+ *  ซ้อนกันสองบรรทัด)
+ *
+ *  เบรกพอยต์เป็นค่ากำหนดเอง @[820px] ไม่ใช่ขนาดมาตรฐานของ Tailwind (@3xl=768
+ *  เตี้ยไป โดนกรอบพรีวิวแท็บเล็ตด้วย, @4xl=896 สูงไป — เนื้อที่จริงในนี้ไม่มี
+ *  ทางถึง เพราะ <main> ล็อก max-w-4xl (896px) ไว้แล้วลบ padding ออกอีกเสมอ)
+ *  วัดจริงจากเบราว์เซอร์แล้ว: กรอบพรีวิวแท็บเล็ต (834px) เหลือพื้นที่ในสุด
+ *  786px จอเว็บจริง (ไม่ถูกล็อกความกว้าง) เหลือ 848px — 820px อยู่กึ่งกลาง
+ *  ระหว่างสองค่านี้พอดี */
+function PriceStat({ label, value, lg }: { label: string; value: string; lg?: boolean }) {
+  return (
+    <div className="flex flex-col @[820px]:flex-row @[820px]:items-baseline @[820px]:gap-1.5">
+      <p className="text-sm text-muted-foreground">
+        {label}
+        <span className="hidden @[820px]:inline">:</span>
+      </p>
+      <p
+        className={cn(
+          "mt-1 font-semibold tabular-nums @[820px]:mt-0",
+          lg && "text-lg"
+        )}
+      >
+        {value}
+      </p>
+    </div>
+  );
+}
+
 export default function CreatePoPage() {
   return (
     <React.Suspense fallback={null}>
@@ -143,23 +164,43 @@ function CreatePoForm() {
     return PO_QUEUE_DOCS.filter((d) => ids.has(d.id));
   }, [searchParams]);
 
-  const [poType, setPoType] = React.useState<"po" | "poi">("po");
-  const [company, setCompany] = React.useState<string | undefined>();
-  const [expectedRange, setExpectedRange] = React.useState<DateRange>();
-  const [lines, setLines] = React.useState<DraftLine[]>(() => selectedDocs.map(toDraftLine));
-  const [note, setNote] = React.useState("");
-
-  const keyCounterRef = React.useRef(0);
-
-  const lockedCategory: PrCategoryId | null = lines[0]?.categoryId ?? null;
-  const addedProductIds = React.useMemo(
-    () => lines.map((l) => l.productId).filter((id): id is string => !!id),
-    [lines]
+  // ช่องหัวใบ + หมายเหตุ อ่านค่าตั้งต้นจาก query param ด้วย (ไม่ใช่แค่ ids) —
+  // เผื่อกรอกไว้แล้วกด "เพิ่มสินค้า" ไปหน้าเลือกใบขอซื้อเพิ่มแล้วย้อนกลับมา
+  // ค่าที่กรอกไว้ต้องไม่หายไป (ดู addItemsHref ด้านล่าง ที่พาค่าชุดนี้ไปด้วย)
+  const [poType, setPoType] = React.useState<"po" | "poi">(() =>
+    searchParams.get("poType") === "poi" ? "poi" : "po"
   );
+  const [company, setCompany] = React.useState<string | undefined>(
+    () => searchParams.get("company") ?? undefined
+  );
+  const [expectedRange, setExpectedRange] = React.useState<DateRange | undefined>(() => {
+    const from = searchParams.get("from");
+    if (!from) return undefined;
+    const to = searchParams.get("to");
+    return { from: new Date(from), to: to ? new Date(to) : undefined };
+  });
+  const [lines, setLines] = React.useState<DraftLine[]>(() => selectedDocs.map(toDraftLine));
+  const [note, setNote] = React.useState(() => searchParams.get("note") ?? "");
+
   const totalPrice = React.useMemo(
     () => lines.reduce((sum, l) => sum + lineTotalPrice(l), 0),
     [lines]
   );
+
+  // ปุ่ม "+ เพิ่มสินค้า" พาไปหน้าเลือกใบขอซื้อเต็มหน้า (คล้ายแท็บ "ขอซื้อ")
+  // แทนกล่อง dialog เดิม — พาสถานะทั้งหมดของใบร่างนี้ไปทาง query param ด้วย
+  // (ไม่ใช่แค่ ids) เพื่อไม่ให้ช่องที่กรอกไว้แล้วหายตอนย้อนกลับมา
+  const addItemsHref = React.useMemo(() => {
+    const sp = new URLSearchParams();
+    const ids = lines.map((l) => l.key).join(",");
+    if (ids) sp.set("ids", ids);
+    sp.set("poType", poType);
+    if (company) sp.set("company", company);
+    if (expectedRange?.from) sp.set("from", expectedRange.from.toISOString().slice(0, 10));
+    if (expectedRange?.to) sp.set("to", expectedRange.to.toISOString().slice(0, 10));
+    if (note.trim()) sp.set("note", note);
+    return `/po/create/add-items?${sp.toString()}`;
+  }, [lines, poType, company, expectedRange, note]);
 
   function updateLine(key: string, patch: Partial<DraftLine>) {
     setLines((prev) => prev.map((l) => (l.key === key ? { ...l, ...patch } : l)));
@@ -167,29 +208,6 @@ function CreatePoForm() {
 
   function removeLine(key: string) {
     setLines((prev) => prev.filter((l) => l.key !== key));
-  }
-
-  function addLine(product: PrProduct) {
-    setLines((prev) => [
-      ...prev,
-      {
-        key: `new-${keyCounterRef.current++}`,
-        productId: product.id,
-        categoryId: product.category,
-        group: product.group,
-        productName: product.name,
-        productSub: product.sub,
-        packing: product.packingOptions[0],
-        packingOptions: product.packingOptions,
-        unit: product.unit,
-        neededDate: "",
-        urgent: false,
-        orderedQty: 0,
-        pricePerUnit: 0,
-        handlingPerUnit: 0,
-        changeReason: "",
-      },
-    ]);
   }
 
   function handleSave() {
@@ -274,19 +292,21 @@ function CreatePoForm() {
         {/* ---------- หัวข้อสินค้า + ปุ่มเพิ่ม ---------- */}
         <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
           <h2 className="font-semibold">สินค้า ({lines.length} รายการ)</h2>
-          <AddProductDialog
-            lockedCategory={lockedCategory}
-            addedProductIds={addedProductIds}
-            onAdd={addLine}
-          />
+          <Button asChild variant="outline-primary">
+            <Link href={addItemsHref}>
+              <PlusIcon />
+              เพิ่มสินค้า
+            </Link>
+          </Button>
         </div>
 
         {/* ---------- สรุปราคารวม ---------- */}
         <div className="mt-3 rounded-lg border border-border bg-brand px-4 py-3.5">
-          <p className="text-sm text-muted-foreground">ราคารวมทั้งหมด (บาท)</p>
-          <p className="mt-1 text-lg font-semibold tabular-nums">
-            {lines.length > 0 ? formatPoBaht(totalPrice) : "-"}
-          </p>
+          <PriceStat
+            label="ราคารวมทั้งหมด (บาท)"
+            value={lines.length > 0 ? formatPoBaht(totalPrice) : "-"}
+            lg
+          />
         </div>
 
         {/* ---------- การ์ดสินค้า ---------- */}
@@ -467,18 +487,14 @@ function ProductCard({
           อยู่แล้ว ไม่ต้องมีเส้น border-t ซ้ำ */}
       <div className="px-4 pt-3">
         <div className="grid gap-4 rounded-lg bg-brand p-4 @sm:grid-cols-2">
-          <div>
-            <p className="text-sm text-muted-foreground">ราคารวมต่อ{line.unit} (บาท)</p>
-            <p className="mt-1 font-semibold tabular-nums">
-              {lineUnitPrice(line) > 0 ? formatPoBaht(lineUnitPrice(line)) : "-"}
-            </p>
-          </div>
-          <div>
-            <p className="text-sm text-muted-foreground">ราคารวมทั้งหมด (บาท)</p>
-            <p className="mt-1 font-semibold tabular-nums">
-              {lineTotalPrice(line) > 0 ? formatPoBaht(lineTotalPrice(line)) : "-"}
-            </p>
-          </div>
+          <PriceStat
+            label={`ราคารวมต่อ${line.unit} (บาท)`}
+            value={lineUnitPrice(line) > 0 ? formatPoBaht(lineUnitPrice(line)) : "-"}
+          />
+          <PriceStat
+            label="ราคารวมทั้งหมด (บาท)"
+            value={lineTotalPrice(line) > 0 ? formatPoBaht(lineTotalPrice(line)) : "-"}
+          />
         </div>
       </div>
 
@@ -610,124 +626,5 @@ function NumberStepper({
         </InputGroupButton>
       </InputGroupAddon>
     </InputGroup>
-  );
-}
-
-/** เพิ่มการ์ดสินค้าใหม่เข้าใบ — ล็อกประเภทสินค้าให้ตรงกับการ์ดแรกเสมอ
- *  (รวมได้เฉพาะประเภทเดียวกัน ตามกติกาเดียวกับตอนติ๊กเลือกในแท็บขอซื้อ) */
-function AddProductDialog({
-  lockedCategory,
-  addedProductIds,
-  onAdd,
-}: {
-  lockedCategory: PrCategoryId | null;
-  addedProductIds: string[];
-  onAdd: (product: PrProduct) => void;
-}) {
-  const [open, setOpen] = React.useState(false);
-  const [categoryId, setCategoryId] = React.useState<PrCategoryId | undefined>(
-    lockedCategory ?? undefined
-  );
-  const [productId, setProductId] = React.useState<string | undefined>();
-
-  function handleOpenChange(next: boolean) {
-    setOpen(next);
-    if (next) {
-      setCategoryId(lockedCategory ?? undefined);
-      setProductId(undefined);
-    }
-  }
-
-  const productsInCategory = PR_PRODUCTS.filter(
-    (p) => p.category === categoryId && !addedProductIds.includes(p.id)
-  );
-
-  function handleCategoryChange(next: string) {
-    setCategoryId(next as PrCategoryId);
-    setProductId(undefined);
-  }
-
-  function handleAdd() {
-    const product = PR_PRODUCTS.find((p) => p.id === productId);
-    if (!product) return;
-    onAdd(product);
-    setProductId(undefined);
-    setOpen(false);
-  }
-
-  return (
-    <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogTrigger asChild>
-        <Button variant="outline" className="border-primary text-primary hover:text-primary">
-          <PlusIcon />
-          เพิ่มสินค้า
-        </Button>
-      </DialogTrigger>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>เพิ่มสินค้า</DialogTitle>
-          <DialogDescription className="sr-only">
-            เลือกสินค้าที่ต้องการเพิ่มเข้าใบสั่งซื้อนี้
-          </DialogDescription>
-        </DialogHeader>
-
-        <div className="space-y-4">
-          <div className="space-y-1.5">
-            <Label htmlFor="add-category">ประเภทสินค้า</Label>
-            <Select
-              value={categoryId}
-              onValueChange={handleCategoryChange}
-              disabled={!!lockedCategory}
-            >
-              <SelectTrigger id="add-category" className="w-full bg-card">
-                <SelectValue placeholder="เลือกประเภทสินค้า" />
-              </SelectTrigger>
-              <SelectContent>
-                {PR_CATEGORIES.map((c) => (
-                  <SelectItem key={c} value={c}>
-                    {PR_CATEGORY_LABEL[c]}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            {lockedCategory && (
-              <p className="text-sm text-muted-foreground">
-                รวมสินค้าในใบเดียวกันได้เฉพาะประเภทเดียวกันเท่านั้น
-              </p>
-            )}
-          </div>
-
-          <div className="space-y-1.5">
-            <Label htmlFor="add-product">สินค้า</Label>
-            <Select value={productId} onValueChange={setProductId} disabled={!categoryId}>
-              <SelectTrigger id="add-product" className="w-full bg-card">
-                <SelectValue
-                  placeholder={
-                    productsInCategory.length > 0 ? "เลือกสินค้า" : "ไม่มีสินค้าให้เพิ่มแล้ว"
-                  }
-                />
-              </SelectTrigger>
-              <SelectContent>
-                {productsInCategory.map((p) => (
-                  <SelectItem key={p.id} value={p.id}>
-                    {p.name}
-                    {p.sub ? ` ${p.sub}` : ""}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
-
-        <DialogFooter>
-          <DialogClose asChild>
-            <Button variant="outline">ย้อนกลับ</Button>
-          </DialogClose>
-          <Button onClick={handleAdd} disabled={!productId}>
-            เพิ่ม
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
   );
 }

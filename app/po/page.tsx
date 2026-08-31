@@ -409,7 +409,7 @@ function PoPageContent() {
                     </p>
                     <Button
                       variant="ghost"
-                      className="ml-auto text-primary"
+                      className="ml-auto text-primary hover:bg-brand hover:text-primary"
                       onClick={() => setSelected(new Set())}
                     >
                       <RotateCcwIcon />

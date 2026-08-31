@@ -81,7 +81,10 @@ export function NotificationList({
       {notifications.map((n) => {
         const read = isRead(n.id);
         return (
-          <div key={n.id} className="flex gap-3 px-4 py-3">
+          <div
+            key={n.id}
+            className={cn("flex gap-3 px-4 py-3", !read && "bg-brand")}
+          >
             <NotificationIcon n={n} />
             <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5">

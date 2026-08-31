@@ -362,13 +362,24 @@ function buildTimeline(
 /** สถานะวนตามรอบ 5 — ตารางตัวอย่างจึงมีครบทุกสถานะให้เห็นสีชิปครบชุด */
 const STATUS_CYCLE: PrStatus[] = ["sent", "ordered", "partial", "stocked", "cancelled"];
 
-function morePr(count = 30): PrDoc[] {
+function morePr(count = 105): PrDoc[] {
+  // นับเฉพาะใบ "ส่งคำขอแล้ว" วนไล่ประเภทสินค้าให้ครบรอบ (ดูด้านล่าง)
+  let sentSlot = 0;
   return Array.from({ length: count }, (_, i) => {
     const rnd = seeded(900 + i);
-    const product = pick(PR_PRODUCTS, rnd);
+    const status = STATUS_CYCLE[i % STATUS_CYCLE.length];
+    // ใบ "ส่งคำขอแล้ว" เท่านั้นที่วนประเภทสินค้าให้ครบทุกประเภทอย่างน้อย
+    // ประเภทละ 3 ใบเสมอ (ไม่ปล่อยสุ่มเต็มที่แบบสถานะอื่น) — ใบพวกนี้คือคิวที่
+    // ยังไปสร้างใบสั่งซื้อได้ ถ้าสุ่มล้วนๆ มีโอกาสสูงที่แต่ละประเภทจะมีใบเดียว
+    // อย่างน้อย 3 ใบ (ไม่ใช่แค่ 2) เพื่อให้พอสร้างใบสั่งซื้อจากใบแรกไปแล้ว ยัง
+    // เหลือให้กดเพิ่มได้มากกว่า 1 ใบในหน้า "เพิ่มสินค้า" — ไม่งั้นทำ flow เพิ่ม
+    // สินค้าหลายรายการให้ดูไม่ได้เลย (เหลือแค่ใบเดียวก็กดได้แค่ครั้งเดียว)
+    const product =
+      status === "sent"
+        ? pick(productsOf(PR_CATEGORIES[sentSlot++ % PR_CATEGORIES.length]), rnd)
+        : pick(PR_PRODUCTS, rnd);
     const qty = Math.round((20 + rnd() * 980) / 10) * 10;
     const day = 18 - (i % 14);
-    const status = STATUS_CYCLE[i % STATUS_CYCLE.length];
     const requester = pick(PR_REQUESTERS, rnd);
     // สุ่มเหตุผลอย่างน้อยหนึ่งอย่างเสมอ ไม่มีใบไหนไม่มีเหตุผลการซื้อ
     const reasons = PR_REASONS.filter(() => rnd() < 0.45);
