@@ -1,14 +1,9 @@
 "use client";
 
 import * as React from "react";
-import {
-  DownloadIcon,
-  ListFilterIcon,
-  SearchIcon,
-  SquareCheckBigIcon,
-  SquareIcon,
-} from "lucide-react";
+import { DownloadIcon, ListFilterIcon, SearchIcon } from "lucide-react";
 import { Badge } from "@peckey954/ui/components/ui/badge";
+import { Switch } from "@peckey954/ui/components/ui/switch";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -41,7 +36,9 @@ import { InboundList } from "@/components/stock/inbound-list";
 import { IssueList } from "@/components/stock/issue-list";
 import { ProductCard } from "@/components/stock/stock-parts";
 import { FifoList, ZoneGroups } from "@/components/stock/lot-list";
+import { SortControl } from "@/components/sort-control";
 import {
+  STOCK_SORTS,
   STOCK_VIEW_DEFAULT,
   StockFilter,
   isStockDefault,
@@ -350,33 +347,38 @@ function GeneralStockView() {
                 <>
                   <span className="h-5 w-px shrink-0 bg-border" aria-hidden />
 
-                  {/* ชิปนี้ต่างจากชิปประเภทตรงที่เป็นตัวกรองเปิด/ปิดได้
-                      จึงมีกล่องติ๊กนำหน้าให้เห็นว่ากดเลือกเพิ่มได้ ไม่ใช่ปุ่มสลับหน้า */}
-                  <button
-                    type="button"
-                    role="checkbox"
-                    onClick={() =>
-                      setView((v) => ({ ...v, lowOnly: !v.lowOnly }))
-                    }
-                    aria-checked={lowOnly}
-                    className={cn(
-                      "flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1 text-sm whitespace-nowrap transition-colors",
-                      lowOnly
-                        ? "border-primary bg-brand font-medium text-primary"
-                        : "border-border text-foreground hover:bg-accent-hover"
-                    )}
-                  >
-                    {lowOnly ? (
-                      <SquareCheckBigIcon className="size-4" />
-                    ) : (
-                      <SquareIcon className="size-4 text-muted-foreground" />
-                    )}
-                    สต็อกต่ำ
-                  </button>
+                  {/* toggle แทนชิปกล่องติ๊กแบบเดิม — ตามแบบ ตัวหนังสือสีเดิม
+                      เสมอ ไม่เปลี่ยนสีตอนเปิด (ต่างจากชิปอื่นในแถวที่เปลี่ยนสี
+                      ตอนเลือก) label ครอบทั้งก้อนรวมตัวหนังสือด้วย กดที่ไหนก็
+                      สลับได้ ไม่ต้องเล็ง switch ตรงๆ */}
+                  <label className="flex shrink-0 cursor-pointer items-center gap-2 text-sm whitespace-nowrap">
+                    <Switch
+                      checked={lowOnly}
+                      onCheckedChange={(v) =>
+                        setView((prev) => ({ ...prev, lowOnly: v }))
+                      }
+                    />
+                    <span className="text-foreground">สต็อกต่ำ</span>
+                  </label>
                 </>
               )}
             </div>
 
+            {/* เรียงตาม — จอเว็บเท่านั้น (เกิน @3xl มีที่พอวางข้างแถวชิปโดยไม่
+                ต้องเปิดกล่องตัวกรอง) จอแคบยังต้องเปิดตัวกรองไปกดในนั้นเหมือนเดิม
+                (StockFilter ด้านล่างมี SortControl ชุดเดียวกันอยู่แล้ว) ไม่ได้
+                ผูก draft+ตกลงแบบในกล่อง กดแล้วมีผลทันทีเหมือนชิปอื่นในแถวนี้ */}
+            {!isHistory && (
+              <div className="hidden shrink-0 items-center gap-2 @3xl:flex">
+                <span className="text-sm text-muted-foreground">เรียงตาม:</span>
+                <SortControl
+                  options={STOCK_SORTS}
+                  value={view.sort}
+                  dir={view.dir}
+                  onChange={(sort, dir) => setView((v) => ({ ...v, sort, dir }))}
+                />
+              </div>
+            )}
           </div>
 
           {/* ---------- ค้นหา + ปุ่ม — อยู่ในแถบติดบนเดียวกับชิป ----------

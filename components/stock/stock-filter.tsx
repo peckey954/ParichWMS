@@ -4,6 +4,7 @@ import * as React from "react";
 import { RotateCcwIcon } from "lucide-react";
 import { Button } from "@peckey954/ui/components/ui/button";
 import { Label } from "@peckey954/ui/components/ui/label";
+import { Switch } from "@peckey954/ui/components/ui/switch";
 import { CheckChip } from "@/components/check-chip";
 import { MultiSelectChips } from "@/components/multi-select-chips";
 import { SortControl, type SortOption } from "@/components/sort-control";
@@ -102,8 +103,27 @@ export function StockFilter({
           />
         </Section>
 
-        <Section title="แสดงในรายการ">
-          <div className="flex flex-wrap gap-2">
+        <Section title="การแสดงข้อมูล">
+          {/* สต็อกต่ำเป็น toggle แยกออกมา ไม่ใช่ชิปกล่องติ๊กปนกับสามอันล่าง —
+              ตามแบบ นี่คือตัวกรองเปิด/ปิดที่ตัดรายการทิ้งจริง ๆ (เหลือแต่ของ
+              สต็อกต่ำ) ต่างจากสามอันล่างที่แค่ซ่อน/แสดงองค์ประกอบในการ์ด
+              ไม่ได้ตัดรายการทิ้ง
+
+              toggle อยู่ซ้าย ชิดข้อความ (gap-2 = 8px) ไม่ใช่ justify-between
+              แยกฝั่งแบบเดิม — ครอบด้วย label เดียวกันทั้งก้อน กดที่ข้อความก็
+              สลับ toggle ได้เลย ไม่ต้องเล็งจุดเล็กๆ ของตัว switch เอง */}
+          <Label
+            htmlFor="stock-low"
+            className="flex w-fit cursor-pointer items-center gap-2 text-sm font-normal"
+          >
+            <Switch
+              id="stock-low"
+              checked={draft.lowOnly}
+              onCheckedChange={(v) => set({ lowOnly: v })}
+            />
+            แสดงเฉพาะสต็อกต่ำ
+          </Label>
+          <div className="mt-3 flex flex-wrap gap-2">
             <CheckChip
               id="stock-chips"
               label="ป้ายข้อมูล"
@@ -121,12 +141,6 @@ export function StockFilter({
               label="Lot สินค้า"
               checked={draft.showLots}
               onChange={(v) => set({ showLots: v })}
-            />
-            <CheckChip
-              id="stock-low"
-              label="สต็อกต่ำ"
-              checked={draft.lowOnly}
-              onChange={(v) => set({ lowOnly: v })}
             />
           </div>
         </Section>
