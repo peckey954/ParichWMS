@@ -199,11 +199,16 @@ function ApprovePanel({
           margin ถึงจะทำให้เส้นสั้นกว่ากล่องจริง เว้นห่างจากขอบการ์ดเท่ากับเส้น
           คั่นระหว่างรายการสินค้า ไม่ใช่เส้นเต็มขอบแบบก่อนหน้านี้ */}
       <div className="mx-4 flex items-center justify-between gap-2 border-t border-border py-3 @3xl:hidden">
-        <span className="text-sm text-muted-foreground">รวมทั้งหมด (บาท):</span>
-        <span className="flex items-center gap-2">
-          <span className="text-sm font-semibold tabular-nums">{formatPoBaht(poTotalPrice(d))}</span>
-          {d.approvalStatus && <ApprovalStatusChip status={d.approvalStatus} />}
-        </span>
+        {/* label กับราคาต่อกันเป็นก้อนเดียว (ไม่ใช่ justify-between แยกฝั่ง
+            เหมือนเดิม) เหลือฝั่งขวาไว้ให้ชิปสถานะอย่างเดียวชัดๆ (แท็บ "ประวัติ"
+            เท่านั้นที่มีชิป — แท็บ "รออนุมัติ" ไม่มีก็ปล่อยฝั่งขวาว่างไป) ฟอนต์
+            ขยับเป็น text-base (16px) เท่าชื่อสินค้า เพราะเป็นตัวเลขสรุปสำคัญของ
+            การ์ด ควรเด่นเท่ากัน ไม่ใช่เล็กกว่าแบบเดิม */}
+        <p className="text-base">
+          <span className="text-muted-foreground">รวมทั้งหมด (บาท): </span>
+          <span className="font-semibold tabular-nums">{formatPoBaht(poTotalPrice(d))}</span>
+        </p>
+        {d.approvalStatus && <ApprovalStatusChip status={d.approvalStatus} />}
       </div>
     </div>
   );
