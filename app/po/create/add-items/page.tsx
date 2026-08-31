@@ -1,7 +1,6 @@
 "use client";
 
 import * as React from "react";
-import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ListFilterIcon, SearchIcon } from "lucide-react";
 import {
@@ -381,7 +380,11 @@ function AddItemsList({
                 return (
                   <TableRow key={d.id} className="hover:bg-transparent">
                     <TableCell className={COL_FIRST}>
-                      <div className="flex items-start gap-3">
+                      {/* label ครอบทั้งกล่องติ๊ก+เลขที่ใบ+วันที่ — คลิกได้ทั้งก้อน
+                          ไม่ใช่แค่กล่องติ๊กเล็กๆ (ดู po-list.tsx pattern เดียวกัน)
+                          เลขที่ใบไม่ใช่ลิงก์ไปหน้าใบขอซื้ออีกต่อไป ข้อมูลครบอยู่
+                          ในตารางนี้แล้ว */}
+                      <label className="flex items-start gap-3 py-1 -my-1 cursor-pointer">
                         <Checkbox
                           aria-label={`เลือก ${d.code}`}
                           className="mt-0.5"
@@ -389,17 +392,12 @@ function AddItemsList({
                           onCheckedChange={(v) => onToggleOne(d.id, v !== false)}
                         />
                         <div>
-                          <Link
-                            href={`/pr/${d.id}`}
-                            className="block font-medium whitespace-nowrap hover:underline"
-                          >
-                            {d.code}
-                          </Link>
+                          <span className="block font-medium whitespace-nowrap">{d.code}</span>
                           <span className="block text-sm whitespace-nowrap text-muted-foreground">
                             {d.createdAt}
                           </span>
                         </div>
-                      </div>
+                      </label>
                     </TableCell>
                     <TableCell>
                       <span className="block font-medium whitespace-nowrap">
@@ -464,7 +462,7 @@ function AddItemsCard({
 }) {
   return (
     <div className="rounded-xl border border-border bg-card p-4">
-      <div className="flex items-start gap-3">
+      <label className="flex items-start gap-3 py-1 -my-1 cursor-pointer">
         <Checkbox
           aria-label={`เลือก ${d.code}`}
           className="mt-0.5"
@@ -472,14 +470,12 @@ function AddItemsCard({
           onCheckedChange={(v) => onToggle(v !== false)}
         />
         <div className="min-w-0">
-          <Link href={`/pr/${d.id}`} className="block font-semibold hover:underline">
-            {d.code}
-          </Link>
+          <span className="block font-semibold">{d.code}</span>
           <span className="block text-sm whitespace-nowrap text-muted-foreground">
             {d.createdAt}
           </span>
         </div>
-      </div>
+      </label>
 
       <CardBox className="mt-3">
         <p className="text-base font-semibold">

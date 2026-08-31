@@ -1,7 +1,6 @@
 "use client";
 
 import * as React from "react";
-import Link from "next/link";
 import { Trash2Icon } from "lucide-react";
 import { Badge } from "@peckey954/ui/components/ui/badge";
 import { Button } from "@peckey954/ui/components/ui/button";
@@ -142,7 +141,13 @@ export function PoList({
                   // ค่าเริ่มต้นด้วย ไม่ใช่แค่ไม่ใส่ ROW_HOVER_NAV เพิ่ม
                   <TableRow key={d.id} className="hover:bg-transparent">
                     <TableCell className={COL_FIRST}>
-                      <div className="flex items-start gap-3">
+                      {/* label ครอบทั้งกล่องติ๊ก+เลขที่ใบ+วันที่ — คลิกได้ทั้งก้อน
+                          ไม่ใช่แค่จุดเล็กๆ 16px ของกล่องติ๊กเอง (label คลิกที่ไหน
+                          ก็ส่งต่อไปที่ input ที่ซ่อนอยู่ข้างใน Checkbox ให้เอง
+                          ตามพฤติกรรมมาตรฐานของ label+input) เลขที่ใบไม่ใช่ลิงก์
+                          ไปหน้าใบขอซื้ออีกต่อไป เพราะข้อมูลที่นั่นมีครบอยู่ใน
+                          ตารางนี้แล้ว ไม่จำเป็นต้องกดออกไปดูที่อื่น */}
+                      <label className="flex items-start gap-3 py-1 -my-1 cursor-pointer">
                         <Checkbox
                           aria-label={`เลือก ${d.code}`}
                           className="mt-0.5"
@@ -151,17 +156,12 @@ export function PoList({
                           onCheckedChange={(v) => onToggleOne(d.id, v !== false)}
                         />
                         <div>
-                          <Link
-                            href={`/pr/${d.id}`}
-                            className="block font-medium whitespace-nowrap hover:underline"
-                          >
-                            {d.code}
-                          </Link>
+                          <span className="block font-medium whitespace-nowrap">{d.code}</span>
                           <span className="block text-sm whitespace-nowrap text-muted-foreground">
                             {d.createdAt}
                           </span>
                         </div>
-                      </div>
+                      </label>
                     </TableCell>
                     <TableCell>
                       <span className="block font-medium whitespace-nowrap">
@@ -274,7 +274,10 @@ function PoCard({
           อัดแน่นเกินไปจนวันที่ตัดคำ แยกวันที่ลงบรรทัดใหม่ใต้เลขที่ใบแทน
           (เหมือนคอลัมน์แรกของตารางจอกว้างด้านบนอยู่แล้ว) */}
       <div className="flex items-start justify-between gap-2">
-        <div className="flex min-w-0 items-start gap-3">
+        {/* label ครอบทั้งกล่องติ๊ก+เลขที่ใบ+วันที่ เหมือนตารางจอกว้าง — คลิกได้
+            ทั้งก้อน เลขที่ใบไม่ใช่ลิงก์ไปหน้าใบขอซื้ออีกต่อไป (ดูเหตุผลที่แถว
+            เดียวกันในตาราง) */}
+        <label className="flex min-w-0 items-start gap-3 py-1 -my-1 cursor-pointer">
           <Checkbox
             aria-label={`เลือก ${d.code}`}
             className="mt-0.5"
@@ -283,14 +286,12 @@ function PoCard({
             onCheckedChange={(v) => onToggle(v !== false)}
           />
           <div className="min-w-0">
-            <Link href={`/pr/${d.id}`} className="block font-semibold hover:underline">
-              {d.code}
-            </Link>
+            <span className="block font-semibold">{d.code}</span>
             <span className="block text-sm whitespace-nowrap text-muted-foreground">
               {d.createdAt}
             </span>
           </div>
-        </div>
+        </label>
         {/* ปุ่มลบอยู่บนสุดคู่กับเลขที่ใบ — ไม่ใช่ลงไปอยู่แถวล่างสุดกับปุ่มอื่น
             ใช้ ghost (ไอคอนดำเฉยๆ hover เทาอ่อน) ไม่ใช่ outline-primary สีส้ม —
             ลบไม่ใช่การกระทำหลัก ไม่ควรเด่นเท่าปุ่มสีแบรนด์ เหมือนปุ่มลบอื่นๆ

@@ -77,7 +77,7 @@ export function PoLineItemDetailDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="@container flex max-h-[85vh] flex-col sm:max-w-lg">
+      <DialogContent className="flex max-h-[85vh] flex-col sm:max-w-lg">
         <DialogHeader className="text-left">
           <DialogTitle>
             {item.productName}
@@ -97,7 +97,7 @@ export function PoLineItemDetailDialog({
         {/* ---------- ตัวเลขหลักของรายการนี้ — กล่องเน้นสีแบรนด์เหมือนกล่อง
             ราคารวม/วันที่ในหัวใบด้านนอก (Stat ใน app/po/[id]/page.tsx) ปักไว้
             นอกโซนเลื่อนด้านล่าง เห็นตลอดไม่ว่าจะเลื่อนดูรายละเอียดแค่ไหน ---------- */}
-        <div className="grid gap-4 rounded-lg bg-brand p-4 @sm:grid-cols-2">
+        <div className="grid grid-cols-2 gap-4 rounded-lg bg-brand p-4">
           <Stat label="สั่งซื้อ" value={`${formatPoQty(item.orderedQty)} ${item.unit}`} />
           <div>
             <Stat label="รับเข้า" value={`${formatPoQty(received)} ${item.unit}`} />
@@ -119,7 +119,7 @@ export function PoLineItemDetailDialog({
             (-mx-6 px-6 ชดเชย padding ของ DialogContent เอง กันแถบเลื่อนไปโผล่
             ทับขอบขวาของเนื้อหา เหมือนกับ CostRowModal) ---------- */}
         <div className="-mx-6 overflow-y-auto px-6">
-          <div className="grid gap-4 pb-1 text-sm @sm:grid-cols-2">
+          <div className="grid grid-cols-2 gap-4 pb-1 text-sm">
             <Field label="ราคาสั่งต่อหน่วย" value={`${formatPoBaht(item.pricePerUnit)} บาท`} />
             <Field label="ค่าจัดการต่อหน่วย" value={`${formatPoBaht(item.handlingPerUnit)} บาท`} />
             <Field label="ราคารวมต่อหน่วย" value={`${formatPoBaht(lineItemUnitPrice(item))} บาท`} />
@@ -138,7 +138,7 @@ export function PoLineItemDetailDialog({
             <Field label="ผู้แก้ไขขอซื้อล่าสุด" value={item.editedBy ?? "-"} />
             <Field label="เหตุผลการซื้อ" value={PR_REASON_LABEL[item.reason]} />
             <Field
-              className="@sm:col-span-2"
+              className="col-span-2"
               label="เหตุผลเปลี่ยนข้อมูลสั่งซื้อ"
               value={item.changeReason ?? "-"}
             />
