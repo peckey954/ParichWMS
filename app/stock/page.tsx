@@ -299,7 +299,87 @@ function GeneralStockView() {
                จึงยกสองอย่างที่ใช้ระหว่างไล่ดู (สลับประเภท + ซ่อน/แสดง) มาติดบนไว้
                ลบขอบซ้ายขวาออกด้วย -mx เพื่อให้พื้นหลังเต็มความกว้างตอนติด */}
           <StickyToolbar hidden={hidden} barRef={stickyRef}>
+          {/* ---------- ค้นหา + ปุ่ม — ทดลองสลับมาไว้บนสุด ----------
+               เดิมอยู่ใต้ชิป (ค้นเฉพาะในประเภทที่เปิดอยู่ ผลลัพธ์เหมือนเดิม
+               ทุกอย่าง แค่ตำแหน่งเปลี่ยน — ยังกรองเฉพาะในชิปที่เลือกอยู่ ไม่ใช่
+               ค้นหาทั้งหมดทุกประเภทพร้อมกัน) placeholder เลยไม่ผูกชื่อประเภท
+               อีกต่อไป เพราะตอนนี้ค้นหาขึ้นก่อนชิปจะเห็นด้วยซ้ำว่าเลือกอะไรอยู่ */}
           <div className="flex items-center gap-2 pt-2">
+            <InputGroup className="min-w-0 flex-1 bg-card">
+              <InputGroupAddon align="inline-start">
+                <SearchIcon />
+              </InputGroupAddon>
+              <InputGroupInput
+                placeholder="ค้นหา..."
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+              />
+            </InputGroup>
+
+            {/* ตัวกรองเป็นกล่องกลางจอ ชุดเดียวกับหน้าสต็อก CWIP
+                แก้ในกล่องก่อน กดตกลงถึงมีผล กากบาทกับ Esc คือยกเลิก
+                เลขบนปุ่มบอกว่ากรองอยู่กี่เงื่อนไข ไม่ใช่แค่ว่ามีหรือไม่มี */}
+            <Dialog open={filterOpen} onOpenChange={setFilterOpen}>
+              <DialogTrigger asChild>
+                <Button
+                  variant="outline-primary"
+                  size="icon"
+                  aria-label="ตัวกรองและการแสดงผล"
+                  className="relative shrink-0"
+                >
+                  <ListFilterIcon />
+                  {/* จุดบอกว่ามีอะไรถูกเปลี่ยนไว้ ไม่บอกว่ากี่อย่าง
+                      ขนาดกับตำแหน่งตามคอมโพเนนต์ในไฟล์ออกแบบ */}
+                  {filterActive && (
+                    <span className="absolute top-1 right-1 size-2 rounded-full bg-primary" />
+                  )}
+                </Button>
+              </DialogTrigger>
+              {/* ไม่มีคำอธิบายใต้หัวข้อ — aria-describedby ต้องเป็น undefined ชัด ๆ
+                  ไม่งั้น Radix เตือนว่าหา DialogDescription ไม่เจอ */}
+              {/* ปุ่มกากบาทของ DS ใช้ focus: ซึ่งติดตอนคลิกเมาส์ด้วย
+                  กดปิดแล้วเลยมีกรอบส้มค้างไว้ทั้งที่ไม่ได้ใช้คีย์บอร์ด
+                  ปิดวงแหวนของ focus แล้วคืนให้เฉพาะ focus-visible ซึ่งขึ้นเฉพาะตอนกด Tab */}
+              <DialogContent
+                aria-describedby={undefined}
+                className="flex max-h-[85svh] flex-col gap-0 overflow-hidden! p-0 sm:max-w-md [&_[data-slot=dialog-close]]:focus:ring-0 [&_[data-slot=dialog-close]]:focus:ring-offset-0 [&_[data-slot=dialog-close]]:focus-visible:ring-2 [&_[data-slot=dialog-close]]:focus-visible:ring-ring [&_[data-slot=dialog-close]]:focus-visible:ring-offset-2"
+              >
+                <DialogHeader className="px-4 pt-4 text-left">
+                  <DialogTitle>ตัวกรองและการแสดงผล</DialogTitle>
+                </DialogHeader>
+                <StockFilter
+                  view={view}
+                  onApply={(next) => {
+                    setView(next);
+                    setFilterOpen(false);
+                  }}
+                />
+              </DialogContent>
+            </Dialog>
+
+            {/* ส่งออกได้เฉพาะรายการของแท็บสต็อก จึงอยู่ในแถบของแท็บนี้
+                ไม่ใช่ข้างชื่อหน้า — ไม่งั้นหัวเรื่องจะกระตุกตอนสลับแท็บ
+                วางริมสุดเพราะเป็นงานทำครั้งเดียวจบ ไม่ได้ใช้ระหว่างไล่ดูรายการ
+                เหมือนปุ่มอื่นในแถวนี้
+                เส้นขอบไม่ใช่พื้นทึบ เพราะนาน ๆ ใช้ที ไม่ควรเด่นกว่าของที่ใช้ทุกวัน */}
+            <Button
+              variant="outline-primary"
+              size="icon"
+              aria-label="ส่งออก CSV"
+              className="shrink-0"
+              onClick={() =>
+                toast.info("ส่งออก CSV", {
+                  description: isHistory
+                    ? "ประวัติการทำรายการ"
+                    : CATEGORY_LABEL[cat as CategoryId],
+                })
+              }
+            >
+              <DownloadIcon />
+            </Button>
+          </div>
+
+          <div className="mt-3 flex items-center gap-2">
             <div
               ref={chipRowRef}
               className={cn(
@@ -379,89 +459,6 @@ function GeneralStockView() {
                 />
               </div>
             )}
-          </div>
-
-          {/* ---------- ค้นหา + ปุ่ม — อยู่ในแถบติดบนเดียวกับชิป ----------
-               ค้นเฉพาะในประเภทที่เปิดอยู่ จึงต้องอยู่ใต้ชิป
-               ปุ่มตัวกรองกับซ่อน/แสดงมาอยู่ข้างช่องค้นหา ตามแบบร่าง */}
-          <div className="mt-3 flex items-center gap-2">
-            {/* พื้นขาว ตัดกับพื้นเทาของแถบที่ติดบน */}
-            <InputGroup className="min-w-0 flex-1 bg-card">
-              <InputGroupAddon align="inline-start">
-                <SearchIcon />
-              </InputGroupAddon>
-              <InputGroupInput
-                placeholder={
-                  isHistory
-                    ? "ค้นหา..."
-                    : `ค้นหาใน ${CATEGORY_LABEL[cat as CategoryId]}`
-                }
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-              />
-            </InputGroup>
-
-            {/* ตัวกรองเป็นกล่องกลางจอ ชุดเดียวกับหน้าสต็อก CWIP
-                แก้ในกล่องก่อน กดตกลงถึงมีผล กากบาทกับ Esc คือยกเลิก
-                เลขบนปุ่มบอกว่ากรองอยู่กี่เงื่อนไข ไม่ใช่แค่ว่ามีหรือไม่มี */}
-            <Dialog open={filterOpen} onOpenChange={setFilterOpen}>
-              <DialogTrigger asChild>
-                <Button
-                  variant="outline-primary"
-                  size="icon"
-                  aria-label="ตัวกรองและการแสดงผล"
-                  className="relative shrink-0"
-                >
-                  <ListFilterIcon />
-                  {/* จุดบอกว่ามีอะไรถูกเปลี่ยนไว้ ไม่บอกว่ากี่อย่าง
-                      ขนาดกับตำแหน่งตามคอมโพเนนต์ในไฟล์ออกแบบ */}
-                  {filterActive && (
-                    <span className="absolute top-1 right-1 size-2 rounded-full bg-primary" />
-                  )}
-                </Button>
-              </DialogTrigger>
-              {/* ไม่มีคำอธิบายใต้หัวข้อ — aria-describedby ต้องเป็น undefined ชัด ๆ
-                  ไม่งั้น Radix เตือนว่าหา DialogDescription ไม่เจอ */}
-              {/* ปุ่มกากบาทของ DS ใช้ focus: ซึ่งติดตอนคลิกเมาส์ด้วย
-                  กดปิดแล้วเลยมีกรอบส้มค้างไว้ทั้งที่ไม่ได้ใช้คีย์บอร์ด
-                  ปิดวงแหวนของ focus แล้วคืนให้เฉพาะ focus-visible ซึ่งขึ้นเฉพาะตอนกด Tab */}
-              <DialogContent
-                aria-describedby={undefined}
-                className="flex max-h-[85svh] flex-col gap-0 overflow-hidden! p-0 sm:max-w-md [&_[data-slot=dialog-close]]:focus:ring-0 [&_[data-slot=dialog-close]]:focus:ring-offset-0 [&_[data-slot=dialog-close]]:focus-visible:ring-2 [&_[data-slot=dialog-close]]:focus-visible:ring-ring [&_[data-slot=dialog-close]]:focus-visible:ring-offset-2"
-              >
-                <DialogHeader className="px-4 pt-4 text-left">
-                  <DialogTitle>ตัวกรองและการแสดงผล</DialogTitle>
-                </DialogHeader>
-                <StockFilter
-                  view={view}
-                  onApply={(next) => {
-                    setView(next);
-                    setFilterOpen(false);
-                  }}
-                />
-              </DialogContent>
-            </Dialog>
-
-            {/* ส่งออกได้เฉพาะรายการของแท็บสต็อก จึงอยู่ในแถบของแท็บนี้
-                ไม่ใช่ข้างชื่อหน้า — ไม่งั้นหัวเรื่องจะกระตุกตอนสลับแท็บ
-                วางริมสุดเพราะเป็นงานทำครั้งเดียวจบ ไม่ได้ใช้ระหว่างไล่ดูรายการ
-                เหมือนปุ่มอื่นในแถวนี้
-                เส้นขอบไม่ใช่พื้นทึบ เพราะนาน ๆ ใช้ที ไม่ควรเด่นกว่าของที่ใช้ทุกวัน */}
-            <Button
-              variant="outline-primary"
-              size="icon"
-              aria-label="ส่งออก CSV"
-              className="shrink-0"
-              onClick={() =>
-                toast.info("ส่งออก CSV", {
-                  description: isHistory
-                    ? "ประวัติการทำรายการ"
-                    : CATEGORY_LABEL[cat as CategoryId],
-                })
-              }
-            >
-              <DownloadIcon />
-            </Button>
           </div>
           </StickyToolbar>
 
@@ -600,12 +597,33 @@ function GeneralStockView() {
           {tab === "issue" && (
             <>
               <StickyToolbar hidden={hidden} barRef={stickyRef}>
+                <div className="flex items-center gap-2 pt-2">
+                  <InputGroup className="min-w-0 flex-1 bg-card">
+                    <InputGroupAddon align="inline-start">
+                      <SearchIcon />
+                    </InputGroupAddon>
+                    <InputGroupInput
+                      placeholder="ค้นหา..."
+                      value={issueQuery}
+                      onChange={(e) => setIssueQuery(e.target.value)}
+                    />
+                  </InputGroup>
+                  <Button
+                    variant="outline-primary"
+                    size="icon"
+                    aria-label="ตัวกรองใบขอเบิก / ขอคืน"
+                    className="shrink-0"
+                  >
+                    <ListFilterIcon />
+                  </Button>
+                </div>
+
                 {/* ทิศทางของเอกสาร เลือกได้ทีละอัน เลื่อนแนวนอนเอาบนจอแคบ */}
                 <div
                   role="tablist"
                   aria-label="ประเภทเอกสาร"
                   className={cn(
-                    "flex items-center gap-2 overflow-x-auto pt-2",
+                    "mt-3 flex items-center gap-2 overflow-x-auto",
                     "flex-nowrap [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
                   )}
                 >
@@ -629,27 +647,6 @@ function GeneralStockView() {
                       </button>
                     );
                   })}
-                </div>
-
-                <div className="mt-3 flex items-center gap-2">
-                  <InputGroup className="min-w-0 flex-1 bg-card">
-                    <InputGroupAddon align="inline-start">
-                      <SearchIcon />
-                    </InputGroupAddon>
-                    <InputGroupInput
-                      placeholder="ค้นหา..."
-                      value={issueQuery}
-                      onChange={(e) => setIssueQuery(e.target.value)}
-                    />
-                  </InputGroup>
-                  <Button
-                    variant="outline-primary"
-                    size="icon"
-                    aria-label="ตัวกรองใบขอเบิก / ขอคืน"
-                    className="shrink-0"
-                  >
-                    <ListFilterIcon />
-                  </Button>
                 </div>
               </StickyToolbar>
 

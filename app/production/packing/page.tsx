@@ -274,46 +274,11 @@ export default function PackingListPage() {
           เลื่อนลงไปแล้วต้องลากกลับขึ้นทั้งหน้าเพื่อพิมพ์คำค้น */}
       <StickyToolbar hidden={hidden} barRef={barRef}>
         <div className="pt-2">
-          {/* ชิปอยู่เหนือช่องค้นหา เพราะชิปคือขอบเขต ส่วนค้นหาคือการหาข้างในขอบเขตนั้น
-              แต่ละชิปเป็นข้อมูลคนละชุด (การ์ดสินค้า / ตารางเอกสาร / ตารางประวัติ)
-              สิ่งที่ค้นได้จึงต่างกันด้วย ดูได้จาก placeholder ที่เปลี่ยนตามชิป
-              อ่านจากบนลงล่างต้องเรียงตามการครอบ แท็บ > ชิป > ค้นหา
-              เหมือนหน้าสต็อกทั่วไปที่วางแบบนี้อยู่แล้ว
-
-              เลื่อนแนวนอนบนจอแคบ ห้าชิปลงจอ 390px ไม่หมด */}
-          {tab === "cwip" && (
-            <div
-              role="tablist"
-              aria-label="มุมมองสต็อก CWIP"
-              className={cn(
-                "mb-3 flex items-center gap-2 overflow-x-auto",
-                "flex-nowrap [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-              )}
-            >
-              {CWIP_CHIPS.map((c) => {
-                const on = cwipChip === c.id;
-                return (
-                  <button
-                    key={c.id}
-                    type="button"
-                    role="tab"
-                    aria-selected={on}
-                    onClick={() => setCwipChip(c.id)}
-                    className={cn(
-                      "shrink-0 rounded-full border px-3 py-1 text-sm whitespace-nowrap transition-colors",
-                      on
-                        ? "border-primary bg-brand font-medium text-primary"
-                        : "border-border text-foreground hover:bg-accent-hover"
-                    )}
-                  >
-                    {c.label} ({c.count})
-                  </button>
-                );
-              })}
-
-            </div>
-          )}
-
+          {/* ค้นหาอยู่เหนือชิป — ตามแบบใหม่ (เดิมชิปอยู่บนเพราะคิดว่าชิปคือ
+              ขอบเขตที่ค้นหาอยู่ข้างใน) ผลการกรองเหมือนเดิมทุกอย่าง ค้นหายัง
+              ทำงานแค่ในชิปที่เปิดอยู่ (ดูได้จาก placeholder ที่ยังเปลี่ยนตามชิป)
+              แค่สลับตำแหน่งที่วางบนจอเฉยๆ ไม่ได้เปลี่ยน logic การกรอง
+              เหมือนหน้าสต็อกทั่วไปที่ปรับมาแบบนี้ก่อนแล้ว */}
           <PackingToolbar
             query={query}
             onQuery={setQuery}
@@ -340,6 +305,39 @@ export default function PackingListPage() {
             onFilter={() => soon("ตัวกรอง")}
           />
 
+          {/* เลื่อนแนวนอนบนจอแคบ ห้าชิปลงจอ 390px ไม่หมด */}
+          {tab === "cwip" && (
+            <div
+              role="tablist"
+              aria-label="มุมมองสต็อก CWIP"
+              className={cn(
+                "mt-3 flex items-center gap-2 overflow-x-auto",
+                "flex-nowrap [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+              )}
+            >
+              {CWIP_CHIPS.map((c) => {
+                const on = cwipChip === c.id;
+                return (
+                  <button
+                    key={c.id}
+                    type="button"
+                    role="tab"
+                    aria-selected={on}
+                    onClick={() => setCwipChip(c.id)}
+                    className={cn(
+                      "shrink-0 rounded-full border px-3 py-1 text-sm whitespace-nowrap transition-colors",
+                      on
+                        ? "border-primary bg-brand font-medium text-primary"
+                        : "border-border text-foreground hover:bg-accent-hover"
+                    )}
+                  >
+                    {c.label} ({c.count})
+                  </button>
+                );
+              })}
+
+            </div>
+          )}
         </div>
       </StickyToolbar>
 

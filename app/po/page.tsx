@@ -306,42 +306,6 @@ function PoPageContent() {
             <>
               <StickyToolbar hidden={hidden} barRef={stickyRef}>
                 <div className="flex items-center gap-2 pt-2">
-                  <div
-                    ref={chipRowRef}
-                    className={cn(
-                      "flex min-w-0 flex-1 items-center gap-2 overflow-x-auto",
-                      "flex-nowrap [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-                    )}
-                  >
-                    <div role="tablist" aria-label="สถานะใบขอซื้อ" className="flex shrink-0 items-center gap-2">
-                      {CHIPS.map((c) => {
-                        const on = chip === c;
-                        return (
-                          <button
-                            key={c}
-                            type="button"
-                            role="tab"
-                            ref={(el) => {
-                              chipRefs.current[c] = el;
-                            }}
-                            onClick={() => changeChip(c)}
-                            aria-selected={on}
-                            className={cn(
-                              "shrink-0 rounded-full border px-3 py-1 text-sm whitespace-nowrap transition-colors",
-                              on
-                                ? "border-primary bg-brand font-medium text-primary"
-                                : "border-border text-foreground hover:bg-accent-hover"
-                            )}
-                          >
-                            {PO_QUEUE_CHIP_LABEL[c]} ({counts[c]})
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="mt-3 flex items-center gap-2">
                   <InputGroup className="min-w-0 flex-1 bg-card">
                     <InputGroupAddon align="inline-start">
                       <SearchIcon />
@@ -394,18 +358,60 @@ function PoPageContent() {
                   </Dialog>
                 </div>
 
+                <div className="mt-3 flex items-center gap-2">
+                  <div
+                    ref={chipRowRef}
+                    className={cn(
+                      "flex min-w-0 flex-1 items-center gap-2 overflow-x-auto",
+                      "flex-nowrap [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+                    )}
+                  >
+                    <div role="tablist" aria-label="สถานะใบขอซื้อ" className="flex shrink-0 items-center gap-2">
+                      {CHIPS.map((c) => {
+                        const on = chip === c;
+                        return (
+                          <button
+                            key={c}
+                            type="button"
+                            role="tab"
+                            ref={(el) => {
+                              chipRefs.current[c] = el;
+                            }}
+                            onClick={() => changeChip(c)}
+                            aria-selected={on}
+                            className={cn(
+                              "shrink-0 rounded-full border px-3 py-1 text-sm whitespace-nowrap transition-colors",
+                              on
+                                ? "border-primary bg-brand font-medium text-primary"
+                                : "border-border text-foreground hover:bg-accent-hover"
+                            )}
+                          >
+                            {PO_QUEUE_CHIP_LABEL[c]} ({counts[c]})
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+
                 {/* แถบสร้างใบสั่งซื้อรวม — โผล่เฉพาะตอนติ๊กเลือกไว้อย่างน้อยหนึ่งใบ
                     เท่านั้น ไม่ใช่ปุ่มถาวรที่กดไม่ได้เฉยๆ ตอนยังไม่มีอะไรให้รวม
                     ปุ่มหลักเป็น outline (ไม่ใช่พื้นทึบ) ตามแบบ ส่วน "ล้างค่า"
                     ล้างการติ๊กเลือกทั้งหมด (lockedCategory มาจาก selected เอง
-                    ผ่าน useMemo อยู่แล้ว ล้าง selected อย่างเดียวก็พอ) */}
+                    ผ่าน useMemo อยู่แล้ว ล้าง selected อย่างเดียวก็พอ)
+
+                    ข้อความอธิบายเห็นเฉพาะจอเว็บ/แท็บเล็ต (เกิน @md — วัดจริงแล้ว
+                    กรอบจำลองมือถือกว้าง 390px ยังเกิน @sm 384px ไปนิดเดียว ทำให้
+                    ข้อความยังโผล่ผิดพลาดตอนใช้ @sm ต้องขยับไป @md แทนถึงจะตัดจริง
+                    บนมือถือ) มือถือพื้นที่แคบเลยตัดออกไปเลย เหลือแค่ปุ่มสองอัน
+                    พอ ไม่ใช่ซ่อนไว้เฉยๆ */}
                 {selected.size > 0 && (
                   <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1.5">
                     <Button variant="outline-primary" onClick={handleCreateSelected}>
                       สร้างใบสั่งซื้อ
                     </Button>
-                    <p className="text-sm text-muted-foreground">
-                      วัตถุดิบเดียวกันเลือกรวมใน 1 ใบสั่งซื้อได้
+                    <p className="hidden text-sm text-muted-foreground @md:block">
+                      รวมสินค้าหลายรายการในประเภทเดียวกันไว้ใน 1 ใบสั่งซื้อได้
                     </p>
                     <Button
                       variant="ghost"
@@ -440,39 +446,6 @@ function PoPageContent() {
             <>
               <StickyToolbar hidden={hidden} barRef={stickyRef}>
                 <div className="flex items-center gap-2 pt-2">
-                  <div
-                    ref={chipRowRef}
-                    className={cn(
-                      "flex min-w-0 flex-1 items-center gap-2 overflow-x-auto",
-                      "flex-nowrap [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-                    )}
-                  >
-                    <div role="tablist" aria-label="สถานะใบสั่งซื้อ" className="flex shrink-0 items-center gap-2">
-                      {(["pending", "cancelled"] as PoStatus[]).map((s) => {
-                        const on = poChip === s;
-                        return (
-                          <button
-                            key={s}
-                            type="button"
-                            role="tab"
-                            onClick={() => changePoChip(s)}
-                            aria-selected={on}
-                            className={cn(
-                              "shrink-0 rounded-full border px-3 py-1 text-sm whitespace-nowrap transition-colors",
-                              on
-                                ? "border-primary bg-brand font-medium text-primary"
-                                : "border-border text-foreground hover:bg-accent-hover"
-                            )}
-                          >
-                            {PO_STATUS_LABEL[s]} ({poCounts[s]})
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="mt-3 flex items-center gap-2">
                   <InputGroup className="min-w-0 flex-1 bg-card">
                     <InputGroupAddon align="inline-start">
                       <SearchIcon />
@@ -515,6 +488,39 @@ function PoPageContent() {
                       />
                     </DialogContent>
                   </Dialog>
+                </div>
+
+                <div className="mt-3 flex items-center gap-2">
+                  <div
+                    ref={chipRowRef}
+                    className={cn(
+                      "flex min-w-0 flex-1 items-center gap-2 overflow-x-auto",
+                      "flex-nowrap [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+                    )}
+                  >
+                    <div role="tablist" aria-label="สถานะใบสั่งซื้อ" className="flex shrink-0 items-center gap-2">
+                      {(["pending", "cancelled"] as PoStatus[]).map((s) => {
+                        const on = poChip === s;
+                        return (
+                          <button
+                            key={s}
+                            type="button"
+                            role="tab"
+                            onClick={() => changePoChip(s)}
+                            aria-selected={on}
+                            className={cn(
+                              "shrink-0 rounded-full border px-3 py-1 text-sm whitespace-nowrap transition-colors",
+                              on
+                                ? "border-primary bg-brand font-medium text-primary"
+                                : "border-border text-foreground hover:bg-accent-hover"
+                            )}
+                          >
+                            {PO_STATUS_LABEL[s]} ({poCounts[s]})
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
                 </div>
               </StickyToolbar>
 

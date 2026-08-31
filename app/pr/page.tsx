@@ -183,42 +183,6 @@ export default function PrListPage() {
 
           <StickyToolbar hidden={hidden} barRef={stickyRef}>
             <div className="flex items-center gap-2 pt-2">
-              <div
-                ref={chipRowRef}
-                className={cn(
-                  "flex min-w-0 flex-1 items-center gap-2 overflow-x-auto",
-                  "flex-nowrap [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-                )}
-              >
-                <div role="tablist" aria-label="สถานะใบขอซื้อ" className="flex shrink-0 items-center gap-2">
-                  {STATUS_CHIPS.map((c) => {
-                    const on = status === c;
-                    return (
-                      <button
-                        key={c}
-                        type="button"
-                        role="tab"
-                        ref={(el) => {
-                          chipRefs.current[c] = el;
-                        }}
-                        onClick={() => changeStatus(c)}
-                        aria-selected={on}
-                        className={cn(
-                          "shrink-0 rounded-full border px-3 py-1 text-sm whitespace-nowrap transition-colors",
-                          on
-                            ? "border-primary bg-brand font-medium text-primary"
-                            : "border-border text-foreground hover:bg-accent-hover"
-                        )}
-                      >
-                        {CHIP_LABEL[c]} ({counts[c]})
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            </div>
-
-            <div className="mt-3 flex items-center gap-2">
               <InputGroup className="min-w-0 flex-1 bg-card">
                 <InputGroupAddon align="inline-start">
                   <SearchIcon />
@@ -262,6 +226,42 @@ export default function PrListPage() {
                   />
                 </DialogContent>
               </Dialog>
+            </div>
+
+            <div className="mt-3 flex items-center gap-2">
+              <div
+                ref={chipRowRef}
+                className={cn(
+                  "flex min-w-0 flex-1 items-center gap-2 overflow-x-auto",
+                  "flex-nowrap [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+                )}
+              >
+                <div role="tablist" aria-label="สถานะใบขอซื้อ" className="flex shrink-0 items-center gap-2">
+                  {STATUS_CHIPS.map((c) => {
+                    const on = status === c;
+                    return (
+                      <button
+                        key={c}
+                        type="button"
+                        role="tab"
+                        ref={(el) => {
+                          chipRefs.current[c] = el;
+                        }}
+                        onClick={() => changeStatus(c)}
+                        aria-selected={on}
+                        className={cn(
+                          "shrink-0 rounded-full border px-3 py-1 text-sm whitespace-nowrap transition-colors",
+                          on
+                            ? "border-primary bg-brand font-medium text-primary"
+                            : "border-border text-foreground hover:bg-accent-hover"
+                        )}
+                      >
+                        {CHIP_LABEL[c]} ({counts[c]})
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
             </div>
           </StickyToolbar>
 
