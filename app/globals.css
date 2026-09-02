@@ -239,12 +239,15 @@
   align-items: flex-start !important;
 }
 
-/* ฟอนต์ toast ตามแบบ — 14px ทั้งก้อน (ปกติของ sonner คือ 13px) หัวข้อหนา
-   semibold (ปกติ 500) คำอธิบาย normal อยู่แล้วไม่ต้องแตะ ต้องชน !important
-   เหมือนกฎสีด้านบน เพราะ sonner ตั้งค่าพวกนี้ไว้ตายตัวที่ระดับ selector เอง
-   ไม่ใช่ตัวแปร CSS ที่ยกมาแทนได้จาก <Toaster style={...}> */
+/* ฟอนต์+ขนาด toast ตามแบบ — 14px ทั้งก้อน (ปกติของ sonner คือ 13px) หัวข้อหนา
+   semibold (ปกติ 500) คำอธิบาย normal อยู่แล้วไม่ต้องแตะ padding ขยายจาก 16px
+   เดิมของ sonner ให้มีพื้นที่หายใจมากขึ้น (ปุ่ม action ก็ขยายคู่กันไว้ที่
+   app-shell.tsx) ต้องชน !important เหมือนกฎสีด้านบน เพราะ sonner ตั้งค่าพวกนี้
+   ไว้ตายตัวที่ระดับ selector เอง ไม่ใช่ตัวแปร CSS ที่ยกมาแทนได้จาก
+   <Toaster style={...}> */
 [data-sonner-toast][data-styled="true"] {
   font-size: 14px !important;
+  padding: 20px !important;
 }
 [data-sonner-toast][data-styled="true"] [data-title] {
   font-weight: 600 !important;

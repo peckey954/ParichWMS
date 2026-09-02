@@ -12,7 +12,9 @@ import { NotificationList } from "@/components/notification-list";
 import { useNotifications } from "@/components/notifications-provider";
 
 /* ------------------------------------------------------------------
-   กระดิ่งแจ้งเตือนบนหัวเรื่อง — ป้ายตัวเลขมุมขวาบนบอกจำนวนที่ยังไม่อ่าน
+   กระดิ่งแจ้งเตือนบนหัวเรื่อง — จุดกลมมุมขวาบนแค่บอกว่า "มี" ที่ยังไม่อ่าน
+   ไม่บอกจำนวน (ตามแบบเดียวกับจุดบอกตัวกรองที่ใช้งานอยู่ของปุ่มตัวกรองทั่วแอป)
+   จำนวนจริงยังบอกผ่าน aria-label กับหัว popover/หน้ารวมอยู่ ไม่ได้หายไปเลย
 
    จอกว้าง — กดแล้วกางเป็น popover แสดงรายการ เลื่อนดูในนั้นได้เลย (max-h +
    overflow-y-auto) ไม่มีปุ่ม/ลิงก์ "ดูทั้งหมด" พาไปหน้าใหญ่แยกต่างหากอีกต่อไป
@@ -26,11 +28,7 @@ import { useNotifications } from "@/components/notifications-provider";
 
 function UnreadBadge({ count }: { count: number }) {
   if (count <= 0) return null;
-  return (
-    <span className="absolute top-1 right-1 flex size-4 items-center justify-center rounded-full bg-primary text-[10px] font-semibold text-primary-foreground tabular-nums">
-      {count}
-    </span>
-  );
+  return <span className="absolute top-1 right-1 size-2 rounded-full bg-primary" />;
 }
 
 export function NotificationBell() {

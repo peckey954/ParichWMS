@@ -104,10 +104,12 @@ function Shell({ children }: { children: React.ReactNode }) {
       // โปร่งแสงจนเห็นพื้นหลังกล่อง toast ทะลุ — ขอบ+ตัวอักษรส้ม) แทนปุ่มพื้นทึบ
       // เริ่มต้นของ sonner ให้เข้าธีมปุ่มรองของทั้งแอป — ต้องใส่ ! เพราะกฎ
       // [data-button]/[data-description] ของ sonner specificity สูงกว่า
+      // ขนาดปุ่มก็ขยายด้วย (h-8/px-3.5/text-sm) ของเดิม sonner ตั้งไว้เล็กมาก
+      // (สูง 24px ตัวอักษร 12px) กดยากบนมือถือ
       const classNames = {
         title: "font-semibold",
         description: "text-primary!",
-        actionButton: "bg-white! text-primary! border! border-primary!",
+        actionButton: "bg-white! text-primary! border! border-primary! h-8! px-3.5! text-sm! rounded-md!",
       };
 
       if (unread.length === 1) {
