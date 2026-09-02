@@ -26,6 +26,7 @@ import {
 import { LightTooltip } from "@/components/light-tooltip";
 import { NotificationBell } from "@/components/notification-bell";
 import { NotificationsProvider, useNotifications } from "@/components/notifications-provider";
+import { AddedRoundsProvider } from "@/components/po/added-rounds-provider";
 import { RecipeRunProvider } from "@/components/production/recipe-run";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { ModuleIcon } from "@/components/modules/module-icon";
@@ -57,7 +58,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         {/* เหมือนกัน — สถานะอ่านแล้ว/ยังไม่อ่านต้องข้ามหน้าได้ (กระดิ่งกับ
             หน้า /notifications ต้องเห็นค่าเดียวกัน) */}
         <NotificationsProvider>
-          <Shell>{children}</Shell>
+          {/* รอบรับเข้าที่เพิ่มจากหน้า "เพิ่มรอบ" ต้องข้ามหน้าไปโผล่ในตาราง
+              "รอบการรับสินค้า" ของหน้าใบสั่งซื้อได้ (คนละ route กัน) */}
+          <AddedRoundsProvider>
+            <Shell>{children}</Shell>
+          </AddedRoundsProvider>
         </NotificationsProvider>
       </RecipeRunProvider>
     </DevicePreviewProvider>

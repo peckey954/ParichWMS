@@ -84,7 +84,9 @@ export type PoRound = {
   id: string;
   /** เลขที่รับสินค้า — รหัสใบสั่งซื้อ + เลขรายการ + ลำดับรอบของรายการนั้น */
   code: string;
-  batchId: string;
+  /** เลขที่ ID ล็อต — ยังไม่มีตอนเพิ่งเพิ่มรอบ (รอรถขนส่ง) เพราะเป็นเลขที่
+   *  เมนู "ชั่งน้ำหนักและรับสินค้า" เป็นคนออกให้ตอนรถมาถึงจริง */
+  batchId?: string;
   plate: string;
   containerNo?: string;
   arriveDate: string;
@@ -94,6 +96,25 @@ export type PoRound = {
   stockedTon?: number;
   status: PoRoundStatus;
   note?: string;
+
+  /* ---------- ข้อมูลชั่งน้ำหนัก — มีค่าตั้งแต่รถมาชั่งจริงแล้วเท่านั้น
+     (สถานะ waitingQc ขึ้นไป) รอบที่ "รอรถขนส่ง" ยังไม่มีข้อมูลชุดนี้เลย ---------- */
+  /** ผู้รับสินค้าหน้างาน / ผู้แก้ไขข้อมูลรับสินค้าล่าสุด (ถ้าเคยแก้) */
+  receiver?: string;
+  receiverEditedBy?: string;
+  /** ผู้ชั่งสินค้า / ผู้แก้ไขข้อมูลชั่งล่าสุด (ถ้าเคยแก้) */
+  weigher?: string;
+  weigherEditedBy?: string;
+  /** น้ำหนักตามใบชั่งของผู้ขาย (ตัน) — เทียบกับ receivedTon (น้ำหนักจริงที่ชั่งได้)
+   *  เพื่อดูส่วนต่าง/% สูญหาย */
+  sellerWeightTon?: number;
+  /** ชั่งเข้ารถพร้อมสินค้า (กก. + เวลา) */
+  grossKg?: number;
+  grossAt?: string;
+  /** ชั่งออกรถเปล่า (กก. + เวลา) */
+  tareKg?: number;
+  tareAt?: string;
+  weighNote?: string;
 };
 
 /** หนึ่งรายการสินค้าในใบสั่งซื้อ — มีรอบรับเข้าของตัวเอง แยกจากรายการอื่น */
@@ -124,6 +145,12 @@ export type PoLineItem = {
   /** เหตุผลตอนแก้ไขข้อมูลสั่งซื้อภายหลัง — มีค่าเฉพาะรายการที่เคยถูกแก้ไข */
   changeReason?: string;
   rounds: PoRound[];
+
+  /** น้ำหนักชั่งตรวจสอบ (กก.) เทียบกับน้ำหนักตามใบชั่งของผู้ขาย — มีค่าเฉพาะ
+   *  รายการที่เริ่มรับเข้าไปแล้วอย่างน้อยหนึ่งรอบ (ดู lineItemStarted) ยังไม่
+   *  เริ่มรับเข้าเลยแสดงเป็น "-" ทั้งคู่ */
+  weighedKg?: number;
+  sellerWeightKg?: number;
 };
 
 export type PoDoc = {
@@ -151,6 +178,14 @@ export type PoDoc = {
  *  เพราะของที่รับแล้วแต่ยังรอผล QC ก็ถือว่ารับเข้ามาแล้ว ไม่ใช่ยังไม่มา) */
 export function lineItemReceivedQty(item: PoLineItem): number {
   return item.rounds.reduce((sum, r) => sum + (r.receivedTon ?? 0), 0);
+}
+
+/** เริ่มรับเข้ารายการนี้ไปแล้วอย่างน้อยหนึ่งรอบไหม (มีรอบไหนที่ไม่ใช่แค่
+ *  "รอรถขนส่ง" บ้าง) — ใช้ตัดสินว่าคอลัมน์ตัวเลขการรับเข้า (รับเข้า/เข้าคลัง/
+ *  น้ำหนักชั่ง/น้ำหนักตามผู้ขาย ฯลฯ) ควรโชว์ "-" หรือโชว์ค่าจริง ยังไม่เริ่มรับ
+ *  เลยไม่ควรเห็น "0.00" ซึ่งอ่านเหมือนรับมาแล้วได้ศูนย์ */
+export function lineItemStarted(item: PoLineItem): boolean {
+  return item.rounds.some((r) => r.status !== "waitingTruck");
 }
 
 export function lineItemStockedQty(item: PoLineItem): number {
@@ -291,6 +326,40 @@ function randomContainerNo(rnd: () => number) {
   return `${a}${b}-${1000 + Math.floor(rnd() * 8999)}`;
 }
 
+function timeAt(rnd: () => number) {
+  return `${pad(7 + Math.floor(rnd() * 10))}:${pad(Math.floor(rnd() * 60))}`;
+}
+
+/** ไอดีของรอบ จาก "เลขที่รับสินค้า" (code) — code มี "/" ปนอยู่เสมอ (เช่น
+ *  "PO260116/03/01-01") ใช้เป็น URL path segment ตรงๆ ไม่ได้ (บาง server/
+ *  router ตีความ "/" แม้เข้ารหัสแล้วว่าเป็นตัวแบ่ง path เพิ่ม ทำให้ 404) จึง
+ *  ต้องแทนที่ "/" ก่อนเสมอ — ใช้ฟังก์ชันเดียวกันทุกจุดที่สร้างไอดีรอบ (ทั้ง
+ *  ข้อมูลตัวอย่างในไฟล์นี้ และตอนเพิ่มรอบใหม่จากฟอร์ม) กันไอดีไม่ตรงกัน */
+export function roundIdFromCode(code: string): string {
+  return `${code.replace(/\//g, "-")}-r`;
+}
+
+/** ข้อมูลชั่ง/ผู้รับ/ผู้ชั่ง — มีค่าตั้งแต่รถมาชั่งจริงแล้วเท่านั้น (waitingQc
+ *  ขึ้นไป) แยกออกมาเป็นฟังก์ชันเดียวเพราะสามสถานะ (waitingQc/returned/stocked)
+ *  ใช้ชุดข้อมูลเดียวกันเป๊ะ ต่างกันแค่ผลตรวจ QC ที่ต่อท้าย */
+function buildWeighingMeta(receivedTon: number, rnd: () => number) {
+  const tareKg = Math.round(8000 * (0.9 + rnd() * 0.2)); // น้ำหนักรถเปล่าโดยประมาณ
+  const grossKg = tareKg + receivedTon * 1000;
+  return {
+    receiver: pick(PR_REQUESTERS, rnd),
+    receiverEditedBy: rnd() < 0.3 ? pick(PR_REQUESTERS, rnd) : undefined,
+    weigher: pick(PR_REQUESTERS, rnd),
+    weigherEditedBy: rnd() < 0.3 ? pick(PR_REQUESTERS, rnd) : undefined,
+    // น้ำหนักตามใบชั่งของผู้ขาย — ปกติใกล้เคียงน้ำหนักจริง คลาดเคลื่อนได้เล็กน้อย
+    sellerWeightTon: Math.round(receivedTon * (0.98 + rnd() * 0.06)),
+    grossKg,
+    grossAt: timeAt(rnd),
+    tareKg,
+    tareAt: timeAt(rnd),
+    weighNote: rnd() < 0.2 ? "รถมาถึงช้ากว่านัดหมายเดิมเล็กน้อย" : undefined,
+  };
+}
+
 /** สร้างรอบรับเข้าของรายการหนึ่ง — จำนวนรอบและความสมบูรณ์แต่ละรอบขึ้นกับ rnd */
 function buildRounds(
   lineCode: string,
@@ -313,17 +382,19 @@ function buildRounds(
     const roll = rnd();
 
     if (roll < 0.15) {
-      // รอรถขนส่ง — ยังไม่มีตัวเลขให้กรอกเลย
-      rounds.push({ id: `${code}-r`, code, batchId, plate, containerNo, arriveDate, status: "waitingTruck" });
+      // รอรถขนส่ง — ยังไม่มีตัวเลขให้กรอกเลย (ยังไม่มีข้อมูลชั่งด้วย รถยังไม่มาถึง)
+      rounds.push({ id: roundIdFromCode(code), code, batchId, plate, containerNo, arriveDate, status: "waitingTruck" });
       continue;
     }
 
     const receivedTon = Math.round(perRound * (0.85 + rnd() * 0.3));
+    const weighingMeta = buildWeighingMeta(receivedTon, rnd);
 
     if (roll < 0.3) {
       // รับเข้ามาแล้ว แต่ยังรอผลตรวจสอบ QC
       rounds.push({
-        id: `${code}-r`, code, batchId, plate, containerNo, arriveDate, receivedTon, status: "waitingQc",
+        id: roundIdFromCode(code), code, batchId, plate, containerNo, arriveDate, receivedTon,
+        status: "waitingQc", ...weighingMeta,
       });
       continue;
     }
@@ -331,9 +402,9 @@ function buildRounds(
     if (roll < 0.4) {
       // QC ไม่ผ่าน ส่งคืนทั้งหมด
       rounds.push({
-        id: `${code}-r`, code, batchId, plate, containerNo, arriveDate,
+        id: roundIdFromCode(code), code, batchId, plate, containerNo, arriveDate,
         receivedTon, failedTon: receivedTon, qcResult: "ส่งคืน", stockedTon: 0,
-        status: "returned",
+        status: "returned", ...weighingMeta,
       });
       continue;
     }
@@ -341,8 +412,8 @@ function buildRounds(
     // เข้าคลังแล้ว — ผลตรวจสอบสุ่มเป็นผ่าน/รับสภาพ/Repack
     const qcResult = pick<PoQcResult>(["ผ่าน", "รับสภาพ", "Repack"], rnd);
     rounds.push({
-      id: `${code}-r`, code, batchId, plate, containerNo, arriveDate,
-      receivedTon, qcResult, stockedTon: receivedTon, status: "stocked",
+      id: roundIdFromCode(code), code, batchId, plate, containerNo, arriveDate,
+      receivedTon, qcResult, stockedTon: receivedTon, status: "stocked", ...weighingMeta,
     });
   }
 
@@ -371,6 +442,13 @@ function buildPoDoc(seq: number, status: PoStatus): PoDoc {
     const orderedQty = Math.round((150 + rnd() * 700) / 10) * 10;
     const lineCode = `${code}/${pad(i + 1)}`;
     const editedBy = rnd() < 0.4 ? pick(PR_REQUESTERS, rnd) : undefined;
+    const rounds = status === "cancelled" ? [] : buildRounds(lineCode, orderedQty, rnd);
+    // เริ่มรับเข้าไปแล้วอย่างน้อยหนึ่งรอบไหม (มีรอบไหนที่ไม่ใช่แค่ "รอรถขนส่ง"
+    // บ้าง) — ยังไม่เริ่มเลยไม่มีน้ำหนักชั่ง/น้ำหนักตามผู้ขายให้โชว์
+    const started = rounds.some((r) => r.status !== "waitingTruck");
+    const weighedKg = started ? Math.round((80 + rnd() * 60) * 100) / 100 : undefined;
+    const sellerWeightKg =
+      weighedKg != null ? Math.round(weighedKg * (0.96 + rnd() * 0.08) * 100) / 100 : undefined;
     return {
       id: `${id}-li${i + 1}`,
       poId: id,
@@ -391,7 +469,9 @@ function buildPoDoc(seq: number, status: PoStatus): PoDoc {
       editedBy,
       reason: pick<PrReason>(PR_REASONS, rnd),
       changeReason: editedBy ? pick(CHANGE_REASON_POOL, rnd) : undefined,
-      rounds: status === "cancelled" ? [] : buildRounds(lineCode, orderedQty, rnd),
+      rounds,
+      weighedKg,
+      sellerWeightKg,
     } satisfies PoLineItem;
   });
 
