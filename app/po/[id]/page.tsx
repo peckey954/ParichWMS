@@ -52,6 +52,7 @@ import {
 } from "@peckey954/ui/components/ui/table";
 import { cn } from "@peckey954/ui/lib/utils";
 import { toast } from "sonner";
+import { applyRoundEdits, useAddedRounds } from "@/components/po/added-rounds-provider";
 import { PoLineItemDetailDialog } from "@/components/po/line-item-detail-dialog";
 import {
   CardRow,
@@ -71,6 +72,7 @@ import {
   lineItemFailedQty,
   lineItemPendingQty,
   lineItemReceivedQty,
+  lineItemStarted,
   lineItemStockedQty,
   lineItemTotalPrice,
   lineItemUnitPrice,
@@ -97,16 +99,19 @@ import { PR_CATEGORY_LABEL } from "@/lib/pr";
    สินค้าที่ยังค้างรับ ส่วนหน้านี้คือภาพเต็มของทั้งใบ รวมประวัติทุกรอบเรียงกัน
 ------------------------------------------------------------------ */
 
-const ROUND_STATUS_TONE: Record<PoRoundStatus, "warning" | "neutral" | "success" | "danger"> = {
-  waitingTruck: "warning",
-  waitingQc: "neutral",
-  stocked: "success",
-  returned: "danger",
-};
-
 // เขียนคลาสเต็มทุกตัว ห้ามประกอบชื่อด้วย template string
 const URGENT_CHIP =
   "[--bdg-surface:var(--chip-orange)] [--bdg-text:var(--chip-orange-foreground)]";
+/** สีชิปสถานะรอบรับเข้า — ใช้ชุดสี chip-* เดียวกับที่หน้าอื่นทั้งแอปใช้กับชิป
+    สถานะหลายแบบ (เช่น PROGRESS_CHIP ของ po-order-list.tsx) ไม่ใช้ tone ของ
+    Badge ตรงๆ (warning/neutral) เพราะสีไม่ตรงกับดีไซน์ — "รอตรวจสอบ QC" ต้อง
+    เป็นส้ม (chip-orange) แยกจาก "รอรถขนส่ง" ที่เป็นเหลือง (chip-yellow) */
+const ROUND_STATUS_CHIP: Record<PoRoundStatus, string> = {
+  waitingTruck: "[--bdg-surface:var(--chip-yellow)] [--bdg-text:var(--chip-yellow-foreground)]",
+  waitingQc: "[--bdg-surface:var(--chip-orange)] [--bdg-text:var(--chip-orange-foreground)]",
+  stocked: "[--bdg-surface:var(--chip-green)] [--bdg-text:var(--chip-green-foreground)]",
+  returned: "[--bdg-surface:var(--chip-red)] [--bdg-text:var(--chip-red-foreground)]",
+};
 
 function UrgentChip() {
   return (
@@ -118,7 +123,10 @@ function UrgentChip() {
 
 function RoundStatusChip({ status }: { status: PoRoundStatus }) {
   return (
-    <Badge tone={ROUND_STATUS_TONE[status]} appearance="soft" className="font-semibold">
+    <Badge
+      appearance="soft"
+      className={cn("[--bdg-border:transparent] font-semibold", ROUND_STATUS_CHIP[status])}
+    >
       {PO_ROUND_STATUS_LABEL[status]}
     </Badge>
   );
@@ -139,6 +147,7 @@ export default function PoOrderDetailPage() {
   const [subTab, setSubTab] = React.useState<SubTab>("rounds");
   const [productFilter, setProductFilter] = React.useState<string>("all");
   const [cancelOpen, setCancelOpen] = React.useState(false);
+  const { entries: addedEntries, patches, deletedIds } = useAddedRounds();
 
   if (!po) {
     return (
@@ -156,7 +165,27 @@ export default function PoOrderDetailPage() {
   }
 
   const cancelled = po.status === "cancelled";
-  const allRounds = po.lineItems.flatMap((item) => item.rounds.map((r) => ({ round: r, item })));
+  // รอบที่เพิ่งเพิ่มระหว่างเซสชันนี้ (มาจากหน้า "เพิ่มรอบ" คนละหน้ากัน ดู
+  // AddedRoundsProvider) ต้องขึ้นเป็นแถวบนสุดของตารางเสมอ — ก่อนรอบจากข้อมูล
+  // ตัวอย่าง (item.rounds) ทั้งหมด ไม่ว่าจะเป็นรายการสินค้าไหนในใบนี้ก็ตาม
+  // addedEntries เรียงล่าสุดก่อนอยู่แล้ว (ดู provider) จึงกรองแล้วต่อหน้าตรงๆ
+  // ได้เลยไม่ต้อง sort เพิ่ม
+  // ผสาน patch (แก้ไข) และกรองรอบที่ถูกลบออกด้วย applyRoundEdits ตัวเดียวกัน
+  // ทุกจุดที่อ่านรอบ (ดู AddedRoundsProvider) — คืน null แปลว่าถูกลบไปแล้ว
+  const lineItemById = new Map(po.lineItems.map((item) => [item.id, item]));
+  const addedRounds = addedEntries
+    .filter((e) => lineItemById.has(e.lineItemId))
+    .flatMap((e) => {
+      const round = applyRoundEdits(e.round, patches, deletedIds);
+      return round ? [{ round, item: lineItemById.get(e.lineItemId)! }] : [];
+    });
+  const seededRounds = po.lineItems.flatMap((item) =>
+    item.rounds.flatMap((r) => {
+      const round = applyRoundEdits(r, patches, deletedIds);
+      return round ? [{ round, item }] : [];
+    })
+  );
+  const allRounds = [...addedRounds, ...seededRounds];
   const visibleRounds =
     productFilter === "all" ? allRounds : allRounds.filter((r) => r.item.id === productFilter);
 
@@ -468,6 +497,9 @@ function LineItemsTable({ po }: { po: PoDoc }) {
                 <TableHead className="text-right">รับเข้า</TableHead>
                 <TableHead className="text-right">ไม่ผ่าน</TableHead>
                 <TableHead className="text-right">เข้าคลัง</TableHead>
+                <TableHead className="text-right">น้ำหนักชั่ง (กก.)</TableHead>
+                <TableHead className="text-right">น้ำหนักตามผู้ขาย (กก.)</TableHead>
+                <TableHead className="text-right">ส่วนต่าง (กก.)</TableHead>
                 <TableHead className="text-right">ราคาสั่งต่อหน่วย (บาท)</TableHead>
                 <TableHead className="text-right">ค่าจัดการต่อหน่วย (บาท)</TableHead>
                 <TableHead className="text-right">ราคารวมต่อหน่วย (บาท)</TableHead>
@@ -477,10 +509,15 @@ function LineItemsTable({ po }: { po: PoDoc }) {
             </TableHeader>
             <TableBody>
               {po.lineItems.map((item, index) => {
+                const started = lineItemStarted(item);
                 const received = lineItemReceivedQty(item);
                 const pending = lineItemPendingQty(item);
                 const failed = lineItemFailedQty(item);
                 const stocked = lineItemStockedQty(item);
+                const weighDiff =
+                  item.weighedKg != null && item.sellerWeightKg != null
+                    ? item.weighedKg - item.sellerWeightKg
+                    : undefined;
                 return (
                   <TableRow
                     key={item.id}
@@ -510,13 +547,21 @@ function LineItemsTable({ po }: { po: PoDoc }) {
                       {formatPoQty(item.orderedQty)} {item.unit}
                     </TableCell>
                     <TableCell className="text-right whitespace-nowrap tabular-nums">
-                      {formatPoQty(received)} {item.unit}
-                      {/* ค้างรับ — ซ้อนใต้ยอดรับเข้าแทนแยกคอลัมน์ เพราะเป็น
-                          ส่วนขยายของตัวเลขเดียวกัน (สั่งซื้อ − รับเข้าแล้ว) */}
-                      {!cancelled && pending > 0 && (
-                        <span className="block text-sm font-normal text-danger-strong">
-                          ค้างรับ: {formatPoQty(pending)} {item.unit}
-                        </span>
+                      {started ? (
+                        <>
+                          {formatPoQty(received)} {item.unit}
+                          {/* ค้างรับ — ซ้อนใต้ยอดรับเข้าแทนแยกคอลัมน์ เพราะเป็น
+                              ส่วนขยายของตัวเลขเดียวกัน (สั่งซื้อ − รับเข้าแล้ว)
+                              โผล่เฉพาะตอนเริ่มรับแล้วแต่ยังไม่ครบ — ยังไม่เริ่ม
+                              เลยไม่ต้องบอกว่า "ค้างรับ" เพราะทั้งแถวคือ "-" อยู่แล้ว */}
+                          {!cancelled && pending > 0 && (
+                            <span className="block text-sm font-normal text-danger-strong">
+                              ค้างรับ: {formatPoQty(pending)} {item.unit}
+                            </span>
+                          )}
+                        </>
+                      ) : (
+                        <span className="text-muted-foreground">-</span>
                       )}
                     </TableCell>
                     <TableCell className="text-right whitespace-nowrap tabular-nums">
@@ -529,7 +574,35 @@ function LineItemsTable({ po }: { po: PoDoc }) {
                       )}
                     </TableCell>
                     <TableCell className="text-right whitespace-nowrap tabular-nums">
-                      {formatPoQty(stocked)} {item.unit}
+                      {started ? (
+                        `${formatPoQty(stocked)} ${item.unit}`
+                      ) : (
+                        <span className="text-muted-foreground">-</span>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-right whitespace-nowrap tabular-nums">
+                      {item.weighedKg != null ? (
+                        formatPoQty(item.weighedKg)
+                      ) : (
+                        <span className="text-muted-foreground">-</span>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-right whitespace-nowrap tabular-nums">
+                      {item.sellerWeightKg != null ? (
+                        formatPoQty(item.sellerWeightKg)
+                      ) : (
+                        <span className="text-muted-foreground">-</span>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-right whitespace-nowrap tabular-nums">
+                      {weighDiff != null ? (
+                        <span className={cn("font-medium", weighDiff < 0 && "text-danger-strong")}>
+                          {weighDiff > 0 ? "+" : ""}
+                          {formatPoQty(weighDiff)}
+                        </span>
+                      ) : (
+                        <span className="text-muted-foreground">-</span>
+                      )}
                     </TableCell>
                     <TableCell className="text-right whitespace-nowrap tabular-nums">
                       {formatPoBaht(item.pricePerUnit)}
@@ -573,7 +646,25 @@ function LineItemsTable({ po }: { po: PoDoc }) {
 /** ตาราง "รอบการรับสินค้า" — รวมทุกรอบจากทุกรายการสินค้าในใบไว้ในตารางเดียว
     แต่ละแถวบอกบรรจุภัณฑ์ของตัวเองอยู่แล้ว จึงยังรู้ว่าแถวไหนเป็นของสินค้าไหน
     แม้จะรวมกันไว้ในตารางเดียว — ตรงกับไฟล์ออกแบบ */
+/** สถานะ "รอรถขนส่ง" ยังไม่มีตัวเลขให้ดู กดแล้วพาไปฟอร์มแก้ไข (หน้าเดียวกับ
+ *  "เพิ่มรอบ" แค่เปิดโหมดแก้ไข — ดู app/po/[id]/receive/[itemId]/add/page.tsx)
+ *  สถานะอื่น (รอตรวจสอบ QC/เข้าคลังแล้ว/ส่งคืน) มีข้อมูลจริงให้ดูแล้ว พาไปหน้า
+ *  รายละเอียดรอบ (ดูอย่างเดียว) แทน */
+function roundHref(item: PoLineItem, round: PoRound) {
+  // round.id มาจากเลขที่รับสินค้า (code) ซึ่งมี "/" ปนอยู่เสมอ (เช่น
+  // "PO260116/03/01-01-r") ต้อง encodeURIComponent ก่อนใส่เป็นส่วนหนึ่งของ
+  // URL เสมอ ไม่งั้น "/" จะถูกตีความเป็นตัวแบ่ง path เพิ่ม ทำให้จำนวน segment
+  // ไม่ตรงกับ [roundId] แล้ว 404 — query string ก็เข้ารหัสไว้ด้วยเผื่อ browser
+  // ตัวไหนตีความ "/" ในนั้นแปลกๆ แม้ปกติจะปลอดภัยกว่า path segment ก็ตาม
+  const encodedId = encodeURIComponent(round.id);
+  return round.status === "waitingTruck"
+    ? `/po/${item.poId}/receive/${item.id}/add?roundId=${encodedId}`
+    : `/po/${item.poId}/receive/${item.id}/${encodedId}`;
+}
+
 function RoundsTable({ rows }: { rows: { round: PoRound; item: PoLineItem }[] }) {
+  const router = useRouter();
+
   if (rows.length === 0) {
     return <EmptyDocs title="ยังไม่มีรอบรับเข้า" hint="กด “เพิ่มรอบ” ที่รายการสินค้าด้านบนเพื่อเริ่มบันทึก" />;
   }
@@ -582,10 +673,15 @@ function RoundsTable({ rows }: { rows: { round: PoRound; item: PoLineItem }[] })
     <>
       {/* ---------- จอแคบ: การ์ดเรียบๆ — เอาแค่ทะเบียนรถ/รับเข้า/สถานะพอ ที่เหลือ
           (บรรจุภัณฑ์/ไม่ผ่าน/ผลตรวจสอบ QC/เข้าคลัง) โผล่เฉพาะรอบที่มีค่าจริงแล้ว
-          เท่านั้น ไม่งั้นการ์ดรกด้วยข้อมูลที่ยังไม่เกิดขึ้น (เช่นรอบที่ยังไม่ตรวจ QC) ---------- */}
+          เท่านั้น ไม่งั้นการ์ดรกด้วยข้อมูลที่ยังไม่เกิดขึ้น (เช่นรอบที่ยังไม่ตรวจ QC)
+          กดทั้งการ์ดพาไปหน้าแก้ไข/รายละเอียดของรอบนั้น (ดู roundHref) ---------- */}
       <div className="space-y-3 @3xl:hidden">
         {rows.map(({ round: r, item }) => (
-          <div key={r.id} className="rounded-xl border border-border bg-card p-4">
+          <div
+            key={r.id}
+            onClick={() => router.push(roundHref(item, r))}
+            className="cursor-pointer rounded-xl border border-border bg-card p-4"
+          >
             <div className="flex flex-wrap items-baseline justify-between gap-2">
               <span className="font-semibold">{r.code}</span>
               <span className="text-sm text-muted-foreground">{r.arriveDate}</span>
@@ -642,7 +738,11 @@ function RoundsTable({ rows }: { rows: { round: PoRound; item: PoLineItem }[] })
             </TableHeader>
             <TableBody>
               {rows.map(({ round: r, item }) => (
-                <TableRow key={r.id} className={ROW_HOVER_NAV}>
+                <TableRow
+                  key={r.id}
+                  onClick={() => router.push(roundHref(item, r))}
+                  className={cn("cursor-pointer", ROW_HOVER_NAV)}
+                >
                   <TableCell className={COL_FIRST}>
                     <span className="block font-medium whitespace-nowrap">{r.code}</span>
                     <span className="block text-sm text-muted-foreground">{r.arriveDate}</span>
@@ -653,7 +753,7 @@ function RoundsTable({ rows }: { rows: { round: PoRound; item: PoLineItem }[] })
                       <span className="block text-sm text-muted-foreground">{item.productSub}</span>
                     )}
                   </TableCell>
-                  <TableCell className="whitespace-nowrap text-muted-foreground">{r.batchId}</TableCell>
+                  <TableCell className="whitespace-nowrap text-muted-foreground">{r.batchId ?? "-"}</TableCell>
                   <TableCell className="whitespace-nowrap">{r.plate}</TableCell>
                   <TableCell className="whitespace-nowrap">{r.arriveDate}</TableCell>
                   <TableCell className="whitespace-nowrap">{r.containerNo ?? "-"}</TableCell>
