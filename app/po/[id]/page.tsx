@@ -160,6 +160,11 @@ export default function PoOrderDetailPage() {
   // ปริยาย ไม่ต้องมีปุ่มซ้ำ) ไม่มี backend จริง เก็บแค่ state หน้านี้ รีเฟรช/
   // ออกจากหน้าแล้วกลับมาก็รีเซ็ตเป็น "เปิดรับสินค้าอยู่" เหมือนของเดิม
   const [closed, setClosed] = React.useState(false);
+  // ค่าที่กำลังรอยืนยัน — RadioGroup ไม่อัปเดต `closed` ทันทีที่กด แค่เปิด
+  // dialog ถามก่อน ค่า radio ที่โชว์ยังผูกกับ `closed` เดิมอยู่ ถ้ากดยกเลิกใน
+  // dialog ก็เท่ากับไม่เกิดอะไรขึ้น ตัวเลือกจะเด้งกลับไปที่เดิมเองโดยอัตโนมัติ
+  // (ไม่ต้องเขียนโค้ด revert เพิ่ม เพราะ value ของ RadioGroup มาจาก closed เสมอ)
+  const [pendingClosed, setPendingClosed] = React.useState<boolean | null>(null);
   const { entries: addedEntries, patches, deletedIds } = useAddedRounds();
 
   if (!po) {
@@ -208,11 +213,21 @@ export default function PoOrderDetailPage() {
     router.push("/po");
   }
 
-  function handleToggleClosed(next: boolean) {
-    setClosed(next);
+  // เลือกที่ RadioGroup แค่เปิด dialog ถามยืนยันก่อน ยังไม่เปลี่ยนสถานะจริง —
+  // เปลี่ยนจริงตอนกดยืนยันใน dialog เท่านั้น (handleConfirmToggleClosed)
+  function handleRadioChange(next: boolean) {
+    setPendingClosed(next);
+  }
+
+  function handleConfirmToggleClosed() {
+    if (pendingClosed === null) return;
+    setClosed(pendingClosed);
     toast.success(
-      next ? `ปิดใบสั่งซื้อ ${po!.code} แล้ว` : `เปิดรับสินค้าใบสั่งซื้อ ${po!.code} อีกครั้ง`
+      pendingClosed
+        ? `ปิดใบสั่งซื้อ ${po!.code} แล้ว`
+        : `เปิดรับสินค้าใบสั่งซื้อ ${po!.code} อีกครั้ง`
     );
+    setPendingClosed(null);
   }
 
   function handleDownloadReport() {
@@ -261,8 +276,8 @@ export default function PoOrderDetailPage() {
                 <span className="text-muted-foreground whitespace-nowrap">สถานะใบสั่งซื้อ:</span>
                 <RadioGroup
                   value={closed ? "closed" : "open"}
-                  onValueChange={(v) => handleToggleClosed(v === "closed")}
-                  className="flex flex-wrap items-center gap-4"
+                  onValueChange={(v) => handleRadioChange(v === "closed")}
+                  className="flex flex-wrap items-center gap-3"
                 >
                   <RadioOption id="po-status-open" value="open">
                     เปิดรับสินค้าอยู่
@@ -445,6 +460,36 @@ export default function PoOrderDetailPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* ยืนยันก่อนสลับสถานะเปิด/ปิดใบสั่งซื้อ — กดตัวเลือกแค่เปิด dialog นี้
+          ยังไม่เปลี่ยนสถานะจริง (ดู handleRadioChange) ปิด dialog โดยไม่กด
+          ยืนยันแล้วตัวเลือกจะเด้งกลับที่เดิมเอง เพราะ value ของ RadioGroup
+          อ้างอิงจาก `closed` ตรงๆ ไม่ใช่ `pendingClosed` */}
+      <AlertDialog
+        open={pendingClosed !== null}
+        onOpenChange={(next) => !next && setPendingClosed(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {pendingClosed
+                ? "ปิดใบสั่งซื้อนี้ใช่ไหม?"
+                : "เปิดรับสินค้าใบสั่งซื้อนี้อีกครั้งใช่ไหม?"}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {pendingClosed
+                ? "ใบนี้ยังรับสินค้าไม่ครบ ปิดแล้วจะไม่มีรอบรับเข้าเพิ่มอีก"
+                : "จะกลับไปเป็นสถานะทยอยรับสินค้า รับรอบเพิ่มได้ตามปกติ"}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>ยกเลิก</AlertDialogCancel>
+            <AlertDialogAction onClick={handleConfirmToggleClosed}>
+              {pendingClosed ? "ยืนยันปิดใบ" : "ยืนยันเปิดรับสินค้า"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
@@ -492,6 +537,10 @@ function MetaField({ label, value }: { label: string; value: string }) {
 /** ตัวเลือกวิทยุแบบข้อความล้วน ไม่มีกรอบกล่องเหมือน RadioBox ของหน้าสร้าง
     ใบสั่งซื้อ (app/po/create/page.tsx) — ใช้ Label + htmlFor จับคู่ id ของ
     RadioGroupItem แบบเดียวกัน กดที่ข้อความก็เลือกได้เหมือนกดปุ่มวิทยุตรงๆ */
+/** ตัวเลือกแบบกล่อง (ไม่ใช่แค่จุดวิทยุ+ตัวหนังสือเปล่าๆ) — พื้นที่กดกว้างขึ้น
+    ทั้งกล่อง ไม่ต้องเล็งจุดวิทยุพอดี ไฮไลต์กรอบ/พื้นตอนถูกเลือกด้วย data-state
+    ของ RadioGroupItem เอง แบบเดียวกับ RadioBox ของหน้าสร้างใบสั่งซื้อ
+    (app/po/create/page.tsx) */
 function RadioOption({
   id,
   value,
@@ -502,7 +551,13 @@ function RadioOption({
   children: React.ReactNode;
 }) {
   return (
-    <Label htmlFor={id} className="flex cursor-pointer items-center gap-2 font-normal">
+    <Label
+      htmlFor={id}
+      className={cn(
+        "flex cursor-pointer items-center gap-2.5 rounded-lg border border-border bg-card px-4 py-2.5 text-sm font-medium",
+        "has-[[data-state=checked]]:border-primary has-[[data-state=checked]]:bg-brand"
+      )}
+    >
       <RadioGroupItem id={id} value={value} />
       {children}
     </Label>
