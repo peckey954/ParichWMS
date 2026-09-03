@@ -3,7 +3,13 @@
 import * as React from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { ChevronDownIcon, EllipsisVerticalIcon, PencilIcon, Trash2Icon } from "lucide-react";
+import {
+  ChevronDownIcon,
+  DownloadIcon,
+  EllipsisVerticalIcon,
+  PencilIcon,
+  Trash2Icon,
+} from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -35,6 +41,8 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@peckey954/ui/components/ui/dropdown-menu";
+import { Label } from "@peckey954/ui/components/ui/label";
+import { RadioGroup, RadioGroupItem } from "@peckey954/ui/components/ui/radio-group";
 import {
   Select,
   SelectContent,
@@ -147,6 +155,11 @@ export default function PoOrderDetailPage() {
   const [subTab, setSubTab] = React.useState<SubTab>("rounds");
   const [productFilter, setProductFilter] = React.useState<string>("all");
   const [cancelOpen, setCancelOpen] = React.useState(false);
+  // ปิดใบสั่งซื้อเองก่อนรับสินค้าครบ — ใช้ได้เฉพาะตอน "ทยอยรับสินค้า" เท่านั้น
+  // (ยังไม่เริ่มรับก็ไม่มีอะไรให้ปิดก่อนกำหนด รับครบแล้วก็ปิดไปเองอยู่แล้วโดย
+  // ปริยาย ไม่ต้องมีปุ่มซ้ำ) ไม่มี backend จริง เก็บแค่ state หน้านี้ รีเฟรช/
+  // ออกจากหน้าแล้วกลับมาก็รีเซ็ตเป็น "เปิดรับสินค้าอยู่" เหมือนของเดิม
+  const [closed, setClosed] = React.useState(false);
   const { entries: addedEntries, patches, deletedIds } = useAddedRounds();
 
   if (!po) {
@@ -195,12 +208,32 @@ export default function PoOrderDetailPage() {
     router.push("/po");
   }
 
+  function handleToggleClosed(next: boolean) {
+    setClosed(next);
+    toast.success(
+      next ? `ปิดใบสั่งซื้อ ${po!.code} แล้ว` : `เปิดรับสินค้าใบสั่งซื้อ ${po!.code} อีกครั้ง`
+    );
+  }
+
+  function handleDownloadReport() {
+    // ไม่มี backend จริง — ไม่มีไฟล์ให้ดาวน์โหลดจริง แค่ขึ้น toast ยืนยัน
+    // เหมือนปุ่มอื่นๆ ทั้งแอปนี้
+    toast.success(`ดาวน์โหลดรายงานใบสั่งซื้อ ${po!.code} แล้ว`, {
+      description: "รวมเอกสารทุกรอบการรับสินค้าของใบนี้ไว้ในไฟล์เดียว",
+    });
+  }
+
+  const progress = poProgress(po);
+  // ปิดใบก่อนกำหนดได้เฉพาะตอน "ทยอยรับสินค้า" — ยังไม่เริ่มรับก็ไม่มีอะไรให้
+  // ปิดก่อนกำหนด รับครบแล้วก็ถือว่าจบไปเองอยู่แล้วโดยปริยาย
+  const canCloseEarly = !cancelled && progress === "partial";
+
   return (
     <div className="flex min-h-[calc(100vh-3.5rem)] flex-col">
       <main className="mx-auto w-full max-w-6xl flex-1 px-4 pt-6 pb-6 sm:px-6">
         <Crumbs code={po.code} />
 
-        <div className="mt-4 flex items-start justify-between gap-3">
+        <div className="mt-4 flex flex-wrap items-start justify-between gap-4">
           <div>
             <h1 className="text-2xl font-semibold tracking-tight">ใบสั่งซื้อ {po.code}</h1>
             <p className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted-foreground">
@@ -210,10 +243,42 @@ export default function PoOrderDetailPage() {
                 appearance="soft"
                 className="font-semibold"
               >
-                {cancelled ? PO_STATUS_LABEL.cancelled : PO_PROGRESS_LABEL[poProgress(po)]}
+                {cancelled
+                  ? PO_STATUS_LABEL.cancelled
+                  : closed
+                    ? "ปิดใบสั่งซื้อแล้ว"
+                    : PO_PROGRESS_LABEL[progress]}
               </Badge>
             </p>
           </div>
+
+          {/* ปิดใบก่อนกำหนด + ดาวน์โหลดรายงาน — โผล่เฉพาะตอน "ทยอยรับสินค้า"
+              (ดู canCloseEarly) จัดกลุ่มไว้ด้วยกัน แยกจากเมนู "..." ที่เป็นคนละ
+              เรื่อง (แก้ไขข้อมูล/ยกเลิกทั้งใบ) */}
+          <div className="flex flex-wrap items-center gap-4">
+            {canCloseEarly && (
+              <div className="flex flex-wrap items-center gap-3 text-sm">
+                <span className="text-muted-foreground whitespace-nowrap">สถานะใบสั่งซื้อ:</span>
+                <RadioGroup
+                  value={closed ? "closed" : "open"}
+                  onValueChange={(v) => handleToggleClosed(v === "closed")}
+                  className="flex flex-wrap items-center gap-4"
+                >
+                  <RadioOption id="po-status-open" value="open">
+                    เปิดรับสินค้าอยู่
+                  </RadioOption>
+                  <RadioOption id="po-status-closed" value="closed">
+                    ปิดใบสั่งซื้อแล้ว
+                  </RadioOption>
+                </RadioGroup>
+              </div>
+            )}
+            {canCloseEarly && (
+              <Button size="sm" className="shrink-0" onClick={handleDownloadReport}>
+                <DownloadIcon />
+                ดาวน์โหลดรายงาน
+              </Button>
+            )}
 
           {!cancelled && (
             <DropdownMenu>
@@ -239,6 +304,7 @@ export default function PoOrderDetailPage() {
               </DropdownMenuContent>
             </DropdownMenu>
           )}
+          </div>
         </div>
 
         {cancelled && (
@@ -420,6 +486,26 @@ function MetaField({ label, value }: { label: string; value: string }) {
       <p className="text-muted-foreground">{label}</p>
       <p className="mt-0.5 font-medium">{value}</p>
     </div>
+  );
+}
+
+/** ตัวเลือกวิทยุแบบข้อความล้วน ไม่มีกรอบกล่องเหมือน RadioBox ของหน้าสร้าง
+    ใบสั่งซื้อ (app/po/create/page.tsx) — ใช้ Label + htmlFor จับคู่ id ของ
+    RadioGroupItem แบบเดียวกัน กดที่ข้อความก็เลือกได้เหมือนกดปุ่มวิทยุตรงๆ */
+function RadioOption({
+  id,
+  value,
+  children,
+}: {
+  id: string;
+  value: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <Label htmlFor={id} className="flex cursor-pointer items-center gap-2 font-normal">
+      <RadioGroupItem id={id} value={value} />
+      {children}
+    </Label>
   );
 }
 
