@@ -169,10 +169,17 @@ function DocCard({
     // จตุรัส 96px — เท่ากับกรอบรูปในหน้าเพิ่มการรับเข้า
     // ของเดิม 120x152 ซึ่งสูงกว่าที่จำเป็นและไม่ตรงกับที่อื่นในระบบ
     <div className="relative size-24 shrink-0">
+      {/* hover ต้องอยู่ที่กล่องนอกนี้ (มีเส้นขอบ) ไม่ใช่แค่ปุ่มข้างในเฉยๆ —
+          เดิม hover:bg-brand-hover อยู่ที่ปุ่ม ทำให้พื้นในเปลี่ยนสีแต่เส้นขอบ
+          ของกล่องนอกยังเป็นสีเทาเดิม ดูเหมือนขอบขาวค้างอยู่รอบๆ พื้นสีส้ม */}
       <div
         className={cn(
-          "flex size-full flex-col items-center justify-center gap-1 overflow-hidden rounded-lg border px-1.5 text-center",
-          bad ? "border-destructive bg-chip-red" : "border-border bg-card"
+          "flex size-full flex-col items-center justify-center gap-1 overflow-hidden rounded-lg border px-1.5 text-center transition-colors",
+          bad
+            ? "border-destructive bg-chip-red"
+            : openable
+              ? "border-border bg-card hover:border-primary hover:bg-brand-hover"
+              : "border-border bg-card"
         )}
       >
         {bad ? (
@@ -196,7 +203,7 @@ function DocCard({
             type="button"
             onClick={onOpen}
             aria-label={`ดูเอกสาร ${f.name}`}
-            className="flex size-full flex-col items-center justify-center gap-1 rounded-md px-1.5 transition-colors hover:bg-brand-hover focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none"
+            className="flex size-full flex-col items-center justify-center gap-1 rounded-md px-1.5 focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none"
           >
             <FileTextIcon className="size-6 text-primary" strokeWidth={1.5} />
             <span className="line-clamp-2 text-[11px] leading-tight font-medium">

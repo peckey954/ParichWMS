@@ -249,6 +249,15 @@
   font-size: 14px !important;
   padding: 20px !important;
 }
+
+/* toast กว้างขึ้นจาก 356px เริ่มต้นของ sonner — มีปุ่ม action ต่อท้ายข้อความ
+   เสมอ แคบไปตัวหนังสือกับปุ่มก็เบียดกันจนคำอธิบายตัดคำแปลกๆ sonner ตั้งค่านี้
+   เป็น inline style "--width" บน [data-sonner-toaster] เอง (component เซ็ต
+   ให้ตรงๆ ไม่ใช่ตัวแปรที่ยกมาแทนได้จาก <Toaster style={...}>) ต้องชน
+   !important ถึงจะทับได้ */
+[data-sonner-toaster] {
+  --width: 420px !important;
+}
 [data-sonner-toast][data-styled="true"] [data-title] {
   font-weight: 600 !important;
 }
