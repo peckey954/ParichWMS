@@ -47,6 +47,10 @@ import { PR_CATEGORY_LABEL, PR_REASON_LABEL } from "@/lib/pr";
 // เขียนคลาสเต็มทุกตัว ห้ามประกอบชื่อด้วย template string
 const URGENT_CHIP =
   "[--bdg-surface:var(--chip-orange)] [--bdg-text:var(--chip-orange-foreground)]";
+const WEIGH_DIFF_CHIP = {
+  loss: "[--bdg-surface:var(--chip-red)] [--bdg-text:var(--chip-red-foreground)]",
+  gain: "[--bdg-surface:var(--chip-green)] [--bdg-text:var(--chip-green-foreground)]",
+};
 
 function UrgentChip() {
   return (
@@ -74,6 +78,16 @@ export function PoLineItemDetailDialog({
   const pending = lineItemPendingQty(item);
   const failed = lineItemFailedQty(item);
   const stocked = lineItemStockedQty(item);
+  // ส่วนต่างน้ำหนักชั่ง vs ตามผู้ขาย — มีค่าเฉพาะรายการที่เริ่มรับเข้าไปแล้ว
+  // (ดู lineItemStarted ใน lib/po.ts ตอนสร้างข้อมูลตัวอย่าง)
+  const weighDiff =
+    item.weighedKg != null && item.sellerWeightKg != null
+      ? item.weighedKg - item.sellerWeightKg
+      : undefined;
+  const weighDiffPercent =
+    weighDiff != null && item.sellerWeightKg
+      ? (weighDiff / item.sellerWeightKg) * 100
+      : undefined;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -120,6 +134,46 @@ export function PoLineItemDetailDialog({
             ทับขอบขวาของเนื้อหา เหมือนกับ CostRowModal) ---------- */}
         <div className="-mx-6 overflow-y-auto px-6">
           <div className="grid grid-cols-2 gap-4 pb-1 text-sm">
+            {/* น้ำหนักชั่ง/ตามผู้ขาย/ส่วนต่าง — เหมือนคอลัมน์เดียวกันในตาราง
+                "รายการสินค้า" ของหน้าใบสั่งซื้อ (app/po/[id]/page.tsx) มีค่า
+                เฉพาะรายการที่เริ่มรับเข้าไปแล้ว ยังไม่เริ่มโชว์ "-" ทั้งคู่ */}
+            <Field
+              label="น้ำหนักชั่ง"
+              value={item.weighedKg != null ? `${formatPoQty(item.weighedKg)} กก.` : "-"}
+            />
+            <Field
+              label="น้ำหนักตามผู้ขาย"
+              value={item.sellerWeightKg != null ? `${formatPoQty(item.sellerWeightKg)} กก.` : "-"}
+            />
+            <div className="col-span-2">
+              <p className="text-muted-foreground">ส่วนต่าง</p>
+              {weighDiff != null ? (
+                <p className="mt-0.5 flex flex-wrap items-center gap-2">
+                  <span
+                    className={cn(
+                      "font-medium tabular-nums",
+                      weighDiff < 0 && "text-danger-strong"
+                    )}
+                  >
+                    {weighDiff > 0 ? "+" : ""}
+                    {formatPoQty(weighDiff)} กก.
+                  </span>
+                  {weighDiffPercent != null && weighDiffPercent !== 0 && (
+                    <Badge
+                      appearance="soft"
+                      className={cn(
+                        "[--bdg-border:transparent] font-semibold",
+                        WEIGH_DIFF_CHIP[weighDiff < 0 ? "loss" : "gain"]
+                      )}
+                    >
+                      {weighDiff < 0 ? "สูญหาย" : "ได้เพิ่ม"} {Math.abs(weighDiffPercent).toFixed(2)}%
+                    </Badge>
+                  )}
+                </p>
+              ) : (
+                <p className="mt-0.5 font-medium">-</p>
+              )}
+            </div>
             <Field label="ราคาสั่งต่อหน่วย" value={`${formatPoBaht(item.pricePerUnit)} บาท`} />
             <Field label="ค่าจัดการต่อหน่วย" value={`${formatPoBaht(item.handlingPerUnit)} บาท`} />
             <Field label="ราคารวมต่อหน่วย" value={`${formatPoBaht(lineItemUnitPrice(item))} บาท`} />
