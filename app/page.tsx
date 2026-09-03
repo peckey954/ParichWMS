@@ -28,20 +28,21 @@ export default function AllModulesPage() {
 
   return (
     <main className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6">
-      <div className="max-w-2xl">
-        {/* พื้นช่องค้นหาเป็นสีการ์ด (ขาว) ให้ต่างจากพื้นเทาของพื้นที่เนื้อหา
-            ค่าเริ่มต้นของ InputGroup เป็นพื้นโปร่ง สีเทาจะทะลุขึ้นมา */}
-        <InputGroup className="bg-card">
-          <InputGroupAddon align="inline-start">
-            <SearchIcon />
-          </InputGroupAddon>
-          <InputGroupInput
-            placeholder="ค้นหาระบบ..."
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-          />
-        </InputGroup>
-      </div>
+      {/* เต็มความกว้างของพื้นที่เนื้อหา (max-w-7xl ของ main) — เดิมมี max-w-2xl
+          ครอบไว้อีกชั้น ทำให้ช่องค้นหาแคบกว่าเนื้อหาข้างล่างมาก ดูเหมือนเติม
+          พื้นที่ไม่เต็ม/ลอยอยู่ตรงกลางแปลกๆ บนจอกว้าง
+          พื้นช่องค้นหาเป็นสีการ์ด (ขาว) ให้ต่างจากพื้นเทาของพื้นที่เนื้อหา
+          ค่าเริ่มต้นของ InputGroup เป็นพื้นโปร่ง สีเทาจะทะลุขึ้นมา */}
+      <InputGroup className="bg-card">
+        <InputGroupAddon align="inline-start">
+          <SearchIcon />
+        </InputGroupAddon>
+        <InputGroupInput
+          placeholder="ค้นหาระบบ..."
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+        />
+      </InputGroup>
 
       <div className="mt-6 space-y-8">
         {groups.map((g) => (
