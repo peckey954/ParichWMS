@@ -23,6 +23,17 @@ import { cn } from "@peckey954/ui/lib/utils";
 export const MAX_DOC_MB = 50;
 export const MAX_DOC_COUNT = 5;
 
+/**
+ * ความสูงร่วมของช่องลากไฟล์กับการ์ดไฟล์ — ทั้งสองอย่างอยู่แถวเดียวกัน สูงไม่
+ * เท่ากันเมื่อไหร่แถวจะดูขรุขระทันที จึงผูกไว้ที่ค่าเดียวกันตรงนี้ ไม่ใช่ต่างคน
+ * ต่างตั้งแล้วหวังว่าจะบังเอิญเท่ากัน (ของเดิมช่องลากไฟล์สูงตามเนื้อหา ~144px
+ * ส่วนการ์ดล็อกไว้ 96px เลยเตี้ยกว่ากันเห็นชัด)
+ *
+ * 9rem = 144px คือความสูงที่ช่องลากไฟล์ต้องใช้จริงเมื่อเรียงไอคอน/ข้อความ/ปุ่ม
+ * ในแนวตั้ง — การ์ดไฟล์ยืดตามมาให้เท่ากัน แถมได้ที่ให้ชื่อไฟล์หายใจมากขึ้นด้วย
+ */
+const BOX_H = "h-36";
+
 export type DocFile = {
   id: string;
   name: string;
@@ -71,7 +82,9 @@ export function FileUpload({
         </p>
       </div>
 
-      <div className="flex flex-wrap items-stretch gap-3">
+      {/* items-start ไม่ใช่ items-stretch — ช่องลากไฟล์สูงตามเนื้อหา (สูงกว่า
+          การ์ดไฟล์ 96px) การ์ดจึงต้องเกาะขอบบนของแถว ไม่ใช่ยืดตามหรือลอยกลาง */}
+      <div className="flex flex-wrap items-start gap-3">
         <div
           onDragOver={(e) => {
             e.preventDefault();
@@ -85,10 +98,11 @@ export function FileUpload({
           }}
           className={cn(
             // เส้นประบอกว่ากล่องนี้ยังว่าง รอของมาใส่ — ชุดเดียวกับช่องแนบรูป
-            // เรียงแนวนอน ไอคอนซ้าย ข้อความกับปุ่มขวา
-            // เพราะต้องเตี้ยเท่าการ์ดไฟล์ (96px) ซึ่งวางแนวตั้งแล้วไม่พอที่
-            // และความกว้าง 26rem ที่มีอยู่ก็เหลือใช้อยู่แล้ว
-            "flex size-24 h-24 w-full items-center gap-3 rounded-lg px-4",
+            // เรียงแนวตั้งกึ่งกลางทั้งไอคอน/ข้อความ/ปุ่ม เหมือนกันทั้งมือถือและเว็บ
+            // (เดิมเรียงแนวนอน ไอคอนซ้าย ข้อความกับปุ่มชิดซ้าย) ความสูงใช้ค่า
+            // ร่วมกับการ์ดไฟล์ (BOX_H) จะได้สูงเท่ากันทั้งแถว
+            "flex w-full flex-col items-center justify-center gap-2 rounded-lg px-4 text-center",
+            BOX_H,
             "border border-dashed @2xl:w-[26rem]",
             // ชี้หรือลากไฟล์มาวางแล้วส้มเข้มขึ้น ไม่ใช่หม่นลงเป็นเทา
             // ตอนลากคนมองอยู่ที่ปลายเมาส์ สีต้องเข้มขึ้นชัดว่าปล่อยตรงนี้ได้
@@ -105,22 +119,19 @@ export function FileUpload({
             )}
             strokeWidth={1.5}
           />
-          <div className="min-w-0 flex-1 text-left">
-            <p className="text-sm">
-              {full ? `แนบครบ ${MAX_DOC_COUNT} ไฟล์แล้ว` : dropLabel}
-            </p>
-            {!full && (
-              <Button
-                type="button"
-                variant="outline-primary"
-                size="sm"
-                className="mt-1.5"
-                onClick={() => inputRef.current?.click()}
-              >
-                อัปโหลดไฟล์
-              </Button>
-            )}
-          </div>
+          <p className="text-sm">
+            {full ? `แนบครบ ${MAX_DOC_COUNT} ไฟล์แล้ว` : dropLabel}
+          </p>
+          {!full && (
+            <Button
+              type="button"
+              variant="outline-primary"
+              size="sm"
+              onClick={() => inputRef.current?.click()}
+            >
+              อัปโหลดไฟล์
+            </Button>
+          )}
         </div>
 
         <input
@@ -166,15 +177,18 @@ function DocCard({
   const openable = f.status === "done" && onOpen;
 
   return (
-    // จตุรัส 96px — เท่ากับกรอบรูปในหน้าเพิ่มการรับเข้า
-    // ของเดิม 120x152 ซึ่งสูงกว่าที่จำเป็นและไม่ตรงกับที่อื่นในระบบ
-    <div className="relative size-24 shrink-0">
+    // จตุรัส 144px — สูงเท่าช่องลากไฟล์ที่อยู่แถวเดียวกันเป๊ะ (BOX_H) และกว้าง
+    // เท่าความสูงให้เป็นจตุรัสเหมือนเดิม ไม่ใช่การ์ดสูงเรียวผอม
+    <div className={cn("relative w-36 shrink-0", BOX_H)}>
       {/* hover ต้องอยู่ที่กล่องนอกนี้ (มีเส้นขอบ) ไม่ใช่แค่ปุ่มข้างในเฉยๆ —
           เดิม hover:bg-brand-hover อยู่ที่ปุ่ม ทำให้พื้นในเปลี่ยนสีแต่เส้นขอบ
           ของกล่องนอกยังเป็นสีเทาเดิม ดูเหมือนขอบขาวค้างอยู่รอบๆ พื้นสีส้ม */}
       <div
         className={cn(
-          "flex size-full flex-col items-center justify-center gap-1 overflow-hidden rounded-lg border px-1.5 text-center transition-colors",
+          // px-4 (16px) กันชื่อไฟล์/ขนาดไฟล์ชิดขอบการ์ดเกินไป — ระยะเดียวกันทุก
+          // สถานะ (ปกติ/เปิดดูได้/พัง) จึงใส่ไว้ที่กล่องนอกนี้กล่องเดียว ปุ่ม
+          // "เปิดดูได้" ข้างในไม่ต้องมี padding ซ้อนของตัวเองอีกชั้น
+          "flex size-full flex-col items-center justify-center gap-1 overflow-hidden rounded-lg border px-4 text-center transition-colors",
           bad
             ? "border-destructive bg-chip-red"
             : openable
@@ -203,7 +217,7 @@ function DocCard({
             type="button"
             onClick={onOpen}
             aria-label={`ดูเอกสาร ${f.name}`}
-            className="flex size-full flex-col items-center justify-center gap-1 rounded-md px-1.5 focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none"
+            className="flex size-full flex-col items-center justify-center gap-1 rounded-md focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none"
           >
             <FileTextIcon className="size-6 text-primary" strokeWidth={1.5} />
             <span className="line-clamp-2 text-[11px] leading-tight font-medium">
@@ -284,25 +298,37 @@ export function useDocUpload(seed: DocFile[] = []) {
   }, []);
 
   const add = (incoming: FileList) => {
-    setFiles((prev) => {
-      // ตัดที่เกินโควตาทิ้งตั้งแต่ตรงนี้ ไม่ปล่อยให้เกินแล้วค่อยบ่นทีหลัง
-      const room = MAX_DOC_COUNT - prev.length;
-      const picked = Array.from(incoming).slice(0, Math.max(0, room));
-      const next: DocFile[] = picked.map((file) => {
-        seq.current += 1;
-        const id = `doc-${seq.current}`;
-        const tooLarge = file.size > MAX_DOC_MB * 1024 * 1024;
-        if (!tooLarge) start(id);
-        return {
-          id,
-          name: file.name,
-          size: file.size,
-          status: tooLarge ? "tooLarge" : "uploading",
-          progress: 0,
-        };
-      });
-      return [...prev, ...next];
+    // อ่าน FileList ออกมาเป็น array ตรงนี้ทันที ห้ามไปอ่านข้างใน updater ของ
+    // setFiles — ช่อง <input type="file"> ถูกล้างค่า (e.target.value = "")
+    // ทันทีหลัง onAdd() คืนค่า เพื่อให้เลือกไฟล์เดิมซ้ำแล้วยังเกิด change อยู่
+    // ซึ่งล้าง FileList ก้อนเดียวกันนี้ทิ้งไปด้วย updater ทำงานทีหลัง กว่าจะ
+    // ไปอ่านก็ไม่เหลือไฟล์แล้ว = กดปุ่มอัปโหลดแล้วไฟล์ไม่ขึ้น (ลากไฟล์มาวาง
+    // ไม่เจอปัญหานี้ เพราะ dataTransfer.files ไม่ได้ถูกล้าง จึงดูเหมือนบางที
+    // ก็ขึ้นบางทีก็ไม่ขึ้น)
+    // ตัดที่เกินโควตาทิ้งตั้งแต่ตรงนี้ ไม่ปล่อยให้เกินแล้วค่อยบ่นทีหลัง
+    const room = Math.max(0, MAX_DOC_COUNT - files.length);
+    const picked = Array.from(incoming).slice(0, room);
+    if (picked.length === 0) return;
+
+    const next: DocFile[] = picked.map((file) => {
+      seq.current += 1;
+      const tooLarge = file.size > MAX_DOC_MB * 1024 * 1024;
+      return {
+        id: `doc-${seq.current}`,
+        name: file.name,
+        size: file.size,
+        status: tooLarge ? "tooLarge" : "uploading",
+        progress: 0,
+      };
     });
+
+    setFiles((prev) => [...prev, ...next]);
+    // ไต่ความคืบหน้าหลังสั่ง setFiles แล้ว ไม่ใช่ระหว่างอยู่ใน updater —
+    // updater ต้องบริสุทธิ์ StrictMode เรียกซ้ำสองรอบ ถ้าตั้ง interval ข้างใน
+    // จะได้ interval ซ้อนกันสองชุดต่อไฟล์ (และเลข seq เดินสองที)
+    for (const f of next) {
+      if (f.status === "uploading") start(f.id);
+    }
   };
 
   const remove = (id: string) =>

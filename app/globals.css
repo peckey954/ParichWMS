@@ -219,15 +219,26 @@
 }
 
 /* ============================================================
-   toast สำเร็จ (success) — ตัวหนังสือคำอธิบายให้เป็นสีส้มแบรนด์ด้วย ไม่ใช่แค่
-   หัวข้อ
+   toast สำเร็จ (success) — ตัวหนังสือทั้งก้อน (หัวข้อ+ไอคอน+คำอธิบาย) เป็น
+   สีส้มแบรนด์หมด ไม่ใช่แค่คำอธิบาย เดิมเข้าใจผิดว่าไอคอนไล่สีตาม
+   --success-text ให้เองอัตโนมัติ ซึ่งจริง ๆ ใช้ได้เฉพาะตอนเปิด richColors
+   เท่านั้น (ดู sonner ปกติ [data-rich-colors=true][data-type=success]) แอปนี้
+   ไม่ได้เปิด richColors ไอคอนกับหัวข้อเลยเป็นสีเทาดำเข้ม (--normal-text)
+   ตามค่าเริ่มต้นเหมือนกันหมด ไม่ต่างจาก toast ปกติเลย
 
-   sonner (@peckey954/ui/components/ui/sonner.tsx) ตั้ง class คำอธิบายไว้ตายตัว
-   เป็น "text-popover-foreground/90!" (มี !important ติดมาจาก Tailwind) จึงต้อง
-   ชนด้วย !important + selector เจาะจงกว่าถึงจะทับสีได้ — ไอคอนไม่ต้องกำหนดสีเพิ่ม
-   เพราะ svg ของ lucide ใช้ currentColor อยู่แล้ว ไล่สีตาม --success-text ที่ตั้ง
-   ไว้ที่ <Toaster> ให้เองโดยอัตโนมัติ
+   ตั้งสีตรงทุก element ที่ต้องการ (หัวข้อ/ไอคอน/คำอธิบาย) แยกกันเลย ไม่พึ่ง
+   การไล่สีขึ้นจาก [data-sonner-toast] ผ่าน color:inherit ของ sonner เพียง
+   อย่างเดียว — เผื่อ CSS cascade layer ของ sonner (สไตล์ที่ยัดผ่าน JS ตอน
+   mount ด้วย insertCSS ไม่ใช่ layer ของ Tailwind) ตีความลำดับชั้นต่างไปจากที่
+   คาดตอนใช้แค่ inherit กฎอ้อมแบบนั้นแก้ปัญหาไม่ได้จริงมาแล้วรอบหนึ่ง คำอธิบาย
+   ต้องมีกฎของตัวเองอยู่แล้วเพราะ sonner ตั้ง class ไว้ตายตัวเป็น
+   "text-popover-foreground/90!" (มี !important ติดมาจาก Tailwind) ทับด้วย
+   inherit ไม่ได้เช่นกัน
    ============================================================ */
+[data-sonner-toast][data-type="success"],
+[data-sonner-toast][data-type="success"] [data-title],
+[data-sonner-toast][data-type="success"] [data-icon],
+[data-sonner-toast][data-type="success"] [data-icon] svg,
 [data-sonner-toast][data-type="success"] [data-description] {
   color: var(--primary) !important;
 }

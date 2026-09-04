@@ -57,7 +57,14 @@ export type WeighingDocStatus = "pending" | "weighed";
 
 export type WeighingDoc = {
   id: string;
+  /** เลขที่ใบชั่งของรายการนี้โดยเฉพาะ — ต่อท้ายด้วยตัวอักษร A/B/C... ตามลำดับ
+   *  สินค้าภายใต้ใบสั่งซื้อเดียวกันเสมอ (แม้จะมีสินค้าเดียวในใบก็ยังได้ "A"
+   *  ต่อท้าย) แบบเดียวกับ lineItemCode ของหน้าใบสั่งซื้อ/ใบอนุมัติทั้งแอปนี้ */
   code: string;
+  /** เลขที่ใบสั่งซื้อต้นทาง — ไม่มีตัวอักษรต่อท้าย ใช้จัดกลุ่มหาสินค้าอื่นใน
+   *  ใบสั่งซื้อเดียวกัน (ดู siblingWeighingDocs) หนึ่ง PO มีได้หลายสินค้า
+   *  แต่ละสินค้าคือ WeighingDoc คนละใบ ไม่ใช่รวมกันเป็นใบเดียว */
+  poCode: string;
   createdAt: string;
   productName: string;
   /** บรรทัดรองใต้ชื่อสินค้าในตารางรายการ เช่น ลักษณะ/แหล่งผลิต */
@@ -125,7 +132,8 @@ function docStamp(seq: number, rnd: () => number) {
 const SEED_WEIGHING: WeighingDoc[] = [
   {
     id: "wg-1",
-    code: "PO260115/01",
+    poCode: "PO260115/01",
+    code: "PO260115/01A",
     createdAt: "1/16/2026 | 10:42:52",
     productName: "21-0-0",
     productSub: "ฟูเจียนผง",
@@ -137,9 +145,28 @@ const SEED_WEIGHING: WeighingDoc[] = [
     orderTon: 800,
     status: "pending",
   },
+  // สินค้าตัวที่สองของใบสั่งซื้อเดียวกับ wg-1 (poCode เดียวกัน) — ต่อท้าย
+  // ด้วย "B" โผล่ในดรอปดาวน์ "สินค้า" ของหน้าเพิ่มการชั่งน้ำหนักของ wg-1 ด้วย
+  // (ดู siblingWeighingDocs) สาธิตกรณี "1 PO มีหลายสินค้า"
+  {
+    id: "wg-1b",
+    poCode: "PO260115/01",
+    code: "PO260115/01B",
+    createdAt: "1/16/2026 | 10:42:52",
+    productName: "16-20-0",
+    productSub: "เม็ดปั้น",
+    category: "วัตถุดิบปุ๋ยกระสอบ",
+    packing: "50 Kg",
+    supplier: "เอชซี อินเตอร์เนชั่นแนล เทรดดิ้ง จำกัด",
+    arriveDate: "18/06/2026",
+    truck: "กข - 1234, กข - 5678",
+    orderTon: 300,
+    status: "pending",
+  },
   {
     id: "wg-2",
-    code: "PO260115/02",
+    poCode: "PO260115/02",
+    code: "PO260115/02A",
     createdAt: "1/16/2026 | 11:15:07",
     productName: "46-0-0",
     productSub: "ยูเรีย เม็ด",
@@ -153,7 +180,8 @@ const SEED_WEIGHING: WeighingDoc[] = [
   },
   {
     id: "wg-3",
-    code: "PO260116/03",
+    poCode: "PO260116/03",
+    code: "PO260116/03A",
     createdAt: "1/16/2026 | 13:02:44",
     productName: "16-20-0",
     productSub: "เม็ดปั้น",
@@ -167,7 +195,8 @@ const SEED_WEIGHING: WeighingDoc[] = [
   },
   {
     id: "wg-4",
-    code: "PO260113/07",
+    poCode: "PO260113/07",
+    code: "PO260113/07A",
     createdAt: "1/13/2026 | 09:20:31",
     productName: "10-0-4+OM 50%",
     productSub: "ฟูเจียนผง",
@@ -181,7 +210,8 @@ const SEED_WEIGHING: WeighingDoc[] = [
   },
   {
     id: "wg-5",
-    code: "PO260112/02",
+    poCode: "PO260112/02",
+    code: "PO260112/02A",
     createdAt: "1/12/2026 | 14:47:52",
     productName: "แม่ปุ๋ยโพแทส",
     productSub: "เกล็ดแดง",
@@ -209,9 +239,15 @@ function moreWeighing(count = 20): WeighingDoc[] {
       () => `${pad(10 + Math.floor(rnd() * 89))} - ${1000 + Math.floor(rnd() * 8999)}`
     ).join(", ");
 
+    // สินค้าเดียวต่อ PO ในกลุ่มที่สร้างอัตโนมัตินี้ (กรณี "หลายสินค้าใน PO
+    // เดียว" สาธิตไว้แล้วที่ wg-1/wg-1b ใน SEED_WEIGHING) แต่ยังต่อท้าย "A"
+    // เสมอตามธรรมเนียมเลขที่รายการของทั้งแอปนี้
+    const poCode = `PO2601${pad(day)}/${pad((i % 9) + 1)}`;
+
     return {
       id: `wg-g${i + 1}`,
-      code: `PO2601${pad(day)}/${pad((i % 9) + 1)}`,
+      poCode,
+      code: `${poCode}A`,
       createdAt: docStamp(i, rnd),
       productName: item.name,
       productSub: item.sub,
@@ -227,6 +263,16 @@ function moreWeighing(count = 20): WeighingDoc[] {
 }
 
 export const WEIGHING_DOCS: WeighingDoc[] = [...SEED_WEIGHING, ...moreWeighing()];
+
+/** สินค้าอื่นในใบสั่งซื้อเดียวกัน (poCode ตรงกัน) เรียงตามเลขที่ (A, B, C...)
+ *  — ใช้ทำดรอปดาวน์ "สินค้า" ในหน้าเพิ่มการชั่งน้ำหนัก ให้สลับไปกรอกสินค้า
+ *  ตัวอื่นในใบเดียวกันได้โดยไม่ต้องพิมพ์ทะเบียนรถซ้ำ (รถคันเดียวกันมักส่ง
+ *  หลายสินค้าพร้อมกัน) รวมตัวเองไว้ในผลลัพธ์ด้วย ไม่ต้อง filter ออกเอง */
+export function siblingWeighingDocs(poCode: string): WeighingDoc[] {
+  return WEIGHING_DOCS.filter((d) => d.poCode === poCode).sort((a, b) =>
+    a.code.localeCompare(b.code)
+  );
+}
 
 // ---------------------------------------------------------------
 // ชั้นที่ 2 — ใบชั่งน้ำหนักของ PO เดียว รวมทุกรอบที่รถเข้ามาชั่ง
@@ -448,6 +494,16 @@ export function getWeighingReceipt(id: string): WeighingReceipt | undefined {
   const doc = WEIGHING_DOCS.find((d) => d.id === id);
   if (!doc) return undefined;
   return buildWeighingReceipt(doc);
+}
+
+/** น้ำหนักที่ชั่งไปแล้วของ PO นี้ (ตัน) รวมเฉพาะรอบที่ "เทียบกันได้" (ดู
+ *  computeReceiptTotals) — ใช้ในคอลัมน์ "น้ำหนักชั่ง" ของตารางรายการ (ดู
+ *  WeighingList) โดยไม่ต้องดึงทั้ง WeighingReceipt ไปแสดง null = ยังไม่มี
+ *  รอบไหนชั่งเสร็จเลย (แสดง "-" แทน 0.00 ตัน กันสับสนว่าเป็นตัวเลขจริง) */
+export function weighedTonSoFar(doc: WeighingDoc): number | null {
+  const receipt = buildWeighingReceipt(doc);
+  const totals = computeReceiptTotals(receipt.rounds);
+  return totals.comparableRounds > 0 ? totals.netTon : null;
 }
 
 // ---------------------------------------------------------------

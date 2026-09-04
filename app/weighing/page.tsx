@@ -129,7 +129,7 @@ export default function WeighingListPage() {
             key={tab}
             className="mt-4 animate-in slide-in-from-bottom-3 fade-in duration-300"
           >
-            <WeighingList docs={visible} />
+            <WeighingList docs={visible} variant={tab} />
           </div>
 
           <BackToTop show={showTop} onClick={scrollToTop} />
