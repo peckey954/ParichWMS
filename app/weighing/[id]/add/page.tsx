@@ -2,10 +2,11 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { MinusIcon, PlusIcon } from "lucide-react";
 import {
   Breadcrumb,
+  BreadcrumbEllipsis,
   BreadcrumbItem,
   BreadcrumbLink,
   BreadcrumbList,
@@ -38,8 +39,8 @@ import {
 } from "@/components/file-upload";
 import { FileViewer, type ViewerFile } from "@/components/file-viewer";
 import { useNumberField } from "@/components/number-field";
-import { TimeField } from "@/components/time-field";
-import { formatTon, getWeighingReceipt } from "@/lib/weighing";
+import { TimeField, toHHMM } from "@/components/time-field";
+import { formatTon, getWeighingReceipt, siblingWeighingDocs } from "@/lib/weighing";
 
 /* ------------------------------------------------------------------
    เพิ่มการชั่งน้ำหนัก — หนึ่งหน้าต่อรถหนึ่งคัน เข้ามาจากปุ่ม
@@ -55,17 +56,6 @@ import { formatTon, getWeighingReceipt } from "@/lib/weighing";
    ไม่มี backend จริงตามธรรมชาติของแอปนี้ — บันทึกแล้วขึ้น toast แล้วกลับไปหน้า
    ที่เข้ามา เหมือนหน้าใบผลิต ไม่ใช่ push ไปหน้าตายตัว
 ------------------------------------------------------------------ */
-
-/** ไฟล์ตัวอย่างที่ถือว่าอัปเสร็จแล้ว — ยังไม่มีหลังบ้าน ใช้โชว์ตัวอ่านเอกสาร */
-function seedDocs(prefix: string, names: string[]): DocFile[] {
-  return names.map((name, i) => ({
-    id: `${prefix}-${i + 1}`,
-    name,
-    size: 6_900_000,
-    status: "done",
-    progress: 100,
-  }));
-}
 
 /**
  * แปลงไฟล์ที่แนบเป็นข้อมูลของตัวอ่าน
@@ -89,10 +79,26 @@ function toViewer(files: DocFile[], group: string): ViewerFile[] {
 }
 
 export default function AddWeighingRoundPage() {
+  return (
+    <React.Suspense fallback={null}>
+      <AddWeighingRoundForm />
+    </React.Suspense>
+  );
+}
+
+function AddWeighingRoundForm() {
   const router = useRouter();
   const params = useParams<{ id: string }>();
+  const searchParams = useSearchParams();
   const receipt = React.useMemo(() => getWeighingReceipt(params.id), [params.id]);
   const doc = receipt?.doc;
+
+  // สินค้าอื่นในใบสั่งซื้อเดียวกัน — ใช้ทำดรอปดาวน์ "สินค้า" ด้านบนกับปุ่ม
+  // "บันทึกแล้วเพิ่มรายการถัดไป" รวมตัวเองไว้ในผลลัพธ์แล้ว (ดู siblingWeighingDocs)
+  const siblings = React.useMemo(
+    () => (doc ? siblingWeighingDocs(doc.poCode) : []),
+    [doc]
+  );
 
   const plateOptions = React.useMemo(
     () =>
@@ -103,24 +109,47 @@ export default function AddWeighingRoundPage() {
     [doc?.truck]
   );
 
-  const [plateMode, setPlateMode] = React.useState<"system" | "manual">(
-    plateOptions.length > 0 ? "system" : "manual"
+  // มาจากการกด "บันทึกแล้วเพิ่มรายการถัดไป" หรือสลับสินค้าในดรอปดาวน์ด้านบน —
+  // ยึดทะเบียนรถเดิมที่กรอกไว้ในหน้าก่อนหน้า (รถคันเดียวส่งหลายสินค้าพร้อมกัน)
+  const carriedPlate = searchParams.get("plate");
+
+  const [plateMode, setPlateMode] = React.useState<"system" | "manual">(() => {
+    if (carriedPlate) return plateOptions.includes(carriedPlate) ? "system" : "manual";
+    return plateOptions.length > 0 ? "system" : "manual";
+  });
+  const [plateSystem, setPlateSystem] = React.useState<string | undefined>(() =>
+    carriedPlate && plateOptions.includes(carriedPlate) ? carriedPlate : plateOptions[0]
   );
-  const [plateSystem, setPlateSystem] = React.useState<string | undefined>(
-    plateOptions[0]
+  const [plateManual, setPlateManual] = React.useState(() =>
+    carriedPlate && !plateOptions.includes(carriedPlate) ? carriedPlate : ""
   );
-  const [plateManual, setPlateManual] = React.useState("");
-  const [grossTon, setGrossTon] = React.useState(0);
-  const [grossAt, setGrossAt] = React.useState("11:00");
-  const [tareTon, setTareTon] = React.useState(0);
-  const [tareAt, setTareAt] = React.useState("11:00");
-  const [supplierTon, setSupplierTon] = React.useState(0);
+  // กรอกเป็น กก. ตามหน้างานจริง (ตาชั่งรถบรรทุกอ่านเป็น กก.) แต่ทั้งกล่องสรุป
+  // ด้านบนและใบชั่งอื่นๆ ในระบบคิดเป็นตัน — แปลงตอนคำนวณ/แสดงผลเท่านั้น
+  // ตัวแปร state ยังเก็บเป็น กก. ตรงๆ ไม่ปัดเศษเป็นตันแล้วเก็บ กันคลาดเคลื่อนสะสม
+  const [grossKg, setGrossKg] = React.useState(0);
+  const [grossAt, setGrossAt] = React.useState("");
+  const [tareKg, setTareKg] = React.useState(0);
+  const [tareAt, setTareAt] = React.useState("");
+  const [supplierKg, setSupplierKg] = React.useState(0);
   const [note, setNote] = React.useState("");
 
-  // ไฟล์ตัวอย่างที่แนบไว้แล้ว จะได้กดดูตัวอ่านเอกสารได้ทันทีโดยไม่ต้องอัปก่อน
-  const parichDocs = useDocUpload(seedDocs("wp", ["ใบชั่งเข้า-PO260116.pdf", "ใบชั่งออก-PO260116.pdf"]));
-  const supplierDocs = useDocUpload(seedDocs("ws", ["ใบชั่งผู้ขาย-HC-8842.pdf", "ใบกำกับสินค้า-HC-8842.pdf", "รูปหน้าตาชั่ง.jpg"]));
-  const idCardDocs = useDocUpload(seedDocs("wi", ["สำเนาบัตร-คนขับ.pdf"]));
+  // เวลาเข้า/ออกตั้งต้นเป็นเวลาปัจจุบันเสมอ ไม่ใช่เลขตายตัว — อ่านหลัง mount
+  // เท่านั้น (ไม่ใช่ตอน useState initializer) กัน hydration ไม่ตรงกันระหว่าง
+  // เซิร์ฟเวอร์กับไคลเอนต์ เหมือนที่ TimeField เองก็อ่าน "ตอนนี้" ตอนเปิดกล่อง
+  // เท่านั้นเช่นกัน ไม่ทับเวลาที่ผู้ใช้แก้ไว้แล้วถ้าพลาดมา render ซ้ำ
+  React.useEffect(() => {
+    const now = toHHMM(new Date());
+    // ตั้งใจอ่านนาฬิกาเครื่อง (ระบบภายนอกที่ React ไม่รู้จัก) ครั้งเดียวตอน mount
+    // เพื่อกัน hydration ไม่ตรงกัน — ไม่มีทางอื่นที่ไม่ใช่ effect สำหรับกรณีนี้
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setGrossAt((prev) => prev || now);
+    setTareAt((prev) => prev || now);
+  }, []);
+
+  // เอกสารแนบเริ่มว่างเสมอ ให้ผู้ใช้อัปโหลดเองจริงๆ ไม่ตั้งต้นไฟล์ตัวอย่างมาให้
+  const parichDocs = useDocUpload([]);
+  const supplierDocs = useDocUpload([]);
+  const idCardDocs = useDocUpload([]);
 
   const [openFileId, setOpenFileId] = React.useState<string | null>(null);
 
@@ -131,8 +160,10 @@ export default function AddWeighingRoundPage() {
     ...toViewer(idCardDocs.files, "สำเนาบัตรประชาชนคนขับ"),
   ];
 
-  // คำนวณสดจากช่องที่กรอกอยู่ กรอกผิดจะเห็นส่วนต่างเพี้ยนทันที
-  const netTon = Math.max(0, grossTon - tareTon);
+  // คำนวณสดจากช่องที่กรอกอยู่ กรอกผิดจะเห็นส่วนต่างเพี้ยนทันที — กรอกเป็น กก.
+  // แต่ทุกอย่างที่แสดง/เทียบกันในหน้านี้เป็นตันเสมอ หารด้วย 1000 ตอนคำนวณเท่านั้น
+  const supplierTon = supplierKg / 1000;
+  const netTon = Math.max(0, (grossKg - tareKg) / 1000);
   const diffTon = netTon - supplierTon;
 
   if (!receipt || !doc) {
@@ -172,27 +203,48 @@ export default function AddWeighingRoundPage() {
   // เลขรอบต่อท้ายรหัสใบ — รอบถัดไปจากที่มีอยู่แล้วในใบนี้
   const seq = String(rounds.length + 1).padStart(2, "0");
 
-  function handleSave(draft: boolean) {
+  // ไปหน้ากรอกของสินค้าอื่นในใบสั่งซื้อเดียวกัน พกทะเบียนรถที่กรอกไว้ไปด้วย
+  // ผ่าน query string — ไม่ต้องพิมพ์ทะเบียนรถซ้ำเพราะรถคันเดียวกันจริง
+  function goToSibling(targetId: string, plate: string) {
+    const qs = plate ? `?plate=${encodeURIComponent(plate)}` : "";
+    router.push(`/weighing/${targetId}/add${qs}`);
+  }
+
+  // กรอกครบพอที่จะบันทึกจริงได้แล้วหรือยัง — ใช้ตัดสินว่าจะโชว์ปุ่ม "บันทึกแล้ว
+  // เพิ่มรายการถัดไป" ไหม ปุ่มนี้ควรโผล่ตอนกรอกใบนี้เสร็จแล้วเท่านั้น ไม่ใช่
+  // ปุ่มถาวรที่กดตั้งแต่หน้ายังว่างแล้วเด้ง error ใส่ (แบบเดียวกับ canSave ของ
+  // หน้าใบขอซื้อ app/pr/create/page.tsx)
+  const plateNow = plateMode === "system" ? plateSystem : plateManual.trim();
+  const canSave = Boolean(plateNow) && grossKg > tareKg;
+
+  function handleSave(mode: "draft" | "save" | "next") {
     const plate = plateMode === "system" ? plateSystem : plateManual.trim();
     if (!plate) {
       toast.error("กรุณาระบุทะเบียนรถ");
       return;
     }
-    if (!draft && grossTon <= tareTon) {
+    if (mode !== "draft" && grossKg <= tareKg) {
       toast.error("น้ำหนักชั่งเข้าต้องมากกว่าชั่งออก");
       return;
     }
     if (
-      !draft &&
+      mode !== "draft" &&
       (parichDocs.uploading || supplierDocs.uploading || idCardDocs.uploading)
     ) {
       toast.error("เอกสารยังอัปโหลดไม่เสร็จ");
       return;
     }
-    toast.success(draft ? "บันทึกฉบับร่างแล้ว" : `บันทึกการชั่ง ${safeDoc.code}-${seq} แล้ว`, {
-      description: `${plate} — น้ำหนักสินค้าจริง ${formatTon(netTon)} ตัน`,
-    });
-    if (!draft) router.back();
+    toast.success(
+      mode === "draft" ? "บันทึกฉบับร่างแล้ว" : `บันทึกการชั่ง ${safeDoc.code}-${seq} แล้ว`,
+      { description: `${plate} — น้ำหนักสินค้าจริง ${formatTon(netTon)} ตัน` }
+    );
+    if (mode === "save") {
+      router.back();
+    } else if (mode === "next") {
+      const currentIndex = siblings.findIndex((s) => s.id === safeDoc.id);
+      const next = siblings[(currentIndex + 1) % siblings.length];
+      if (next) goToSibling(next.id, plate);
+    }
   }
 
   return (
@@ -204,13 +256,26 @@ export default function AddWeighingRoundPage() {
               <BreadcrumbLink href="/">ระบบ</BreadcrumbLink>
             </BreadcrumbItem>
             <BreadcrumbSeparator />
+            {/* จอแคบยุบชั้นนี้เหลือ ⋯ และตัดเลขที่ใบออกจากชั้นถัดไป — ไม่งั้น
+                breadcrumb ยาวเกินจนตกลงไปสองบรรทัด ยังกดกลับไปหน้ารายการได้
+                เหมือนเดิม (อ่านชื่อจริงได้จาก aria-label) */}
             <BreadcrumbItem>
-              <BreadcrumbLink href="/weighing">ชั่งน้ำหนัก</BreadcrumbLink>
+              <BreadcrumbLink
+                href="/weighing"
+                aria-label="ชั่งน้ำหนัก"
+                className="@lg:hidden"
+              >
+                <BreadcrumbEllipsis className="size-4" />
+              </BreadcrumbLink>
+              <BreadcrumbLink href="/weighing" className="hidden @lg:inline">
+                ชั่งน้ำหนัก
+              </BreadcrumbLink>
             </BreadcrumbItem>
             <BreadcrumbSeparator />
             <BreadcrumbItem>
               <BreadcrumbLink href={`/weighing/${doc.id}`}>
-                ใบชั่งน้ำหนัก {doc.code}
+                ใบชั่งน้ำหนัก
+                <span className="hidden @lg:inline"> {doc.code}</span>
               </BreadcrumbLink>
             </BreadcrumbItem>
             <BreadcrumbSeparator />
@@ -222,9 +287,55 @@ export default function AddWeighingRoundPage() {
           </BreadcrumbList>
         </Breadcrumb>
 
+        {/* จอแคบ: เลขที่ใบลงบรรทัดใหม่ ไม่ให้ตัดคำกลางเลขจนอ่านไม่รู้เรื่อง
+            (เช่น "PO260115/01A-" ขึ้นบรรทัดหนึ่ง เหลือ "02" อีกบรรทัด) */}
         <h1 className="mt-2 text-2xl font-semibold tracking-tight">
-          เพิ่มการชั่งน้ำหนัก {doc.code}-{seq}
+          เพิ่มการชั่งน้ำหนัก{" "}
+          <span className="block @lg:inline">
+            {doc.code}-{seq}
+          </span>
         </h1>
+
+        {/* ---------- สองหัวข้อ ----------
+             1. ข้อมูลสินค้า — สินค้า/น้ำหนัก/เอกสารชั่งของพาริช+ผู้ขาย
+             2. ข้อมูลทะเบียนรถ — ทะเบียนรถ/หมายเหตุผู้สั่งซื้อ/สำเนาบัตรคนขับ
+             แยกสองก้อนเพราะเป็นคนละคำถาม "สินค้าอะไร/หนักเท่าไหร่" กับ
+             "รถคันไหน/คนขับใคร" ไม่ต้องไล่อ่านรวดเดียวจากบนสุดถึงล่างสุด */}
+        <SectionHeading
+          index={1}
+          title="ข้อมูลสินค้า"
+          subtitle="ข้อมูลสินค้า น้ำหนัก และเอกสารการชั่งน้ำหนัก"
+        />
+
+        {/* ---------- สลับสินค้า ----------
+             ใบสั่งซื้อเดียวกันมีได้หลายสินค้า (ดู siblingWeighingDocs) — สลับ
+             ไปกรอกสินค้าอื่นในใบเดียวกันได้โดยไม่ต้องพิมพ์ทะเบียนรถซ้ำ เพราะ
+             รถคันเดียวกันมักส่งหลายสินค้าพร้อมกัน ขึ้นเฉพาะตอนมีสินค้าอื่นจริง */}
+        {siblings.length > 1 && (
+          <div className="mt-4 space-y-1.5">
+            <Label htmlFor="product-switch">สินค้า</Label>
+            <Select
+              value={safeDoc.id}
+              onValueChange={(id) => {
+                if (id === safeDoc.id) return;
+                const plate = plateMode === "system" ? plateSystem : plateManual.trim();
+                goToSibling(id, plate ?? "");
+              }}
+            >
+              <SelectTrigger id="product-switch" className="w-full bg-card @lg:w-80">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {siblings.map((s) => (
+                  <SelectItem key={s.id} value={s.id}>
+                    {s.code} — {s.productName}
+                    {s.productSub && ` ${s.productSub}`}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
 
         {/* ---------- หัวใบ ----------
              ชื่อสินค้ากับผู้ขายอยู่คนละมุม เพราะเป็นสองคำถามคนละข้อ
@@ -250,8 +361,10 @@ export default function AddWeighingRoundPage() {
           </div>
 
           {/* พื้นส้มอ่อน — สามตัวเลขนี้คือคำตอบของทั้งหน้า อ่านรวดเดียวจบ
-              ส่วนต่างเป็นสีแดงเมื่อได้ของน้อยกว่าที่ผู้ขายแจ้ง ซึ่งคือเงินที่หายไป */}
-          <div className="mt-3 grid gap-4 rounded-lg bg-brand p-4 @2xl:grid-cols-3">
+              ส่วนต่างเป็นสีแดงเมื่อได้ของน้อยกว่าที่ผู้ขายแจ้ง ซึ่งคือเงินที่หายไป
+              จอแคบสองคอลัมน์ ไม่ใช่เรียงลงมาทีละอัน — น้ำหนักจริงกับน้ำหนักตาม
+              ผู้ขายต้องอยู่บรรทัดเดียวกันถึงจะเทียบกันได้ในสายตาเดียว */}
+          <div className="mt-3 grid grid-cols-2 gap-4 rounded-lg bg-brand p-4 @2xl:grid-cols-3">
             <Stat label="น้ำหนักจริง (ตัน)" value={formatTon(netTon)} />
             <Stat label="น้ำหนักตามผู้ขาย (ตัน)" value={formatTon(supplierTon)} />
             <Stat
@@ -262,8 +375,102 @@ export default function AddWeighingRoundPage() {
           </div>
         </div>
 
+        {/* ---------- น้ำหนักชั่ง ----------
+             เข้ากับออกอยู่แถวเดียวกัน เพราะสองค่านี้ต้องเทียบกันตลอด
+             แยกคนละแถวแล้วต้องเลื่อนสายตาขึ้นลงเพื่อตรวจว่าเข้ามากกว่าออกจริง
+             กรอกเป็น กก. ตามตาชั่งจริงหน้างาน แต่โชว์ค่าแปลงเป็นตันชิดขวาของ
+             ป้ายชื่อช่องไว้เสมอ กันงงว่ากรอกไปตัวไหนกันแน่ ไม่ต้องกดคำนวณเอง */}
+        <div className="mt-6 grid gap-4 @2xl:grid-cols-4">
+          <div className="space-y-1.5">
+            <WeightLabel htmlFor="gross-kg" kg={grossKg}>
+              ชั่งเข้ารถพร้อมสินค้า (กก.)
+            </WeightLabel>
+            <WeightStepper id="gross-kg" value={grossKg} onValueChange={setGrossKg} />
+          </div>
+          <div className="space-y-1.5">
+            {/* ครอบด้วย flex แถวเดียวกับ WeightLabel ข้างๆ ให้โครงสร้างสูงเท่ากัน
+                เป๊ะๆ เสมอ ไม่ใช่หวังพึ่งว่าบรรทัดเดี่ยวจะสูงพอดีเอง */}
+            <div className="flex items-baseline justify-between gap-2">
+              <Label htmlFor="gross-at">เวลาเข้า</Label>
+            </div>
+            <TimeField id="gross-at" value={grossAt} onValueChange={setGrossAt} />
+          </div>
+          <div className="space-y-1.5">
+            <WeightLabel htmlFor="tare-kg" kg={tareKg}>
+              ชั่งออกรถเปล่า (กก.)
+            </WeightLabel>
+            <WeightStepper id="tare-kg" value={tareKg} onValueChange={setTareKg} />
+          </div>
+          <div className="space-y-1.5">
+            <div className="flex items-baseline justify-between gap-2">
+              <Label htmlFor="tare-at">เวลาออก</Label>
+            </div>
+            <TimeField id="tare-at" value={tareAt} onValueChange={setTareAt} />
+          </div>
+
+          <div className="space-y-1.5 @2xl:col-span-2">
+            <WeightLabel htmlFor="supplier-kg" kg={supplierKg}>
+              น้ำหนักสินค้าตามผู้ขาย (กก.)
+            </WeightLabel>
+            <WeightStepper
+              id="supplier-kg"
+              value={supplierKg}
+              onValueChange={setSupplierKg}
+            />
+          </div>
+        </div>
+
+        <div className="mt-4 space-y-1.5">
+          <Label htmlFor="note">
+            หมายเหตุ{" "}
+            <span className="font-normal text-muted-foreground">(ไม่บังคับ)</span>
+          </Label>
+          <Textarea
+            id="note"
+            className="bg-card"
+            placeholder="ระบุหมายเหตุ"
+            rows={3}
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+          />
+        </div>
+
+        {/* ---------- เอกสารแนบของสินค้า ----------
+             แยกสองช่องตามที่มาของเอกสาร ไม่ใช่กองรวมช่องเดียว
+             เวลาเคลมกับผู้ขายต้องหยิบเฉพาะใบของผู้ขายออกมา
+             กองรวมกันแล้วต้องมาไล่เปิดทีละไฟล์ว่าอันไหนของใคร
+             (สำเนาบัตรคนขับอยู่หัวข้อ 2 ข้อมูลทะเบียนรถแทน — เป็นเอกสารของ
+             "คนขับ/รถ" ไม่ใช่ของสินค้า) */}
+        <div className="mt-8 space-y-6">
+          <FileUpload
+            title="เอกสารชั่งน้ำหนักของพาริช"
+            dropLabel="อัปโหลด / ลากไฟล์ใบชั่งน้ำหนักของพาริช"
+            files={parichDocs.files}
+            onAdd={parichDocs.add}
+            onRemove={parichDocs.remove}
+            onRetry={parichDocs.retry}
+            onOpen={setOpenFileId}
+          />
+          <FileUpload
+            title="เอกสารชั่งน้ำหนักของผู้ขาย"
+            dropLabel="อัปโหลด / ลากไฟล์ใบชั่งน้ำหนักของผู้ขาย"
+            files={supplierDocs.files}
+            onAdd={supplierDocs.add}
+            onRemove={supplierDocs.remove}
+            onRetry={supplierDocs.retry}
+            onOpen={setOpenFileId}
+          />
+        </div>
+
+        <SectionHeading
+          index={2}
+          title="ข้อมูลทะเบียนรถ"
+          subtitle="ข้อมูลทะเบียนรถ และสำเนาบัตรประชาชนคนขับ"
+          className="mt-8"
+        />
+
         {/* ---------- ทะเบียนรถ ---------- */}
-        <div className="mt-6 grid gap-4 @2xl:grid-cols-2">
+        <div className="mt-4 grid gap-4 @2xl:grid-cols-2">
           <div className="space-y-3">
             <Label>วิธีระบุทะเบียนรถ</Label>
             <RadioGroup
@@ -325,75 +532,7 @@ export default function AddWeighingRoundPage() {
           </p>
         )}
 
-        {/* ---------- น้ำหนักชั่ง ----------
-             เข้ากับออกอยู่แถวเดียวกัน เพราะสองค่านี้ต้องเทียบกันตลอด
-             แยกคนละแถวแล้วต้องเลื่อนสายตาขึ้นลงเพื่อตรวจว่าเข้ามากกว่าออกจริง */}
-        <div className="mt-6 grid gap-4 @2xl:grid-cols-4">
-          <div className="space-y-1.5">
-            <Label htmlFor="gross-ton">ชั่งเข้ารถพร้อมสินค้า (ตัน)</Label>
-            <TonStepper id="gross-ton" value={grossTon} onValueChange={setGrossTon} />
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="gross-at">เวลาเข้า</Label>
-            <TimeField id="gross-at" value={grossAt} onValueChange={setGrossAt} />
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="tare-ton">ชั่งออกรถเปล่า (ตัน)</Label>
-            <TonStepper id="tare-ton" value={tareTon} onValueChange={setTareTon} />
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="tare-at">เวลาออก</Label>
-            <TimeField id="tare-at" value={tareAt} onValueChange={setTareAt} />
-          </div>
-
-          <div className="space-y-1.5 @2xl:col-span-2">
-            <Label htmlFor="supplier-ton">น้ำหนักสินค้าตามผู้ขาย (ตัน)</Label>
-            <TonStepper
-              id="supplier-ton"
-              value={supplierTon}
-              onValueChange={setSupplierTon}
-            />
-          </div>
-        </div>
-
-        <div className="mt-4 space-y-1.5">
-          <Label htmlFor="note">
-            หมายเหตุ{" "}
-            <span className="font-normal text-muted-foreground">(ไม่บังคับ)</span>
-          </Label>
-          <Textarea
-            id="note"
-            className="bg-card"
-            placeholder="ระบุหมายเหตุ"
-            rows={3}
-            value={note}
-            onChange={(e) => setNote(e.target.value)}
-          />
-        </div>
-
-        {/* ---------- เอกสารแนบ ----------
-             แยกสามช่องตามที่มาของเอกสาร ไม่ใช่กองรวมช่องเดียว
-             เวลาเคลมกับผู้ขายต้องหยิบเฉพาะใบของผู้ขายออกมา
-             กองรวมกันแล้วต้องมาไล่เปิดทีละไฟล์ว่าอันไหนของใคร */}
-        <div className="mt-8 space-y-6">
-          <FileUpload
-            title="เอกสารชั่งน้ำหนักของพาริช"
-            dropLabel="อัปโหลด / ลากไฟล์ใบชั่งน้ำหนักของพาริช"
-            files={parichDocs.files}
-            onAdd={parichDocs.add}
-            onRemove={parichDocs.remove}
-            onRetry={parichDocs.retry}
-            onOpen={setOpenFileId}
-          />
-          <FileUpload
-            title="เอกสารชั่งน้ำหนักของผู้ขาย"
-            dropLabel="อัปโหลด / ลากไฟล์ใบชั่งน้ำหนักของผู้ขาย"
-            files={supplierDocs.files}
-            onAdd={supplierDocs.add}
-            onRemove={supplierDocs.remove}
-            onRetry={supplierDocs.retry}
-            onOpen={setOpenFileId}
-          />
+        <div className="mt-6">
           <FileUpload
             title="เอกสารสำเนาบัตรประชาชนคนขับ"
             dropLabel="อัปโหลด / ลากไฟล์สำเนาบัตรประชาชนคนขับ"
@@ -404,6 +543,7 @@ export default function AddWeighingRoundPage() {
             onOpen={setOpenFileId}
           />
         </div>
+
         <FileViewer
           files={viewerFiles}
           openId={openFileId}
@@ -413,21 +553,95 @@ export default function AddWeighingRoundPage() {
 
       {/* ---------- แถบปุ่มล่าง ----------
            บันทึกร่างไม่ตรวจอะไร เพราะรถยังไม่ออกก็ยังไม่มีน้ำหนักชั่งออก
-           คนต้องเก็บงานค้างไว้กลางทางได้ ส่วนบันทึกจริงถึงจะตรวจครบ */}
+           คนต้องเก็บงานค้างไว้กลางทางได้ ส่วนบันทึกจริงถึงจะตรวจครบ
+
+           จอแคบ vs จอกว้างเป็นคนละเลย์เอาต์ตั้งใจ เหมือนหน้าใบขอซื้อ
+           (app/pr/create/page.tsx) — ป้ายปุ่มยาว อยู่แถวเดียวกันสี่ปุ่มบนจอ
+           มือถือไม่พอดี จอแคบเลยแยกเป็นแถวละปุ่ม: บันทึกร่าง / บันทึกแล้วเพิ่ม
+           รายการถัดไป กว้างเต็มคนละแถว แล้วค่อย ย้อนกลับ+บันทึก แบ่งครึ่งแถว
+           ล่างสุด — จอกว้างมีที่พอ อยู่แถวเดียวได้ ใช้ @lg: ไม่ใช่ lg: ตาม
+           ธรรมเนียมเดียวกัน (วัดจากกล่อง @container ของ DeviceFrame ไม่ใช่
+           ขนาดจอจริง)
+
+           "บันทึกแล้วเพิ่มรายการถัดไป" ขึ้นก็ต่อเมื่อกรอกครบพอจะบันทึกได้แล้ว
+           (canSave) และมีสินค้าตัวอื่นในใบให้ไปต่อจริง — ไม่ใช่ปุ่มถาวรที่กด
+           ตั้งแต่หน้ายังว่างแล้วเด้ง error ใส่ */}
       <div className="sticky bottom-0 z-30 border-t border-border bg-surface">
-        <div className="mx-auto flex w-full max-w-6xl items-center justify-between gap-3 px-8 py-3">
-          <Button variant="outline-primary" onClick={() => router.back()}>
-            ย้อนกลับ
-          </Button>
-          <div className="flex items-center gap-3">
-            <Button variant="outline-primary" onClick={() => handleSave(true)}>
+        <div className="mx-auto w-full max-w-6xl px-8 py-3">
+          {/* ---------- จอแคบ: แยกแถว ---------- */}
+          <div className="flex flex-col gap-3 @lg:hidden">
+            <Button
+              variant="outline-primary"
+              className="w-full"
+              onClick={() => handleSave("draft")}
+            >
               บันทึกร่าง
             </Button>
-            <Button onClick={() => handleSave(false)}>บันทึก</Button>
+            {siblings.length > 1 && canSave && (
+              <Button
+                variant="outline-primary"
+                className="w-full"
+                onClick={() => handleSave("next")}
+              >
+                บันทึกแล้วเพิ่มรายการถัดไป
+              </Button>
+            )}
+            <div className="flex items-center gap-3">
+              <Button
+                variant="outline-primary"
+                className="flex-1"
+                onClick={() => router.back()}
+              >
+                ย้อนกลับ
+              </Button>
+              <Button className="flex-1" onClick={() => handleSave("save")}>
+                บันทึก
+              </Button>
+            </div>
+          </div>
+
+          {/* ---------- จอกว้าง: แถวเดียว ---------- */}
+          <div className="hidden items-center justify-between gap-3 @lg:flex">
+            <Button variant="outline-primary" onClick={() => router.back()}>
+              ย้อนกลับ
+            </Button>
+            <div className="flex items-center gap-3">
+              <Button variant="outline-primary" onClick={() => handleSave("draft")}>
+                บันทึกร่าง
+              </Button>
+              {siblings.length > 1 && canSave && (
+                <Button variant="outline-primary" onClick={() => handleSave("next")}>
+                  บันทึกแล้วเพิ่มรายการถัดไป
+                </Button>
+              )}
+              <Button onClick={() => handleSave("save")}>บันทึก</Button>
+            </div>
           </div>
         </div>
       </div>
     </>
+  );
+}
+
+/** หัวข้อใหญ่ของแต่ละก้อนในฟอร์ม — เลขนำหน้า + ชื่อหัวข้อ + คำอธิบายสั้นใต้ชื่อ */
+function SectionHeading({
+  index,
+  title,
+  subtitle,
+  className,
+}: {
+  index: number;
+  title: string;
+  subtitle: string;
+  className?: string;
+}) {
+  return (
+    <div className={cn("mt-4", className)}>
+      <h2 className="text-base font-semibold">
+        {index}. {title}
+      </h2>
+      <p className="mt-1 text-sm text-muted-foreground">{subtitle}</p>
+    </div>
   );
 }
 
@@ -479,7 +693,40 @@ function RadioBox({
   );
 }
 
-function TonStepper({
+/** ป้ายชื่อช่องกรอกน้ำหนัก (กก.) พร้อมค่าแปลงเป็นตันชิดขวา — คำนวณสดตามที่กรอก
+ *  ยังไม่มีค่า (0) ซ่อนด้วย invisible ไม่ใช่ไม่เรนเดอร์ — ต้องกันพื้นที่ไว้เท่ากัน
+ *  เสมอ ไม่งั้นพอเริ่มพิมพ์แล้วมีข้อความโผล่ ความสูงแถวจะเปลี่ยนแล้วเนื้อหา
+ *  ด้านล่างขยับ */
+function WeightLabel({
+  htmlFor,
+  kg,
+  children,
+}: {
+  htmlFor: string;
+  kg: number;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="flex items-baseline justify-between gap-2">
+      <Label htmlFor={htmlFor}>{children}</Label>
+      <span
+        className={cn(
+          // leading-none ให้ตรงกับ Label ข้างๆ เป๊ะ (Label ของดีไซน์ซิสเต็มตั้ง
+          // leading-none ไว้ แต่ span เปล่าใช้ line-height ปกติของเบราว์เซอร์ซึ่ง
+          // สูงกว่า ทำให้แถวนี้สูงกว่าแถวเวลาเข้า/ออกที่มีแค่ Label เดี่ยวๆ)
+          "text-sm leading-none font-medium tabular-nums",
+          kg <= 0 && "invisible"
+        )}
+      >
+        {formatTon(kg / 1000)} ตัน
+      </span>
+    </div>
+  );
+}
+
+/** กรอกน้ำหนักเป็น กก. — ขั้นละ 10 กก. ตามความละเอียดจริงของตาชั่งรถบรรทุก
+ *  ไม่มีทศนิยม ต่างจากค่าตันที่แปลงแสดงผล (formatTon ปัดสองตำแหน่งเสมอ) */
+function WeightStepper({
   id,
   value,
   onValueChange,
@@ -488,20 +735,19 @@ function TonStepper({
   value: number;
   onValueChange: (next: number) => void;
 }) {
-  const field = useNumberField(value, onValueChange, 2);
-  const step = (delta: number) =>
-    onValueChange(Math.max(0, Number((value + delta).toFixed(2))));
+  const field = useNumberField(value, onValueChange, 0);
+  const step = (delta: number) => onValueChange(Math.max(0, value + delta));
 
   return (
     <InputGroup className="bg-card">
       <InputGroupAddon align="inline-start">
-        <InputGroupButton size="icon-xs" aria-label="ลดน้ำหนัก" onClick={() => step(-1)}>
+        <InputGroupButton size="icon-xs" aria-label="ลดน้ำหนัก" onClick={() => step(-10)}>
           <MinusIcon />
         </InputGroupButton>
       </InputGroupAddon>
       <InputGroupInput {...field} id={id} className="text-center" />
       <InputGroupAddon align="inline-end">
-        <InputGroupButton size="icon-xs" aria-label="เพิ่มน้ำหนัก" onClick={() => step(1)}>
+        <InputGroupButton size="icon-xs" aria-label="เพิ่มน้ำหนัก" onClick={() => step(10)}>
           <PlusIcon />
         </InputGroupButton>
       </InputGroupAddon>

@@ -14,7 +14,7 @@ import {
   TableRow,
 } from "@peckey954/ui/components/ui/table";
 import { cn } from "@peckey954/ui/lib/utils";
-import { formatTon, type WeighingDoc } from "@/lib/weighing";
+import { formatTon, weighedTonSoFar, type WeighingDoc } from "@/lib/weighing";
 import {
   CardBox,
   CardHead,
@@ -32,17 +32,25 @@ import {
 } from "@/components/stock/doc-parts";
 
 /**
- * รายการใบชั่งน้ำหนัก — ทั้งการ์ดและแถวตารางกดแล้วไปหน้าเดียวกันคือ
- * "ใบชั่งน้ำหนัก" (รวมทุกรอบที่รถเข้ามาชั่งของ PO นั้น) ไม่มีทางลัดข้ามไป
- * หน้ากรอกชั่งจริงตรง ๆ เหมือนแท็บรอรับเข้า เพราะที่นี่ต้องเห็นก่อนว่า
- * PO นี้เคยชั่งไปกี่รอบแล้ว ก่อนจะเพิ่มรอบใหม่
+ * รายการใบชั่งน้ำหนัก — จอกว้างเป็นตาราง จอแคบเป็นการ์ด ใช้ชิ้นส่วนร่วมชุด
+ * เดียวกับแท็บรอรับเข้า (components/stock/doc-parts) เพราะเป็นเลย์เอาต์
+ * เอกสารทั่วไป ไม่ใช่ตรรกะเฉพาะสต็อก
  *
- * จอกว้าง — ตาราง จอแคบ — การ์ด เหมือนแท็บรอรับเข้า ใช้ชิ้นส่วนร่วมชุดเดียวกัน
- * (components/stock/doc-parts) เพราะเป็นเลย์เอาต์เอกสารทั่วไป ไม่ใช่ตรรกะเฉพาะสต็อก
+ * ทั้งแถว/การ์ดกดแล้วไปหน้า "ใบชั่งน้ำหนัก" (ดีเทลรวม รวมทุกรอบที่เคยชั่งของ
+ * PO นั้น) เสมอทั้งสองแท็บ — ต้องเห็นก่อนว่า PO นี้เคยชั่งไปกี่รอบแล้วก่อนเพิ่ม
+ * รอบใหม่ ส่วนปุ่ม "ชั่งน้ำหนัก" ท้ายแถว/การ์ด (โผล่เฉพาะแท็บ variant="pending"
+ * ที่มี action ให้กดต่อทันที) เป็นทางลัดข้ามไปหน้า "เพิ่มการชั่งน้ำหนัก" ตรงๆ
+ * แยกปลายทางจากตัวแถวโดยตั้งใจ — กดตารางไปดูภาพรวม กดปุ่มไปกรอกชั่งเลย
  */
 const PAGE_SIZE = 15;
 
-export function WeighingList({ docs }: { docs: WeighingDoc[] }) {
+export function WeighingList({
+  docs,
+  variant,
+}: {
+  docs: WeighingDoc[];
+  variant: "pending" | "weighed";
+}) {
   const [page, setPage] = React.useState(1);
   const { pages, safe, slice } = paginate(docs, page, PAGE_SIZE);
   const router = useRouter();
@@ -51,13 +59,22 @@ export function WeighingList({ docs }: { docs: WeighingDoc[] }) {
     return <EmptyDocs title="ไม่พบใบชั่งน้ำหนัก" hint="ลองใช้คำค้นสั้นลง" />;
   }
 
+  const detailHref = (id: string) => `/weighing/${id}`;
+  const addHref = (id: string) => `/weighing/${id}/add`;
+
   return (
     <>
       {/* ---------- จอแคบ: การ์ด ---------- */}
       <div className="@3xl:hidden">
         <div className="space-y-4">
           {slice.map((d) => (
-            <WeighingCard key={d.id} doc={d} />
+            <WeighingCard
+              key={d.id}
+              doc={d}
+              detailHref={detailHref(d.id)}
+              addHref={addHref(d.id)}
+              variant={variant}
+            />
           ))}
         </div>
         <TablePager page={safe} pages={pages} onChange={setPage} />
@@ -71,66 +88,96 @@ export function WeighingList({ docs }: { docs: WeighingDoc[] }) {
               <TableRow>
                 <TableHead className={HEAD_FIRST}>เลขที่ใบชั่งน้ำหนัก</TableHead>
                 <TableHead>วัตถุดิบ</TableHead>
+                <TableHead>บรรจุภัณฑ์</TableHead>
                 <TableHead>บริษัท</TableHead>
                 <TableHead>วันที่รถจะเข้าล่าสุด</TableHead>
                 <TableHead>ทะเบียนรถที่จะเข้าล่าสุด</TableHead>
                 <TableHead className="text-right">สั่งซื้อ</TableHead>
-                <TableHead className={cn(HEAD_LAST, "text-right")}>ชั่งน้ำหนัก</TableHead>
+                <TableHead
+                  className={cn("text-right", variant === "weighed" && HEAD_LAST)}
+                >
+                  น้ำหนักสินค้า
+                </TableHead>
+                {variant === "pending" && (
+                  <TableHead className={cn(HEAD_LAST, "text-right")}>
+                    ชั่งน้ำหนัก
+                  </TableHead>
+                )}
               </TableRow>
             </TableHeader>
             <TableBody>
-              {slice.map((d) => (
-                <TableRow
-                  key={d.id}
-                  // ทั้งแถวกดได้ ไม่ใช่เฉพาะตัวอักษรเลขที่ใบ — เป้าเล็กแค่คำเดียว
-                  // ในแถวสูง 65px คือกดพลาดตลอด ยังเป็น <a> จริงในเซลล์แรกด้วย
-                  onClick={() => router.push(`/weighing/${d.id}`)}
-                  className={cn("cursor-pointer", ROW_HOVER_NAV)}
-                >
-                  <TableCell className={COL_FIRST}>
-                    <Link
-                      href={`/weighing/${d.id}`}
-                      className="block font-medium whitespace-nowrap hover:underline"
-                    >
-                      {d.code}
-                    </Link>
-                    <span className="block text-sm text-muted-foreground">
-                      {d.createdAt}
-                    </span>
-                  </TableCell>
-                  <TableCell>
-                    <span className="block font-medium">{d.productName}</span>
-                    {d.productSub && (
+              {slice.map((d) => {
+                const weighed = weighedTonSoFar(d);
+                const href = detailHref(d.id);
+                return (
+                  <TableRow
+                    key={d.id}
+                    // ทั้งแถวกดได้ ไม่ใช่เฉพาะตัวอักษรเลขที่ใบ — เป้าเล็กแค่คำเดียว
+                    // ในแถวสูง 65px คือกดพลาดตลอด ยังเป็น <a> จริงในเซลล์แรกด้วย
+                    // ไปหน้าดีเทลรวมเสมอ ไม่ใช่หน้ากรอกชั่ง (ดูปุ่ม "ชั่งน้ำหนัก"
+                    // ท้ายแถวสำหรับทางลัดไปหน้ากรอกชั่งตรงๆ)
+                    onClick={() => router.push(href)}
+                    className={cn("cursor-pointer", ROW_HOVER_NAV)}
+                  >
+                    <TableCell className={COL_FIRST}>
+                      <Link
+                        href={href}
+                        className="block font-medium whitespace-nowrap hover:underline"
+                      >
+                        {d.code}
+                      </Link>
                       <span className="block text-sm text-muted-foreground">
-                        {d.productSub}
+                        {d.createdAt}
                       </span>
+                    </TableCell>
+                    <TableCell>
+                      <span className="block font-medium">{d.productName}</span>
+                      {d.productSub && (
+                        <span className="block text-sm text-muted-foreground">
+                          {d.productSub}
+                        </span>
+                      )}
+                    </TableCell>
+                    <TableCell className="whitespace-nowrap text-muted-foreground">
+                      {d.packing}
+                    </TableCell>
+                    <TableCell className="max-w-56 truncate" title={d.supplier}>
+                      {d.supplier}
+                    </TableCell>
+                    <TableCell className="whitespace-nowrap">{d.arriveDate}</TableCell>
+                    <TableCell
+                      className="max-w-40 truncate text-muted-foreground"
+                      title={d.truck}
+                    >
+                      {d.truck}
+                    </TableCell>
+                    <TableCell className="text-right whitespace-nowrap tabular-nums">
+                      {formatTon(d.orderTon)} ตัน
+                    </TableCell>
+                    <TableCell
+                      className={cn(
+                        "text-right whitespace-nowrap tabular-nums",
+                        variant === "weighed" && COL_LAST
+                      )}
+                    >
+                      {weighed === null ? "-" : `${formatTon(weighed)} ตัน`}
+                    </TableCell>
+                    {/* ทางลัดข้ามไปหน้ากรอกชั่งตรงๆ — ต่างจากแถวที่ไปหน้าดีเทลรวม
+                        โผล่เฉพาะแท็บรอชั่งเท่านั้น แท็บชั่งแล้วไม่มี action
+                        ให้กดต่อจากตารางนี้ทันที */}
+                    {variant === "pending" && (
+                      <TableCell
+                        className={cn(COL_LAST, "text-right")}
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <Button asChild variant="outline-primary" size="sm">
+                          <Link href={addHref(d.id)}>ชั่งน้ำหนัก</Link>
+                        </Button>
+                      </TableCell>
                     )}
-                  </TableCell>
-                  <TableCell className="max-w-56 truncate" title={d.supplier}>
-                    {d.supplier}
-                  </TableCell>
-                  <TableCell className="whitespace-nowrap">{d.arriveDate}</TableCell>
-                  <TableCell
-                    className="max-w-40 truncate text-muted-foreground"
-                    title={d.truck}
-                  >
-                    {d.truck}
-                  </TableCell>
-                  <TableCell className="text-right whitespace-nowrap tabular-nums">
-                    {formatTon(d.orderTon)} ตัน
-                  </TableCell>
-                  {/* ปุ่มยืนยันทางไปหน้าเดียวกับที่ทั้งแถวกดได้ — ให้มีเป้ากดชัดเจน
-                      บนแถวยาว ไม่ใช่ทางลัดไปที่อื่น */}
-                  <TableCell
-                    className={cn(COL_LAST, "text-right")}
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    <Button asChild variant="outline-primary" size="sm">
-                      <Link href={`/weighing/${d.id}`}>ชั่งน้ำหนัก</Link>
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              ))}
+                  </TableRow>
+                );
+              })}
             </TableBody>
           </Table>
 
@@ -141,12 +188,24 @@ export function WeighingList({ docs }: { docs: WeighingDoc[] }) {
   );
 }
 
-function WeighingCard({ doc }: { doc: WeighingDoc }) {
+function WeighingCard({
+  doc,
+  detailHref,
+  addHref,
+  variant,
+}: {
+  doc: WeighingDoc;
+  detailHref: string;
+  addHref: string;
+  variant: "pending" | "weighed";
+}) {
+  const weighed = weighedTonSoFar(doc);
   return (
     // ลิงก์คลุมทั้งใบด้วย after:inset-0 แทนที่จะเอา <a> ครอบเนื้อหา
     // เพราะในการ์ดมีปุ่มอยู่ด้วย ปุ่มซ้อนในลิงก์เป็น HTML ที่ผิด
+    // ทั้งการ์ดไปหน้าดีเทลรวม ปุ่ม "ชั่งน้ำหนัก" ท้ายการ์ดต่างหากที่ลัดไปกรอกชั่ง
     <div className="relative rounded-xl border border-border bg-card p-4">
-      <CardHead code={doc.code} at={doc.createdAt} href={`/weighing/${doc.id}`} />
+      <CardHead code={doc.code} at={doc.createdAt} href={detailHref} />
 
       <CardBox className="mt-3">
         <p className="font-medium">
@@ -157,19 +216,26 @@ function WeighingCard({ doc }: { doc: WeighingDoc }) {
       </CardBox>
 
       <dl className="mt-3 space-y-1.5 text-sm">
+        <CardRow label="บรรจุภัณฑ์">{doc.packing}</CardRow>
         <CardRow label="วันที่รถจะเข้า">{doc.arriveDate}</CardRow>
         <CardRow label="ทะเบียนรถ">{doc.truck}</CardRow>
         <CardRow label="สั่งซื้อ">{formatTon(doc.orderTon)} ตัน</CardRow>
+        <CardRow label="น้ำหนักสินค้า">
+          {weighed === null ? "-" : `${formatTon(weighed)} ตัน`}
+        </CardRow>
       </dl>
 
-      <Separator className="mt-3" />
-
-      {/* z-10 ให้ปุ่มลอยเหนือลิงก์ที่คลุมทั้งใบ ไม่งั้นกดไม่โดน */}
-      <div className="relative z-10 mt-3 flex justify-end">
-        <Button asChild variant="outline-primary" size="sm">
-          <Link href={`/weighing/${doc.id}`}>ชั่งน้ำหนัก</Link>
-        </Button>
-      </div>
+      {variant === "pending" && (
+        <>
+          <Separator className="mt-3" />
+          {/* z-10 ให้ปุ่มลอยเหนือลิงก์ที่คลุมทั้งใบ ไม่งั้นกดไม่โดน */}
+          <div className="relative z-10 mt-3 flex justify-end">
+            <Button asChild variant="outline-primary" size="sm">
+              <Link href={addHref}>ชั่งน้ำหนัก</Link>
+            </Button>
+          </div>
+        </>
+      )}
     </div>
   );
 }

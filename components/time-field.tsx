@@ -25,6 +25,9 @@ import { cn } from "@peckey954/ui/lib/utils";
 
    ดีไซน์จึงเป็น ทางลัดของกรณีที่พบบ่อย + พิมพ์ได้เต็มที่สำหรับที่เหลือ
    ไม่ใช่บังคับให้ทุกคนไต่ลูกศรทีละนาที ซึ่ง 11:00 ไป 10:47 คือกดสิบหกครั้ง
+   ทางลัดนี้ไม่ได้เป็นปุ่มแยกอีกต่อไป — พอเปิดกล่องมา วงล้อตั้งต้นที่เวลา
+   ปัจจุบันให้เลย (ถ้าช่องยังไม่เคยมีค่าที่ตีความได้) แปดในสิบครั้งกดยืนยัน
+   ได้เลยไม่ต้องเลื่อนอะไร ที่เหลือค่อยเลื่อน/พิมพ์แก้จากตรงนั้น
 
    พิมพ์ 1047 แล้วได้ 10:47 เลย ไม่ต้องพิมพ์ทวิภาคเอง
    บนมือถือขึ้นแป้นตัวเลขให้ด้วย ไม่ใช่แป้นตัวอักษรเต็ม
@@ -33,9 +36,10 @@ import { cn } from "@peckey954/ui/lib/utils";
    กล่องกลางจอจะบังทั้งตาราง แล้วคนกรอกจะไม่เห็นว่าอยู่ครั้งที่เท่าไหร่
    ซึ่งเป็นสิ่งเดียวที่ต้องเห็นตอนนั้น
 
-   ชั่วโมงกับนาทีเป็นวงล้อเลื่อน ค่าที่อยู่กลางแถบคือค่าที่เลือกอยู่
-   เลื่อนแล้วค่าในช่องเปลี่ยนตามทันที ไม่มีปุ่มยืนยัน — เห็นผลระหว่างเลื่อนเลย
-   ปิดกล่องเมื่อไหร่ก็ได้ ค่าเข้าไปตั้งแต่ตอนเลื่อนแล้ว
+   ชั่วโมงกับนาทีเป็นวงล้อเลื่อน ค่าที่อยู่กลางแถบคือค่าที่เลือกอยู่ — แต่ค่าที่
+   เลื่อนยังไม่เข้าช่องจริงจนกว่าจะกด "ยืนยัน" ท้ายกล่อง (ปิดกล่องด้วยการกด
+   ข้างนอก/Esc = ยกเลิก ไม่บันทึกค่าที่เลื่อนไว้) กันเผลอเลื่อนโดนแล้วค่าเปลี่ยน
+   ไปโดยไม่ได้ตั้งใจ ต่างจากก่อนหน้านี้ที่เลื่อนแล้วเข้าช่องทันที
 ------------------------------------------------------------------ */
 
 /** ความสูงของหนึ่งแถวในวงล้อ ใช้คำนวณว่าเลื่อนไปหยุดที่ค่าไหน */
@@ -52,7 +56,9 @@ const MINUTES = Array.from({ length: 12 }, (_, i) =>
 );
 
 const pad = (n: number) => String(n).padStart(2, "0");
-const toHHMM = (d: Date) => `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+/** เวลาปัจจุบันเป็น HH:MM — export ไว้ให้หน้าฟอร์มใช้ตั้งค่าเริ่มต้นของช่องเวลา
+ *  เป็นเวลาปัจจุบันได้เอง (อ่านหลัง mount เท่านั้น กัน hydration ไม่ตรงกัน) */
+export const toHHMM = (d: Date) => `${pad(d.getHours())}:${pad(d.getMinutes())}`;
 
 /**
  * อ่านสิ่งที่พิมพ์มาให้เป็นเวลา — คืน null เมื่อตีความไม่ได้
@@ -110,8 +116,11 @@ export function TimeField({
   // ตัวหนังสือระหว่างที่ยังพิมพ์ไม่จบ ยังไม่ต้องแปลงเป็นเวลาทุกตัวอักษร
   // แปลงทันทีจะเถียงกับคนพิมพ์ เช่นพิมพ์ 1 แล้วเด้งเป็น 01:00 ทั้งที่กำลังจะพิมพ์ 10
   const [text, setText] = React.useState<string | null>(null);
-  // เวลาปัจจุบันอ่านตอนเปิดกล่อง ไม่ใช่ตอน render — server กับ client จะได้ไม่ต่างกัน
-  const [now, setNow] = React.useState("");
+  // ค่าที่วงล้อกำลังเลื่อนอยู่ตอนกล่องเปิด — ยังไม่เข้าช่องจริงจนกว่าจะกด
+  // "ยืนยัน" ตั้งต้นที่เวลาปัจจุบันเสมอถ้าช่องยังไม่เคยมีค่าที่ตีความได้
+  // (ดูคอมเมนต์บนสุดของไฟล์) อ่านเวลาปัจจุบันตอนเปิดกล่อง ไม่ใช่ตอน render
+  // — server กับ client จะได้ไม่ต่างกัน
+  const [staged, setStaged] = React.useState("00:00");
 
   const commit = () => {
     if (text === null) return;
@@ -120,13 +129,16 @@ export function TimeField({
     setText(null);
   };
 
-  const [hh, mm] = (parseTime(current) ?? "--:--").split(":");
+  const [hh, mm] = staged.split(":");
 
   return (
     <Popover
       open={open}
       onOpenChange={(v) => {
-        if (v) setNow(toHHMM(new Date()));
+        // เปิด: ตั้งวงล้อที่ค่าเดิม (ถ้ามี) หรือเวลาปัจจุบัน — ปิด: ไม่ว่าจะปิด
+        // ด้วยปุ่มไหนหรือกดข้างนอก/Esc ก็ไม่ยุ่งกับค่าที่บันทึกไว้แล้ว
+        // (ยืนยัน/ย้อนกลับ setValue หรือไม่ setValue เองไปแล้วก่อนเรียก setOpen)
+        if (v) setStaged(parseTime(current) ?? toHHMM(new Date()));
         setOpen(v);
       }}
     >
@@ -170,51 +182,55 @@ export function TimeField({
         // กดในกล่องแล้วไม่ต้องดึงโฟกัสกลับไปที่ช่อง เดี๋ยว onBlur จะไปทับค่าที่เพิ่งเลือก
         onOpenAutoFocus={(e) => e.preventDefault()}
       >
-        {/* ปุ่มเดียวที่ตอบคำถามแปดในสิบครั้ง จึงใหญ่สุดและอยู่บนสุด */}
-        <Button
-          className="h-11 w-full"
-          onClick={() => {
-            setValue(now);
-            setOpen(false);
-          }}
-        >
-          <ClockIcon />
-          ตอนนี้ <span className="tabular-nums">{now}</span>
-        </Button>
-
         {/* ป้ายอยู่นอกกรอบวงล้อ แถบกลางจึงเริ่มที่ขอบบนของวงล้อพอดี
             ไม่ต้องเดาว่าป้ายสูงเท่าไหร่แล้วบวกชดเชยเอา
             และแถบเดียวพาดสองคอลัมน์ ไม่ใช่สองแถบแยกกันมีร่องตรงกลาง */}
-        <div className="mt-3 border-t border-border pt-3">
-          <div className="grid grid-cols-2 gap-2 text-center text-xs text-muted-foreground">
-            <span>ชั่วโมง</span>
-            <span>นาที</span>
-          </div>
+        <div className="grid grid-cols-2 gap-2 text-center text-xs text-muted-foreground">
+          <span>ชั่วโมง</span>
+          <span>นาที</span>
+        </div>
 
-          <div className="relative mt-1">
-            <div
-              aria-hidden
-              className="pointer-events-none absolute inset-x-0 rounded-md bg-brand"
-              style={{ top: PAD, height: ITEM_H }}
+        <div className="relative mt-1">
+          <div
+            aria-hidden
+            className="pointer-events-none absolute inset-x-0 rounded-md bg-brand"
+            style={{ top: PAD, height: ITEM_H }}
+          />
+          <div className="relative grid grid-cols-2 gap-2">
+            <Wheel
+              label="ชั่วโมง"
+              options={HOURS}
+              value={hh}
+              onChange={(h) => setStaged(`${h}:${mm}`)}
             />
-            <div className="relative grid grid-cols-2 gap-2">
-              <Wheel
-                label="ชั่วโมง"
-                options={HOURS}
-                value={hh === "--" ? now.slice(0, 2) : hh}
-                onChange={(h) => setValue(`${h}:${mm === "--" ? "00" : mm}`)}
-              />
-              <Wheel
-                label="นาที"
-                options={MINUTES}
-                value={mm === "--" ? "00" : mm}
-                prefix=":"
-                onChange={(m) =>
-                  setValue(`${hh === "--" ? now.slice(0, 2) : hh}:${m}`)
-                }
-              />
-            </div>
+            <Wheel
+              label="นาที"
+              options={MINUTES}
+              value={mm}
+              onChange={(m) => setStaged(`${hh}:${m}`)}
+            />
           </div>
+        </div>
+
+        {/* ยืนยัน/ย้อนกลับ — ค่าที่เลื่อนไว้ยังไม่เข้าช่องจริงจนกว่าจะกดยืนยัน
+            ย้อนกลับปิดกล่องเฉยๆ ไม่แตะค่าเดิม */}
+        <div className="mt-3 flex gap-2 border-t border-border pt-3">
+          <Button
+            variant="outline-primary"
+            className="flex-1"
+            onClick={() => setOpen(false)}
+          >
+            ย้อนกลับ
+          </Button>
+          <Button
+            className="flex-1"
+            onClick={() => {
+              setValue(staged);
+              setOpen(false);
+            }}
+          >
+            ยืนยัน
+          </Button>
         </div>
       </PopoverContent>
     </Popover>

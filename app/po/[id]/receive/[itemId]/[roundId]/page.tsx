@@ -436,10 +436,11 @@ function MetaField({ label, value }: { label: string; value: string }) {
 }
 
 /** เอกสารตัวอย่าง — ไม่มีไฟล์จริง กดไม่ได้ (แอปนี้ไม่มี backend ให้อัปโหลดจริง)
-    ขนาด 96px เท่ากับการ์ดเอกสารที่อื่นในแอป (components/file-upload.tsx) */
+    ขนาด 144px เท่ากับการ์ดเอกสารที่อื่นในแอป (BOX_H ใน components/file-upload.tsx)
+    ถ้าที่นั่นเปลี่ยนขนาด ต้องตามมาแก้ที่นี่ด้วย ไม่งั้นสองที่จะไม่เท่ากัน */
 function DocPlaceholderCard() {
   return (
-    <div className="flex size-24 flex-col items-center justify-center gap-1 rounded-lg border border-border bg-card px-1.5 text-center">
+    <div className="flex size-36 flex-col items-center justify-center gap-1 rounded-lg border border-border bg-card px-4 text-center">
       <FileTextIcon className="size-6 text-primary" strokeWidth={1.5} />
       <span className="line-clamp-2 text-[11px] leading-tight font-medium">
         เอกสารการชั่ง No.12X4534567890...
