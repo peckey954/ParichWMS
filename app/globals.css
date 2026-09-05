@@ -227,20 +227,27 @@
    ตามค่าเริ่มต้นเหมือนกันหมด ไม่ต่างจาก toast ปกติเลย
 
    ตั้งสีตรงทุก element ที่ต้องการ (หัวข้อ/ไอคอน/คำอธิบาย) แยกกันเลย ไม่พึ่ง
-   การไล่สีขึ้นจาก [data-sonner-toast] ผ่าน color:inherit ของ sonner เพียง
-   อย่างเดียว — เผื่อ CSS cascade layer ของ sonner (สไตล์ที่ยัดผ่าน JS ตอน
-   mount ด้วย insertCSS ไม่ใช่ layer ของ Tailwind) ตีความลำดับชั้นต่างไปจากที่
-   คาดตอนใช้แค่ inherit กฎอ้อมแบบนั้นแก้ปัญหาไม่ได้จริงมาแล้วรอบหนึ่ง คำอธิบาย
-   ต้องมีกฎของตัวเองอยู่แล้วเพราะ sonner ตั้ง class ไว้ตายตัวเป็น
-   "text-popover-foreground/90!" (มี !important ติดมาจาก Tailwind) ทับด้วย
-   inherit ไม่ได้เช่นกัน
+   การไล่สีขึ้นจาก [data-sonner-toast] ผ่าน color:inherit ของ sonner อย่างเดียว
+
+   ⚠️ ต้องอยู่ใน @layer components เท่านั้น เขียนลอย ๆ นอก layer แล้วคำอธิบาย
+   จะไม่เปลี่ยนสี (หัวข้อกับไอคอนเปลี่ยน) เพราะ sonner ของ DS ตั้ง class
+   คำอธิบายไว้เป็น "text-popover-foreground/90!" ซึ่งเป็น utility ของ Tailwind
+   ที่มี !important และอยู่ใน @layer utilities
+
+   กติกาของ cascade layer: เวลาชน !important ด้วยกัน ลำดับชั้นจะ "กลับด้าน" —
+   layer ที่มาก่อนชนะ layer ที่มาหลัง และกฎที่ไม่อยู่ layer ไหนเลยมีศักดิ์
+   ต่ำสุด (ตรงข้ามกับกฎปกติที่ไม่มี !important) กฎนี้จึงต้องอยู่ใน layer ที่
+   มาก่อน utilities ถึงจะชนะ — components มาก่อน utilities พอดี
+   (ลำดับของ Tailwind v4 คือ theme, base, components, utilities)
    ============================================================ */
-[data-sonner-toast][data-type="success"],
-[data-sonner-toast][data-type="success"] [data-title],
-[data-sonner-toast][data-type="success"] [data-icon],
-[data-sonner-toast][data-type="success"] [data-icon] svg,
-[data-sonner-toast][data-type="success"] [data-description] {
-  color: var(--primary) !important;
+@layer components {
+  [data-sonner-toast][data-type="success"],
+  [data-sonner-toast][data-type="success"] [data-title],
+  [data-sonner-toast][data-type="success"] [data-icon],
+  [data-sonner-toast][data-type="success"] [data-icon] svg,
+  [data-sonner-toast][data-type="success"] [data-description] {
+    color: var(--primary) !important;
+  }
 }
 
 /* ไอคอนชิดขอบบนของหัวข้อ ไม่ใช่กึ่งกลางทั้งก้อน — ค่าเดิมของ sonner

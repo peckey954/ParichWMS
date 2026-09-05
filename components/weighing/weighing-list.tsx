@@ -87,7 +87,11 @@ export function WeighingList({
             <TableHeader className={STICKY_HEAD}>
               <TableRow>
                 <TableHead className={HEAD_FIRST}>เลขที่ใบชั่งน้ำหนัก</TableHead>
-                <TableHead>วัตถุดิบ</TableHead>
+                <TableHead>สินค้า</TableHead>
+                {/* ประเภท | หมวด | บรรจุภัณฑ์ — สามชั้นชุดเดียวกับที่ใช้ทั้งแอป
+                    (ดูใบขอซื้อ/ใบสั่งซื้อ) ไม่ใช่ยุบรวมเป็นช่องเดียว */}
+                <TableHead>ประเภท</TableHead>
+                <TableHead>หมวด</TableHead>
                 <TableHead>บรรจุภัณฑ์</TableHead>
                 <TableHead>บริษัท</TableHead>
                 <TableHead>วันที่รถจะเข้าล่าสุด</TableHead>
@@ -137,6 +141,12 @@ export function WeighingList({
                           {d.productSub}
                         </span>
                       )}
+                    </TableCell>
+                    <TableCell className="whitespace-nowrap text-muted-foreground">
+                      {d.category}
+                    </TableCell>
+                    <TableCell className="whitespace-nowrap text-muted-foreground">
+                      {d.group}
                     </TableCell>
                     <TableCell className="whitespace-nowrap text-muted-foreground">
                       {d.packing}
@@ -207,21 +217,47 @@ function WeighingCard({
     <div className="relative rounded-xl border border-border bg-card p-4">
       <CardHead code={doc.code} at={doc.createdAt} href={detailHref} />
 
+      {/* สองกล่องส้ม แยกกันตามคำถามคนละข้อ — กล่องแรกตอบ "ของอะไร ของใคร"
+          กล่องสองตอบ "รถคันไหน เข้าเมื่อไหร่" เอาไปกองรวมเป็นรายการเดียวแล้ว
+          ต้องไล่อ่านทีละบรรทัดว่าอันไหนเรื่องของอันไหนเรื่องรถ */}
       <CardBox className="mt-3">
         <p className="font-medium">
           {doc.productName}
           {doc.productSub && ` ${doc.productSub}`}
         </p>
-        <p className="text-sm">{doc.supplier}</p>
+        {/* ประเภท | หมวด | บรรจุภัณฑ์ — ชุดเดียวกับคอลัมน์ในตารางจอกว้าง */}
+        <p className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-sm text-muted-foreground">
+          <span>{doc.category}</span>
+          <span className="text-border" aria-hidden>
+            |
+          </span>
+          <span>{doc.group}</span>
+          {doc.packing && (
+            <>
+              <span className="text-border" aria-hidden>
+                |
+              </span>
+              <span>{doc.packing}</span>
+            </>
+          )}
+        </p>
+        <p className="mt-1 text-sm font-medium">{doc.supplier}</p>
+      </CardBox>
+
+      <CardBox className="mt-2">
+        <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 text-sm">
+          <span className="font-medium">{doc.truck}</span>
+          <span>
+            <span className="text-muted-foreground">วันที่รถจะเข้า: </span>
+            <span className="font-medium">{doc.arriveDate}</span>
+          </span>
+        </div>
       </CardBox>
 
       <dl className="mt-3 space-y-1.5 text-sm">
-        <CardRow label="บรรจุภัณฑ์">{doc.packing}</CardRow>
-        <CardRow label="วันที่รถจะเข้า">{doc.arriveDate}</CardRow>
-        <CardRow label="ทะเบียนรถ">{doc.truck}</CardRow>
-        <CardRow label="สั่งซื้อ">{formatTon(doc.orderTon)} ตัน</CardRow>
-        <CardRow label="น้ำหนักสินค้า">
-          {weighed === null ? "-" : `${formatTon(weighed)} ตัน`}
+        <CardRow label="สั่งซื้อ (ตัน)">{formatTon(doc.orderTon)}</CardRow>
+        <CardRow label="น้ำหนักสินค้า (ตัน)">
+          {weighed === null ? "-" : formatTon(weighed)}
         </CardRow>
       </dl>
 

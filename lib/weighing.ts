@@ -71,6 +71,11 @@ export type WeighingDoc = {
   productSub?: string;
   /** ประเภทวัตถุดิบ โชว์ในหัวใบชั่ง/หน้ากรอกชั่ง เช่น "วัตถุดิบปุ๋ยกระสอบ" */
   category: string;
+  /** หมวดสินค้า — คนละชั้นกับ category ใช้คำศัพท์ชุดเดียวกับใบขอซื้อ/ใบสั่งซื้อ
+   *  (ดู group ใน lib/pr.ts) เช่น "แม่ปุ๋ย" "อินทรีย์เคมี" "PNR"
+   *  สามชั้นที่โชว์คู่กันทั้งแอปคือ ประเภท (category) | หมวด (group) |
+   *  บรรจุภัณฑ์ (packing) */
+  group: string;
   packing?: string;
   supplier: string;
   /** วันที่รถจะเข้าล่าสุด */
@@ -84,9 +89,15 @@ export type WeighingDoc = {
 export function matchesWeighing(d: WeighingDoc, q: string): boolean {
   const s = q.trim().toLowerCase();
   if (!s) return true;
-  return [d.code, d.productName, d.productSub ?? "", d.supplier, d.truck].some(
-    (v) => v.toLowerCase().includes(s)
-  );
+  return [
+    d.code,
+    d.productName,
+    d.productSub ?? "",
+    d.category,
+    d.group,
+    d.supplier,
+    d.truck,
+  ].some((v) => v.toLowerCase().includes(s));
 }
 
 const ACTOR_POOL = [
@@ -102,14 +113,15 @@ const ITEM_POOL: {
   name: string;
   sub: string;
   category: string;
+  group: string;
   packing?: string;
 }[] = [
-  { name: "21-0-0", sub: "ฟูเจียนผง", category: "วัตถุดิบปุ๋ยกระสอบ", packing: "Bulk" },
-  { name: "46-0-0", sub: "ยูเรีย เม็ด", category: "วัตถุดิบปุ๋ยกระสอบ", packing: "Bulk" },
-  { name: "16-20-0", sub: "เม็ดปั้น", category: "วัตถุดิบปุ๋ยกระสอบ", packing: "50 Kg" },
-  { name: "10-0-4+OM 50%", sub: "ฟูเจียนผง", category: "วัตถุดิบปุ๋ยกระสอบ", packing: "40 Kg" },
-  { name: "แม่ปุ๋ยโพแทส", sub: "เกล็ดแดง", category: "วัตถุดิบปุ๋ยเกล็ด", packing: "25 Kg" },
-  { name: "ยิปซัม", sub: "ผงละเอียด", category: "วัตถุดิบเสริม", packing: "Bulk" },
+  { name: "21-0-0", sub: "ฟูเจียนผง", category: "วัตถุดิบปุ๋ยกระสอบ", group: "แม่ปุ๋ย", packing: "Bulk" },
+  { name: "46-0-0", sub: "ยูเรีย เม็ด", category: "วัตถุดิบปุ๋ยกระสอบ", group: "แม่ปุ๋ย", packing: "Bulk" },
+  { name: "16-20-0", sub: "เม็ดปั้น", category: "วัตถุดิบปุ๋ยกระสอบ", group: "แม่ปุ๋ย", packing: "50 Kg" },
+  { name: "10-0-4+OM 50%", sub: "ฟูเจียนผง", category: "วัตถุดิบปุ๋ยกระสอบ", group: "อินทรีย์เคมี", packing: "40 Kg" },
+  { name: "แม่ปุ๋ยโพแทส", sub: "เกล็ดแดง", category: "วัตถุดิบปุ๋ยเกล็ด", group: "แม่ปุ๋ย", packing: "25 Kg" },
+  { name: "ยิปซัม", sub: "ผงละเอียด", category: "วัตถุดิบเสริม", group: "PNR", packing: "Bulk" },
 ];
 
 const SUPPLIER_POOL = [
@@ -138,6 +150,7 @@ const SEED_WEIGHING: WeighingDoc[] = [
     productName: "21-0-0",
     productSub: "ฟูเจียนผง",
     category: "วัตถุดิบปุ๋ยกระสอบ",
+    group: "แม่ปุ๋ย",
     packing: "Bulk",
     supplier: "เอชซี อินเตอร์เนชั่นแนล เทรดดิ้ง จำกัด",
     arriveDate: "18/06/2026",
@@ -156,6 +169,7 @@ const SEED_WEIGHING: WeighingDoc[] = [
     productName: "16-20-0",
     productSub: "เม็ดปั้น",
     category: "วัตถุดิบปุ๋ยกระสอบ",
+    group: "แม่ปุ๋ย",
     packing: "50 Kg",
     supplier: "เอชซี อินเตอร์เนชั่นแนล เทรดดิ้ง จำกัด",
     arriveDate: "18/06/2026",
@@ -171,6 +185,7 @@ const SEED_WEIGHING: WeighingDoc[] = [
     productName: "46-0-0",
     productSub: "ยูเรีย เม็ด",
     category: "วัตถุดิบปุ๋ยกระสอบ",
+    group: "แม่ปุ๋ย",
     packing: "Bulk",
     supplier: "ไทยเคมิคอล อะกริ จำกัด",
     arriveDate: "19/06/2026",
@@ -186,6 +201,7 @@ const SEED_WEIGHING: WeighingDoc[] = [
     productName: "16-20-0",
     productSub: "เม็ดปั้น",
     category: "วัตถุดิบปุ๋ยกระสอบ",
+    group: "แม่ปุ๋ย",
     packing: "50 Kg",
     supplier: "ยูนิเวอร์แซล เคมิคอล กรุ๊ป",
     arriveDate: "19/06/2026",
@@ -201,6 +217,7 @@ const SEED_WEIGHING: WeighingDoc[] = [
     productName: "10-0-4+OM 50%",
     productSub: "ฟูเจียนผง",
     category: "วัตถุดิบปุ๋ยกระสอบ",
+    group: "อินทรีย์เคมี",
     packing: "40 Kg",
     supplier: "ไทยแอกโกร อินดัสทรี",
     arriveDate: "14/06/2026",
@@ -216,6 +233,7 @@ const SEED_WEIGHING: WeighingDoc[] = [
     productName: "แม่ปุ๋ยโพแทส",
     productSub: "เกล็ดแดง",
     category: "วัตถุดิบปุ๋ยเกล็ด",
+    group: "แม่ปุ๋ย",
     packing: "25 Kg",
     supplier: "สยามเฟอร์ทิไลเซอร์ จำกัด",
     arriveDate: "13/06/2026",
@@ -252,6 +270,7 @@ function moreWeighing(count = 20): WeighingDoc[] {
       productName: item.name,
       productSub: item.sub,
       category: item.category,
+      group: item.group,
       packing: item.packing,
       supplier: pick(SUPPLIER_POOL, rnd),
       arriveDate: `${pad(day + 2)}/01/2026`,

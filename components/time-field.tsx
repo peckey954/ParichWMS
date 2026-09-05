@@ -238,15 +238,25 @@ export function TimeField({
 }
 
 /**
- * วงล้อเลื่อนหาตัวเลข
+ * วงล้อเลื่อนหาตัวเลข — วนไม่รู้จบ 23 ต่อด้วย 00 / 55 ต่อด้วย 00
  *
  * เลื่อนแล้วหยุดตรงไหน ค่าตรงนั้นคือค่าที่เลือก ไม่ต้องกดอีกที
  * ใช้ scroll snap ของเบราว์เซอร์ทำการดูดเข้าแถว ไม่ได้เขียน physics เอง
  * นิ้วปล่อยแล้วมันไหลต่อและหยุดพอดีแถวให้เอง เหมือนวงล้อบนมือถือ
  *
+ * วิธีทำให้วน: เรนเดอร์รายการซ้ำ REPEAT ชุดต่อกันไปเลย แล้วพอเลื่อนหยุด ค่อย
+ * ดีดกลับมา "ชุดกลาง" ที่เลขเดียวกันแบบไม่มีอนิเมชัน ตาคนมองไม่เห็นความต่าง
+ * เพราะเลขใต้แถบไฮไลต์เป็นตัวเดิมเป๊ะ แต่ที่ว่างข้างบน/ข้างล่างถูกเติมใหม่
+ * ให้เลื่อนต่อได้เรื่อย ๆ ทั้งสองทาง (ไม่ใช่ virtual scroll จริง แค่พอสำหรับ
+ * 12–24 ตัวเลือก ซึ่งซ้ำ 5 ชุดก็แค่ 60–120 แถว)
+ *
  * ขอบบนล่างจางหายไปด้วย mask ไม่ใช่เส้นตัด
  * ตัวเลขที่ยังไม่ถึงกลางจึงค่อย ๆ โผล่ ไม่ใช่โผล่มาเต็มตัวแล้วหายวับ
  */
+/** จำนวนชุดที่เรนเดอร์ซ้ำ — คี่ เพื่อให้มีชุดกลางจริง ๆ ไว้เป็นบ้าน */
+const REPEAT = 5;
+const MID = Math.floor(REPEAT / 2);
+
 function Wheel({
   label,
   options,
@@ -266,20 +276,24 @@ function Wheel({
   // เปิดกล่องมาแล้วเห็นวงล้อกำลังวิ่งหาที่คือเสียเวลาเปล่า
   const jumped = React.useRef(false);
 
+  const len = options.length;
   const index = Math.max(0, options.indexOf(value));
+  /** ตำแหน่งของค่านี้ในชุดกลาง = จุดพักปกติของวงล้อ */
+  const home = (MID * len + index) * ITEM_H;
 
   React.useEffect(() => {
     const el = ref.current;
     if (!el) return;
-    const target = index * ITEM_H;
-    // ห่างไม่ถึงหนึ่งแถวแปลว่ามันมาจากการเลื่อนของคนใช้เอง อย่าไปดึงซ้ำ
-    if (Math.abs(el.scrollTop - target) < 2) return;
-    el.scrollTo({
-      top: target,
-      behavior: jumped.current ? "smooth" : "instant",
-    });
-    jumped.current = true;
-  }, [index]);
+    if (!jumped.current) {
+      el.scrollTo({ top: home, behavior: "instant" });
+      jumped.current = true;
+      return;
+    }
+    // อยู่ตรงเลขนี้อยู่แล้ว (ชุดไหนก็นับว่าใช่) แปลว่าเพิ่งเลื่อนมาเอง อย่าไปดึงซ้ำ
+    const at = ((Math.round(el.scrollTop / ITEM_H) % len) + len) % len;
+    if (at === index) return;
+    el.scrollTo({ top: home, behavior: "smooth" });
+  }, [index, home, len]);
 
   // เบราว์เซอร์ยิง scroll รัว ๆ ระหว่างที่ยังไหลอยู่
   // รอให้นิ่งก่อนค่อยอ่านว่าหยุดที่แถวไหน ไม่งั้นค่าจะกระพริบไปตลอดทาง
@@ -288,10 +302,14 @@ function Wheel({
     settle.current = setTimeout(() => {
       const el = ref.current;
       if (!el) return;
-      const i = Math.min(
-        options.length - 1,
-        Math.max(0, Math.round(el.scrollTop / ITEM_H))
-      );
+      const raw = Math.round(el.scrollTop / ITEM_H);
+      const i = ((raw % len) + len) % len;
+
+      // ดีดกลับชุดกลางทุกครั้งที่หยุดนิ่ง เพื่อให้เหลือที่เลื่อนต่อทั้งขึ้นและลง
+      // เสมอ ใช้ instant เพราะเลขใต้แถบไฮไลต์เป็นตัวเดิม ไม่มีอะไรให้เห็นขยับ
+      const back = (MID * len + i) * ITEM_H;
+      if (el.scrollTop !== back) el.scrollTo({ top: back, behavior: "instant" });
+
       if (options[i] !== value) onChange(options[i]);
     }, 100);
   };
@@ -316,11 +334,14 @@ function Wheel({
         paddingBottom: PAD,
       }}
     >
-      {options.map((o) => {
-        const on = o === value;
+      {/* ชุดเดิมซ้ำ REPEAT รอบ เพื่อให้เลื่อนวนได้ทั้งขึ้นและลง — ตัวเลือกจริง
+          ยังมีเท่าเดิม แค่โผล่ซ้ำหลายรอบ (key จึงต้องใช้ตำแหน่ง ไม่ใช่ค่า) */}
+      {Array.from({ length: REPEAT * len }, (_, i) => {
+        const o = options[i % len];
+        const on = i % len === index;
         return (
           <button
-            key={o}
+            key={i}
             type="button"
             role="option"
             aria-selected={on}
