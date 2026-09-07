@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { ListFilterIcon, PlusIcon, SearchIcon } from "lucide-react";
+import { ListFilterIcon, PlusIcon, SearchIcon, Settings2Icon } from "lucide-react";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -172,13 +172,28 @@ export default function PrListPage() {
               <h1 className="text-2xl font-semibold tracking-tight">ขอซื้อ PR</h1>
               <p className="mt-1 text-sm text-muted-foreground">การขอซื้อสินค้า</p>
             </div>
-            <Button asChild>
-              <Link href="/pr/create">
-                <PlusIcon />
-                <span className="sm:hidden">สร้าง</span>
-                <span className="hidden sm:inline">สร้างใบขอซื้อ</span>
-              </Link>
-            </Button>
+            {/* ตั้งค่าเป็นงานนาน ๆ ทำที ปุ่มรองจึงเป็น outline และอยู่ก่อนปุ่มหลัก
+                จอแคบเหลือไอคอนอย่างเดียว ไม่งั้นสองปุ่มเบียดจนปุ่มหลักตกบรรทัด */}
+            <div className="flex shrink-0 items-center gap-2">
+              <Button asChild variant="outline-primary" size="icon" className="@3xl:hidden">
+                <Link href="/pr/setup" aria-label="ตั้งค่าใบขอซื้อ">
+                  <Settings2Icon />
+                </Link>
+              </Button>
+              <Button asChild variant="outline-primary" className="hidden @3xl:inline-flex">
+                <Link href="/pr/setup">
+                  <Settings2Icon />
+                  ตั้งค่า
+                </Link>
+              </Button>
+              <Button asChild>
+                <Link href="/pr/create">
+                  <PlusIcon />
+                  <span className="sm:hidden">สร้าง</span>
+                  <span className="hidden sm:inline">สร้างใบขอซื้อ</span>
+                </Link>
+              </Button>
+            </div>
           </div>
 
           <StickyToolbar hidden={hidden} barRef={stickyRef}>

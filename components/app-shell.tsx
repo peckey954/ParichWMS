@@ -27,6 +27,7 @@ import { LightTooltip } from "@/components/light-tooltip";
 import { NotificationBell } from "@/components/notification-bell";
 import { NotificationsProvider, useNotifications } from "@/components/notifications-provider";
 import { AddedRoundsProvider } from "@/components/po/added-rounds-provider";
+import { PrSetupProvider } from "@/components/pr/pr-setup-provider";
 import { SafetyStockProvider } from "@/components/stock/safety-stock-provider";
 import { RecipeRunProvider } from "@/components/production/recipe-run";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -65,7 +66,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             {/* เกณฑ์ Safety Stock ตั้งที่หน้า /stock/safety-stock แต่ไปโผล่เป็น
                 ชิปเกรดบนการ์ดสินค้าในหน้าสต็อกทั่วไป คนละ route กันเหมือนกัน */}
             <SafetyStockProvider>
-              <Shell>{children}</Shell>
+              {/* ประเภทสินค้า/คลังปลายทางตั้งที่หน้า /pr/setup แต่ฟอร์มสร้าง
+                  ใบขอซื้อเป็นคนใช้ คนละ route กันเหมือนกัน */}
+              <PrSetupProvider>
+                <Shell>{children}</Shell>
+              </PrSetupProvider>
             </SafetyStockProvider>
           </AddedRoundsProvider>
         </NotificationsProvider>

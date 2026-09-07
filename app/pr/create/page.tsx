@@ -40,10 +40,9 @@ import {
 import { toast } from "sonner";
 import { DateSelect, formatDateSlash } from "@/components/date-select";
 import { useNumberField } from "@/components/number-field";
+import { usePrSetup } from "@/components/pr/pr-setup-provider";
 import {
   formatPrQty,
-  PR_CATEGORIES,
-  PR_CATEGORY_LABEL,
   PR_REASONS,
   PR_REASON_LABEL,
   productsOf,
@@ -66,6 +65,8 @@ import {
 export default function CreatePrPage() {
   const router = useRouter();
 
+  const { setup: prSetup } = usePrSetup();
+  const prCategories = prSetup.categories;
   const [categoryId, setCategoryId] = React.useState<PrCategoryId | undefined>();
   const [productId, setProductId] = React.useState<string | undefined>();
   const [packing, setPacking] = React.useState<string | undefined>();
@@ -82,6 +83,15 @@ export default function CreatePrPage() {
   const [productFieldKey, setProductFieldKey] = React.useState(0);
 
   const products = categoryId ? productsOf(categoryId) : [];
+  // คลังปลายทางของประเภทที่เลือก — ให้เห็นตั้งแต่ตอนกรอกว่าของจะไปลงที่ไหน
+  const destination = React.useMemo(() => {
+    const cat = prCategories.find((c) => c.id === categoryId);
+    if (!cat || cat.warehouseIds.length === 0) return null;
+    return cat.warehouseIds
+      .map((id) => prSetup.warehouses.find((w) => w.id === id)?.label)
+      .filter(Boolean)
+      .join(" · ");
+  }, [categoryId, prCategories, prSetup.warehouses]);
   const product: PrProduct | undefined = products.find((p) => p.id === productId);
 
   const isDirty = categoryId !== undefined;
@@ -159,13 +169,22 @@ export default function CreatePrPage() {
                 <SelectValue placeholder="เลือกประเภทสินค้า" />
               </SelectTrigger>
               <SelectContent>
-                {PR_CATEGORIES.map((c) => (
-                  <SelectItem key={c} value={c}>
-                    {PR_CATEGORY_LABEL[c]}
-                  </SelectItem>
-                ))}
+                {/* ประเภทมาจากหน้าตั้งค่าใบขอซื้อ (/pr/setup) ไม่ใช่รายการตายตัว
+                    ตัวที่เพิ่งเพิ่มแล้วยังไม่ได้ตั้งชื่อไม่ต้องโชว์ กันตัวเลือกว่าง */}
+                {prCategories
+                  .filter((c) => c.label.trim() !== "")
+                  .map((c) => (
+                    <SelectItem key={c.id} value={c.id}>
+                      {c.label}
+                    </SelectItem>
+                  ))}
               </SelectContent>
             </Select>
+            {destination && (
+              <p className="text-sm text-muted-foreground">
+                ของเข้าคลัง: <span className="font-medium">{destination}</span>
+              </p>
+            )}
           </div>
 
           {/* ---------- ขั้นที่ 2: สินค้า — โผล่หลังเลือกประเภทแล้วเท่านั้น ---------- */}

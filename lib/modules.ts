@@ -195,6 +195,13 @@ export const SETTINGS_ITEMS: {
     href: "/qc/setup",
   },
   {
+    id: "pr-setup",
+    label: "ตั้งค่าใบขอซื้อ",
+    description: "ประเภทสินค้าที่ขอซื้อได้ และคลังปลายทางของแต่ละประเภท",
+    icon: "clipboardPlus",
+    href: "/pr/setup",
+  },
+  {
     id: "safety-stock",
     label: "ตั้งค่า Safety Stock",
     description: "แบ่งเกรด A/B/C จากยอดขายคาดการณ์ และกำหนด % สำรองของแต่ละเกรด",
