@@ -5,6 +5,8 @@ import { Badge } from "@peckey954/ui/components/ui/badge";
 import { Button } from "@peckey954/ui/components/ui/button";
 import { cn } from "@peckey954/ui/lib/utils";
 import { AdjustLotDialog, MoveLotDialog } from "./lot-dialogs";
+import { useSafetyStock } from "./safety-stock-provider";
+import { isProductLow } from "@/lib/safety-stock";
 import {
   CATEGORY_LABEL,
   CONDITION_LABEL,
@@ -57,6 +59,11 @@ function LotRow({
   showChips: boolean;
   showActions: boolean;
 }) {
+  // สต็อกต่ำมาจากเกณฑ์ Safety Stock ที่ตั้งไว้ ไม่ใช่ธงที่ติดมากับข้อมูล
+  // ต้องใช้ที่มาเดียวกับการ์ดสินค้า ไม่งั้นสองที่บอกไม่ตรงกัน
+  const { config } = useSafetyStock();
+  const lowStock = isProductLow(product, config);
+
   const chips = (
     <>
       {/* ประเภทสินค้าขึ้นเป็นป้ายแรกเสมอ
@@ -74,7 +81,7 @@ function LotRow({
           {CONDITION_LABEL[lot.condition]}
         </Badge>
       )}
-      {product.low && (
+      {lowStock && (
         <Badge
           tone="danger"
           appearance="soft"

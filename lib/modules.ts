@@ -195,6 +195,13 @@ export const SETTINGS_ITEMS: {
     href: "/qc/setup",
   },
   {
+    id: "safety-stock",
+    label: "ตั้งค่า Safety Stock",
+    description: "แบ่งเกรด A/B/C จากยอดขายคาดการณ์ และกำหนด % สำรองของแต่ละเกรด",
+    icon: "boxes",
+    href: "/stock/safety-stock",
+  },
+  {
     id: "design-system",
     label: "Design system",
     description: "ตัวอย่าง component และโทเคนสีทั้งหมดที่ระบบใช้",

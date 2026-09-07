@@ -3,20 +3,67 @@
 // หนึ่งสินค้ามีได้หลายล็อต แต่ละล็อตอยู่คนละโซนและมีสภาพต่างกัน
 // ============================================================
 
-export type CategoryId = "sack" | "sticker" | "giveaway" | "lineSupply";
+export type CategoryId =
+  | "jumboFert"
+  | "sackFert"
+  | "sack"
+  | "oem"
+  | "produced"
+  | "sticker"
+  | "giveaway"
+  | "lineSupply"
+  | "powder"
+  | "liquid"
+  | "bottle";
 
 export const CATEGORIES: { id: CategoryId; label: string }[] = [
+  { id: "jumboFert", label: "ปุ๋ยจัมโบ้" },
+  { id: "sackFert", label: "ปุ๋ยกระสอบ" },
   { id: "sack", label: "กระสอบ" },
+  { id: "oem", label: "สินค้า OEM" },
+  { id: "produced", label: "สินค้าผลิต" },
   { id: "sticker", label: "สติกเกอร์" },
   { id: "giveaway", label: "ของแจกของแถม" },
   { id: "lineSupply", label: "ของใช้ในไลน์ผลิต" },
+  { id: "powder", label: "ผงโรย" },
+  { id: "liquid", label: "น้ำยา" },
+  { id: "bottle", label: "ขวด" },
 ];
 
 export const CATEGORY_LABEL: Record<CategoryId, string> = {
+  jumboFert: "ปุ๋ยจัมโบ้",
+  sackFert: "ปุ๋ยกระสอบ",
   sack: "กระสอบ",
+  oem: "สินค้า OEM",
+  produced: "สินค้าผลิต",
   sticker: "สติกเกอร์",
   giveaway: "ของแจกของแถม",
   lineSupply: "ของใช้ในไลน์ผลิต",
+  powder: "ผงโรย",
+  liquid: "น้ำยา",
+  bottle: "ขวด",
+};
+
+/**
+ * หน่วยนับประจำประเภท — หนึ่งประเภทมีหน่วยเดียวเสมอ ไม่ปนกัน
+ *
+ * ของเดิมหน่วยกระจัดกระจายมาก (ใบ ดวง ตัว ม้วน คู่ ชิ้น) ทั้งที่ของพวกนี้
+ * นับเป็น "ชิ้น" เหมือนกันหมดในทางปฏิบัติ พอจะตั้งเกณฑ์สต็อกเลยตั้งไม่ได้
+ * ต้องมานั่งตั้งทีละหน่วยทั้งที่เป็นของกลุ่มเดียวกัน ยุบเหลือห้าหน่วยตามที่
+ * ใช้จริง: ตัน / ชิ้น / กิโล / ลิตร / ลัง
+ */
+export const CATEGORY_UNIT: Record<CategoryId, string> = {
+  jumboFert: "ตัน",
+  sackFert: "ตัน",
+  sack: "ตัน",
+  oem: "ตัน",
+  produced: "ตัน",
+  sticker: "ชิ้น",
+  giveaway: "ชิ้น",
+  lineSupply: "ชิ้น",
+  powder: "กก.",
+  liquid: "ลิตร",
+  bottle: "ลัง",
 };
 
 /** สภาพของล็อต — ข้อมูลประกอบ ไม่ใช่สถานะที่ต้องรีบจัดการ */
@@ -127,6 +174,24 @@ function seeded(n: number) {
 }
 
 const NAME_POOL: Record<CategoryId, string[]> = {
+  jumboFert: [
+    "ปุ๋ย 15-15-15 จัมโบ้",
+    "ปุ๋ย 16-16-16 จัมโบ้",
+    "ปุ๋ย 46-0-0 จัมโบ้",
+  ],
+  sackFert: [
+    "แม่ปุ๋ย 18-46-0 DAP",
+    "แม่ปุ๋ย 0-0-60 MOP",
+    "ปุ๋ย 8-24-24 กระสอบ",
+  ],
+  oem: [
+    "ปุ๋ยสั่งผลิต 13-13-21 OEM",
+    "ปุ๋ยสั่งผลิต 25-7-7 OEM",
+  ],
+  produced: [
+    "ปุ๋ยผสมเสร็จ 20-8-8",
+    "ปุ๋ยผสมเสร็จ 16-20-0",
+  ],
   sack: [
     "กระสอบพิมพ์ 15-15-15 ตราเรือใบ",
     "กระสอบพิมพ์ 16-20-0 ตราเรือใบ",
@@ -160,33 +225,63 @@ const NAME_POOL: Record<CategoryId, string[]> = {
     "ด้ายเย็บกระสอบ เบอร์ 10",
     "ด้ายเย็บกระสอบ เบอร์ 40",
     "เข็มเย็บกระสอบ DN-x1",
-    "น้ำมันเกียร์ SAE 90",
-    "จาระบีทนความร้อน",
     "สายพานลำเลียง PVC 600 mm",
     "ตะแกรงร่อน 4 mm",
     "ถุงมือผ้าเคลือบยาง",
     "หน้ากากกันฝุ่น N95",
   ],
+  powder: [
+    "ผงโรยกันเค้ก ซิลิกา",
+    "ผงโรยกันชื้น เกรดอาหารสัตว์",
+    "ผงสีผสมปุ๋ย สีแดงอิฐ",
+    "ผงสีผสมปุ๋ย สีน้ำเงิน",
+    "ผงกันจับตัวเป็นก้อน",
+  ],
+  liquid: [
+    "น้ำมันเกียร์ SAE 90",
+    "จาระบีทนความร้อน",
+    "น้ำยาเคลือบเม็ดปุ๋ย",
+    "น้ำยาล้างสายพาน",
+    "น้ำยาฆ่าเชื้อในไลน์ผลิต",
+  ],
+  bottle: [
+    "ขวดสเปรย์ฉีดพ่น 1 ลิตร",
+    "ขวดตัวอย่างเก็บสารเคมี",
+    "ขวดน้ำยาเคลือบ 5 ลิตร",
+    "ขวด HDPE ฝาเกลียว 500 ml",
+  ],
 };
 
-const UNIT_POOL: Record<CategoryId, { unit: string; packing: string }[]> = {
-  sack: [
-    { unit: "ใบ", packing: "มัดละ 100 ใบ" },
-    { unit: "ใบ", packing: "มัดละ 50 ใบ" },
-  ],
-  sticker: [
-    { unit: "ดวง", packing: "ม้วน" },
-    { unit: "ดวง", packing: "แผ่น" },
-  ],
-  giveaway: [
-    { unit: "ชิ้น", packing: "ลัง" },
-    { unit: "ตัว", packing: "ลัง" },
-  ],
-  lineSupply: [
-    { unit: "ม้วน", packing: "กล่อง" },
-    { unit: "ลิตร", packing: "ถัง 20 ลิตร" },
-    { unit: "คู่", packing: "โหล" },
-  ],
+/** สเปกการบรรจุของแต่ละประเภท — หน่วยไม่ได้อยู่ตรงนี้แล้ว มาจาก CATEGORY_UNIT
+ *  ตัวเดียว หนึ่งประเภทหนึ่งหน่วยเสมอ ไม่ต้องกลัวสองที่ไม่ตรงกัน */
+const PACKING_POOL: Record<CategoryId, string[]> = {
+  jumboFert: ["จัมโบ้ 1 ตัน", "จัมโบ้ 500 กก."],
+  sackFert: ["50 Kg", "25 Kg"],
+  oem: ["50 Kg", "Bulk"],
+  produced: ["50 Kg", "Bulk"],
+  sack: ["มัดละ 100 ใบ", "มัดละ 50 ใบ", "Bulk"],
+  sticker: ["ม้วน", "แผ่น"],
+  giveaway: ["ลัง"],
+  lineSupply: ["กล่อง", "โหล"],
+  powder: ["ถุง 25 กก.", "ถุง 50 กก."],
+  liquid: ["ถัง 20 ลิตร", "แกลลอน 5 ลิตร"],
+  bottle: ["ลังละ 12 ขวด", "ลังละ 24 ขวด"],
+};
+
+/** ปริมาณตั้งต้นต่างกันตามหน่วย — ตันหลักร้อย ชิ้นหลักพัน ลังหลักสิบ
+ *  ไม่งั้นของที่นับเป็นลังจะมีเป็นหมื่นลัง ซึ่งไม่มีทางเป็นไปได้ในคลังจริง */
+const QTY_SCALE: Record<CategoryId, number> = {
+  jumboFert: 0.6,
+  sackFert: 0.5,
+  oem: 0.3,
+  produced: 0.7,
+  sack: 0.35,
+  sticker: 20,
+  giveaway: 3,
+  lineSupply: 4,
+  powder: 1.2,
+  liquid: 0.9,
+  bottle: 0.08,
 };
 
 /** โซนทั้งหมดในคลัง ใช้ทั้งตอนสร้างข้อมูลตัวอย่างและตอนเลือกปลายทางในกล่องย้ายสต็อก */
@@ -217,12 +312,16 @@ function generate(): Product[] {
   for (const cat of CATEGORIES) {
     NAME_POOL[cat.id].forEach((name, i) => {
       const rnd = seeded(++n);
-      const spec = UNIT_POOL[cat.id][i % UNIT_POOL[cat.id].length];
+      const packing = PACKING_POOL[cat.id][i % PACKING_POOL[cat.id].length];
+      const unit = CATEGORY_UNIT[cat.id];
       const lotCount = 1 + Math.floor(rnd() * 3);
       const low = rnd() < 0.22;
 
       const lots: Lot[] = Array.from({ length: lotCount }, (_, li) => {
-        const qty = Math.round((5 + rnd() * 900) * (cat.id === "sticker" ? 20 : 1));
+        const qty = Math.max(
+          1,
+          Math.round((5 + rnd() * 900) * QTY_SCALE[cat.id])
+        );
         const day = 1 + Math.floor(rnd() * 27);
         return {
           id: `g${n}-l${li}`,
@@ -232,14 +331,16 @@ function generate(): Product[] {
           receivedAt: `5/${day}/2026`,
           ageDays: 30 + Math.floor(rnd() * 30),
           qty,
-          packNote: spec.packing,
+          packNote: packing,
           pieces: Math.max(1, Math.round(qty / (1 + Math.floor(rnd() * 4)))),
           kgPerPiece: 25 + Math.floor(rnd() * 4) * 25,
+          // ยอดค้างต้องสเกลตามหน่วยเดียวกับ qty ไม่งั้นของที่นับเป็นลังจะขึ้น
+          // "ค้างรับ 3,200 ลัง" ทั้งที่ทั้งคลังมีอยู่ 40 ลัง
           pending:
             rnd() < 0.3
-              ? { inbound: Math.round(rnd() * 500) * 10 }
+              ? { inbound: Math.max(1, Math.round(qty * (0.1 + rnd() * 0.4))) }
               : rnd() < 0.25
-                ? { issue: Math.round(rnd() * 200) * 10 }
+                ? { issue: Math.max(1, Math.round(qty * (0.05 + rnd() * 0.25))) }
                 : {},
           low: low && li === 0,
         };
@@ -250,8 +351,8 @@ function generate(): Product[] {
         name,
         sku: `${cat.id.slice(0, 2).toUpperCase()}-${1000 + n}`,
         category: cat.id,
-        packing: spec.packing,
-        unit: spec.unit,
+        packing,
+        unit,
         low,
         lots,
       });
@@ -317,7 +418,7 @@ const SEED_PRODUCTS: Product[] = [
     sku: "SK-PLAIN-50",
     category: "sack",
     packing: "50 kg",
-    unit: "ใบ",
+    unit: "ตัน",
     low: false,
     lots: [
       {
@@ -326,7 +427,7 @@ const SEED_PRODUCTS: Product[] = [
         code: "PD260514/11",
         receivedAt: "5/14/2026",
         ageDays: 44,
-        qty: 12400,
+        qty: 148,
         packNote: "มัดละ 100 ใบ",
         pending: {},
       },
@@ -337,7 +438,7 @@ const SEED_PRODUCTS: Product[] = [
         condition: "sweep",
         receivedAt: "5/16/2026",
         ageDays: 42,
-        qty: 3200,
+        qty: 62,
         packNote: "มัดละ 100 ใบ",
         pending: { issue: 800 },
       },
@@ -349,7 +450,7 @@ const SEED_PRODUCTS: Product[] = [
     sku: "ST-POINT-69",
     category: "sticker",
     packing: "ม้วน",
-    unit: "ดวง",
+    unit: "ชิ้น",
     low: true,
     lots: [
       {
@@ -371,7 +472,7 @@ const SEED_PRODUCTS: Product[] = [
     sku: "ST-QR-01",
     category: "sticker",
     packing: "ม้วน",
-    unit: "ดวง",
+    unit: "ชิ้น",
     low: false,
     lots: [
       {
@@ -392,7 +493,7 @@ const SEED_PRODUCTS: Product[] = [
     sku: "GF-TEE-01",
     category: "giveaway",
     packing: "ลัง",
-    unit: "ตัว",
+    unit: "ชิ้น",
     low: false,
     lots: [
       {
@@ -424,7 +525,7 @@ const SEED_PRODUCTS: Product[] = [
     sku: "LS-THREAD-20",
     category: "lineSupply",
     packing: "กล่อง",
-    unit: "ม้วน",
+    unit: "ชิ้น",
     low: true,
     lots: [
       {
@@ -443,8 +544,10 @@ const SEED_PRODUCTS: Product[] = [
   {
     id: "p7",
     name: "น้ำมันหล่อลื่นสายพาน",
-    sku: "LS-OIL-46",
-    category: "lineSupply",
+    sku: "LQ-OIL-46",
+    // ย้ายจาก "ของใช้ในไลน์ผลิต" มาเป็น "น้ำยา" — ของใช้ในไลน์ผลิตนับเป็นชิ้น
+    // ทั้งประเภทแล้ว ของเหลวอยู่ปนไม่ได้ หน่วยจะไม่ตรงกับประเภทตัวเอง
+    category: "liquid",
     packing: "ถัง 20 ลิตร",
     unit: "ลิตร",
     low: false,
@@ -458,6 +561,90 @@ const SEED_PRODUCTS: Product[] = [
         qty: 300,
         packNote: "15 ถัง (20 ลิตร/ถัง)",
         pending: { issue: 60 },
+      },
+    ],
+  },
+
+  // ---------- ปุ๋ยที่นับเป็นตัน ----------
+  // ของเดิมในสต็อกทั่วไปเป็นกระสอบ/สติกเกอร์/ของแจกเกือบทั้งหมด มีที่นับเป็นตัน
+  // อยู่ใบเดียว (p1) พอเอาเกรด Safety Stock มาโชว์ในหน้านี้เลยไม่มีของให้ดู
+  // สามตัวนี้เติมไว้ให้เห็นเกรดที่ตัดด้วยเกณฑ์หน่วยตันจริง ๆ
+  {
+    id: "p8",
+    name: "แม่ปุ๋ย 46-0-0 ยูเรีย เม็ด",
+    sku: "RM-4600-BK",
+    category: "sack",
+    packing: "Bulk",
+    unit: "ตัน",
+    low: false,
+    lots: [
+      {
+        id: "l8a",
+        zone: "C-1L",
+        code: "RM260518/01",
+        receivedAt: "5/18/2026",
+        ageDays: 40,
+        qty: 620,
+        packNote: "กองเท (Bulk)",
+        pending: { inbound: 200 },
+      },
+      {
+        id: "l8b",
+        zone: "C-2L",
+        code: "RM260520/03",
+        condition: "accepted",
+        receivedAt: "5/20/2026",
+        ageDays: 38,
+        qty: 340,
+        packNote: "กองเท (Bulk)",
+        pending: {},
+      },
+    ],
+  },
+  {
+    id: "p9",
+    name: "แม่ปุ๋ย 21-0-0 ฟูเจียน ผง",
+    sku: "RM-2100-50",
+    category: "sack",
+    packing: "50 Kg",
+    unit: "ตัน",
+    low: true,
+    lots: [
+      {
+        id: "l9a",
+        zone: "C-4M",
+        code: "RM260522/02",
+        receivedAt: "5/22/2026",
+        ageDays: 36,
+        qty: 96,
+        packNote: "1,920 กระสอบ (50 กก./กระสอบ)",
+        pieces: 1920,
+        kgPerPiece: 50,
+        pending: { issue: 40 },
+        low: true,
+      },
+    ],
+  },
+  {
+    id: "p10",
+    name: "16-20-0 เม็ดปั้น",
+    sku: "RM-1620-50",
+    category: "sack",
+    packing: "50 Kg",
+    unit: "ตัน",
+    low: false,
+    lots: [
+      {
+        id: "l10a",
+        zone: "D-3L",
+        code: "RM260515/06",
+        receivedAt: "5/15/2026",
+        ageDays: 43,
+        qty: 245,
+        packNote: "4,900 กระสอบ (50 กก./กระสอบ)",
+        pieces: 4900,
+        kgPerPiece: 50,
+        pending: {},
       },
     ],
   },
@@ -537,7 +724,7 @@ const DOC_ITEMS: {
     name: "สติกเกอร์ QR",
     sub: "ตรวจสอบย้อนกลับ",
     packing: "1,000 ดวง",
-    unit: "ดวง",
+    unit: "ชิ้น",
   },
   { name: "ถุงมือผ้าเคลือบยาง", sub: "ไซซ์ L", unit: "คู่" },
   {
@@ -1001,7 +1188,7 @@ const SEED_ISSUE: IssueDoc[] = [
     packing: "1,000 ดวง",
     count: -6,
     qty: -6000,
-    unit: "ดวง",
+    unit: "ชิ้น",
     note: "ใช้กับล็อตส่งออก",
     requester: "ธนกฤต ศรีบุญเรือง",
     status: "issueInternal",

@@ -1,7 +1,10 @@
 "use client";
 
 import * as React from "react";
-import { DownloadIcon, ListFilterIcon, SearchIcon } from "lucide-react";
+import Link from "next/link";
+import { DownloadIcon, ListFilterIcon, SearchIcon, Settings2Icon } from "lucide-react";
+import { useSafetyStock } from "@/components/stock/safety-stock-provider";
+import { isProductLow } from "@/lib/safety-stock";
 import { Badge } from "@peckey954/ui/components/ui/badge";
 import { Switch } from "@peckey954/ui/components/ui/switch";
 import {
@@ -100,6 +103,9 @@ function GeneralStockView() {
     armScrollGuard,
     releaseScrollGuard,
   } = useScrollState();
+  // ตัวกรอง "สต็อกต่ำ" ใช้เกณฑ์ Safety Stock ที่ตั้งไว้ ที่มาเดียวกับชิปแดง
+  // บนการ์ด ปรับเกณฑ์แล้วรายการที่กรองได้เปลี่ยนตามทันที
+  const { config: safetyConfig } = useSafetyStock();
   // ของจริงแยกประเภทกันเด็ดขาด ไม่มีมุมมอง "ทั้งหมด"
   // ชิปจึงเป็นการนำทาง (เลือกอยู่เสมอหนึ่งอัน) ไม่ใช่ตัวกรองที่ปิดได้
   // "history" เป็นมุมมองพิเศษ ไม่ใช่ประเภทสินค้า แต่อยู่แถวชิปเดียวกัน
@@ -141,7 +147,7 @@ function GeneralStockView() {
         (p) =>
           cats.includes(p.category) &&
           matchesQuery(p, query) &&
-          (!lowOnly || p.low)
+          (!lowOnly || isProductLow(p, safetyConfig))
       ).filter(
         (p) => view.products.length === 0 || view.products.includes(p.name)
       );
@@ -164,7 +170,7 @@ function GeneralStockView() {
               (p) =>
                 p.category === c.id &&
                 matchesQuery(p, query) &&
-                (!lowOnly || p.low)
+                (!lowOnly || isProductLow(p, safetyConfig))
             )
         );
 
@@ -255,16 +261,31 @@ function GeneralStockView() {
           </Breadcrumb>
 
           {/* ---------- หัวเรื่อง ----------
-               ไม่มีปุ่มตรงนี้ ปุ่มที่ใช้ได้เฉพาะบางแท็บอยู่ใต้แถบแท็บ
-               ตำแหน่งข้างชื่อหน้าสื่อว่าใช้ได้ทั้งหน้า พอความจริงไม่ตรง
-               หัวเรื่องจะกระตุกทุกครั้งที่สลับแท็บเพราะปุ่มโผล่มาแล้วหายไป */}
-          <div className="mt-2 min-w-0 sm:mt-3">
-            <h1 className="text-2xl font-semibold tracking-tight">
-              สต็อกทั่วไป
-            </h1>
-            <p className="mt-1 text-sm text-muted-foreground">
-              จัดการสต็อกทั่วไป
-            </p>
+               กฎของตรงนี้: วางได้เฉพาะปุ่มระดับ "ทั้งหน้า" ที่อยู่ตลอดทุกแท็บ
+               ปุ่มที่ใช้ได้เฉพาะบางแท็บยังห้ามมาอยู่ข้างชื่อหน้าเหมือนเดิม
+               เพราะตำแหน่งนี้สื่อว่าใช้ได้ทั้งหน้า พอความจริงไม่ตรง หัวเรื่อง
+               จะกระตุกทุกครั้งที่สลับแท็บเพราะปุ่มโผล่มาแล้วหายไป — ปุ่มแบบนั้น
+               ให้ไปอยู่ใต้แถบแท็บ
+
+               "ตั้งค่า Safety Stock" ผ่านกฎนี้ เป็นการตั้งค่าของทั้งคลัง ไม่ผูก
+               กับแท็บไหน จึงอยู่ถาวรไม่กระตุก (แบบเดียวกับหน้าผลิตแบ่งบรรจุ) */}
+          <div className="mt-2 flex items-start justify-between gap-3 sm:mt-3">
+            <div className="min-w-0">
+              <h1 className="text-2xl font-semibold tracking-tight">
+                สต็อกทั่วไป
+              </h1>
+              <p className="mt-1 text-sm text-muted-foreground">
+                จัดการสต็อกทั่วไป
+              </p>
+            </div>
+
+            <Button asChild variant="outline-primary" className="shrink-0">
+              <Link href="/stock/safety-stock">
+                <Settings2Icon className="hidden @3xl:inline" />
+                <span className="@3xl:hidden">Safety Stock</span>
+                <span className="hidden @3xl:inline">ตั้งค่า Safety Stock</span>
+              </Link>
+            </Button>
           </div>
 
           <Tabs

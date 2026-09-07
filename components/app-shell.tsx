@@ -27,6 +27,7 @@ import { LightTooltip } from "@/components/light-tooltip";
 import { NotificationBell } from "@/components/notification-bell";
 import { NotificationsProvider, useNotifications } from "@/components/notifications-provider";
 import { AddedRoundsProvider } from "@/components/po/added-rounds-provider";
+import { SafetyStockProvider } from "@/components/stock/safety-stock-provider";
 import { RecipeRunProvider } from "@/components/production/recipe-run";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { ModuleIcon } from "@/components/modules/module-icon";
@@ -61,7 +62,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           {/* รอบรับเข้าที่เพิ่มจากหน้า "เพิ่มรอบ" ต้องข้ามหน้าไปโผล่ในตาราง
               "รอบการรับสินค้า" ของหน้าใบสั่งซื้อได้ (คนละ route กัน) */}
           <AddedRoundsProvider>
-            <Shell>{children}</Shell>
+            {/* เกณฑ์ Safety Stock ตั้งที่หน้า /stock/safety-stock แต่ไปโผล่เป็น
+                ชิปเกรดบนการ์ดสินค้าในหน้าสต็อกทั่วไป คนละ route กันเหมือนกัน */}
+            <SafetyStockProvider>
+              <Shell>{children}</Shell>
+            </SafetyStockProvider>
           </AddedRoundsProvider>
         </NotificationsProvider>
       </RecipeRunProvider>

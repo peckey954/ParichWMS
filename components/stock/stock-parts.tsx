@@ -9,6 +9,8 @@ import {
 } from "@peckey954/ui/components/ui/collapsible";
 import { cn } from "@peckey954/ui/lib/utils";
 import { AdjustLotDialog, MoveLotDialog } from "./lot-dialogs";
+import { RankChip, useSafetyStock } from "./safety-stock-provider";
+import { productSafety } from "@/lib/safety-stock";
 import {
   CATEGORY_LABEL,
   CONDITION_LABEL,
@@ -47,9 +49,15 @@ function ConditionChip({ condition }: { condition: LotCondition }) {
   );
 }
 
+/** ประเภทสินค้า — เทา ไม่ใช่ส้มแบรนด์เหมือนเดิม
+ *
+ *  ยกส้มไปให้ชิปเกรดใช้แทน เพราะส้มควรอยู่กับของที่ "ต่างกันในแต่ละใบ" ส่วน
+ *  ประเภทสินค้าซ้ำกันทั้งหน้าอยู่แล้ว (ชิปประเภทด้านบนเป็นตัวกรอง เปิดอยู่
+ *  ประเภทไหนการ์ดก็เป็นประเภทนั้นทั้งหมด) ย้ำด้วยสีแบรนด์ทุกใบเลยเป็นการเน้น
+ *  ของที่ไม่ได้ให้ข้อมูลใหม่ และไปชนกับเกรด C ที่เป็นส้มเส้นขอบเหมือนกันเป๊ะ */
 function CategoryChip({ product }: { product: Product }) {
   return (
-    <Badge tone="brand" appearance="outline">
+    <Badge tone="neutral" appearance="outline">
       {CATEGORY_LABEL[product.category]}
     </Badge>
   );
@@ -262,6 +270,10 @@ export function ProductCard({
 }) {
   const total = productTotal(product);
   const pending = rollupPending(product);
+  // เกรดมาจากเกณฑ์ที่ตั้งไว้ในหน้า /stock/safety-stock — ปรับเกณฑ์ที่นั่นแล้ว
+  // ชิปตรงนี้เปลี่ยนตามทันที null = หน่วยนับนี้ยังไม่ได้ตั้งเกณฑ์ไว้ ไม่เดาให้
+  const { config } = useSafetyStock();
+  const safety = productSafety(product, config);
 
   const chips = (
     <>
@@ -269,7 +281,7 @@ export function ProductCard({
       <Badge tone="neutral" appearance="soft" className={NO_BORDER}>
         {product.packing}
       </Badge>
-      {product.low && <LowChip />}
+      {safety?.low && <LowChip />}
       <PendingChips pending={pending} unit={product.unit} />
     </>
   );
@@ -285,19 +297,25 @@ export function ProductCard({
               {showChips && <ChipsInline>{chips}</ChipsInline>}
             </div>
 
-            <p className="shrink-0 text-right tabular-nums">
-              <span
-                className={cn(
-                  "text-lg font-semibold",
-                  product.low && "text-destructive"
-                )}
-              >
-                {formatQty(total)}
-              </span>{" "}
-              <span className="text-sm text-muted-foreground">
-                {product.unit}
-              </span>
-            </p>
+            {/* เกรดอยู่ติดกับตัวเลข ไม่ไปปนกับชิปข้างชื่อ — เกรดคือคุณสมบัติของ
+                "ปริมาณ" (ใช้เยอะแค่ไหน) จึงควรอ่านคู่กับจำนวนคงเหลือ ส่วนชิป
+                ข้างชื่อเป็นคุณสมบัติของตัวสินค้า (ประเภท/บรรจุ) คนละเรื่องกัน */}
+            <div className="flex shrink-0 items-center gap-2">
+              {safety && <RankChip rank={safety.rank} />}
+              <p className="text-right tabular-nums">
+                <span
+                  className={cn(
+                    "text-lg font-semibold",
+                    safety?.low && "text-destructive"
+                  )}
+                >
+                  {formatQty(total)}
+                </span>{" "}
+                <span className="text-sm text-muted-foreground">
+                  {product.unit}
+                </span>
+              </p>
+            </div>
           </div>
 
           {/* จอแคบเท่านั้น — แถวชิปกว้างเท่าการ์ด เลื่อนดูได้ */}
