@@ -17,6 +17,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@peckey954/ui/components/ui/dialog";
+import { TooltipProvider } from "@peckey954/ui/components/ui/tooltip";
 import { LightTooltip } from "@/components/light-tooltip";
 import { cn } from "@peckey954/ui/lib/utils";
 import { toast } from "sonner";
@@ -145,9 +146,19 @@ export function UploadDataDialog({
             <div className="flex flex-wrap items-center justify-between gap-3">
               <p className="flex items-center gap-1.5 font-medium">
                 ตัวอย่างข้อมูล
-                <LightTooltip label="หัวคอลัมน์ต้องสะกดตามนี้ ลำดับสลับได้ ส่วนหน่วยกับบรรจุภัณฑ์ใส่เพิ่มได้">
-                  <InfoIcon className="size-4 text-muted-foreground" />
-                </LightTooltip>
+                {/* TooltipProvider ของแอปอยู่ใน SidebarBody ไม่ได้ครอบเนื้อหาหน้า
+                    Tooltip ที่นี่จึงต้องพา provider ของตัวเองมาด้วย ไม่งั้น Radix
+                    โยน error ตอนเรนเดอร์แล้วกล่องทั้งใบเปิดไม่ขึ้น */}
+                <TooltipProvider delayDuration={200}>
+                  <LightTooltip
+                    side="bottom"
+                    label="หัวคอลัมน์ต้องสะกดตามนี้ ลำดับสลับได้ ส่วนหน่วยกับบรรจุภัณฑ์ใส่เพิ่มได้"
+                  >
+                    <button type="button" aria-label="รูปแบบไฟล์ที่รองรับ">
+                      <InfoIcon className="size-4 text-muted-foreground" />
+                    </button>
+                  </LightTooltip>
+                </TooltipProvider>
               </p>
               <Button variant="outline-primary" size="sm" onClick={downloadTemplate}>
                 <DownloadIcon />
