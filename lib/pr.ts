@@ -221,6 +221,15 @@ export type PrDoc = {
   code: string;
   createdAt: string;
   categoryId: PrCategoryId;
+  /**
+   * ชื่อประเภท ณ วันที่สร้างใบ — คัดลอกไว้ ไม่ใช่ไปอ่านสดจากค่าตั้งค่า
+   *
+   * ตั้งค่าเปลี่ยนชื่อประเภทได้ตลอด ถ้าหน้ารายละเอียดไปอ่านชื่อสดทุกครั้ง
+   * ใบที่ปิดไปแล้วเมื่อปีก่อนจะเปลี่ยนชื่อตามไปด้วย ทั้งที่ตอนนั้นไม่ได้ชื่อนี้
+   * ส่วน categoryId ข้างบนเก็บไว้ตอบคำถามว่า "ถ้าแก้ประเภทนี้ กระทบใบไหนบ้าง"
+   * — สองฟิลด์นี้ทำงานคนละหน้าที่ ต้องมีคู่กัน ไม่ใช่เลือกอย่างใดอย่างหนึ่ง
+   */
+  categoryLabel: string;
   group: string;
   productName: string;
   productSub?: string;
@@ -251,7 +260,7 @@ export function matchesPr(d: PrDoc, q: string): boolean {
     d.code,
     d.productName,
     d.productSub ?? "",
-    PR_CATEGORY_LABEL[d.categoryId],
+    d.categoryLabel,
     d.group,
     d.requester,
   ].some((v) => v.toLowerCase().includes(s));
@@ -390,6 +399,7 @@ function morePr(count = 105): PrDoc[] {
       code: `PRQ2601${pad(day)}/${pad((i % 9) + 1)}`,
       createdAt: docStamp(i, rnd),
       categoryId: product.category,
+      categoryLabel: PR_CATEGORY_LABEL[product.category],
       group: product.group,
       productName: product.name,
       productSub: product.sub,

@@ -41,11 +41,10 @@ import {
 import { toast } from "sonner";
 import { DateSelect, formatDateSlash, parseDateSlash } from "@/components/date-select";
 import { useNumberField } from "@/components/number-field";
+import { usePrSetup } from "@/components/pr/pr-setup-provider";
 import {
   formatPrQty,
   getPrDoc,
-  PR_CATEGORIES,
-  PR_CATEGORY_LABEL,
   PR_PRODUCTS,
   PR_REASONS,
   PR_REASON_LABEL,
@@ -69,6 +68,7 @@ export default function EditPrPage() {
   const router = useRouter();
   const params = useParams<{ id: string }>();
   const doc = React.useMemo(() => getPrDoc(params.id), [params.id]);
+  const prCategories = usePrSetup().setup.categories;
 
   const initialProduct = React.useMemo(
     () =>
@@ -191,11 +191,16 @@ export default function EditPrPage() {
                 <SelectValue placeholder="เลือกประเภทสินค้า" />
               </SelectTrigger>
               <SelectContent>
-                {PR_CATEGORIES.map((c) => (
-                  <SelectItem key={c} value={c}>
-                    {PR_CATEGORY_LABEL[c]}
-                  </SelectItem>
-                ))}
+                {/* ตัวเลือกอ่านจากค่าตั้งค่าปัจจุบัน ชุดเดียวกับหน้าสร้างใบขอซื้อ
+                    ส่วนชื่อที่ "แสดง" บนใบเก่าอ่านจาก doc.categoryLabel ที่ปักไว้
+                    ตอนสร้าง — เลือกใหม่เมื่อไหร่ค่อยเขียนทับสำเนานั้น */}
+                {prCategories
+                  .filter((c) => c.label.trim() !== "")
+                  .map((c) => (
+                    <SelectItem key={c.id} value={c.id}>
+                      {c.label}
+                    </SelectItem>
+                  ))}
               </SelectContent>
             </Select>
           </div>

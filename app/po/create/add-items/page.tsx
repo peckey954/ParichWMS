@@ -55,7 +55,6 @@ import {
   formatPrQty,
   formatReasons,
   matchesPr,
-  PR_CATEGORY_LABEL,
   PR_PRODUCTS,
   type PrCategoryId,
   type PrDoc,
@@ -406,7 +405,7 @@ function AddItemsList({
                       </span>
                     </TableCell>
                     <TableCell className="whitespace-nowrap">
-                      {PR_CATEGORY_LABEL[d.categoryId]}
+                      {d.categoryLabel}
                     </TableCell>
                     <TableCell className="whitespace-nowrap">{d.group}</TableCell>
                     <TableCell className="whitespace-nowrap">{d.packing ?? "-"}</TableCell>
@@ -483,7 +482,7 @@ function AddItemsCard({
           {d.productSub && ` ${d.productSub}`}
         </p>
         <p className="mt-2 text-sm">
-          {PR_CATEGORY_LABEL[d.categoryId]} <span className="text-border" aria-hidden>|</span> {d.group}
+          {d.categoryLabel} <span className="text-border" aria-hidden>|</span> {d.group}
           {d.packing && (
             <>
               {" "}

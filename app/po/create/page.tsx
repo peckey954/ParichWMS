@@ -38,7 +38,7 @@ import { cn } from "@peckey954/ui/lib/utils";
 import { toast } from "sonner";
 import { DateRangeSelect, type DateRange } from "@/components/date-select";
 import { useNumberField } from "@/components/number-field";
-import { PR_CATEGORY_LABEL, PR_PRODUCTS, type PrCategoryId, type PrDoc } from "@/lib/pr";
+import { PR_PRODUCTS, type PrCategoryId, type PrDoc } from "@/lib/pr";
 import { COMPANY_POOL, formatPoBaht, formatPoQty, PO_QUEUE_DOCS } from "@/lib/po";
 
 /* ------------------------------------------------------------------
@@ -56,6 +56,9 @@ type DraftLine = {
   key: string;
   productId?: string;
   categoryId: PrCategoryId;
+  /** ชื่อประเภทที่ใบขอซื้อต้นทางปักไว้ — ส่งต่อมาทั้งอย่างนั้น ไม่อ่านใหม่
+   *  ใบสั่งซื้อจึงพูดชื่อเดียวกับใบขอซื้อที่มันมา แม้ตั้งค่าจะเปลี่ยนไปแล้ว */
+  categoryLabel: string;
   group: string;
   productName: string;
   productSub?: string;
@@ -92,6 +95,7 @@ function toDraftLine(pr: PrDoc): DraftLine {
     key: pr.id,
     productId: product?.id,
     categoryId: pr.categoryId,
+    categoryLabel: pr.categoryLabel,
     group: pr.group,
     productName: pr.productName,
     productSub: pr.productSub,
@@ -435,7 +439,7 @@ function ProductCard({
               {line.productSub && ` ${line.productSub}`}
             </p>
             <p className="mt-2 text-sm whitespace-nowrap text-muted-foreground">
-              {PR_CATEGORY_LABEL[line.categoryId]} · {line.group}
+              {line.categoryLabel} · {line.group}
               {line.packing && ` · ${line.packing}`}
             </p>
           </div>

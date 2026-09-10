@@ -17,6 +17,7 @@
 
 import {
   formatPrQty,
+  PR_CATEGORY_LABEL,
   PR_DOCS,
   PR_PRODUCTS,
   PR_REASONS,
@@ -122,6 +123,8 @@ export type PoLineItem = {
   id: string;
   poId: string;
   categoryId: PrCategoryId;
+  /** ชื่อประเภท ณ วันที่สร้างรายการ — เหตุผลเดียวกับ PrDoc.categoryLabel */
+  categoryLabel: string;
   group: string;
   productName: string;
   productSub?: string;
@@ -453,6 +456,7 @@ function buildPoDoc(seq: number, status: PoStatus): PoDoc {
       id: `${id}-li${i + 1}`,
       poId: id,
       categoryId: product.category,
+      categoryLabel: PR_CATEGORY_LABEL[product.category],
       group: product.group,
       productName: product.name,
       productSub: product.sub,

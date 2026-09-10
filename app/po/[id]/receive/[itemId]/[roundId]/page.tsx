@@ -26,7 +26,6 @@ import {
   PO_ROUND_STATUS_LABEL,
   type PoRoundStatus,
 } from "@/lib/po";
-import { PR_CATEGORY_LABEL } from "@/lib/pr";
 
 /* ------------------------------------------------------------------
    ใบรับเข้าวัตถุดิบ — รายละเอียดรอบรับเข้าหนึ่งรอบ ดูอย่างเดียว (ไม่มีแก้ไข
@@ -153,7 +152,7 @@ export default function PoRoundDetailPage() {
                   {item.productSub && ` ${item.productSub}`}
                 </span>
                 <span className="mt-0.5 block text-sm text-muted-foreground @lg:mt-0">
-                  {PR_CATEGORY_LABEL[item.categoryId]} | {item.group}
+                  {item.categoryLabel} | {item.group}
                   {item.packing && ` | ${item.packing}`}
                 </span>
               </div>

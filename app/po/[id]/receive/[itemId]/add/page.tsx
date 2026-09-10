@@ -35,7 +35,6 @@ import { toast } from "sonner";
 import { DateSelect, formatDateSlash, parseDateSlash } from "@/components/date-select";
 import { useNumberField } from "@/components/number-field";
 import { applyRoundEdits, useAddedRounds } from "@/components/po/added-rounds-provider";
-import { PR_CATEGORY_LABEL } from "@/lib/pr";
 import { formatPoQty, getPoLineItem, roundIdFromCode, type PoRound } from "@/lib/po";
 
 /* ------------------------------------------------------------------
@@ -251,7 +250,7 @@ function AddPoRoundForm() {
               {item.productSub && ` ${item.productSub}`}
             </p>
             <p className="mt-1.5 text-sm text-muted-foreground">
-              {PR_CATEGORY_LABEL[item.categoryId]} <span className="text-border" aria-hidden>|</span> {item.group}
+              {item.categoryLabel} <span className="text-border" aria-hidden>|</span> {item.group}
               {item.packing && (
                 <>
                   {" "}
@@ -268,7 +267,7 @@ function AddPoRoundForm() {
                 {item.productSub && ` ${item.productSub}`}
               </span>
               <span className="ml-3 text-sm text-muted-foreground">
-                {PR_CATEGORY_LABEL[item.categoryId]} <span className="text-border" aria-hidden>|</span> {item.group}
+                {item.categoryLabel} <span className="text-border" aria-hidden>|</span> {item.group}
                 {item.packing && (
                   <>
                     {" "}

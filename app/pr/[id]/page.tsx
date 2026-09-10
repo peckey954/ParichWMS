@@ -53,7 +53,6 @@ import {
   formatPrQty,
   formatReasons,
   getPrDoc,
-  PR_CATEGORY_LABEL,
   PR_STATUS_LABEL,
 } from "@/lib/pr";
 
@@ -188,7 +187,7 @@ export default function PrDetailPage() {
                   {doc.productSub && ` ${doc.productSub}`}
                 </span>
                 <span className="flex flex-wrap items-center gap-x-2 text-sm text-muted-foreground">
-                  <span>{PR_CATEGORY_LABEL[doc.categoryId]}</span>
+                  <span>{doc.categoryLabel}</span>
                   <span className="text-border" aria-hidden>
                     |
                   </span>

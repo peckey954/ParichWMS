@@ -94,7 +94,6 @@ import {
   type PoRound,
   type PoRoundStatus,
 } from "@/lib/po";
-import { PR_CATEGORY_LABEL } from "@/lib/pr";
 
 /* ------------------------------------------------------------------
    ใบสั่งซื้อ — โครงตามไฟล์ออกแบบ: กล่อง "ข้อมูลใบสั่งซื้อ" พับ/กางได้ (ราคารวม
@@ -602,7 +601,7 @@ function LineItemsTable({ po }: { po: PoDoc }) {
                 {item.productSub && ` ${item.productSub}`}
               </p>
               <p className="mt-2 text-muted-foreground">
-                {PR_CATEGORY_LABEL[item.categoryId]} <span className="text-border" aria-hidden>|</span> {item.group}
+                {item.categoryLabel} <span className="text-border" aria-hidden>|</span> {item.group}
                 {item.packing && (
                   <>
                     {" "}
@@ -672,7 +671,7 @@ function LineItemsTable({ po }: { po: PoDoc }) {
                       </span>
                       {item.urgent && <UrgentChip />}
                       <span className="mt-2 block text-sm text-muted-foreground">
-                        {PR_CATEGORY_LABEL[item.categoryId]} <span className="text-border" aria-hidden>|</span> {item.group}
+                        {item.categoryLabel} <span className="text-border" aria-hidden>|</span> {item.group}
                         {item.packing && (
                           <>
                             {" "}
