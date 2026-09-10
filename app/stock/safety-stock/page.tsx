@@ -153,28 +153,35 @@ function GroupCard({
       {/* ---------- หัวการ์ด ----------
            ชิปบอกว่ากลุ่มนี้คลุมประเภทสินค้าไหนบ้าง
 
-           จัดลำดับด้วย order แทนการเขียนชิปซ้ำสองชุด —
-           จอแคบ: "ประเภทสินค้า:" กับ "หน่วย" อยู่บรรทัดเดียวกัน ชิปตกลงบรรทัดใหม่
-                  (ชิปห้าใบเรียงต่อท้ายในจอแคบแล้วดันหน่วยหลุดหายไปเลย)
-           จอกว้าง: ชิปต่อท้ายป้ายในบรรทัดเดียวกัน หน่วยชิดขวาสุด
-           ml-auto ดันหน่วยไปขวาได้ทั้งสองแบบ ไม่ต้องแยก layout */}
-      <div className="flex flex-wrap items-center gap-2">
-        <span className="text-sm text-muted-foreground">ประเภทสินค้า:</span>
+           บรรทัดเดียวทุกขนาดจอ: ป้ายซ้าย ชิปตรงกลาง หน่วยขวาสุด
+           ชิปที่ล้นเลื่อนดูในแนวนอน ไม่ตกบรรทัดใหม่ — ห้าใบในจอแคบถ้าปล่อยให้
+           ห่อบรรทัด การ์ดจะสูงขึ้นไม่เท่ากันทั้งห้าใบ และหัวข้อ "หน่วย" ที่คนใช้
+           อ้างอิงตลอดจะถูกดันหลุดออกจากสายตา
+           ซ่อนแถบเลื่อนไว้ ชิปที่ถูกตัดครึ่งที่ขอบเป็นตัวบอกเองว่ายังมีต่อ */}
+      <div className="flex flex-nowrap items-center gap-2">
+        <span className="shrink-0 text-sm text-muted-foreground">
+          ประเภทสินค้า:
+        </span>
 
-        <div className="order-2 flex w-full flex-wrap items-center gap-2 @3xl:order-1 @3xl:w-auto">
+        <div
+          className={cn(
+            "flex min-w-0 flex-1 items-center gap-2 overflow-x-auto",
+            "flex-nowrap [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+          )}
+        >
           {categories.map((c) => (
             <Badge
               key={c}
               tone="neutral"
               appearance="outline"
-              className="font-semibold"
+              className="shrink-0 font-semibold"
             >
               {c}
             </Badge>
           ))}
         </div>
 
-        <p className="order-1 ml-auto shrink-0 text-sm @3xl:order-2">
+        <p className="shrink-0 text-sm">
           <span className="text-muted-foreground">หน่วย: </span>
           <span className="font-semibold">{unit}</span>
         </p>
@@ -182,7 +189,7 @@ function GroupCard({
 
       {/* ---------- หัวคอลัมน์ (เฉพาะจอกว้าง) ----------
            จอแคบไม่มีคอลัมน์ให้พาดหัว แต่ละช่องมี label ของตัวเองอยู่แล้ว */}
-      <div className="mt-4 hidden gap-4 @3xl:grid @3xl:grid-cols-[3.5rem_1fr_1fr] @3xl:items-baseline">
+      <div className="mt-5 hidden gap-4 @3xl:grid @3xl:grid-cols-[3.5rem_1fr_1fr] @3xl:items-baseline">
         <span className="text-sm font-medium">อันดับ</span>
         <span className="text-sm font-medium">
           เกณฑ์ตัดอันดับจากยอดคาดการณ์ ({unit})
@@ -190,7 +197,8 @@ function GroupCard({
         <span />
       </div>
 
-      <div className="mt-3 space-y-3 @3xl:mt-2 @3xl:space-y-2">
+      {/* 16 ทั้งแนวตั้งแนวนอน — ของเดิม 8-12 ทำให้สามบรรทัดอันดับเบียดกันจนอ่านยาก */}
+      <div className="mt-4 space-y-4 @3xl:mt-2">
         {SAFETY_RANKS.map((rank) => (
           <RankRow
             key={rank}
@@ -227,7 +235,7 @@ function RankRow({
   const pctId = `percent-${groupId}-${rank}`;
 
   return (
-    <div className="grid gap-3 border-t border-border pt-3 first:border-0 first:pt-0 @3xl:grid-cols-[3.5rem_1fr_1fr] @3xl:items-center @3xl:gap-4 @3xl:border-0 @3xl:pt-0">
+    <div className="grid gap-4 border-t border-border pt-4 first:border-0 first:pt-0 @3xl:grid-cols-[3.5rem_1fr_1fr] @3xl:items-center @3xl:gap-4 @3xl:border-0 @3xl:pt-0">
       {/* อันดับ — จอแคบมีคำว่า "อันดับ:" นำหน้า จอกว้างเป็นคอลัมน์อยู่แล้ว */}
       <div className="flex items-center gap-2">
         <span className="text-sm font-medium text-muted-foreground @3xl:hidden">
@@ -241,7 +249,7 @@ function RankRow({
         เกณฑ์ตัดอันดับจากยอดคาดการณ์
       </p>
 
-      <div className="grid gap-3 @3xl:contents">
+      <div className="grid gap-4 @3xl:contents">
         {/* เกณฑ์ตัด — อันดับ C ไม่มีช่องกรอก เพราะเป็น "ส่วนที่เหลือ"
             ตั้งเส้นล่างให้ C ด้วยจะเกิดช่องว่างที่ไม่มีอันดับไหนรับ */}
         {isC ? (
@@ -297,7 +305,7 @@ function Stepper({
     onValueChange(Math.max(0, Number((value + delta).toFixed(2))));
 
   return (
-    <div className="grid gap-2 @3xl:grid-cols-[auto_1fr] @3xl:items-center @3xl:gap-3">
+    <div className="grid gap-2 @3xl:grid-cols-[auto_1fr] @3xl:items-center @3xl:gap-4">
       <Label htmlFor={id} className="whitespace-nowrap text-muted-foreground">
         {label}:
       </Label>
