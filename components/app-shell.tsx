@@ -23,6 +23,7 @@ import {
   DevicePreviewProvider,
   DevicePreviewToggle,
 } from "@/components/device-preview";
+import { FileViewerProvider } from "@/components/file-viewer-provider";
 import { LightTooltip } from "@/components/light-tooltip";
 import { NotificationBell } from "@/components/notification-bell";
 import { NotificationsProvider, useNotifications } from "@/components/notifications-provider";
@@ -69,7 +70,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               {/* ประเภทสินค้า/คลังปลายทางตั้งที่หน้า /pr/setup แต่ฟอร์มสร้าง
                   ใบขอซื้อเป็นคนใช้ คนละ route กันเหมือนกัน */}
               <PrSetupProvider>
-                <Shell>{children}</Shell>
+                {/* เอกสารที่กดดูจากฟอร์มไปเปิดที่หน้า /files ซึ่งเป็นคนละ route */}
+                <FileViewerProvider>
+                  <Shell>{children}</Shell>
+                </FileViewerProvider>
               </PrSetupProvider>
             </SafetyStockProvider>
           </AddedRoundsProvider>

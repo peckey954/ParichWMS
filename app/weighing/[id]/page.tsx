@@ -128,7 +128,11 @@ export default function WeighingReceiptPage() {
               type="button"
               className="group flex w-full items-start justify-between gap-3 px-4 pt-4 pb-3 text-left"
             >
-              <span className="flex min-w-0 flex-1 flex-col gap-y-1">
+              {/* จอกว้าง: ผู้ขายไปอยู่ขวาสุดบรรทัดเดียวกับชื่อสินค้า ไม่กินบรรทัดใหม่
+                  จอแคบ: ชื่อผู้ขายยาวกว่าที่เหลืออยู่แล้ว ดันลงบรรทัดล่างเหมือนเดิม
+                  ใช้ flex-col → flex-row ที่ @2xl แทนที่จะซ่อน/โชว์สองชุด
+                  จะได้ไม่ต้องมีชื่อผู้ขายซ้ำสองที่ใน DOM */}
+              <span className="flex min-w-0 flex-1 flex-col gap-y-1 @2xl:flex-row @2xl:items-baseline @2xl:justify-between @2xl:gap-x-4">
                 <span className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
                   <span className="font-semibold">
                     {doc.productName}
@@ -144,7 +148,9 @@ export default function WeighingReceiptPage() {
                     </>
                   )}
                 </span>
-                <span className="text-sm font-medium">{doc.supplier}</span>
+                <span className="text-sm font-medium @2xl:shrink-0 @2xl:text-end">
+                  {doc.supplier}
+                </span>
               </span>
               <ChevronDownIcon className="mt-0.5 size-5 shrink-0 text-muted-foreground transition-transform group-data-[state=open]:rotate-180" />
             </button>

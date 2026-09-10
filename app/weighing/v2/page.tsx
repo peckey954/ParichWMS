@@ -43,7 +43,8 @@ import {
 import { cn } from "@peckey954/ui/lib/utils";
 import { toast } from "sonner";
 import { FileUpload, useDocUpload, type DocFile } from "@/components/file-upload";
-import { FileViewer, type ViewerFile } from "@/components/file-viewer";
+import { type ViewerFile } from "@/components/file-viewer";
+import { useFileViewer } from "@/components/file-viewer-provider";
 import { useNumberField } from "@/components/number-field";
 import { TimeField } from "@/components/time-field";
 import {
@@ -150,7 +151,7 @@ export default function MultiProductWeighingDemoPage() {
     seedDocs("ws", ["ใบชั่งผู้ขาย-รวม3รายการ.pdf"])
   );
   const idCardDocs = useDocUpload(seedDocs("wi", ["สำเนาบัตร-คนขับ.pdf"]));
-  const [openFileId, setOpenFileId] = React.useState<string | null>(null);
+  const { openViewer } = useFileViewer();
   const viewerFiles: ViewerFile[] = [
     ...toViewer(parichDocs.files, "เอกสารของพาริช"),
     ...toViewer(supplierDocs.files, "เอกสารของผู้ขาย"),
@@ -444,7 +445,7 @@ export default function MultiProductWeighingDemoPage() {
                 onAdd={parichDocs.add}
                 onRemove={parichDocs.remove}
                 onRetry={parichDocs.retry}
-                onOpen={setOpenFileId}
+                onOpen={(id) => openViewer(viewerFiles, id)}
               />
               <FileUpload
                 title="เอกสารชั่งน้ำหนักของผู้ขาย"
@@ -453,7 +454,7 @@ export default function MultiProductWeighingDemoPage() {
                 onAdd={supplierDocs.add}
                 onRemove={supplierDocs.remove}
                 onRetry={supplierDocs.retry}
-                onOpen={setOpenFileId}
+                onOpen={(id) => openViewer(viewerFiles, id)}
               />
               <FileUpload
                 title="เอกสารสำเนาบัตรประชาชนคนขับ"
@@ -462,10 +463,9 @@ export default function MultiProductWeighingDemoPage() {
                 onAdd={idCardDocs.add}
                 onRemove={idCardDocs.remove}
                 onRetry={idCardDocs.retry}
-                onOpen={setOpenFileId}
+                onOpen={(id) => openViewer(viewerFiles, id)}
               />
             </div>
-            <FileViewer files={viewerFiles} openId={openFileId} onOpenChange={setOpenFileId} />
           </>
         )}
       </main>

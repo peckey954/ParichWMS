@@ -11,18 +11,15 @@ import {
   PrinterIcon,
   XIcon,
 } from "lucide-react";
-import {
-  Dialog,
-  DialogContent,
-  DialogTitle,
-} from "@peckey954/ui/components/ui/dialog";
 import { cn } from "@peckey954/ui/lib/utils";
 
 /* ------------------------------------------------------------------
-   กล่องดูเอกสารเต็มจอ
+   หน้าดูเอกสาร
 
-   เปิดมาแล้วเอกสารได้พื้นที่เกือบทั้งจอ ไม่ใช่ย่อลงมาแปะในหน้าฟอร์ม
-   เพราะสิ่งที่คนมาทำคืออ่านตัวเลขในใบชั่ง ซึ่งเป็นตัวหนังสือขนาดเล็ก
+   เป็นหน้าเต็ม ไม่ใช่กล่องซ้อน — เดิมเป็น Dialog ที่กว้าง 96vw แต่ยังมีขอบมน
+   ฉากมืด และกรอบจำลองอุปกรณ์ครอบอยู่ เอกสารเลยเหลือพื้นที่จริงน้อยกว่าที่เห็น
+   สิ่งที่คนมาทำคืออ่านตัวเลขในใบชั่งซึ่งเป็นตัวหนังสือเล็ก ๆ พื้นที่ทุกพิกเซลมีค่า
+   และการเป็นหน้าจริงยังทำให้ปุ่มย้อนกลับของเบราว์เซอร์ใช้ได้ตามที่คนคาด
 
    รางซ้ายสองชั้น — ไฟล์อยู่บน หน้าอยู่ล่าง
    ที่ต้องเห็นไฟล์ทั้งหมดพร้อมกัน ไม่ซ่อนไว้หลังดรอปดาวน์
@@ -52,10 +49,14 @@ export function FileViewer({
   files,
   openId,
   onOpenChange,
+  onClose,
 }: {
   files: ViewerFile[];
   openId: string | null;
-  onOpenChange: (id: string | null) => void;
+  /** สลับไปดูอีกไฟล์ในชุดเดียวกัน */
+  onOpenChange: (id: string) => void;
+  /** ออกจากหน้าดูเอกสาร */
+  onClose: () => void;
 }) {
   const index = files.findIndex((f) => f.id === openId);
   const file = index >= 0 ? files[index] : null;
@@ -85,23 +86,32 @@ export function FileViewer({
     else groups.push({ name: f.group, items: [f] });
   }
 
+  // คีย์ลัดต้องทำงานทั้งหน้า ไม่ใช่เฉพาะตอนโฟกัสอยู่ในกล่อง เพราะตอนนี้เป็นหน้าจริง
+  // ไม่มี Dialog คอยดักคีย์ให้แล้ว
+  React.useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      // วงเล็บเหลี่ยมสลับไฟล์ ลูกศรขึ้นลงเปลี่ยนหน้า
+      // สองอย่างนี้คนละแกนกัน คีย์จึงต้องคนละชุด ไม่ให้กดสลับกันเอง
+      if (e.key === "[") stepFile(-1);
+      if (e.key === "]") stepFile(1);
+      if (e.key === "Escape") onClose();
+      if (file && e.key === "ArrowDown") {
+        e.preventDefault();
+        setPage((p) => Math.min(file.pages, p + 1));
+      }
+      if (e.key === "ArrowUp") {
+        e.preventDefault();
+        setPage((p) => Math.max(1, p - 1));
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  });
+
   return (
-    <Dialog open={file !== null} onOpenChange={(v) => !v && onOpenChange(null)}>
-      <DialogContent
-        aria-describedby={undefined}
-        showCloseButton={false}
-        onKeyDown={(e) => {
-          // วงเล็บเหลี่ยมสลับไฟล์ ลูกศรขึ้นลงเปลี่ยนหน้า
-          // สองอย่างนี้คนละแกนกัน คีย์จึงต้องคนละชุด ไม่ให้กดสลับกันเอง
-          if (e.key === "[") stepFile(-1);
-          if (e.key === "]") stepFile(1);
-          if (file && e.key === "ArrowDown")
-            setPage((p) => Math.min(file.pages, p + 1));
-          if (e.key === "ArrowUp") setPage((p) => Math.max(1, p - 1));
-        }}
+      <div
         className={cn(
-          "@container flex h-[92vh] w-[96vw] max-w-none flex-col gap-0 overflow-hidden p-0",
-          "sm:max-w-none"
+          "@container flex min-h-0 flex-1 flex-col overflow-hidden bg-card",
         )}
       >
         {/* ---------- หัวกล่อง ---------- */}
@@ -121,9 +131,7 @@ export function FileViewer({
           </button>
 
           <div className="min-w-0 flex-1">
-            <DialogTitle className="truncate text-base">
-              {file?.name}
-            </DialogTitle>
+            <h1 className="truncate text-base font-medium">{file?.name}</h1>
             {/* ตัวนับไฟล์อยู่บนหัว รู้ว่ามีอะไรรออยู่อีกแม้ตอนพับรางไว้ */}
             <p className="text-sm text-muted-foreground">
               {file?.kind === "pdf" ? `PDF · ${file.pages} หน้า` : "รูปภาพ"}
@@ -155,7 +163,7 @@ export function FileViewer({
           <IconBtn label="ดาวน์โหลด" onClick={() => {}}>
             <DownloadIcon className="size-5" />
           </IconBtn>
-          <IconBtn label="ปิด" onClick={() => onOpenChange(null)}>
+          <IconBtn label="ปิด" onClick={onClose}>
             <XIcon className="size-5" />
           </IconBtn>
         </div>
@@ -204,8 +212,7 @@ export function FileViewer({
             )}
           </div>
         </div>
-      </DialogContent>
-    </Dialog>
+      </div>
   );
 }
 

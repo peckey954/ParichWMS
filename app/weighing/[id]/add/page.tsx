@@ -37,7 +37,8 @@ import {
   useDocUpload,
   type DocFile,
 } from "@/components/file-upload";
-import { FileViewer, type ViewerFile } from "@/components/file-viewer";
+import { type ViewerFile } from "@/components/file-viewer";
+import { useFileViewer } from "@/components/file-viewer-provider";
 import { useNumberField } from "@/components/number-field";
 import { TimeField, toHHMM } from "@/components/time-field";
 import { formatTon, getWeighingReceipt, siblingWeighingDocs } from "@/lib/weighing";
@@ -151,7 +152,7 @@ function AddWeighingRoundForm() {
   const supplierDocs = useDocUpload([]);
   const idCardDocs = useDocUpload([]);
 
-  const [openFileId, setOpenFileId] = React.useState<string | null>(null);
+  const { openViewer } = useFileViewer();
 
   // รวมไฟล์ทั้งสามช่องเป็นชุดเดียวให้ตัวอ่าน แต่ยังคงที่มาไว้เพื่อจัดกลุ่มในราง
   const viewerFiles: ViewerFile[] = [
@@ -449,7 +450,7 @@ function AddWeighingRoundForm() {
             onAdd={parichDocs.add}
             onRemove={parichDocs.remove}
             onRetry={parichDocs.retry}
-            onOpen={setOpenFileId}
+            onOpen={(id) => openViewer(viewerFiles, id)}
           />
           <FileUpload
             title="เอกสารชั่งน้ำหนักของผู้ขาย"
@@ -458,7 +459,7 @@ function AddWeighingRoundForm() {
             onAdd={supplierDocs.add}
             onRemove={supplierDocs.remove}
             onRetry={supplierDocs.retry}
-            onOpen={setOpenFileId}
+            onOpen={(id) => openViewer(viewerFiles, id)}
           />
         </div>
 
@@ -540,15 +541,10 @@ function AddWeighingRoundForm() {
             onAdd={idCardDocs.add}
             onRemove={idCardDocs.remove}
             onRetry={idCardDocs.retry}
-            onOpen={setOpenFileId}
+            onOpen={(id) => openViewer(viewerFiles, id)}
           />
         </div>
 
-        <FileViewer
-          files={viewerFiles}
-          openId={openFileId}
-          onOpenChange={setOpenFileId}
-        />
       </main>
 
       {/* ---------- แถบปุ่มล่าง ----------
