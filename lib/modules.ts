@@ -197,7 +197,7 @@ export const SETTINGS_ITEMS: {
   {
     id: "pr-setup",
     label: "ตั้งค่าใบขอซื้อ",
-    description: "ประเภทสินค้าที่ขอซื้อได้ และคลังปลายทางของแต่ละประเภท",
+    description: "คลัง ประเภทสินค้าที่ขอซื้อได้ และรายการสินค้าในแต่ละประเภท",
     icon: "clipboardPlus",
     href: "/pr/setup",
   },
