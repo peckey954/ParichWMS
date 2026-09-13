@@ -72,7 +72,7 @@ export default function AllModulesPage() {
                 ("ตรวจวัตถุดิบก่อนผลิต" "สูตรการผลิตประจำสัปดาห์") ซึ่งเป็นข้อมูล
                 ชิ้นเดียวที่คนใช้เลือกเมนู การ์ดสลับเป็นแนวนอนในโหมดนี้ด้วย
                 ความสูงจึงไม่ได้เพิ่มเป็นเท่าตัวตามจำนวนแถว */}
-            <div className="mt-3 grid gap-3 @2xl:grid-cols-3 @4xl:grid-cols-4">
+            <div className="mt-3 grid grid-cols-1 gap-3 @2xl:grid-cols-3 @4xl:grid-cols-4">
               {g.items.map((m) => (
                 <ModuleCard key={m.id} module={m} tone={g.tone} />
               ))}
