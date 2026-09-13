@@ -66,8 +66,13 @@ export default function AllModulesPage() {
             </div>
 
             {/* วัดจากความกว้างของกรอบเนื้อหา ไม่ใช่ขนาดหน้าต่าง
-                ไม่งั้นโหมดจำลองมือถือจะยังขึ้นสี่ใบต่อแถวเพราะจอจริงยังกว้างอยู่ */}
-            <div className="mt-3 grid grid-cols-2 gap-3 @2xl:grid-cols-3 @4xl:grid-cols-4">
+                ไม่งั้นโหมดจำลองมือถือจะยังขึ้นสี่ใบต่อแถวเพราะจอจริงยังกว้างอยู่
+
+                มือถือเรียงใบละแถว — สองใบต่อแถวทำให้ชื่อยาวโดนตัดท้ายเกือบทุกใบ
+                ("ตรวจวัตถุดิบก่อนผลิต" "สูตรการผลิตประจำสัปดาห์") ซึ่งเป็นข้อมูล
+                ชิ้นเดียวที่คนใช้เลือกเมนู การ์ดสลับเป็นแนวนอนในโหมดนี้ด้วย
+                ความสูงจึงไม่ได้เพิ่มเป็นเท่าตัวตามจำนวนแถว */}
+            <div className="mt-3 grid gap-3 @2xl:grid-cols-3 @4xl:grid-cols-4">
               {g.items.map((m) => (
                 <ModuleCard key={m.id} module={m} tone={g.tone} />
               ))}
@@ -99,24 +104,34 @@ function ModuleCard({
   const body = (
     <>
       {m.pending !== undefined && (
-        <PendingBadge count={m.pending} className="absolute top-3 right-3" />
+        <PendingBadge
+          count={m.pending}
+          // แนวนอนวางกลางแถว แนวตั้งวางมุมบนขวาเหมือนเดิม
+          className="absolute top-1/2 right-4 -translate-y-1/2 @2xl:top-3 @2xl:right-3 @2xl:translate-y-0"
+        />
       )}
       {tone && (
         <IconBox
           name={m.icon}
           tone={tone}
-          className="transition-transform duration-150 motion-safe:group-hover:scale-105"
+          className="shrink-0 transition-transform duration-150 motion-safe:group-hover:scale-105"
         />
       )}
-      {/* ชื่อยาวเกินการ์ดให้ตัดท้ายเป็น … ไม่ตกบรรทัดใหม่ การ์ดจะได้สูงเท่ากันทุกใบ
-          จอแคบใช้ชื่อย่อถ้ามี ชื่อเต็มยังอยู่ใน title ให้ชี้ดูได้
+      {/* มือถือ: การ์ดเต็มความกว้าง ชื่อจึงห่อบรรทัดได้เต็ม ๆ ไม่ต้องตัดท้าย
+          จอกว้าง: การ์ดแคบลง ตัดท้ายเป็น … เพื่อให้ทุกใบสูงเท่ากัน
+          ชื่อเต็มอยู่ใน title ให้ชี้ดูได้ทั้งสองแบบ
 
-          ไม่มีไอคอน = ไม่ต้องเว้นระยะเผื่อไอคอน การ์ดจะเตี้ยลงเหลือแค่สองบรรทัด
-          ไม่ใช่การ์ดสูงเท่าเดิมที่มีที่ว่างค้างอยู่ข้างบน */}
-      <div className={cn("min-w-0", tone ? "mt-6" : "pr-12")}>
-        <p className="truncate font-semibold" title={m.label}>
-          <span className="sm:hidden">{m.shortLabel ?? m.label}</span>
-          <span className="hidden sm:inline">{m.label}</span>
+          ไม่มีไอคอน = ไม่ต้องเว้นระยะเผื่อไอคอนบนจอกว้าง การ์ดเตี้ยลงเหลือ
+          สองบรรทัด ไม่ใช่สูงเท่าเดิมแล้วมีที่ว่างค้างอยู่ข้างบน */}
+      <div
+        className={cn(
+          "min-w-0 flex-1",
+          tone && "@2xl:mt-6",
+          m.pending !== undefined && "pr-12 @2xl:pr-0"
+        )}
+      >
+        <p className="font-semibold @2xl:truncate" title={m.label}>
+          {m.label}
         </p>
         <p className="mt-0.5 truncate text-sm text-muted-foreground">
           {m.code}
@@ -125,8 +140,11 @@ function ModuleCard({
     </>
   );
 
-  const base =
-    "group relative flex h-full flex-col rounded-xl border border-border bg-card p-4 shadow-sm";
+  // มือถือเป็นแถวแนวนอน (ไอคอนซ้าย ชื่อขวา) จอกว้างกลับเป็นการ์ดแนวตั้ง
+  const base = cn(
+    "group relative flex h-full items-center gap-3 rounded-xl border border-border bg-card p-4 shadow-sm",
+    "@2xl:flex-col @2xl:items-stretch @2xl:gap-0"
+  );
 
   // หน้าที่ยังไม่ได้ทำ — หน้าตาเหมือนใบอื่นทุกอย่าง แค่กดแล้วไม่ไปไหน
   // ไม่ใส่เอฟเฟกต์ตอนชี้ด้วย ไม่งั้นจะหลอกว่ากดได้
