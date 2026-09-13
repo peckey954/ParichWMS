@@ -210,6 +210,7 @@ export const MODULES: ModuleItem[] = [
     description: "ลำดับขั้นการอนุมัติ วงเงินของแต่ละขั้น และผู้มีสิทธิ์อนุมัติ",
     code: "FM-PD-01-03",
     icon: "circleCheck",
+    href: "/approve/setup",
   },
 ];
 
