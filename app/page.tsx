@@ -48,13 +48,17 @@ export default function AllModulesPage() {
         {groups.map((g) => (
           <section key={g.id}>
             <div className="flex items-center gap-2">
-              <span
-                className={cn(
-                  "size-2.5 shrink-0 rounded-full",
-                  TONE_DOT[g.tone]
-                )}
-                aria-hidden
-              />
+              {/* หมวดที่ไม่มีสีประจำก็ไม่มีจุดนำหน้า — จุดสีคือคู่ของไอคอนบนการ์ด
+                  มีจุดแต่การ์ดไม่มีสีเลยจะกลายเป็นสีที่ไม่ได้ชี้ไปหาอะไร */}
+              {g.tone && (
+                <span
+                  className={cn(
+                    "size-2.5 shrink-0 rounded-full",
+                    TONE_DOT[g.tone]
+                  )}
+                  aria-hidden
+                />
+              )}
               <h2 className="font-semibold">{g.label}</h2>
               <span className="text-sm text-muted-foreground">
                 {g.items.length} ระบบ
@@ -89,21 +93,27 @@ function ModuleCard({
   tone,
 }: {
   module: ModuleItem;
-  tone: Parameters<typeof IconBox>[0]["tone"];
+  /** ไม่มี tone = การ์ดหมวดนี้ไม่มีไอคอน (ดู ModuleGroup.tone) */
+  tone?: Parameters<typeof IconBox>[0]["tone"];
 }) {
   const body = (
     <>
       {m.pending !== undefined && (
         <PendingBadge count={m.pending} className="absolute top-3 right-3" />
       )}
-      <IconBox
-        name={m.icon}
-        tone={tone}
-        className="transition-transform duration-150 motion-safe:group-hover:scale-105"
-      />
+      {tone && (
+        <IconBox
+          name={m.icon}
+          tone={tone}
+          className="transition-transform duration-150 motion-safe:group-hover:scale-105"
+        />
+      )}
       {/* ชื่อยาวเกินการ์ดให้ตัดท้ายเป็น … ไม่ตกบรรทัดใหม่ การ์ดจะได้สูงเท่ากันทุกใบ
-          จอแคบใช้ชื่อย่อถ้ามี ชื่อเต็มยังอยู่ใน title ให้ชี้ดูได้ */}
-      <div className="mt-6 min-w-0">
+          จอแคบใช้ชื่อย่อถ้ามี ชื่อเต็มยังอยู่ใน title ให้ชี้ดูได้
+
+          ไม่มีไอคอน = ไม่ต้องเว้นระยะเผื่อไอคอน การ์ดจะเตี้ยลงเหลือแค่สองบรรทัด
+          ไม่ใช่การ์ดสูงเท่าเดิมที่มีที่ว่างค้างอยู่ข้างบน */}
+      <div className={cn("min-w-0", tone ? "mt-6" : "pr-12")}>
         <p className="truncate font-semibold" title={m.label}>
           <span className="sm:hidden">{m.shortLabel ?? m.label}</span>
           <span className="hidden sm:inline">{m.label}</span>

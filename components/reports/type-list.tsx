@@ -127,10 +127,12 @@ export function TypeList({
                 key={g.id}
                 label={g.label}
                 icon={
-                  <span
-                    className={cn("size-2 shrink-0 rounded-full", TONE_DOT[g.tone])}
-                    aria-hidden
-                  />
+                  g.tone ? (
+                    <span
+                      className={cn("size-2 shrink-0 rounded-full", TONE_DOT[g.tone])}
+                      aria-hidden
+                    />
+                  ) : undefined
                 }
               >
                 {g.items.map((t) => (
