@@ -36,7 +36,6 @@ import { ModuleIcon } from "@/components/modules/module-icon";
 import { PendingBadge } from "@/components/modules/pending-badge";
 import {
   MODULE_GROUPS,
-  SYSTEM_LINK,
   modulesOf,
   type ModuleItem,
 } from "@/lib/modules";
@@ -306,10 +305,6 @@ function SidebarBody({
             </section>
           ))}
         </nav>
-      </div>
-
-      <div className="border-t border-sidebar-border px-2 py-3">
-        <nav className="flex flex-col gap-0.5">{item(SYSTEM_LINK)}</nav>
       </div>
     </>
   );

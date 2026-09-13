@@ -211,28 +211,7 @@ export const MODULES: ModuleItem[] = [
     code: "FM-PD-01-03",
     icon: "circleCheck",
   },
-  {
-    id: "design-system",
-    group: "settings",
-    label: "Design system",
-    description: "ตัวอย่าง component และโทเคนสีทั้งหมดที่ระบบใช้",
-    code: "FM-PD-01-01",
-    icon: "palette",
-    href: "/design-system",
-  },
 ];
-
-/**
- * ท้ายเมนูข้างมีรายการเดียว พาไปหน้ารวมการตั้งค่า
- * เมนูข้างเป็นทางลัดสำหรับคนที่รู้อยู่แล้วว่าจะไปไหน ส่วนคนที่ยังไม่รู้
- * จะเจอหมวด "ตั้งค่าระบบ" ที่ท้ายเมนูหลักอยู่แล้ว
- */
-export const SYSTEM_LINK = {
-  id: "settings",
-  label: "ตั้งค่าระบบ",
-  icon: "settings",
-  href: "/settings",
-};
 
 /** รายการที่อยู่ในหน้าตั้งค่าระบบ — ดึงจาก MODULES ไม่เก็บซ้ำอีกชุด
  *  เพิ่มการตั้งค่าใหม่ที่ MODULES ที่เดียว ทั้งเมนูหลักและหน้า /settings เห็นพร้อมกัน */
