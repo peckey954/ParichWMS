@@ -1,124 +1,158 @@
 // ============================================================
 // ตั้งค่าการอนุมัติใบสั่งซื้อ
 //
-// วงเงินเป็นตัวตัดว่าใบนั้นต้องเข้าสายอนุมัติหรือไม่:
-//   ต่ำกว่าวงเงิน  → ไม่ต้องอนุมัติเลย Procurement สร้างใบแล้วจบในตัว
-//   ตั้งแต่วงเงิน  → เข้าสายอนุมัติสองชั้น Factory Manager แล้วต่อ Director
+// หนึ่งบรรทัด = หนึ่งการอนุมัติ ถือของครบชุดในตัวเอง:
+//   ช่วงวงเงิน (เริ่มต้น–สูงสุด) · ประเภทสินค้าที่คุม · ผู้อนุมัติ · เปิด/ปิดใช้งาน
 //
-// Procurement ไม่ได้เป็น "ชั้นอนุมัติ" ที่ตั้งผู้มีสิทธิ์ได้ เพราะเป็นคนสร้างใบเอง
-// อำนาจของเขาคือวงเงินที่ต่ำกว่าเส้น ไม่ใช่การไปเซ็นรับรองใบของคนอื่น
-// ผู้มีสิทธิ์ที่ตั้งได้จึงมีแค่สองชั้นบน
+// ช่วงวงเงินเป็น "ช่วงปิด" ทั้งสองด้าน ยอดที่เท่ากับขอบพอดีถือว่าอยู่ในช่วง
+// ช่วงจึงต้องไม่ทับกันเอง วิธีเขียนที่ใช้จริงคือให้ขอบล่างของบรรทัดบน
+// เกินขอบบนของบรรทัดล่างมา .01 (50,000.00 / 50,000.01) ไม่ใช่ให้เท่ากัน
+//
+// ผู้อนุมัติใส่ได้หลายคนแต่ต้องการแค่คนเดียวกด — ใส่หลายชื่อคือเผื่อคนลา
+// ไม่ใช่ต้องเซ็นครบทุกคน ป้ายบนหัวคอลัมน์เขียนกำกับไว้เพราะเข้าใจผิดกันบ่อย
+//
+// ปิดใช้งานแทนลบ — บรรทัดที่ปิดอยู่ยังเก็บค่าที่ตั้งไว้ทั้งหมด เปิดกลับมาใช้
+// ได้ทันทีโดยไม่ต้องกรอกใหม่ และประวัติการอนุมัติเก่ายังอ่านออกว่ามาจากกฎไหน
 // ============================================================
 
-import { poTotalPrice, PO_ORDER_DOCS, type PoDoc } from "@/lib/po";
+import { PR_CATEGORIES, PR_CATEGORY_LABEL, type PrCategoryId } from "@/lib/pr";
 
-export type ApprovalRole = "procurement" | "factoryManager" | "director";
+/** เพดานวงเงินของระบบ ใช้เป็นขอบบนของบรรทัดสูงสุด */
+export const MAX_BAHT = 100_000_000;
 
-export const APPROVAL_ROLE_LABEL: Record<ApprovalRole, string> = {
-  procurement: "Procurement",
-  factoryManager: "Factory Manager",
-  director: "Director",
+export type ApprovalRule = {
+  id: string;
+  /** ขอบล่างของช่วง รวมค่านี้ด้วย */
+  minBaht: number;
+  /** ขอบบนของช่วง รวมค่านี้ด้วย */
+  maxBaht: number;
+  /** ประเภทสินค้าที่บรรทัดนี้คุม — ว่าง = ทั้งหมด ไม่ใช่ "ไม่มีประเภทไหนเลย" */
+  categories: PrCategoryId[];
+  /** รหัสผู้อนุมัติ — ใครคนหนึ่งในนี้กดก็ถือว่าผ่าน */
+  approverIds: string[];
+  enabled: boolean;
 };
-
-export const APPROVAL_ROLE_TH: Record<ApprovalRole, string> = {
-  procurement: "ฝ่ายจัดซื้อ",
-  factoryManager: "ผู้จัดการโรงงาน",
-  director: "กรรมการ",
-};
-
-/** ชั้นที่ต้องอนุมัติจริง เรียงตามลำดับที่ใบต้องผ่าน — ไม่รวม Procurement */
-export type ApproverLayer = "factoryManager" | "director";
-export const APPROVAL_LAYERS: ApproverLayer[] = ["factoryManager", "director"];
 
 export type ApprovalConfig = {
-  /**
-   * วงเงินที่ต้องเข้าสายอนุมัติ หน่วยบาท
-   *
-   * **ตั้งแต่ค่านี้ขึ้นไปต้องอนุมัติ** ตั้ง 50,000 แปลว่า 49,999.99 ไม่ต้องอนุมัติ
-   * ส่วน 50,000 ถ้วนต้องอนุมัติ — เส้นแบ่งกำกวมได้ง่ายมาก จึงเขียนกำกับไว้ทั้งใน
-   * โค้ดและบนหน้าจอว่าค่าที่เท่ากับเส้นพอดีอยู่ฝั่งไหน
-   */
-  directorFromBaht: number;
-  /** ผู้มีสิทธิ์อนุมัติของแต่ละชั้น */
-  approvers: Record<ApproverLayer, string[]>;
+  /** เรียงจากวงเงินสูงลงมาต่ำ บรรทัดใหม่แทรกบนสุด */
+  rules: ApprovalRule[];
+  /** เวลาที่บันทึกล่าสุด เก็บเป็นสตริงสำเร็จรูป ไม่ให้ render ไปคำนวณเวลาเอง
+   *  ไม่งั้นค่าฝั่งเซิร์ฟเวอร์กับเบราว์เซอร์ไม่ตรงกันแล้ว hydration พัง */
+  updatedAt: string;
 };
+
+// ---------------------------------------------------------------
+// บัญชีผู้อนุมัติที่เลือกได้
+// ---------------------------------------------------------------
+
+export type ApproverAccount = { id: string; name: string };
+
+export const APPROVER_ACCOUNTS: ApproverAccount[] = [
+  { id: "alisa", name: "อลิสา พรสุขสิริ" },
+  { id: "nattawut", name: "ณัฐวุฒิ แก้วประเสริฐ" },
+  { id: "suchanat", name: "สุชานาถ อินทร์ทอง" },
+  { id: "kittipong", name: "กิตติพงศ์ ใจดีงาม" },
+  { id: "thanakrit", name: "ธนกฤต ศรีบุญเรือง" },
+  { id: "pimchanok", name: "พิมพ์ชนก วงศ์อารีย์" },
+];
+
+export const APPROVER_OPTIONS = APPROVER_ACCOUNTS.map((a) => ({
+  value: a.id,
+  label: a.name,
+}));
+
+export const CATEGORY_OPTIONS = PR_CATEGORIES.map((id) => ({
+  value: id as string,
+  label: PR_CATEGORY_LABEL[id],
+}));
+
+// ---------------------------------------------------------------
 
 export const DEFAULT_APPROVAL_CONFIG: ApprovalConfig = {
-  directorFromBaht: 50000,
-  approvers: {
-    factoryManager: ["ณัฐวุฒิ แก้วประเสริฐ", "สุชานาถ อินทร์ทอง"],
-    director: ["กิตติพงศ์ ใจดีงาม"],
-  },
+  updatedAt: "1/16/2026 | 10:42:52",
+  rules: [
+    {
+      id: "rule-high",
+      minBaht: 50000.01,
+      maxBaht: MAX_BAHT,
+      categories: [],
+      approverIds: [],
+      enabled: true,
+    },
+    {
+      id: "rule-low",
+      minBaht: 0,
+      maxBaht: 50000,
+      categories: [],
+      approverIds: [],
+      enabled: true,
+    },
+  ],
 };
 
-/** ใบนี้ต้องเข้าสายอนุมัติไหม — เท่ากับเส้นพอดีถือว่าต้อง */
-export const needsApproval = (totalBaht: number, cfg: ApprovalConfig) =>
-  totalBaht >= cfg.directorFromBaht;
-
-/** สายอนุมัติของใบหนึ่ง เรียงตามลำดับที่ต้องผ่าน
- *  ว่าง = ไม่ต้องอนุมัติ Procurement สร้างแล้วจบ */
-export function approvalChain(
-  totalBaht: number,
-  cfg: ApprovalConfig
-): ApproverLayer[] {
-  return needsApproval(totalBaht, cfg) ? [...APPROVAL_LAYERS] : [];
-}
-
-/** ชั้นที่ยังไม่มีใครถือสิทธิ์ — ตั้งวงเงินไว้แต่ไม่มีคนอนุมัติ ใบจะค้างทันที */
-export const layersWithoutApprover = (cfg: ApprovalConfig) =>
-  APPROVAL_LAYERS.filter((l) => cfg.approvers[l].length === 0);
-
-// ---------------------------------------------------------------
-// ผลกระทบกับใบสั่งซื้อที่มีอยู่จริง
-//
-// ตัวเลขวงเงินลอย ๆ บอกไม่ได้ว่าตั้งแล้วงานจะหนักขึ้นแค่ไหน ต้องเอาไปทาบกับ
-// ใบสั่งซื้อจริงให้เห็นว่ากี่ใบจะเด้งไปหากรรมการ
-// ---------------------------------------------------------------
-
-export type ApprovalImpact = {
-  total: number;
-  /** ใบที่ต้องเข้าสายอนุมัติ (Factory Manager → Director) */
-  needsApproval: number;
-  /** ใบที่ต่ำกว่าวงเงิน — Procurement สร้างแล้วจบ ไม่ต้องอนุมัติ */
-  noApproval: number;
-  /** ใบที่ยอดใกล้เส้นที่สุด เรียงจากใกล้ที่สุด — ใช้ดูว่าขยับเส้นนิดเดียวใครเด้ง */
-  nearest: { doc: PoDoc; total: number; needsApproval: boolean }[];
-  /**
-   * ช่วงยอดของใบที่มีอยู่ — ต้องบอก ไม่งั้นตั้งเส้นแล้วเห็น "ต้องอนุมัติ 10 จาก 10 ใบ"
-   * จะดูเหมือนระบบพัง ทั้งที่สาเหตุจริงคือเส้นอยู่ต่ำกว่าใบที่เล็กที่สุดมาก
-   * เห็นช่วงแล้วถึงจะรู้ว่าต้องตั้งเส้นแถวไหนถึงจะแบ่งงานได้จริง
-   */
-  min: number;
-  max: number;
-};
-
-export function approvalImpact(cfg: ApprovalConfig): ApprovalImpact {
-  const rows = PO_ORDER_DOCS.map((doc) => ({
-    doc,
-    total: poTotalPrice(doc),
-    needsApproval: needsApproval(poTotalPrice(doc), cfg),
-  }));
-
-  const totals = rows.map((r) => r.total);
-
+/**
+ * บรรทัดใหม่ที่จะไปแทรกบนสุด
+ *
+ * ตั้งขอบล่างต่อจากขอบบนของบรรทัดที่อยู่บนสุดเดิมมา .01 ช่วงจะได้ไม่ทับกัน
+ * ตั้งแต่วินาทีแรก ส่วนขอบบนให้เป็นเพดานระบบ แล้วค่อยให้คนตั้งค่าปรับลง
+ */
+export function blankRule(currentTop: ApprovalRule | undefined): ApprovalRule {
+  const from = currentTop ? round2(currentTop.maxBaht + 0.01) : 0;
   return {
-    total: rows.length,
-    min: totals.length ? Math.min(...totals) : 0,
-    max: totals.length ? Math.max(...totals) : 0,
-    needsApproval: rows.filter((r) => r.needsApproval).length,
-    noApproval: rows.filter((r) => !r.needsApproval).length,
-    nearest: [...rows]
-      .sort(
-        (a, b) =>
-          Math.abs(a.total - cfg.directorFromBaht) -
-          Math.abs(b.total - cfg.directorFromBaht)
-      )
-      .slice(0, 4),
+    id: `rule-${Date.now()}`,
+    minBaht: from,
+    maxBaht: Math.max(from, MAX_BAHT),
+    categories: [],
+    approverIds: [],
+    enabled: true,
   };
 }
+
+export const round2 = (v: number) => Number(v.toFixed(2));
 
 export const formatBaht = (v: number) =>
   v.toLocaleString("th-TH", {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   });
+
+/** เวลาที่บันทึก ในรูปแบบเดียวกับที่โชว์ใต้หัวข้อ — เรียกตอนกดบันทึกเท่านั้น */
+export function stampNow(now = new Date()) {
+  const p = (n: number) => String(n).padStart(2, "0");
+  return `${now.getMonth() + 1}/${now.getDate()}/${now.getFullYear()} | ${p(now.getHours())}:${p(now.getMinutes())}:${p(now.getSeconds())}`;
+}
+
+// ---------------------------------------------------------------
+// ใบหนึ่งตกไปหาใคร
+// ---------------------------------------------------------------
+
+/**
+ * บรรทัดนี้กินใบใบนี้ไหม
+ *
+ * ประเภทสินค้าเช็กแบบ "มีอย่างน้อยหนึ่งรายการตรง" ไม่ใช่ต้องตรงทั้งใบ —
+ * ใบที่มีของประเภทที่บรรทัดนั้นคุมปนอยู่แม้รายการเดียวก็ต้องให้เขาเห็น
+ */
+export function ruleApplies(
+  rule: ApprovalRule,
+  totalBaht: number,
+  categories: PrCategoryId[]
+): boolean {
+  if (!rule.enabled) return false;
+  if (totalBaht < rule.minBaht || totalBaht > rule.maxBaht) return false;
+  if (rule.categories.length === 0) return true;
+  return categories.some((c) => rule.categories.includes(c));
+}
+
+/** บรรทัดแรกที่กินใบนี้ — ช่วงไม่ทับกันจึงได้ไม่เกินหนึ่ง */
+export const ruleFor = (
+  totalBaht: number,
+  categories: PrCategoryId[],
+  cfg: ApprovalConfig
+): ApprovalRule | undefined =>
+  cfg.rules.find((r) => ruleApplies(r, totalBaht, categories));
+
+/** ชื่อประเภทที่บรรทัดนี้คุม ใช้เขียนเป็นคำอ่าน */
+export const categorySummary = (rule: ApprovalRule) =>
+  rule.categories.length === 0
+    ? "ทั้งหมด"
+    : rule.categories.map((c) => PR_CATEGORY_LABEL[c]).join(" · ");
