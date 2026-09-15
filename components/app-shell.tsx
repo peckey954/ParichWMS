@@ -8,6 +8,11 @@ import { CheckIcon, MenuIcon, XIcon } from "lucide-react";
 import { Avatar, AvatarFallback } from "@peckey954/ui/components/ui/avatar";
 import { Button } from "@peckey954/ui/components/ui/button";
 import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@peckey954/ui/components/ui/popover";
+import {
   Sheet,
   SheetClose,
   SheetContent,
@@ -37,6 +42,7 @@ import { PendingBadge } from "@/components/modules/pending-badge";
 import {
   MODULE_GROUPS,
   modulesOf,
+  type ModuleGroup,
   type ModuleItem,
 } from "@/lib/modules";
 import type { AppNotification } from "@/lib/notifications";
@@ -265,7 +271,8 @@ function SidebarBody({
   const item = (m: {
     id: string;
     href?: string;
-    icon: string;
+    /** ไม่มีค่า = หมวดนี้ไม่มีไอคอนรายตัว (ดู ModuleGroup.tone) */
+    icon?: string;
     label: string;
     pending?: number;
   }) => {
@@ -298,12 +305,32 @@ function SidebarBody({
             {item({ id: "home", href: "/", icon: "grid", label: "ระบบทั้งหมด" })}
           </section>
 
-          {MODULE_GROUPS.map((g) => (
-            <section key={g.id} className="flex flex-col gap-0.5">
-              {!collapsed && <GroupLabel>{g.label}</GroupLabel>}
-              {modulesOf(g.id).map((m: ModuleItem) => item(m))}
-            </section>
-          ))}
+          {MODULE_GROUPS.map((g) => {
+            const items = modulesOf(g.id);
+
+            // หมวดที่ไม่มี tone ไม่มีไอคอนรายตัว (ดู ModuleGroup.tone) ซึ่งตอนหุบ
+            // เป็นปัญหา เพราะแถวที่หุบเหลือแค่ไอคอนอย่างเดียว ถ้าไม่วาดอะไรเลย
+            // จะได้กล่องเปล่าเรียงกันเก้าใบ — ยุบทั้งหมวดเป็นปุ่มเดียวแทน
+            if (!g.tone && collapsed) {
+              return (
+                <CollapsedGroup
+                  key={g.id}
+                  group={g}
+                  items={items}
+                  pathname={pathname}
+                />
+              );
+            }
+
+            return (
+              <section key={g.id} className="flex flex-col gap-0.5">
+                {!collapsed && <GroupLabel>{g.label}</GroupLabel>}
+                {items.map((m: ModuleItem) =>
+                  item({ ...m, icon: g.tone ? m.icon : undefined })
+                )}
+              </section>
+            );
+          })}
         </nav>
       </div>
     </>
@@ -319,6 +346,65 @@ function SidebarBody({
         body
       )}
     </TooltipProvider>
+  );
+}
+
+/**
+ * หมวดที่ไม่มีไอคอนรายตัว ตอนเมนูหุบ — ยุบทั้งหมวดเหลือปุ่มเดียว
+ * กดแล้วรายชื่อเด้งออกมาทางขวา
+ *
+ * ปุ่มติดสถานะ active เมื่อหน้าปัจจุบันอยู่ในหมวดนี้ ไม่งั้นคนใช้จะไม่รู้ว่า
+ * ตัวเองอยู่ตรงไหน เพราะรายชื่อถูกซ่อนอยู่ในกล่อง
+ *
+ * ไม่ใส่ tooltip ที่ปุ่มเหมือนแถวหุบอื่น เพราะ tooltip กับ popover บนปุ่มเดียวกัน
+ * จะแย่งกันเปิด — ชื่อหมวดไปอยู่เป็นหัวในกล่องแทน
+ */
+function CollapsedGroup({
+  group,
+  items,
+  pathname,
+}: {
+  group: ModuleGroup;
+  items: ModuleItem[];
+  pathname: string;
+}) {
+  const [open, setOpen] = React.useState(false);
+  const active = items.some((m) => m.href === pathname);
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          aria-label={group.label}
+          className={cn(
+            "flex size-10 items-center justify-center self-center rounded-md",
+            "text-sm transition-colors",
+            active
+              ? "bg-brand font-medium text-primary ring-1 ring-primary/20 ring-inset"
+              : "text-sidebar-foreground hover:bg-accent-hover"
+          )}
+        >
+          <ModuleIcon name={group.icon ?? "grid"} className="size-5 shrink-0" />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent side="right" align="start" className="w-64 p-2">
+        <GroupLabel>{group.label}</GroupLabel>
+        <div className="flex flex-col gap-0.5">
+          {items.map((m) => (
+            <NavItem
+              key={m.id}
+              href={m.href}
+              label={m.label}
+              pending={m.pending}
+              active={pathname === m.href}
+              // ปิดกล่องหลังกด ไม่งั้นเปลี่ยนหน้าแล้วกล่องยังค้างทับเนื้อหาอยู่
+              onClick={() => setOpen(false)}
+            />
+          ))}
+        </div>
+      </PopoverContent>
+    </Popover>
   );
 }
 
@@ -338,7 +424,8 @@ const NavItem = React.forwardRef<
   HTMLElement,
   Omit<React.ComponentPropsWithoutRef<"a">, "href"> & {
     href?: string;
-    icon: string;
+    /** ไม่มีค่า = หมวดนี้ไม่มีไอคอนรายตัว เว้นช่องไว้เฉย ๆ */
+    icon?: string;
     label: string;
     pending?: number;
     active?: boolean;
@@ -358,7 +445,14 @@ const NavItem = React.forwardRef<
 
   const inner = (
     <>
-      <ModuleIcon name={icon} className="size-5 shrink-0" />
+      {/* หมวดที่ไม่มีไอคอนยังต้องเว้นช่องเท่าเดิม ป้ายชื่อทุกแถวในเมนูข้างจะได้
+          ชิดขอบซ้ายเส้นเดียวกันทั้งคอลัมน์ ช่องว่างจึงอ่านเป็นความตั้งใจ
+          ไม่ใช่ไอคอนโหลดไม่ขึ้น */}
+      {icon ? (
+        <ModuleIcon name={icon} className="size-5 shrink-0" />
+      ) : (
+        <span className="size-5 shrink-0" aria-hidden />
+      )}
       {!collapsed && (
         <>
           <span className="truncate">{label}</span>
