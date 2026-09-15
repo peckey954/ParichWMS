@@ -210,12 +210,6 @@ export const REPORT_TYPES: ReportType[] = [
 export const getReportType = (id: string) =>
   REPORT_TYPES.find((t) => t.id === id);
 
-/**
- * ชนิดเอกสารที่บัญชีเปิดบ่อยที่สุด ปักไว้บนสุดของรายการ
- * คนที่มาหน้านี้ทุกวันไม่ควรต้องเลื่อนหาของเดิมซ้ำ ๆ
- */
-export const PINNED_TYPES = ["po", "grn-raw", "grn-fg", "issue"];
-
 // ---------------------------------------------------------------
 // ช่วงวันที่
 // ---------------------------------------------------------------
@@ -227,15 +221,6 @@ export type PresetId =
   | "lastQuarter"
   | "thisYear"
   | "custom";
-
-export const PRESETS: { id: PresetId; label: string }[] = [
-  { id: "lastMonth", label: "เดือนที่แล้ว" },
-  { id: "thisMonth", label: "เดือนนี้" },
-  { id: "lastQuarter", label: "ไตรมาสที่แล้ว" },
-  { id: "thisQuarter", label: "ไตรมาสนี้" },
-  { id: "thisYear", label: "ปีนี้" },
-  { id: "custom", label: "กำหนดเอง" },
-];
 
 export type Range = { from: string; to: string };
 
@@ -282,10 +267,6 @@ export const inRange = (date: string, r: Range) => date >= r.from && date <= r.t
 export function formatDate(iso: string) {
   const [y, m, d] = iso.split("-");
   return `${d}/${m}/${y}`;
-}
-
-export function formatRange(r: Range) {
-  return `${formatDate(r.from)} – ${formatDate(r.to)}`;
 }
 
 export const formatBaht = (n: number) =>
@@ -438,18 +419,9 @@ export function matchesRow(r: ReportRow, q: string) {
 // รูปแบบไฟล์ + การสร้างไฟล์
 // ---------------------------------------------------------------
 
-export type FormatId = "csv" | "xlsx" | "pdf";
-
-export const FORMATS: { id: FormatId; label: string; note: string }[] = [
-  { id: "csv", label: "CSV (เปิดด้วย Excel)", note: "ไฟล์เดียว รวมทุกเอกสาร" },
-  { id: "xlsx", label: "Excel (.xlsx)", note: "ไฟล์เดียว รวมทุกเอกสาร" },
-  { id: "pdf", label: "PDF แยกไฟล์ต่อเอกสาร", note: "บีบเป็น .zip ให้อัตโนมัติ" },
-];
-
 /** ชื่อไฟล์ที่อ่านออกโดยไม่ต้องเปิด — บัญชีเก็บไฟล์รวมกันเป็นร้อย */
-export function fileName(t: ReportType, r: Range, format: FormatId) {
-  const ext = format === "pdf" ? "zip" : format === "xlsx" ? "xlsx" : "csv";
-  return `${t.prefix}_${t.label}_${r.from}_ถึง_${r.to}.${ext}`;
+export function fileName(t: ReportType, r: Range) {
+  return `${t.prefix}_${t.label}_${r.from}_ถึง_${r.to}.csv`;
 }
 
 const csvCell = (v: string | number | undefined) => {

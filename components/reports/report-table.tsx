@@ -1,7 +1,6 @@
 "use client";
 
 import * as React from "react";
-import { Checkbox } from "@peckey954/ui/components/ui/checkbox";
 import { Separator } from "@peckey954/ui/components/ui/separator";
 import {
   Table,
@@ -34,11 +33,9 @@ import {
 /* ------------------------------------------------------------------
    ตารางพรีวิวเอกสาร
 
-   เลือกทีละใบได้ เพราะบัญชีไม่ได้ดึงทั้งงวดเสมอไป
-   บางทีตามหาเฉพาะใบที่ผู้สอบบัญชีขอ หรือใบที่ต้องแก้แล้วส่งใหม่
-
-   ติ๊กหัวตาราง = เลือกทั้งงวด ไม่ใช่แค่หน้าที่เห็น
-   ถ้าเลือกแค่หน้าปัจจุบันคนจะเผลอโหลดไม่ครบโดยไม่รู้ตัว
+   เป็นของดูอย่างเดียว ไม่ได้เลือกทีละใบ — ปุ่มส่งออกด้านบนหยิบทุกใบที่ผ่าน
+   ตัวกรองปัจจุบัน ตัวกรองจึงเป็นตัวกำหนดขอบเขตไฟล์ ไม่ใช่การติ๊กทีละแถว
+   ทางนี้มีสถานะเดียวให้จำ คนอ่านตารางแล้วรู้ทันทีว่ากดส่งออกจะได้อะไร
 ------------------------------------------------------------------ */
 
 const PAGE_SIZE = 15;
@@ -46,19 +43,13 @@ const PAGE_SIZE = 15;
 export function ReportTable({
   type,
   rows,
-  selected,
-  onToggle,
-  onToggleAll,
 }: {
   type: ReportType;
   rows: ReportRow[];
-  selected: Set<string>;
-  onToggle: (id: string) => void;
-  onToggleAll: () => void;
 }) {
   const [page, setPage] = React.useState(1);
 
-  // เปลี่ยนชนิดเอกสารหรือช่วงวันที่ = คนละชุดข้อมูล ต้องกลับหน้าแรก
+  // เปลี่ยนชนิดเอกสารหรือตัวกรอง = คนละชุดข้อมูล ต้องกลับหน้าแรก
   // ปรับค่าตอนเรนเดอร์ ไม่ใช้ effect เพราะ effect จะเรนเดอร์หน้าเก่าแวบหนึ่งก่อน
   const key = `${type.id}:${rows.length}`;
   const [lastKey, setLastKey] = React.useState(key);
@@ -72,39 +63,19 @@ export function ReportTable({
   if (rows.length === 0) {
     return (
       <EmptyDocs
-        title={`ไม่มี${type.label}ในช่วงที่เลือก`}
-        hint="ลองขยายช่วงวันที่ หรือเลือกชนิดเอกสารอื่น"
+        title={`ไม่มี${type.label}ตามตัวกรองที่เลือก`}
+        hint="ลองขยายช่วงวันที่ ล้างคำค้น หรือเลือกชนิดเอกสารอื่น"
       />
     );
   }
-
-  const allChecked = rows.every((r) => selected.has(r.id));
-  const someChecked = !allChecked && rows.some((r) => selected.has(r.id));
 
   return (
     <>
       {/* ---------- จอแคบ: การ์ด ---------- */}
       <div className="@3xl:hidden">
-        <div className="mb-3 flex items-center gap-2 rounded-xl border border-border bg-card px-4 py-3">
-          <Checkbox
-            id="select-all-cards"
-            checked={allChecked ? true : someChecked ? "indeterminate" : false}
-            onCheckedChange={onToggleAll}
-          />
-          <label htmlFor="select-all-cards" className="text-sm font-medium">
-            เลือกทั้งหมดในช่วงนี้ ({rows.length})
-          </label>
-        </div>
-
         <div className="space-y-3">
           {slice.map((r) => (
-            <RowCard
-              key={r.id}
-              type={type}
-              row={r}
-              checked={selected.has(r.id)}
-              onToggle={() => onToggle(r.id)}
-            />
+            <RowCard key={r.id} type={type} row={r} />
           ))}
         </div>
         <TablePager page={safe} pages={pages} onChange={setPage} />
@@ -116,16 +87,7 @@ export function ReportTable({
           <Table>
             <TableHeader className={STICKY_HEAD}>
               <TableRow>
-                <TableHead className={cn(HEAD_FIRST, "w-12")}>
-                  <Checkbox
-                    aria-label="เลือกทุกเอกสารในช่วงนี้"
-                    checked={
-                      allChecked ? true : someChecked ? "indeterminate" : false
-                    }
-                    onCheckedChange={onToggleAll}
-                  />
-                </TableHead>
-                <TableHead>เลขที่เอกสาร</TableHead>
+                <TableHead className={HEAD_FIRST}>เลขที่เอกสาร</TableHead>
                 <TableHead>วันที่</TableHead>
                 <TableHead>{type.partyLabel}</TableHead>
                 <TableHead>{type.refLabel ?? "อ้างอิง"}</TableHead>
@@ -138,15 +100,8 @@ export function ReportTable({
             </TableHeader>
             <TableBody>
               {slice.map((r) => (
-                <TableRow key={r.id} data-state={selected.has(r.id) ? "selected" : undefined}>
-                  <TableCell className={COL_FIRST}>
-                    <Checkbox
-                      aria-label={`เลือก ${r.code}`}
-                      checked={selected.has(r.id)}
-                      onCheckedChange={() => onToggle(r.id)}
-                    />
-                  </TableCell>
-                  <TableCell className="font-medium whitespace-nowrap">
+                <TableRow key={r.id}>
+                  <TableCell className={cn(COL_FIRST, "font-medium whitespace-nowrap")}>
                     {r.code}
                   </TableCell>
                   <TableCell className="whitespace-nowrap tabular-nums">
@@ -177,49 +132,29 @@ export function ReportTable({
   );
 }
 
-function RowCard({
-  type,
-  row,
-  checked,
-  onToggle,
-}: {
-  type: ReportType;
-  row: ReportRow;
-  checked: boolean;
-  onToggle: () => void;
-}) {
+function RowCard({ type, row }: { type: ReportType; row: ReportRow }) {
   return (
     <div className="rounded-xl border border-border bg-card p-4">
-      <div className="flex items-start gap-3">
-        <Checkbox
-          aria-label={`เลือก ${row.code}`}
-          checked={checked}
-          onCheckedChange={onToggle}
-          className="mt-1"
-        />
-        <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-baseline justify-between gap-2">
-            <span className="font-semibold">{row.code}</span>
-            <span className="text-sm text-muted-foreground tabular-nums">
-              {formatDate(row.date)}
-            </span>
-          </div>
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <span className="font-semibold">{row.code}</span>
+        <span className="text-sm text-muted-foreground tabular-nums">
+          {formatDate(row.date)}
+        </span>
+      </div>
 
-          <dl className="mt-3 space-y-1.5 text-sm">
-            <Line label={type.partyLabel}>{row.party}</Line>
-            <Line label={type.refLabel ?? "อ้างอิง"}>{row.ref ?? "-"}</Line>
-            <Line label="จำนวนรายการ">{row.items}</Line>
-            {type.hasAmount && (
-              <Line label="มูลค่า (บาท)">{formatBaht(row.amount ?? 0)}</Line>
-            )}
-          </dl>
+      <dl className="mt-3 space-y-1.5 text-sm">
+        <Line label={type.partyLabel}>{row.party}</Line>
+        <Line label={type.refLabel ?? "อ้างอิง"}>{row.ref ?? "-"}</Line>
+        <Line label="จำนวนรายการ">{row.items}</Line>
+        {type.hasAmount && (
+          <Line label="มูลค่า (บาท)">{formatBaht(row.amount ?? 0)}</Line>
+        )}
+      </dl>
 
-          <Separator className="mt-3" />
-          <div className="mt-3 flex items-baseline justify-between gap-3 text-sm">
-            <span className="text-muted-foreground">สถานะ:</span>
-            <StatusChip status={row.status} />
-          </div>
-        </div>
+      <Separator className="mt-3" />
+      <div className="mt-3 flex items-baseline justify-between gap-3 text-sm">
+        <span className="text-muted-foreground">สถานะ:</span>
+        <StatusChip status={row.status} />
       </div>
     </div>
   );

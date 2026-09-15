@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { SearchIcon, StarIcon } from "lucide-react";
+import { SearchIcon } from "lucide-react";
 import {
   InputGroup,
   InputGroupAddon,
@@ -17,15 +17,20 @@ import {
   SelectValue,
 } from "@peckey954/ui/components/ui/select";
 import { cn } from "@peckey954/ui/lib/utils";
-import { TONE_DOT } from "@/components/modules/module-icon";
 import { MODULE_GROUPS } from "@/lib/modules";
-import { PINNED_TYPES, REPORT_TYPES, type ReportType } from "@/lib/reports";
+import { REPORT_TYPES, type ReportType } from "@/lib/reports";
 
 /* ------------------------------------------------------------------
    รายการชนิดเอกสาร
 
    จอกว้างเป็นแถบซ้ายที่ค้างอยู่ตลอด เพราะบัญชีสลับชนิดเอกสารบ่อยมาก
    ถ้าเป็นดรอปดาวน์จะต้องกดเปิดทุกครั้ง ช้ากว่ากันมากเมื่อทำวันละหลายสิบรอบ
+
+   ช่องค้นหาอยู่ในกล่องเดียวกับรายการ ไม่ลอยอยู่ข้างบน — มันคือเครื่องมือ
+   ของรายการนี้อันเดียว ไม่ได้ค้นอย่างอื่นในหน้า อยู่ในกรอบเดียวกันจึงอ่านถูก
+
+   เรียงตามหมวดไปตรง ๆ ไม่มีกลุ่ม "ใช้บ่อย" ปักไว้ข้างบน เพราะชื่อเดียวกัน
+   จะโผล่สองที่ในรายการเดียว แล้วนับจำนวนซ้ำจนดูเหมือนมีเอกสารสองชุด
 
    จอแคบใช้ดรอปดาวน์แทน แถบซ้ายกินความกว้างเกินไป
 ------------------------------------------------------------------ */
@@ -53,7 +58,6 @@ export function TypeList({
     );
   }, [query]);
 
-  const pinned = matched.filter((t) => PINNED_TYPES.includes(t.id));
   const groups = MODULE_GROUPS.map((g) => ({
     ...g,
     items: matched.filter((t) => t.group === g.id),
@@ -89,52 +93,27 @@ export function TypeList({
       {/* ---------- จอกว้าง: แถบซ้าย ---------- */}
       <div className="hidden @3xl:block">
         {/* ค้างไว้ตอนเลื่อนตาราง จะได้สลับชนิดเอกสารโดยไม่ต้องเลื่อนกลับขึ้นบน */}
-        <div className="sticky top-4 space-y-3">
+        <nav
+          aria-label="ชนิดเอกสาร"
+          className="sticky top-4 flex max-h-[calc(100dvh-8rem)] flex-col rounded-xl border border-border bg-card p-3"
+        >
           <InputGroup className="bg-card">
             <InputGroupAddon align="inline-start">
               <SearchIcon />
             </InputGroupAddon>
             <InputGroupInput
-              placeholder="ค้นหาชนิดเอกสาร..."
+              placeholder="ค้นหาประเภทเอกสาร..."
               value={query}
               onChange={(e) => setQuery(e.target.value)}
             />
           </InputGroup>
 
-          <nav
-            aria-label="ชนิดเอกสาร"
-            className="max-h-[calc(100dvh-12rem)] overflow-y-auto rounded-xl border border-border bg-card p-2"
-          >
-            {pinned.length > 0 && (
-              <Section
-                label="ใช้บ่อย"
-                icon={<StarIcon className="size-3.5 shrink-0" />}
-              >
-                {pinned.map((t) => (
-                  <TypeButton
-                    key={`pin-${t.id}`}
-                    type={t}
-                    active={t.id === value}
-                    count={counts[t.id] ?? 0}
-                    onClick={() => onChange(t.id)}
-                  />
-                ))}
-              </Section>
-            )}
-
+          <div className="mt-2 min-h-0 flex-1 overflow-y-auto">
             {groups.map((g) => (
-              <Section
-                key={g.id}
-                label={g.label}
-                icon={
-                  g.tone ? (
-                    <span
-                      className={cn("size-2 shrink-0 rounded-full", TONE_DOT[g.tone])}
-                      aria-hidden
-                    />
-                  ) : undefined
-                }
-              >
+              <div key={g.id} className="mb-1 last:mb-0">
+                <p className="px-2 pt-3 pb-1 text-sm font-medium text-muted-foreground">
+                  {g.label}
+                </p>
                 {g.items.map((t) => (
                   <TypeButton
                     key={t.id}
@@ -144,7 +123,7 @@ export function TypeList({
                     onClick={() => onChange(t.id)}
                   />
                 ))}
-              </Section>
+              </div>
             ))}
 
             {matched.length === 0 && (
@@ -152,30 +131,10 @@ export function TypeList({
                 ไม่พบชนิดเอกสารที่ค้นหา
               </p>
             )}
-          </nav>
-        </div>
+          </div>
+        </nav>
       </div>
     </>
-  );
-}
-
-function Section({
-  label,
-  icon,
-  children,
-}: {
-  label: string;
-  icon: React.ReactNode;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className="mb-1 last:mb-0">
-      <p className="flex items-center gap-1.5 px-2 pt-2 pb-1 text-sm font-medium text-muted-foreground">
-        {icon}
-        {label}
-      </p>
-      {children}
-    </div>
   );
 }
 
