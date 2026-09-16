@@ -140,7 +140,16 @@ export const MODULES: ModuleItem[] = [
   },
 
   // ---------- การตรวจคุณภาพสินค้า ----------
-  { id: "qc-raw", group: "qc", label: "ตรวจรับวัตถุดิบ", code: "FM-QC-02-03", icon: "filePlus", pending: 7 },
+  {
+    id: "qc-raw",
+    group: "qc",
+    label: "ตรวจรับวัตถุดิบ",
+    code: "FM-QC-02-03",
+    icon: "filePlus",
+    href: "/qc/raw-receiving",
+    // เท่ากับจำนวนใบในแท็บรอตรวจวัตถุดิบ — ตัวเลขบนการ์ดกับในหน้าต้องตรงกัน
+    pending: 11,
+  },
   {
     id: "qc-fg-in",
     group: "qc",

@@ -5,8 +5,6 @@ import {
   ChevronDownIcon,
   CircleCheckIcon,
   CircleXIcon,
-  MinusIcon,
-  PlusIcon,
   TriangleAlertIcon,
 } from "lucide-react";
 import { Badge } from "@peckey954/ui/components/ui/badge";
@@ -16,15 +14,9 @@ import {
   CollapsibleTrigger,
 } from "@peckey954/ui/components/ui/collapsible";
 import { Input } from "@peckey954/ui/components/ui/input";
-import {
-  InputGroup,
-  InputGroupAddon,
-  InputGroupButton,
-  InputGroupInput,
-} from "@peckey954/ui/components/ui/input-group";
 import { Label } from "@peckey954/ui/components/ui/label";
 import { cn } from "@peckey954/ui/lib/utils";
-import { useNumberField } from "@/components/number-field";
+import { NumberStepper } from "@/components/qc/number-stepper";
 import { VerdictChoice } from "@/components/qc/verdict-choice";
 import {
   answerOf,
@@ -311,51 +303,5 @@ function ItemBlock({
         </div>
       </div>
     </div>
-  );
-}
-
-/**
- * ช่องตัวเลขที่มีปุ่มลบ/บวก — ชุดเดียวกับที่ใช้ในใบชั่งกับใบผลิต
- * เก็บค่าเป็นตัวหนังสือเพราะช่องว่างกับเลขศูนย์ไม่ใช่เรื่องเดียวกัน
- * ว่าง = ยังไม่ได้ชั่ง ศูนย์ = ชั่งแล้วได้ศูนย์
- */
-function NumberStepper({
-  id,
-  label,
-  value,
-  onValueChange,
-}: {
-  id: string;
-  label: string;
-  value: string;
-  onValueChange: (v: string) => void;
-}) {
-  const num = value.trim() === "" ? 0 : Number(value) || 0;
-  const field = useNumberField(num, (n) => onValueChange(String(n)), 2);
-  const step = (delta: number) =>
-    onValueChange(String(Math.max(0, Number((num + delta).toFixed(2)))));
-
-  return (
-    <InputGroup className="h-11 bg-card">
-      <InputGroupAddon align="inline-start">
-        <InputGroupButton
-          size="icon-sm"
-          aria-label={`ลด${label}`}
-          onClick={() => step(-1)}
-        >
-          <MinusIcon />
-        </InputGroupButton>
-      </InputGroupAddon>
-      <InputGroupInput {...field} id={id} className="text-center tabular-nums" />
-      <InputGroupAddon align="inline-end">
-        <InputGroupButton
-          size="icon-sm"
-          aria-label={`เพิ่ม${label}`}
-          onClick={() => step(1)}
-        >
-          <PlusIcon />
-        </InputGroupButton>
-      </InputGroupAddon>
-    </InputGroup>
   );
 }
