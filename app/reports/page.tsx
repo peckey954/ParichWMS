@@ -29,7 +29,6 @@ import { ReportTable } from "@/components/reports/report-table";
 import { TypeList } from "@/components/reports/type-list";
 import {
   DOC_STATUS_LABEL,
-  REPORT_TYPES,
   buildCsv,
   fileName,
   formatCount,
@@ -91,8 +90,8 @@ export default function ReportsPage() {
   const type = getReportType(typeId)!;
 
   /** ช่วงวันที่ที่กรองจริง — เลือกค้างไว้ครึ่งเดียวถือว่ายังไม่กรอง
-   *  ต้อง memo ไว้ ไม่งั้นอ็อบเจกต์ใหม่ทุกเรนเดอร์จะทำให้ตัวนับข้างล่าง
-   *  ไล่สร้างเอกสารทุกชนิดใหม่หมดทุกครั้งที่พิมพ์คำค้นหนึ่งตัวอักษร */
+   *  ต้อง memo ไว้ ไม่งั้นอ็อบเจกต์ใหม่ทุกเรนเดอร์จะทำให้ตัวกรองข้างล่าง
+   *  คำนวณใหม่ทุกครั้งที่พิมพ์คำค้นหนึ่งตัวอักษร */
   const range = React.useMemo<Range | null>(
     () =>
       period.from && period.to
@@ -115,19 +114,6 @@ export default function ReportsPage() {
       ),
     [all, range, status, query]
   );
-
-  // จำนวนของแต่ละชนิดในงวดเดียวกัน ใช้โชว์ข้างชื่อในแถบซ้าย
-  const counts = React.useMemo(() => {
-    const out: Record<string, number> = {};
-    for (const t of REPORT_TYPES) {
-      const rows = rowsFor(t.id);
-      out[t.id] =
-        range === null
-          ? rows.length
-          : rows.filter((r) => inRange(r.date, range)).length;
-    }
-    return out;
-  }, [range]);
 
   const exportCsv = () => {
     if (visible.length === 0) return;
@@ -171,7 +157,7 @@ export default function ReportsPage() {
       </div>
 
       <div className="mt-5 grid gap-4 @3xl:grid-cols-[280px_minmax(0,1fr)]">
-        <TypeList value={typeId} onChange={setTypeId} counts={counts} />
+        <TypeList value={typeId} onChange={setTypeId} />
 
         <section className="min-w-0 rounded-xl border border-border bg-card p-4">
           {/* ---------- หัวข้อ: ชนิดเอกสารที่เลือก + จำนวนที่จะได้ ---------- */}
