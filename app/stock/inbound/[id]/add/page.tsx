@@ -41,7 +41,7 @@ import {
   type Photo,
 } from "@/components/photo-upload";
 import { useNumberField } from "@/components/number-field";
-import { getInboundReceipt, formatQty, ZONES } from "@/lib/general-stock";
+import { getInboundReceipt, formatQty } from "@/lib/general-stock";
 
 /* ------------------------------------------------------------------
    เพิ่มการรับเข้าสต็อกทั่วไป — ปุ่ม "รับเข้า" บนการ์ด/ตารางแท็บรอรับเข้า
@@ -74,14 +74,6 @@ export default function AddInboundRoundPage() {
   );
   const doc = receipt?.doc;
 
-  const plateOptions = React.useMemo(
-    () =>
-      (doc?.truck ?? "")
-        .split(",")
-        .map((s) => s.trim())
-        .filter(Boolean),
-    [doc?.truck]
-  );
   const packingOptions = React.useMemo(
     () =>
       Array.from(
@@ -94,20 +86,13 @@ export default function AddInboundRoundPage() {
     [doc?.packing]
   );
 
-  const [plateMode, setPlateMode] = React.useState<"system" | "manual">(
-    plateOptions.length > 0 ? "system" : "manual"
-  );
-  const [plateSystem, setPlateSystem] = React.useState<string | undefined>(
-    plateOptions[0]
-  );
-  const [plateManual, setPlateManual] = React.useState("");
   const [containerNo, setContainerNo] = React.useState("");
   const [tonQty, setTonQty] = React.useState(0);
-  const [pieceQty, setPieceQty] = React.useState(0);
   const [packing, setPacking] = React.useState(doc?.packing ?? "");
-  const [zone, setZone] = React.useState<string | undefined>();
   const [quality, setQuality] = React.useState<"ok" | "bad">("ok");
   const [note, setNote] = React.useState("");
+  /** บันทึกไปกี่ชิ้นแล้วในรอบนี้ ใช้เดินเลขที่รับสินค้าของชิ้นถัดไป */
+  const [savedCount, setSavedCount] = React.useState(0);
   // ของที่ไม่ถูกต้องต้องมีหลักฐาน — รูปกับเหตุผล เก็บแยกจากหมายเหตุทั่วไป
   const [badNote, setBadNote] = React.useState("");
   const [photos, setPhotos] = React.useState<Photo[]>([]);
@@ -204,31 +189,34 @@ export default function AddInboundRoundPage() {
     );
   }
 
-  const { doc: safeDoc, meta, rounds } = receipt;
+  const { doc: safeDoc, meta, pieces } = receipt;
 
-  // เลขรอบต่อท้ายรหัสใบ — รอบถัดไปจากที่มีอยู่แล้วในใบนี้
-  const seq = String(rounds.length + 1).padStart(2, "0");
+  // เลขที่รับสินค้าของชิ้นที่กำลังจะบันทึก — ต่อจากชิ้นสุดท้ายที่มีอยู่ในใบนี้
+  // บวกจำนวนที่เพิ่งบันทึกไปในรอบนี้ด้วย เพราะกด "บันทึกแล้วเพิ่มรายการถัดไป"
+  // แล้วยังอยู่หน้าเดิม เลขต้องเดินเองโดยไม่ต้องรีเฟรช
+  const pieceSeq = String(pieces.length + savedCount + 1).padStart(2, "0");
+  const receiptCode = `${safeDoc.code}-${meta.roundNo}-${pieceSeq}`;
 
-  // สรุปยอดที่เคยรับเข้าจริงของใบนี้ (นับเฉพาะรอบที่ตรวจ QC จบแล้ว)
-  // ไม่นับรอบ "รอตรวจสอบ QC" ที่ยังไม่แตกยอดจริง กันนับซ้ำกับรอบย่อยของมัน
-  const settledRounds = rounds.filter(
-    (r) => r.status === "stocked" || r.status === "returned"
-  );
-  const priorTotal =
-    settledRounds.length > 0
-      ? settledRounds.reduce((sum, r) => sum + (r.receivedQty ?? 0), 0)
-      : null;
-  const priorAvg =
-    priorTotal !== null ? priorTotal / settledRounds.length : null;
+  const live = pieces.filter((p) => !p.cancelled);
+  const priorTotal = live.length > 0 ? live.reduce((sum, p) => sum + p.qty, 0) : null;
+  const priorAvg = priorTotal !== null ? priorTotal / live.length : null;
 
-  function handleSave() {
-    const plate = plateMode === "system" ? plateSystem : plateManual.trim();
-    if (!plate) {
-      toast.error("กรุณาระบุทะเบียนรถ");
+  /**
+   * บันทึกหนึ่งชิ้น = ออกใบรับหนึ่งใบ แล้วพิมพ์เลขที่ติดไปกับของ
+   *
+   * เลขที่พิมพ์ติดนี่แหละที่คนเก็บของเอาไปสแกนตอนระบุโซนทีหลัง
+   * ไม่พิมพ์ = ของกองอยู่โดยไม่มีอะไรบอกว่ามันคือชิ้นไหนในระบบ
+   *
+   * โซนไม่ได้ถามตรงนี้ คนที่ยืนรับของไม่ได้เป็นคนเอาของไปเก็บ
+   * บังคับให้เลือกตอนนี้ก็ได้แค่ค่าที่เดาไว้แล้วไม่ตรงกับของจริง
+   */
+  function handleSave(andNext: boolean) {
+    if (tonQty <= 0) {
+      toast.error("กรุณาระบุปริมาณรับเข้าต่อชิ้น");
       return;
     }
-    if (tonQty <= 0) {
-      toast.error("กรุณาระบุจำนวนรับเข้า");
+    if (!packing) {
+      toast.error("กรุณาเลือกบรรจุภัณฑ์");
       return;
     }
     // ของที่ตีกลับไปหาผู้ขายต้องบอกได้ว่าเพราะอะไร ไม่งั้นเคลมไม่ได้
@@ -240,13 +228,25 @@ export default function AddInboundRoundPage() {
       toast.error("รูปภาพยังอัปโหลดไม่เสร็จ");
       return;
     }
-    toast.success(`บันทึกการรับเข้า ${safeDoc.code}-${seq} แล้ว`, {
-      description: `${plate} — ${formatQty(tonQty)} ${safeDoc.orderUnit}${
-        zone ? ` เข้าโซน ${zone}` : ""
-      }`,
+
+    toast.success(`บันทึกและพิมพ์ ${receiptCode} แล้ว`, {
+      description: `${formatQty(tonQty)} ${safeDoc.orderUnit} · ${packing} — ไปติดเลขที่ใบไว้กับของ แล้วค่อยระบุโซนทีหลัง`,
     });
-    // ไม่มี backend จริง — กลับไปหน้าที่เข้ามา เหมือนแบบหน้าใบผลิต
-    router.back();
+
+    if (!andNext) {
+      // ไม่มี backend จริง — กลับไปหน้าที่เข้ามา เหมือนแบบหน้าใบผลิต
+      router.back();
+      return;
+    }
+
+    // เคลียร์เฉพาะของที่เป็นของชิ้นนั้น ๆ — เบอร์ตู้กับบรรจุภัณฑ์เป็นของทั้งเที่ยว
+    // ยกของลงมาสิบชิ้นจากตู้เดียวกันแล้วต้องเลือกบรรจุภัณฑ์ใหม่ทุกชิ้นคือคีย์ซ้ำเปล่า ๆ
+    setSavedCount((n) => n + 1);
+    setTonQty(0);
+    setQuality("ok");
+    setBadNote("");
+    setNote("");
+    setPhotos([]);
   }
 
   return (
@@ -277,7 +277,7 @@ export default function AddInboundRoundPage() {
         </Breadcrumb>
 
         <h1 className="mt-4 text-2xl font-semibold tracking-tight">
-          เพิ่มการรับเข้าสต็อกทั่วไป {doc.code}-{seq}
+          เพิ่มการรับเข้าสต็อกทั่วไป {receiptCode}
         </h1>
 
         {/* ---------- ข้อมูลใบสั่งซื้อ — อ้างอิงอย่างเดียว ไม่แก้ที่นี่ ---------- */}
@@ -315,58 +315,12 @@ export default function AddInboundRoundPage() {
         </div>
 
         {/* ---------- ฟอร์มรับเข้า ---------- */}
+        {/* ---------- ฟอร์มรับเข้าหนึ่งชิ้น ----------
+             ไม่มีช่องทะเบียนรถแล้ว — ทั้งใบคือรถคันเดียวเที่ยวเดียว ทะเบียนอยู่บนใบ
+             ถามซ้ำทุกชิ้นได้แค่โอกาสคีย์ไม่ตรงกันเองระหว่างชิ้นในใบเดียว
+
+             ไม่มีช่องโซนเหมือนกัน — คนเก็บของเข้าโซนมาทีหลังและเป็นคนละคน */}
         <div className="mt-6 grid gap-5 @2xl:grid-cols-2">
-          <div className="space-y-3 @2xl:col-span-2">
-            <Label>วิธีระบุทะเบียนรถ</Label>
-            <RadioGroup
-              value={plateMode}
-              onValueChange={(v) => setPlateMode(v as "system" | "manual")}
-              className="grid gap-3 @lg:grid-cols-2"
-            >
-              <RadioBox id="plate-mode-system" value="system">
-                ทะเบียนรถในระบบ
-              </RadioBox>
-              <RadioBox id="plate-mode-manual" value="manual">
-                ระบุทะเบียนรถเอง
-              </RadioBox>
-            </RadioGroup>
-          </div>
-
-          {plateMode === "system" ? (
-            <div className="space-y-1.5 @2xl:col-span-2">
-              <Label htmlFor="plate-system">ทะเบียนรถในระบบ</Label>
-              <Select value={plateSystem} onValueChange={setPlateSystem}>
-                <SelectTrigger id="plate-system" className="w-full bg-card">
-                  <SelectValue placeholder="เลือกทะเบียนรถ" />
-                </SelectTrigger>
-                <SelectContent>
-                  {plateOptions.length === 0 ? (
-                    <div className="px-2 py-1.5 text-sm text-muted-foreground">
-                      ใบนี้ยังไม่มีทะเบียนรถในระบบ
-                    </div>
-                  ) : (
-                    plateOptions.map((p) => (
-                      <SelectItem key={p} value={p}>
-                        {p}
-                      </SelectItem>
-                    ))
-                  )}
-                </SelectContent>
-              </Select>
-            </div>
-          ) : (
-            <div className="space-y-1.5 @2xl:col-span-2">
-              <Label htmlFor="plate-manual">ทะเบียนรถ</Label>
-              <Input
-                id="plate-manual"
-                className="bg-card"
-                placeholder="ระบุทะเบียนรถ"
-                value={plateManual}
-                onChange={(e) => setPlateManual(e.target.value)}
-              />
-            </div>
-          )}
-
           {meta.buyerNote && (
             <div className="rounded-lg bg-brand px-4 py-3 text-sm @2xl:col-span-2">
               <span className="text-muted-foreground">
@@ -393,18 +347,8 @@ export default function AddInboundRoundPage() {
           </div>
 
           <div className="space-y-1.5">
-            <Label htmlFor="ton-qty">รับเข้า ({doc.orderUnit})</Label>
+            <Label htmlFor="ton-qty">ปริมาณรับเข้าต่อชิ้น ({doc.orderUnit})</Label>
             <QtyStepper id="ton-qty" value={tonQty} onValueChange={setTonQty} digits={2} />
-          </div>
-
-          <div className="space-y-1.5">
-            <Label htmlFor="piece-qty">
-              จำนวนรับเข้า (บรรจุภัณฑ์){" "}
-              <span className="font-normal text-muted-foreground">
-                (ไม่บังคับ)
-              </span>
-            </Label>
-            <QtyStepper id="piece-qty" value={pieceQty} onValueChange={setPieceQty} />
           </div>
 
           <div className="space-y-1.5">
@@ -417,22 +361,6 @@ export default function AddInboundRoundPage() {
                 {packingOptions.map((p) => (
                   <SelectItem key={p} value={p}>
                     {p}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="space-y-1.5">
-            <Label htmlFor="zone">โซนรับเข้า</Label>
-            <Select value={zone} onValueChange={setZone}>
-              <SelectTrigger id="zone" className="w-full bg-card">
-                <SelectValue placeholder="เลือกโซน" />
-              </SelectTrigger>
-              <SelectContent>
-                {ZONES.map((z) => (
-                  <SelectItem key={z} value={z}>
-                    {z}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -510,7 +438,17 @@ export default function AddInboundRoundPage() {
           <Button variant="outline-primary" onClick={() => router.back()}>
             ย้อนกลับ
           </Button>
-          <Button onClick={handleSave}>บันทึก</Button>
+          {/* สองปุ่ม เพราะงานจริงมีสองจังหวะ — ยกลงชิ้นสุดท้ายแล้วจบ
+              กับยังมีอีกสิบชิ้นรออยู่บนรถ ปุ่มขวาคือทางที่ใช้บ่อยกว่า
+              จึงเป็นปุ่มหลัก และไม่พากลับหน้าเดิม ฟอร์มเคลียร์รอชิ้นถัดไปเลย */}
+          <div className="flex items-center gap-2">
+            <Button variant="outline-primary" onClick={() => handleSave(false)}>
+              บันทึกและพิมพ์
+            </Button>
+            <Button onClick={() => handleSave(true)}>
+              บันทึกและพิมพ์แล้วเพิ่มรายการถัดไป
+            </Button>
+          </div>
         </div>
       </div>
     </>

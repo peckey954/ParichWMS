@@ -877,51 +877,49 @@ export function matchesInbound(d: InboundDoc, q: string): boolean {
 }
 
 /* ------------------------------------------------------------------
-   ใบรับเข้าสต็อกทั่วไป — หน้ารายละเอียดของแต่ละ InboundDoc
+   ใบรับเข้าสต็อกทั่วไป — หนึ่งใบ = ของที่มากับรถทะเบียนเดียว หนึ่งเที่ยว
 
-   หนึ่งใบสั่งซื้ออาจมีรถเข้าหลายรอบ และแต่ละรอบพอตรวจ QC แล้ว
-   อาจแตกเป็นหลายผล (รับสภาพ/Repack/ผ่าน/ส่งคืน) แต่ละผลนับแยกกัน
-   จึงเก็บเป็นตาราง "รอบการรับเข้าสินค้า" แทนที่จะมีแค่ยอดเดียว
+   ทะเบียนรถกับวันที่รถเข้าเป็นของ "ทั้งใบ" ไม่ใช่ของแต่ละแถว จึงย้ายไปอยู่บนการ์ด
+   ของเดิมเก็บทะเบียนซ้ำทุกแถวทั้งที่ทุกแถวมาจากรถคันเดียวกัน อ่านแล้วชวนเข้าใจผิดว่า
+   ใบเดียวมีหลายคัน และเวลาทะเบียนเปลี่ยนต้องไล่แก้ทุกแถว
+
+   แถวในตารางคือ "หนึ่งชิ้นที่รับเข้า" — หนึ่งพาเลท/หนึ่งถุงใหญ่ ที่มีเลขที่รับสินค้า
+   ของตัวเอง พิมพ์ติดไปกับของจริงตอนกดบันทึก เลขนั้นเอาไว้สแกนตอนระบุโซนทีหลัง
+
+   โซนแยกออกจากตอนรับของโดยตั้งใจ — คนที่ยืนรับของหน้าโกดังกับคนที่เอาของไปเก็บ
+   คนละคนคนละเวลา บังคับให้เลือกโซนตั้งแต่ตอนรับ แปลว่าคนรับต้องเดาแทนอีกคน
+   ชิ้นที่ยังไม่มีโซนจึงเป็นสถานะปกติที่รอได้ ไม่ใช่ข้อมูลไม่ครบ
 ------------------------------------------------------------------ */
 
-export type QcResult = "accepted" | "repack" | "passed" | "returned";
+export type PieceStatus = "waitingZone" | "stocked" | "cancelled";
 
-export const QC_RESULT_LABEL: Record<QcResult, string> = {
-  accepted: "รับสภาพ",
-  repack: "Repack",
-  passed: "ผ่าน",
-  returned: "ส่งคืน",
+export const PIECE_STATUS_LABEL: Record<PieceStatus, string> = {
+  waitingZone: "รอระบุโซน",
+  stocked: "รับสินค้าครบแล้ว",
+  cancelled: "ยกเลิก",
 };
 
-export type InboundRoundStatus =
-  | "waitingTruck"
-  | "waitingQc"
-  | "stocked"
-  | "returned";
-
-export const INBOUND_ROUND_STATUS_LABEL: Record<InboundRoundStatus, string> = {
-  waitingTruck: "รอรถขนส่ง",
-  waitingQc: "รอตรวจสอบ QC",
-  stocked: "สินค้าเข้าคลังแล้ว",
-  returned: "ส่งคืน",
-};
-
-/** หนึ่งแถวในตาราง "รอบการรับเข้าสินค้า" — บางช่องยังไม่มีค่าตามสถานะ */
-export type InboundRound = {
+/** หนึ่งชิ้นที่รับเข้า = หนึ่งแถวในตาราง และหนึ่งใบที่พิมพ์ติดของ */
+export type InboundPiece = {
   id: string;
+  /** เลขที่รับสินค้า — เลขเดียวกับที่พิมพ์ติดของจริง ใช้สแกนตอนระบุโซน */
   receiptCode: string;
-  batchId: string;
-  plate: string;
-  arriveDate: string;
+  createdAt: string;
   containerNo?: string;
+  /** ว่าง = ยังไม่มีใครมาระบุโซน */
   zone?: string;
-  packing?: string;
-  receivedQty?: number;
-  rejectedQty?: number;
-  qcResult?: QcResult;
-  stockedQty?: number;
-  status: InboundRoundStatus;
+  packing: string;
+  /** ปริมาณรับเข้าต่อชิ้น */
+  qty: number;
+  /** ของชิ้นนี้ตรงกับที่สั่งไหม กาว่าไม่ถูกต้องแล้วต้องบอกเหตุผล */
+  correct: boolean;
+  wrongNote?: string;
+  note?: string;
+  cancelled: boolean;
 };
+
+export const pieceStatus = (p: InboundPiece): PieceStatus =>
+  p.cancelled ? "cancelled" : p.zone ? "stocked" : "waitingZone";
 
 export type InboundReceiptMeta = {
   prCode: string;
@@ -934,16 +932,39 @@ export type InboundReceiptMeta = {
   deliveryFrom: string;
   /** หมายเหตุที่ผู้สั่งซื้อฝากไว้ตอนทำใบสั่งซื้อ — ไม่ใช่ทุกใบจะมี */
   buyerNote?: string;
+  /** เที่ยวที่เท่าไรของใบสั่งซื้อนี้ ใช้ประกอบเลขที่รับสินค้า */
+  roundNo: string;
 };
 
 export type InboundReceipt = {
   doc: InboundDoc;
   meta: InboundReceiptMeta;
-  /** รวมจากทุกรอบที่ตรวจ QC แล้ว — เป็นค่าที่ผูกกับ rounds จริง ไม่ใช่สุ่มแยกต่างหาก */
-  rejectedQty: number;
-  stockedQty: number;
-  rounds: InboundRound[];
+  pieces: InboundPiece[];
 };
+
+// ---------------------------------------------------------------
+// ยอดสรุปสี่ช่องบนการ์ด — คิดจาก pieces จริงเสมอ ไม่ใช่ค่านิ่งที่เก็บแยกไว้
+// เก็บแยกแล้ววันหนึ่งจะมีคนเพิ่มชิ้นโดยลืมอัปเดตยอด แล้วสองที่จะไม่ตรงกัน
+// ชิ้นที่ยกเลิกไม่นับในทุกช่อง มันคือของที่ไม่ได้รับเข้ามาจริง
+// ---------------------------------------------------------------
+
+export const livePieces = (pieces: InboundPiece[]) =>
+  pieces.filter((p) => !p.cancelled);
+
+export const receivedTons = (pieces: InboundPiece[]) =>
+  livePieces(pieces).reduce((sum, p) => sum + p.qty, 0);
+
+export const receivedCount = (pieces: InboundPiece[]) => livePieces(pieces).length;
+
+/** ของที่รับมาแล้วแต่กาว่าไม่ถูกต้อง — ยังไม่ตัดออกจากยอดรับเข้า แต่ไม่เข้าคลัง */
+export const rejectedTons = (pieces: InboundPiece[]) =>
+  livePieces(pieces).filter((p) => !p.correct).reduce((sum, p) => sum + p.qty, 0);
+
+export const stockedTons = (pieces: InboundPiece[]) =>
+  livePieces(pieces).filter((p) => p.correct).reduce((sum, p) => sum + p.qty, 0);
+
+export const waitingZoneCount = (pieces: InboundPiece[]) =>
+  livePieces(pieces).filter((p) => !p.zone).length;
 
 const REASON_POOL = [
   "ผลิต",
@@ -959,6 +980,12 @@ const BUYER_NOTE_POOL = [
   "ประสานคนขับก่อนเข้าคลัง เบอร์อยู่ในใบสั่งซื้อ",
 ];
 
+const WRONG_NOTE_POOL = [
+  "น้ำหนักไม่ถูกต้อง",
+  "ถุงฉีกขาด",
+  "ป้ายสินค้าไม่ตรงกับใบสั่ง",
+];
+
 /** เลขที่ตายตัวจาก id เอกสาร กันไม่ให้เปลี่ยนค่าไปมาระหว่างเซิร์ฟเวอร์กับเบราว์เซอร์ */
 function seedFromId(id: string) {
   let h = 0;
@@ -972,11 +999,14 @@ function hex(rnd: () => number, len: number) {
   return s;
 }
 
+const pad2 = (n: number) => String(n).padStart(2, "0");
+
 function buildInboundReceipt(doc: InboundDoc): InboundReceipt {
   const rnd = seeded(seedFromId(doc.id));
 
   const maker = pick(DOC_ACTORS, rnd);
   const poMaker = rnd() < 0.6 ? maker : pick(DOC_ACTORS, rnd);
+  const roundNo = pad2(1 + Math.floor(rnd() * 9));
   const meta: InboundReceiptMeta = {
     prCode: doc.code.replace(/^PO/, "PR"),
     prqId: hex(rnd, 6),
@@ -987,79 +1017,80 @@ function buildInboundReceipt(doc: InboundDoc): InboundReceipt {
     reason: pick(REASON_POOL, rnd),
     deliveryFrom: doc.arriveDate,
     buyerNote: rnd() < 0.5 ? pick(BUYER_NOTE_POOL, rnd) : undefined,
+    roundNo,
   };
 
-  const batchId = `IN-${hex(rnd, 4)}-${hex(rnd, 4)}`;
-  const rounds: InboundRound[] = [
-    {
-      id: `${doc.id}-r0`,
-      receiptCode: doc.code,
-      batchId,
-      plate: doc.truck,
-      arriveDate: doc.arriveDate,
-      packing: doc.packing,
-      status: "waitingTruck",
-    },
-  ];
-
-  let rejectedQty = 0;
-  let stockedQty = 0;
-
+  const pieces: InboundPiece[] = [];
   if (doc.receivedQty > 0) {
-    const zone = pick(ZONES, rnd);
+    // ของทั้งเที่ยวถูกซอยเป็นชิ้นเท่า ๆ กัน ชิ้นสุดท้ายรับเศษที่เหลือ
+    const count = 4 + Math.floor(rnd() * 5);
+    const per = Math.round((doc.receivedQty / count) * 100) / 100;
     const containerNo =
-      rnd() < 0.6 ? `AB-${1000 + Math.floor(rnd() * 9000)}` : undefined;
+      rnd() < 0.7 ? `AB-${1000 + Math.floor(rnd() * 9000)}` : undefined;
+    const packing = doc.packing ?? "50 กก.";
 
-    rounds.push({
-      id: `${doc.id}-r1`,
-      receiptCode: doc.code,
-      batchId,
-      plate: doc.truck,
-      arriveDate: doc.arriveDate,
-      containerNo,
-      zone,
-      packing: doc.packing,
-      receivedQty: doc.receivedQty,
-      status: "waitingQc",
-    });
+    for (let i = 0; i < count; i++) {
+      const isLast = i === count - 1;
+      const qty = isLast
+        ? Math.round((doc.receivedQty - per * (count - 1)) * 100) / 100
+        : per;
+      const correct = rnd() > 0.15;
+      // ชิ้นแรก ๆ ที่เพิ่งลงจากรถยังไม่มีใครมาระบุโซน เป็นสถานะปกติ ไม่ใช่ข้อมูลขาด
+      const zoned = rnd() > 0.25;
 
-    // ตรวจ QC แล้วส่วนใหญ่ — บางใบยังค้างรอตรวจอยู่แค่แถวเดียวด้านบน
-    if (rnd() < 0.75) {
-      const pool: QcResult[] = ["accepted", "passed", "repack", "returned"];
-      const picked = pool.filter(() => rnd() < 0.5);
-      const results: QcResult[] = picked.length > 0 ? picked : ["accepted"];
+      pieces.push({
+        id: `${doc.id}-p${i}`,
+        // เลขไล่จากมากไปน้อย ชิ้นที่บันทึกล่าสุดอยู่บนสุดของตาราง
+        receiptCode: `${doc.code}-${roundNo}-${pad2(count - i)}`,
+        createdAt: doc.createdAt,
+        containerNo: i === 0 && !zoned ? undefined : containerNo,
+        zone: zoned ? pick(ZONES, rnd) : undefined,
+        packing,
+        qty,
+        correct,
+        wrongNote: correct ? undefined : pick(WRONG_NOTE_POOL, rnd),
+        cancelled: false,
+      });
+    }
 
-      let remaining = doc.receivedQty;
-      results.forEach((qc, i) => {
-        const isLast = i === results.length - 1;
-        const portion = isLast
-          ? remaining
-          : Math.max(1, Math.round(remaining * (0.3 + rnd() * 0.4)));
-        remaining -= portion;
-        const isReturned = qc === "returned";
-        if (isReturned) rejectedQty += portion;
-        else stockedQty += portion;
-
-        rounds.push({
-          id: `${doc.id}-r${2 + i}`,
-          receiptCode: doc.code,
-          batchId,
-          plate: doc.truck,
-          arriveDate: doc.arriveDate,
-          containerNo,
-          zone,
-          packing: doc.packing,
-          receivedQty: portion,
-          rejectedQty: isReturned ? portion : undefined,
-          qcResult: qc,
-          stockedQty: isReturned ? undefined : portion,
-          status: isReturned ? "returned" : "stocked",
-        });
+    // บางใบมีชิ้นที่ยกเลิกไป เช่นคีย์ซ้ำหรือของถูกตีกลับตั้งแต่หน้าโกดัง
+    const cancelCount = rnd() < 0.5 ? 1 + Math.floor(rnd() * 2) : 0;
+    for (let i = 0; i < cancelCount; i++) {
+      pieces.push({
+        id: `${doc.id}-c${i}`,
+        receiptCode: `${doc.code}-${roundNo}-${pad2(count + i + 1)}`,
+        createdAt: doc.createdAt,
+        packing: doc.packing ?? "50 กก.",
+        qty: per,
+        correct: true,
+        note: "คีย์ซ้ำ",
+        cancelled: true,
       });
     }
   }
 
-  return { doc, meta, rejectedQty, stockedQty, rounds };
+  // โซนที่ระบุไว้ในเซสชันนี้ทับค่าที่สุ่มมาเสมอ
+  for (const p of pieces) {
+    const zone = ZONE_PICKED.get(p.id);
+    if (zone) p.zone = zone;
+  }
+
+  return { doc, meta, pieces };
+}
+
+/* ---------------------------------------------------------------
+   โซนที่เพิ่งเลือกให้ของแต่ละชิ้น
+
+   ไม่มีหลังบ้านจริง เก็บไว้ในหน่วยความจำของแท็บ หายตอนรีเฟรช
+   เก็บไว้ที่นี่ไม่ใช่ใน state ของหน้าใบรับเข้า เพราะจอแคบแยกไปเลือกโซนกัน
+   คนละหน้า กดบันทึกแล้วกลับมา หน้าใบรับเข้าถูกสร้างใหม่ทั้งหน้า ของที่เพิ่ง
+   ระบุไปจะหายทันทีถ้าผูกไว้กับหน้าเดียว
+--------------------------------------------------------------- */
+
+const ZONE_PICKED = new Map<string, string>();
+
+export function setPieceZones(ids: string[], zone: string) {
+  for (const id of ids) ZONE_PICKED.set(id, zone);
 }
 
 export function getInboundReceipt(id: string): InboundReceipt | undefined {
