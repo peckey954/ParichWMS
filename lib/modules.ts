@@ -204,6 +204,16 @@ export const MODULES: ModuleItem[] = [
     href: "/qc/setup",
   },
   {
+    id: "qc-setup-erp",
+    group: "settings",
+    label: "Setup QC",
+    description:
+      "ตั้งค่าการตรวจคุณภาพตามโครง ERPNext — เทมเพลต ทะเบียนหัวข้อตรวจ และการบังคับใช้กับการรับของ",
+    code: "FM-QC-02-04",
+    icon: "clipboardCheck",
+    href: "/qc/setup-erp",
+  },
+  {
     id: "safety-stock",
     group: "settings",
     label: "ตั้งค่า Safety Stock",

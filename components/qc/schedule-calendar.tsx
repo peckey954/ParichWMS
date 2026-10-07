@@ -121,7 +121,7 @@ export function SchedulePreviewCalendar({ schedule }: { schedule: Schedule }) {
 
       <p className="mt-3 text-sm text-muted-foreground">
         จุด = ช่วงเวลาที่ต้องตรวจ 1 จุดต่อ 1 ใบ ({schedule.slots.length} จุดต่อวัน)
-        {isWeekendSkipped && " · ช่องเทาคือวันที่เว้นไว้ตามรอบการตรวจ"}
+        {isWeekendSkipped && " · ช่องเทาคือวันหยุด ไม่มีใบให้ทำ"}
         {" — "}
         เป็นแค่ตัวอย่างโครง ยังไม่มีใบจริงจนกว่าจะเผยแพร่และมีคนเปิดใบ
       </p>
