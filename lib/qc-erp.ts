@@ -292,11 +292,146 @@ export const QI_PARAMETERS: QiParameter[] = [
 export const paramOf = (id: string) => QI_PARAMETERS.find((p) => p.id === id);
 
 // ---------------------------------------------------------------
+// แหล่งข้อมูลที่ดึงมาให้เลือกได้
+//
+// custom = Quality Inspection ไม่มีช่องให้เก็บ ไม่ใช่ว่าทำไม่ได้ แต่ต้องไปอยู่
+// doctype QC Check ที่เราสร้างเอง — ตัวนี้คือสิ่งที่ตัดสินว่าใบไปลงที่ไหน
+// คนตั้งค่าไม่ต้องเลือก doctype เอง เลือกว่าดึงอะไรมา แล้วอ่านคำตอบจากตรงนั้น
+// ---------------------------------------------------------------
+
+export type RowKind = "text" | "system";
+
+export const ROW_KIND: Record<RowKind, { label: string; store: string }> = {
+  text: {
+    label: "ข้อความ",
+    store: "specification → ทะเบียนหัวข้อตรวจ",
+  },
+  system: {
+    label: "ดึงจากระบบ",
+    store: "ผู้ตรวจเลือกจากรายการของระบบ ไม่ได้พิมพ์เอง",
+  },
+};
+
+export const ROW_KINDS = Object.keys(ROW_KIND) as RowKind[];
+
+export type SourceId =
+  | "item"
+  | "docPr"
+  | "docDn"
+  | "docSe"
+  | "docJc"
+  | "batch"
+  | "user"
+  | "warehouse"
+  | "machine";
+
+export const SOURCE: Record<
+  SourceId,
+  { label: string; store: string; custom: boolean; pool: string[] }
+> = {
+  item: {
+    label: "สินค้า",
+    store: "item_code → Item",
+    custom: false,
+    pool: [],
+  },
+  docPr: {
+    label: "ใบรับสินค้าภายนอก",
+    store: "reference_type = Purchase Receipt · reference_name",
+    custom: false,
+    pool: ["PR260115/01-01", "PR260115/01-02", "PR260114/03-01"],
+  },
+  docDn: {
+    label: "ใบส่งของ",
+    store: "reference_type = Delivery Note · reference_name",
+    custom: false,
+    pool: ["DN260115/01-01", "DN260114/02-01"],
+  },
+  docSe: {
+    label: "ใบเบิก-โอนสต็อก",
+    store: "reference_type = Stock Entry · reference_name",
+    custom: false,
+    pool: ["SE260115/01-01", "SE260115/01-02"],
+  },
+  docJc: {
+    label: "ใบงานผลิต",
+    store: "reference_type = Job Card · reference_name",
+    custom: false,
+    pool: ["JC260115/L1-01", "JC260115/L2-01"],
+  },
+  batch: {
+    label: "ล็อต",
+    store: "batch_no → Batch",
+    custom: false,
+    pool: ["LOT-260115-01", "LOT-260115-02"],
+  },
+  user: {
+    label: "ผู้ตรวจ",
+    store: "inspected_by → User",
+    custom: false,
+    pool: ["อลิสา พรสุขสิริ", "ณัฐพล ศรีวิไล"],
+  },
+  warehouse: {
+    label: "คลังสินค้า",
+    store: "QC Check · Link → Warehouse",
+    custom: true,
+    pool: [
+      "สต็อกทั่วไป",
+      "สต็อกวัตถุดิบ",
+      "สต็อกสินค้า",
+      "สต็อก WIP",
+      "สต็อก CWIP",
+    ],
+  },
+  machine: {
+    label: "เครื่องจักร",
+    store: "QC Check · Link → Asset",
+    custom: true,
+    pool: ["L1", "L2", "L3"],
+  },
+};
+
+export const SOURCE_IDS = Object.keys(SOURCE) as SourceId[];
+
+/** รายการให้เลือกของแหล่งหนึ่ง — สินค้าอ่านจาก ITEM_POOL ที่ประกาศทีหลัง */
+export const sourcePool = (id: SourceId): string[] =>
+  id === "item" ? ITEM_POOL : SOURCE[id].pool;
+
+/* หัวข้อตรวจดึงได้แค่สามอย่าง — ของที่ "ตรวจ" ได้จริง
+   เอกสารกับผู้ตรวจไม่อยู่ในนี้ เพราะเป็นของหัวใบ ไม่ใช่หัวข้อที่ตัดสินผ่าน */
+export const CHECK_SOURCES: SourceId[] = ["item", "warehouse", "machine"];
+
+// ---------------------------------------------------------------
+// ช่องในส่วนหัวเอกสาร — ผู้ตรวจกรอกครั้งเดียวต่อใบ
+//
+// ของเดิมไม่มีแนวคิดนี้ ช่องหัวใบถูกตั้งตายตัวไว้ในโค้ด ฟอร์มที่ต้องการช่องอื่น
+// จึงทำไม่ได้เลย ตัวนี้เปิดให้ตั้งเองว่าใบนี้ต้องกรอกอะไรก่อนเริ่มตรวจ
+// ---------------------------------------------------------------
+
+export type DocField = {
+  id: string;
+  label: string;
+  source: SourceId | "";
+  required: boolean;
+};
+
+// ---------------------------------------------------------------
 // หนึ่งแถวในเทมเพลต — Item Quality Inspection Parameter
 // ---------------------------------------------------------------
 
 export type QiRow = {
   id: string;
+  /**
+   * หัวข้อนี้มาจากไหน
+   *   text    ชื่อจากทะเบียน Quality Inspection Parameter ผู้ตรวจกรอกค่าเอง
+   *   system  ผู้ตรวจเลือกจากรายการของระบบ ชื่อหัวข้อคือตัวแหล่งข้อมูลไปในตัว
+   *
+   * เคยไม่มีแกนนี้ ฟอร์มที่ต้องให้เลือกสูตรหรือเครื่องจักรต่อการตรวจจึงทำไม่ได้
+   * ต้องไปทำตารางแยกอีกตาราง ซึ่งกลายเป็นสองที่ที่ตั้งเหมือนกันแต่คนละหน้าตา
+   */
+  kind: RowKind;
+  /** ใช้เมื่อ kind = system — เป็นชื่อหัวข้อไปในตัว ไม่ต้องตั้งชื่อซ้ำ */
+  source?: SourceId;
   parameterId: string;
   /** numeric — คีย์ตัวเลขหลายค่า ไม่ติ๊กคือคีย์ข้อความช่องเดียว */
   numeric: boolean;
@@ -556,18 +691,50 @@ export const targetPool = (subject: Subject): string[] =>
   subject === "item" ? ITEM_POOL : [];
 
 /**
- * ใบตรวจของฟอร์มนี้ลง Quality Inspection ได้ไหม
+ * เหตุผลทั้งหมดที่ทำให้ใบของฟอร์มนี้ลง Quality Inspection ไม่ได้
  *
- * ต้องครบสองอย่าง ไม่ใช่แค่ว่าตรวจสินค้า — ต้องมีเอกสารเป็นตัวเปิดใบด้วย
- * เพราะ reference_type กับ reference_name เป็น reqd=1 ที่ไม่มี depends_on
- * และ frappe._validate_mandatory ทำงานตอน save ไม่ใช่ตอน submit ฟอร์มที่สุ่ม
- * ตรวจเองโดยไม่มีเอกสารใบไหนเป็นต้นเรื่องจึงบันทึกแม้แต่ draft ไม่ได้
+ * คืนเป็นรายการ ไม่ใช่ true/false เพราะหน้าจอต้องบอกได้ว่า "ติดที่อะไร"
+ * บอกแค่ว่าเป็น custom แล้วปล่อยให้เดาเอง คือสิ่งที่ทำให้คนตั้งค่าไม่กล้าแก้อะไร
+ *
+ * ไม่มีช่องให้เลือกเองว่าจะลง doctype ไหน — อ่านจากที่ตั้งไว้ทั้งหมด เพราะคำตอบ
+ * มันอยู่ในนั้นอยู่แล้ว ให้เลือกซ้ำอีกช่องมีแต่จะตั้งขัดกันเองแล้วต้องมาเตือนทีหลัง
+ * และคนตั้งค่าตอบได้ว่าฟอร์มนี้ตรวจอะไร แต่ตอบไม่ได้ว่าจะเอา doctype ไหน
+ */
+export function blockersOf(t: QiTemplate): string[] {
+  const out: string[] = [];
+
+  // Quality Inspection ไม่มีช่องเก็บเครื่องจักรหรือคลัง มีแต่ item_code
+  if (t.subject !== "item") out.push("ประเภทการตรวจไม่ใช่สินค้า");
+
+  // reference_type / reference_name เป็น reqd=1 ที่ไม่มี depends_on และ
+  // frappe._validate_mandatory ทำงานตอน save ไม่ใช่ตอน submit —
+  // ฟอร์มที่ไม่มีเอกสารเป็นต้นเรื่องจึงบันทึกแม้แต่ draft ไม่ได้
+  if (t.subject === "item" && t.refDocs.length === 0)
+    out.push("ไม่ได้อ้างอิงเอกสาร");
+
+  // item_code ก็ reqd=1 เหมือนกัน ไม่ผูกสินค้าคือไม่มีใบให้เปิด
+  if (t.subject === "item" && t.targets.length === 0)
+    out.push("ยังไม่ได้ผูกกับสินค้าตัวไหน");
+
+  for (const f of t.headerFields)
+    if (f.source !== "" && SOURCE[f.source].custom)
+      out.push(`ส่วนหัว “${f.label || "ไม่มีชื่อ"}”`);
+
+  for (const r of t.rows)
+    if (r.kind === "system" && r.source && SOURCE[r.source].custom)
+      out.push(`หัวข้อ “${SOURCE[r.source].label}”`);
+
+  return out;
+}
+
+/**
+ * ใบตรวจของฟอร์มนี้ลง Quality Inspection ได้ไหม
  *
  * เคยเช็คจาก subject อย่างเดียว ซึ่งตอบผิดกับฟอร์มสุ่มตรวจผลิตภัณฑ์สำเร็จรูป
  * ที่ตรวจสินค้าจริงแต่ไม่ได้เกิดจากเอกสาร
  */
 export const usesQualityInspection = (t: QiTemplate) =>
-  t.subject === "item" && t.refDocs.length > 0;
+  blockersOf(t).length === 0;
 
 export type Origin = "doc" | "shift" | "manual";
 
@@ -619,6 +786,20 @@ export type QiTemplate = {
    */
   href?: string;
   rows: QiRow[];
+  /** ช่องที่ผู้ตรวจกรอกครั้งเดียวต่อใบ — ว่างได้ แปลว่าใบนี้ไม่มีหัวเอกสาร */
+  headerFields: DocField[];
+  /**
+   * สุ่มได้หลายตัวอย่างต่อครั้ง — เป็นเรื่องของ "กี่ใบ" ไม่ใช่ "doctype ไหน"
+   *
+   * หนึ่งตัวอย่าง = หนึ่งใบ ไม่ใช่หนึ่งคอลัมน์ในใบเดียว เพราะ reading_1…reading_10
+   * ไม่ได้แปลว่า "ของสิบชิ้น" มันแปลว่า "วัดของชิ้นเดียวสิบครั้ง" ซึ่งพิสูจน์ได้
+   * จาก calculate_mean ที่เอาทุกค่ามาเฉลี่ยกัน และหนึ่งแถวมี status เดียว
+   * บอกไม่ได้ว่าตัวอย่างไหนตก
+   *
+   * ERPNext มี make_quality_inspections ที่สร้างทีละหลายใบจากรายการสินค้าอยู่แล้ว
+   * ตารางตัวอย่างจึงเป็นแค่หน้าจอ ที่เก็บยังเป็นของมาตรฐานทุกใบ
+   */
+  multiSample: boolean;
   subject: Subject;
   /**
    * สิ่งที่ผูกฟอร์มนี้ไว้ — เป็นสินค้า เครื่องจักร หรือคลัง ตาม subject
@@ -666,6 +847,7 @@ const range = (
   remark: RemarkMode = "onFail"
 ): QiRow => ({
   id: rid(),
+  kind: "text",
   parameterId,
   numeric: true,
   formulaBased: false,
@@ -687,6 +869,7 @@ const value = (
   remark: RemarkMode = "onFail"
 ): QiRow => ({
   id: rid(),
+  kind: "text",
   parameterId,
   numeric: false,
   formulaBased: false,
@@ -710,6 +893,7 @@ const formula = (
   labels?: string[]
 ): QiRow => ({
   id: rid(),
+  kind: "text",
   parameterId,
   numeric: true,
   formulaBased: true,
@@ -743,6 +927,32 @@ const fgRound = (): QiRow[] => [
   manual("p-moist", "ไม่เกิน 80%"),
 ];
 
+/**
+ * แถวที่ผู้ตรวจเลือกจากรายการของระบบ — ไม่มีเกณฑ์ให้ระบบตัดสิน
+ *
+ * ชื่อหัวข้อคือตัวแหล่งข้อมูลไปในตัว จึงไม่ต้องมี parameterId
+ */
+const fromSystem = (
+  source: SourceId,
+  criteria = "",
+  remark: RemarkMode = "onFail"
+): QiRow => ({
+  id: rid(),
+  kind: "system",
+  source,
+  parameterId: "",
+  numeric: false,
+  formulaBased: false,
+  manualInspection: true,
+  min: null,
+  max: null,
+  value: "",
+  formula: "",
+  readings: 1,
+  remark,
+  criteria,
+});
+
 /** แถวที่ระบบไม่ตัดสิน ผู้ตรวจติ๊กเอง */
 const manual = (
   parameterId: string,
@@ -750,6 +960,7 @@ const manual = (
   remark: RemarkMode = "onFail"
 ): QiRow => ({
   id: rid(),
+  kind: "text",
   parameterId,
   numeric: false,
   formulaBased: false,
@@ -809,6 +1020,8 @@ export const QI_TEMPLATES: QiTemplate[] = [
       formula("p-hard", "mean >= 0.4", 5, "ค่าเฉลี่ยความแข็งของเม็ดปุ๋ย ไม่น้อยกว่า 0.4 กก."),
       range("p-moist", 0, 10, 1, "ความชื้นของเม็ดปุ๋ย น้อยกว่า 10%"),
     ],
+    headerFields: [],
+    multiSample: false,
     targets: ["21-0-0 ฟูเจียน ผง", "46-0-0 ยูเรีย", "18-46-0 DAP"],
     requireBefore: true,
     dispositions: ["accept", "repack", "return"],
@@ -830,6 +1043,8 @@ export const QI_TEMPLATES: QiTemplate[] = [
       value("p-formula", "ตรง"),
       range("p-temp", 20, 35, 1, "off"),
     ],
+    headerFields: [],
+    multiSample: false,
     targets: ["ปุ๋ยสูตร 15-15-15 กระสอบ 50 กก."],
     requireBefore: false,
     dispositions: [],
@@ -852,6 +1067,8 @@ export const QI_TEMPLATES: QiTemplate[] = [
       range("p-moist", 0, 2),
       formula("p-size", "(reading_2 + reading_3) / 2500 * 100 >= 80", 4),
     ],
+    headerFields: [],
+    multiSample: false,
     targets: ["ปุ๋ยสูตร 15-15-15 กระสอบ 50 กก.", "ปุ๋ยสูตร 16-20-0 กระสอบ 50 กก."],
     requireBefore: false,
     dispositions: ["accept", "repack"],
@@ -892,6 +1109,10 @@ export const QI_TEMPLATES: QiTemplate[] = [
       manual("p-sewing", "ตรวจเช็คกลไกและการทำงานของเครื่องเย็บ"),
       manual("p-printer", "ตรวจสอบความคมชัดและระบบการพิมพ์ให้ถูกต้อง"),
     ],
+    headerFields: [
+      { id: rid(), label: "เครื่องจักรที่ตรวจ", source: "machine", required: true },
+    ],
+    multiSample: false,
     targets: [],
     requireBefore: false,
     dispositions: [],
@@ -920,6 +1141,10 @@ export const QI_TEMPLATES: QiTemplate[] = [
       manual("p-area-climate", "อุณหภูมิและความชื้นในบริเวณอยู่ในเกณฑ์ที่กำหนด"),
       manual("p-clean-area", "พื้นที่จัดเก็บสะอาด ไม่มีเศษวัสดุตกค้าง"),
     ],
+    headerFields: [
+      { id: rid(), label: "คลังสินค้าที่ตรวจ", source: "warehouse", required: true },
+    ],
+    multiSample: false,
     targets: [],
     requireBefore: false,
     dispositions: [],
@@ -937,14 +1162,22 @@ export const QI_TEMPLATES: QiTemplate[] = [
     updatedAt: "24/09/2026",
     inspectionType: "inProcess",
     refDocs: [],
-    /* หัวเรื่องบนกระดาษคือ "เช่น การเย็บด้ายต้องติด ตัวเลขของกระสอบต้องชัด"
-       สองอย่างนั้นคือเกณฑ์จริงที่ตรวจ ส่วนคอลัมน์ สูตร / เครื่องผลิต / สลิง
-       ไม่ใช่หัวข้อตรวจ แต่เป็นตัวระบุว่ากระสอบที่สุ่มมาคือกระสอบไหน */
+    /* สี่คอลัมน์ตรงตามกระดาษ — สูตร เครื่องผลิต น้ำหนัก สลิง
+       คอลัมน์ วันที่ / ตรวจสอบ ผ่าน-ไม่ผ่าน / หมายเหตุ ไม่ได้ตั้งเป็นหัวข้อ
+       เพราะมากับตัวใบอยู่แล้ว (report_date · status · remarks)
+       ตั้งซ้ำคือได้สองที่ที่ขัดกันเองวันหนึ่ง
+
+       เกณฑ์บนหัวกระดาษเป็นเกณฑ์ของทั้งแถว ไม่ใช่ของคอลัมน์ไหนคอลัมน์หนึ่ง
+       วางไว้ที่สูตรซึ่งเป็นตัวระบุว่ากระสอบไหน */
     rows: [
-      manual("p-seam", "ด้ายต้องติดตลอดแนว ฝีเข็มสม่ำเสมอ ไม่หลุดไม่ขาด"),
-      manual("p-print-clear", "ตัวเลขสูตรปุ๋ยบนกระสอบต้องอ่านออกชัดเจน"),
-      manual("p-weight", "ชั่งแล้วต้องไม่ต่ำกว่า 50.2 กก."),
+      fromSystem("item", "การเย็บด้ายต้องติด ตัวเลขของกระสอบต้องชัด"),
+      fromSystem("machine"),
+      range("p-weight", null, null, 1, "ชั่งแล้วบันทึกน้ำหนักที่ได้"),
+      value("p-sling", "30 / 35 / 40", "ต้องตรงกับที่ระบุในใบสั่งผลิต"),
     ],
+    headerFields: [],
+    // หนึ่งกระสอบที่สุ่ม = หนึ่งใบ ไม่ใช่หนึ่งคอลัมน์ในใบเดียว
+    multiSample: true,
     targets: [],
     requireBefore: false,
     dispositions: [],
@@ -966,6 +1199,8 @@ export const QI_TEMPLATES: QiTemplate[] = [
        ช่องติ๊กกับคอลัมน์เกณฑ์มาตรฐานให้อ่าน แม้แต่ข้อน้ำหนักกับความชื้นที่มี
        ตัวเลขในเกณฑ์ ผู้ตรวจก็ชั่งแล้วติ๊กเอา ไม่ได้คีย์ตัวเลขลงใบ */
     rows: [...fgRound(), ...fgRound(), ...fgRound()],
+    headerFields: [],
+    multiSample: false,
     targets: ["ปุ๋ยสูตร 15-15-15 กระสอบ 50 กก."],
     requireBefore: true,
     dispositions: ["accept", "repack"],
@@ -999,6 +1234,8 @@ export const QI_TEMPLATES: QiTemplate[] = [
       manual("p-rm-amsu"),
       manual("p-rm-urea"),
     ],
+    headerFields: [],
+    multiSample: false,
     targets: [],
     requireBefore: false,
     dispositions: [],
@@ -1026,6 +1263,8 @@ export const QI_TEMPLATES: QiTemplate[] = [
       range("p-warehouse-temp", 20, 35),
       value("p-bag", "ปกติ"),
     ],
+    headerFields: [],
+    multiSample: false,
     targets: ["ปุ๋ยสูตร 15-15-15 กระสอบ 50 กก."],
     requireBefore: false,
     dispositions: [],
@@ -1048,6 +1287,8 @@ export const QI_TEMPLATES: QiTemplate[] = [
     inspectionType: "outgoing",
     refDocs: ["deliveryNote"],
     rows: [range("p-weight", 49.5, 50.5, 3), value("p-bag", "ปกติ")],
+    headerFields: [],
+    multiSample: false,
     targets: ["ปุ๋ยสูตร 15-15-15 กระสอบ 50 กก.", "ปุ๋ยสูตร 16-20-0 กระสอบ 50 กก."],
     requireBefore: false,
     dispositions: ["accept", "repack"],
@@ -1068,6 +1309,8 @@ export const QI_TEMPLATES: QiTemplate[] = [
     inspectionType: "outgoing",
     refDocs: [],
     rows: [value("p-complaint", "รับเรื่องแล้ว"), manual("p-trace")],
+    headerFields: [],
+    multiSample: false,
     targets: [],
     requireBefore: false,
     dispositions: ["accept", "return"],
@@ -1086,37 +1329,14 @@ export const QI_TEMPLATES: QiTemplate[] = [
     inspectionType: "incoming",
     refDocs: [],
     rows: [value("p-coa-complete", "ครบ"), value("p-coa-match", "ตรง")],
+    headerFields: [],
+    multiSample: false,
     targets: [],
     requireBefore: false,
     dispositions: [],
     requireDisposition: false,
     schedule: { ...DEFAULT_SCHEDULE },
     note: "เป็นทะเบียนรับเอกสาร วันหนึ่งรับกี่ใบก็ได้ ไม่ใช่การตรวจสินค้า — ต้องทำ doctype แยกที่เพิ่มแถวเองได้",
-  },
-
-  // ---------- ฟอร์มตัวอย่าง ไม่ใช่ฟอร์มที่โรงงานใช้จริง ----------
-  {
-    id: "t-demo-engine",
-    subject: "other",
-    name: "สุ่มตรวจผลิตภัณฑ์สำเร็จรูป (ตัวอย่างแบบใหม่)",
-    code: "ตัวอย่าง · ยังไม่ใช้จริง",
-    // ปิดไว้ตลอด เป็นของให้ดูก่อนตัดสินใจ ไม่ใช่ฟอร์มที่มีใครเปิดใบจากมันได้
-    active: false,
-    owner: "อลิสา พรสุขสิริ",
-    updatedAt: "07/10/2026",
-    inspectionType: "inProcess",
-    refDocs: [],
-    /* ไม่มีแถว ไม่มี disposition ตั้งใจให้ว่าง — ฟอร์มนี้ไม่ได้เก็บอะไรของตัวเอง
-       เนื้อหาอยู่ในหน้าของมันเองทั้งหมด ปล่อยว่างไว้แบบนี้ยอดนับหัวข้อตรวจกับ
-       ยอดนับตัวเลือกผลไม่ผ่านจึงไม่เพี้ยนไปเพราะฟอร์มที่ไม่ได้ใช้จริง */
-    rows: [],
-    targets: [],
-    requireBefore: false,
-    dispositions: [],
-    requireDisposition: false,
-    schedule: { ...DEFAULT_SCHEDULE },
-    href: "/qc/setup-erp-demo",
-    note: "ฟอร์มตัวอย่างสำหรับดูหน้าตั้งค่าแบบที่เลือกได้ว่าใบไปลง Quality Inspection หรือ QC Check พร้อมหัวข้อคอลัมน์ข้อมูลตัวอย่าง — ยังไม่ได้ย้ายเข้าของจริง ตั้งอะไรในหน้านั้นไม่กระทบเทมเพลตใบอื่น",
   },
 ];
 
@@ -1315,6 +1535,8 @@ export const blankTemplate = (): QiTemplate => ({
   // จะได้ฟอร์มที่ผูกกับเอกสารผิดใบโดยไม่มีใครรู้
   refDocs: [],
   rows: [],
+  headerFields: [],
+  multiSample: false,
   subject: "item",
   targets: [],
   requireBefore: true,
@@ -1339,6 +1561,7 @@ export const cloneRow = (row: QiRow): QiRow => ({ ...row, id: uid("row") });
 
 export const newRow = (): QiRow => ({
   id: uid("row"),
+  kind: "text",
   parameterId: "",
   numeric: true,
   formulaBased: false,

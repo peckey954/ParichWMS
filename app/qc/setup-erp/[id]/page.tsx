@@ -16,7 +16,6 @@ import {
   MinusIcon,
   PlusIcon,
   Trash2Icon,
-  TrashIcon,
 } from "lucide-react";
 import {
   Alert,
@@ -68,11 +67,10 @@ import { ChipGroup } from "@/components/chip-group";
 import { SchedulePreviewCalendar } from "@/components/qc/schedule-calendar";
 import { TimeField } from "@/components/time-field";
 import { MultiSelectChips } from "@/components/multi-select-chips";
-import { ParamCombobox } from "@/components/qc/param-picker";
+import { CheckTable, HeaderFieldTable, rowTitle } from "@/components/qc/check-table";
 import {
   DEFAULT_SCHEDULE,
   ORIGIN,
-  FLAG,
   DISPOSITIONS,
   INSPECTION_TYPE_LABEL,
   INSPECTION_TYPE_VALUE,
@@ -82,13 +80,11 @@ import {
   REF_DOCS_OF,
   REF_DOC_LABEL,
   REF_DOC_VALUE,
-  REMARK_LABEL,
   targetPool,
   usesQualityInspection,
   cloneRow,
   describeCriteria,
   dispositionOf,
-  explainRow,
   originOf,
   docsPerDay,
   newShift,
@@ -97,16 +93,19 @@ import {
   paramOf,
   readingLabels,
   templateOf,
+  blockersOf,
+  sourcePool,
+  uid,
+  SOURCE,
   blankTemplate,
   commitTemplate,
   NEW_TEMPLATE_ID,
-  type FlagKey,
   type InspectionType,
   type QiRow,
   type QiSchedule,
   type QiTemplate,
   type RefDoc,
-  type RemarkMode,
+  type SourceId,
   type Subject,
 } from "@/lib/qc-erp";
 
@@ -173,6 +172,8 @@ function Editor({ seed, isNew }: { seed: QiTemplate; isNew: boolean }) {
                       → ต้องตรวจของ "และ" มีเอกสารเป็นตัวเปิดใบ
      ฟอร์มสุ่มตรวจผลิตภัณฑ์สำเร็จรูปคือตัวที่คำตอบสองอันนี้ไม่ตรงกัน */
   const inspectsItem = tpl.subject === "item";
+  // เหตุผลที่ลง Quality Inspection ไม่ได้ — อ่านสด ๆ จากที่ตั้งไว้ ไม่ได้เก็บแยก
+  const blockers = blockersOf(tpl);
   // ใบที่ลง Quality Inspection ติดคำว่า Accepted/Rejected ตายตัว ส่วนใบที่ไปอยู่
   // doctype ของเราเลือกคำเองได้ ใบตรวจถังจึงใช้ ปกติ/ผิดปกติ ตามกระดาษ
   const verdict: VerdictWords = usesQualityInspection(tpl)
@@ -189,18 +190,6 @@ function Editor({ seed, isNew }: { seed: QiTemplate; isNew: boolean }) {
   // ป้ายเปลี่ยนทันที ไม่มีที่ให้ป้ายค้างไว้จนโกหก
   const origin = originOf(tpl);
 
-
-  /** ย้ายหัวข้อขึ้น/ลง — ฟอร์มกระดาษมีลำดับข้อตายตัว ตั้งผิดลำดับต้องย้ายได้ */
-  const moveRow = (id: string, delta: number) =>
-    setTpl((p) => {
-      const i = p.rows.findIndex((r) => r.id === id);
-      const j = i + delta;
-      if (i < 0 || j < 0 || j >= p.rows.length) return p;
-      const rows = [...p.rows];
-      [rows[i], rows[j]] = [rows[j], rows[i]];
-      return { ...p, rows };
-    });
-
   /**
    * คัดลอกทั้งชุดต่อท้าย — ฟอร์มกระดาษที่มีคอลัมน์ "ตรวจครั้งที่ 1/2/3"
    *
@@ -210,16 +199,6 @@ function Editor({ seed, isNew }: { seed: QiTemplate; isNew: boolean }) {
    */
   const duplicateAll = () =>
     setTpl((p) => ({ ...p, rows: [...p.rows, ...p.rows.map(cloneRow)] }));
-
-  /** คัดลอกวางไว้ใต้ข้อเดิม — ฟอร์มที่มีข้อโครงเหมือนกันหลายข้อจะได้ไม่ต้องตั้งซ้ำ */
-  const duplicateRow = (id: string) =>
-    setTpl((p) => {
-      const i = p.rows.findIndex((r) => r.id === id);
-      if (i < 0) return p;
-      const rows = [...p.rows];
-      rows.splice(i + 1, 0, cloneRow(rows[i]));
-      return { ...p, rows };
-    });
 
   const patchRow = (id: string, next: Partial<QiRow>) =>
     setTpl((p) => ({
@@ -322,6 +301,40 @@ function Editor({ seed, isNew }: { seed: QiTemplate; isNew: boolean }) {
             <AlertDescription>{tpl.note}</AlertDescription>
           </Alert>
         )}
+
+        {/* ปลายทางเป็นผลลัพธ์ ไม่ใช่ช่องให้เลือก — อ่านจากที่ตั้งไว้ทั้งหมด
+            และต้องบอกเหตุผลเป็นรายข้อ ไม่ใช่บอกแค่ว่าเป็น custom แล้วปล่อยให้
+            เดาเอง ซึ่งเป็นสิ่งที่ทำให้คนตั้งค่าไม่กล้าแก้อะไรเลย */}
+        <div
+          className={cn(
+            "mt-5 rounded-xl border px-4 py-3",
+            blockers.length === 0
+              ? "border-success-border bg-success"
+              : "border-border bg-brand"
+          )}
+        >
+          <div className="flex flex-wrap items-center gap-2">
+            <p className="font-medium">
+              {blockers.length === 0
+                ? "ใบของฟอร์มนี้ลง Quality Inspection ของ ERPNext ได้"
+                : "ใบของฟอร์มนี้ต้องไปลง QC Check"}
+            </p>
+            {blockers.length > 0 && (
+              <Badge
+                appearance="soft"
+                tone="warning"
+                className="font-mono text-[10px] uppercase"
+              >
+                custom
+              </Badge>
+            )}
+          </div>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {blockers.length === 0
+              ? "ทุกช่องมีที่เก็บใน doctype มาตรฐาน — บล็อกการรับของได้ อยู่ใต้ Stock Settings และเข้ารายงานมาตรฐาน"
+              : `เพราะ ${blockers.join(" · ")} — ไม่ได้ให้เลือกเอง อ่านจากที่ตั้งไว้ทั้งหมด`}
+          </p>
+        </div>
 
         <Tabs defaultValue="build" className="mt-5">
           <TabsList className="grid w-full grid-cols-2">
@@ -584,62 +597,112 @@ function Editor({ seed, isNew }: { seed: QiTemplate; isNew: boolean }) {
             ))}
         </Section>
 
-        {/* ---------- 2 หัวข้อตรวจ ---------- */}
+        {/* ---------- 2 ส่วนหัวเอกสาร ---------- */}
+        {/* ของเดิมไม่มีก้อนนี้เลย ช่องหัวใบถูกตั้งตายตัวไว้ในโค้ด ฟอร์มที่ต้องการ
+             ช่องอื่น (เช่นเครื่องผลิต หรือคลังที่เดินไปตรวจ) จึงทำไม่ได้
+             เว้นว่างไว้ได้ ไม่ใช่ทุกฟอร์มที่ต้องกรอกอะไรก่อนเริ่มตรวจ */}
+        <Section
+          index={2}
+          title={`ส่วนหัวเอกสาร (${tpl.headerFields.length})`}
+          note="ช่องที่ผู้ตรวจกรอกครั้งเดียวต่อใบ เช่น เลขที่เอกสาร สินค้า เครื่องจักร"
+        >
+          <HeaderFieldTable
+            fields={tpl.headerFields}
+            onChange={(headerFields) => patch({ headerFields })}
+          />
+          <div className="mt-3 flex justify-center">
+            <Button
+              variant="outline-primary"
+              size="sm"
+              onClick={() =>
+                patch({
+                  headerFields: [
+                    ...tpl.headerFields,
+                    { id: uid("hf"), label: "", source: "", required: false },
+                  ],
+                })
+              }
+            >
+              <PlusIcon />
+              เพิ่มหัวเอกสาร
+            </Button>
+          </div>
+        </Section>
+
+        {/* ---------- 3 หัวข้อตรวจ ---------- */}
         {/* เพิ่มหัวข้อที่นี่ = หยิบชื่อจากทะเบียนมาใส่ฟอร์มนี้ แล้วตั้งเกณฑ์ของมัน
              ชื่อที่ยังไม่มีในทะเบียนก็พิมพ์สร้างได้จากในช่องเลย ทะเบียนเต็ม ๆ
              (ไว้แก้ชื่อ/ดูตัวที่ไม่มีใครใช้) อยู่ท้ายแท็บตั้งค่าระบบของหน้า Setup QC */}
         <Section
-          index={2}
+          index={3}
           title={`หัวข้อตรวจ (${tpl.rows.length})`}
-          note="กำหนดหัวข้อ เกณฑ์ และการตัดสิน · หนึ่งหัวข้อ = หนึ่งแถวใน readings = หนึ่งเกณฑ์"
-        >
-          <div className="space-y-3">
-            {tpl.rows.map((row, i) => (
-              <RowCard
-                key={row.id}
-                index={i + 1}
-                row={row}
-                isFirst={i === 0}
-                isLast={i === tpl.rows.length - 1}
-                onChange={(next) => patchRow(row.id, next)}
-                onMove={(delta) => moveRow(row.id, delta)}
-                onDuplicate={() => duplicateRow(row.id)}
-                onRemove={() =>
-                  setTpl((p) => ({
-                    ...p,
-                    rows: p.rows.filter((r) => r.id !== row.id),
-                  }))
-                }
+          note="หนึ่งหัวข้อ = หนึ่งแถวใน readings · กดดินสอเพื่อตั้งเกณฑ์ จำนวนค่า และหมายเหตุ"
+          action={
+            <label className="flex items-center gap-2 text-sm">
+              <Switch
+                checked={tpl.multiSample}
+                onCheckedChange={(v) => patch({ multiSample: v })}
               />
-            ))}
-            {tpl.rows.length === 0 && (
-              <div className="rounded-lg border border-dashed border-border px-6 py-12 text-center">
-                <p className="font-medium">ยังไม่มีหัวข้อตรวจในฟอร์มนี้</p>
-                <p className="mx-auto mt-1 max-w-md text-sm text-muted-foreground">
-                  กด “เพิ่มหัวข้อตรวจ” แล้วพิมพ์ชื่อหัวข้อที่ต้องการ —
-                  เจอของเดิมก็เลือกเลย ไม่เจอก็กดสร้างใหม่ได้ในช่องเดียวกัน
+              สุ่มหลายตัวอย่างต่อครั้ง
+            </label>
+          }
+        >
+          {/* สวิตช์นี้เปลี่ยนว่า "กี่ใบ" ไม่ได้เปลี่ยนว่า "doctype ไหน"
+              จึงไม่ไปยุ่งกับแถบปลายทางด้านบน ต้องเขียนให้ชัดตรงนี้
+              ไม่งั้นจะเข้าใจว่าเปิดแล้วหลุดจาก ERPNext */}
+          <div className="mb-3 rounded-xl border border-border bg-card px-4 py-3 text-sm">
+            {tpl.multiSample ? (
+              <>
+                <p className="font-medium">
+                  หนึ่งตัวอย่าง = หนึ่งใบตรวจ สุ่มกี่ตัวอย่างก็ได้
+                  แต่ละตัวอย่างมีผลผ่าน/ไม่ผ่านของตัวเอง
                 </p>
-              </div>
+                <p className="mt-1 text-muted-foreground">
+                  ตารางเป็นแค่หน้าจอ กดบันทึกทีเดียวแล้วระบบแตกเป็นหลายใบให้ —
+                  ที่เก็บยังเป็นของมาตรฐานทุกใบ
+                </p>
+                <FieldNote>
+                  make_quality_inspections(company, doctype, docname, items,
+                  inspection_type) — ของ ERPNext เอง ไม่ต้องเขียนเพิ่ม
+                </FieldNote>
+              </>
+            ) : (
+              <>
+                <p className="font-medium">
+                  หนึ่งใบต่อครั้ง วัดซ้ำได้สูงสุด {MAX_READINGS} ครั้งต่อหัวข้อ
+                </p>
+                <p className="mt-1 text-muted-foreground">
+                  ใช้กับการวัดของชิ้นเดียวซ้ำหลายจุดแล้วเอามาเฉลี่ย
+                  ซึ่งเป็นสิ่งที่ reading_1…reading_10 ถูกทำมาเพื่อรองรับ
+                  ผลผ่าน/ไม่ผ่านจึงมีอันเดียวต่อหัวข้อ
+                </p>
+              </>
             )}
+          </div>
 
-            <div className="flex flex-wrap justify-center gap-2">
-              <Button
-                variant="outline-primary"
-                size="sm"
-                onClick={() =>
-                  setTpl((p) => ({ ...p, rows: [...p.rows, newRow()] }))
-                }
-              >
-                <PlusIcon />
-                เพิ่มหัวข้อตรวจ
+          <CheckTable
+            rows={tpl.rows}
+            onChange={(rows) => patch({ rows })}
+            onPatch={patchRow}
+          />
+
+          <div className="mt-3 flex flex-wrap justify-center gap-2">
+            <Button
+              variant="outline-primary"
+              size="sm"
+              onClick={() =>
+                setTpl((p) => ({ ...p, rows: [...p.rows, newRow()] }))
+              }
+            >
+              <PlusIcon />
+              เพิ่มหัวข้อตรวจ
+            </Button>
+            {tpl.rows.length > 0 && (
+              <Button variant="ghost" size="sm" onClick={duplicateAll}>
+                <CopyIcon />
+                คัดลอกทั้งชุดต่อท้าย ({tpl.rows.length} ข้อ)
               </Button>
-              {tpl.rows.length > 0 && (
-                <Button variant="ghost" size="sm" onClick={duplicateAll}>
-                  <CopyIcon />
-                  คัดลอกทั้งชุดต่อท้าย ({tpl.rows.length} ข้อ)
-                </Button>
-              )}
-            </div>
+            )}
           </div>
         </Section>
 
@@ -648,7 +711,7 @@ function Editor({ seed, isNew }: { seed: QiTemplate; isNew: boolean }) {
             กับตรวจคลังไม่มีของให้ตัดสิน ซ่อนทั้งก้อนไปเลย */}
         {inspectsItem && (
         <Section
-          index={3}
+          index={4}
           title="ผลตรวจที่ไม่ผ่าน"
           note="ผู้ตรวจต้องเลือกว่าจะจัดการสินค้าที่ไม่ผ่านอย่างไร"
           action={
@@ -725,7 +788,7 @@ function Editor({ seed, isNew }: { seed: QiTemplate; isNew: boolean }) {
              อยู่ท้ายสุดเพราะเป็นก้อนที่ฟอร์มส่วนใหญ่ไม่ได้เปิด — ฟอร์มที่เกิดจาก
              ใบรับของไม่มีรอบเวลา เปิดมาเจอกะสี่ช่องก่อนจะงงว่าต้องกรอกไหม */}
         <Section
-          index={4}
+          index={5}
           title="เปิดใบตามรอบเวลาทำงาน"
           note="ระบบจะขึ้นข้อมูลให้ทำเอกสารตามช่วงเวลาการทำงานที่ตั้งไว้ ไม่รวมวันหยุดทำงานและวันหยุดนักขัตฤกษ์ วันไหนไม่มีข้อมูล ระบบจะขึ้นว่ายังไม่มีใครทำ จึงดูเป็นปฏิทินทั้งเดือนได้"
           action={
@@ -849,6 +912,35 @@ function Editor({ seed, isNew }: { seed: QiTemplate; isNew: boolean }) {
               <PreviewDocHeader item={tpl.targets[0]} />
             )}
 
+            {/* ช่องที่ตั้งไว้ในส่วนหัวเอกสาร — ผู้ตรวจกรอกก่อนเริ่มตรวจ
+                ต่างจาก PreviewDocHeader ข้างบนที่เป็นของที่ ERPNext เติมมาให้เอง */}
+            {tpl.headerFields.length > 0 && (
+              <div className="mt-5 grid gap-4 @2xl:grid-cols-3">
+                {tpl.headerFields.map((f) => (
+                  <div key={f.id} className="space-y-1.5">
+                    <Label htmlFor={`pv-hf-${f.id}`}>
+                      {f.label || "ยังไม่ได้ตั้งชื่อ"}{" "}
+                      {!f.required && (
+                        <span className="font-normal text-muted-foreground">
+                          (ไม่บังคับ)
+                        </span>
+                      )}
+                    </Label>
+                    <SourceSelect id={`pv-hf-${f.id}`} source={f.source} />
+                    {!plain && (
+                      <FieldNote
+                        custom={f.source !== "" && SOURCE[f.source].custom}
+                      >
+                        {f.source === ""
+                          ? "ยังไม่ได้เลือกแหล่งข้อมูล"
+                          : SOURCE[f.source].store}
+                      </FieldNote>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+
             <div className="mt-6 mb-3 flex flex-wrap items-center justify-between gap-3">
               <div className="min-w-0">
                 <h3 className="font-semibold">การตรวจสอบ</h3>
@@ -877,22 +969,39 @@ function Editor({ seed, isNew }: { seed: QiTemplate; isNew: boolean }) {
             </div>
 
             <div className="space-y-3">
-              {tpl.rows.map((row, i) => (
-                <PreviewRow
-                  key={row.id}
-                  index={i + 1}
-                  row={row}
-                  plain={plain}
-                  verdict={verdict}
-                  state={tryOf(row.id)}
-                  onChange={(next) =>
-                    setTries((prev) => ({
-                      ...prev,
-                      [row.id]: { ...tryOf(row.id), ...next },
-                    }))
-                  }
-                />
-              ))}
+              {tpl.rows.map((row, i) =>
+                row.kind === "system" ? (
+                  <PreviewSystemRow
+                    key={row.id}
+                    index={i + 1}
+                    row={row}
+                    plain={plain}
+                    verdict={verdict}
+                    state={tryOf(row.id)}
+                    onChange={(next) =>
+                      setTries((prev) => ({
+                        ...prev,
+                        [row.id]: { ...tryOf(row.id), ...next },
+                      }))
+                    }
+                  />
+                ) : (
+                  <PreviewRow
+                    key={row.id}
+                    index={i + 1}
+                    row={row}
+                    plain={plain}
+                    verdict={verdict}
+                    state={tryOf(row.id)}
+                    onChange={(next) =>
+                      setTries((prev) => ({
+                        ...prev,
+                        [row.id]: { ...tryOf(row.id), ...next },
+                      }))
+                    }
+                  />
+                )
+              )}
 
               {tpl.rows.length === 0 && (
                 <p className="rounded-lg border border-dashed border-border px-6 py-12 text-center text-sm text-muted-foreground">
@@ -1169,433 +1278,6 @@ function ScheduleEditor({
   );
 }
 
-/* ---------- หนึ่งหัวข้อตรวจ ---------- */
-/**
- * สูตรที่เขียนไว้ยังใช้ได้กับที่ติ๊กไว้ตอนนี้ไหม
- *
- * ตัวแปรที่สูตรใช้ได้เปลี่ยนตามติ๊ก "คีย์เป็นตัวเลข" — สลับติ๊กแล้วสูตรเดิมค้างอยู่
- * โดยไม่มีใครบอก ERPNext จะ throw error ตอนตรวจจริง ซึ่งสายไปแล้ว
- */
-function formulaProblem(row: QiRow): string | null {
-  if (!row.formulaBased || row.formula.trim() === "") return null;
-
-  const slots = [...row.formula.matchAll(/reading_(\d+)/g)].map((m) =>
-    Number(m[1])
-  );
-  const usesValue = /reading_value/.test(row.formula);
-
-  if (!row.numeric) {
-    if (slots.length > 0)
-      return `สูตรอ้าง reading_${slots[0]} แต่ข้อนี้ไม่ได้คีย์เป็นตัวเลข มีแค่ reading_value ให้ใช้`;
-    return null;
-  }
-
-  if (usesValue)
-    return "สูตรอ้าง reading_value แต่ข้อนี้คีย์เป็นตัวเลข ใช้ reading_1 … หรือ mean แทน";
-
-  const over = slots.filter((n) => n > row.readings);
-  if (over.length > 0)
-    return `สูตรอ้าง reading_${over[0]} แต่ตั้งให้คีย์แค่ ${row.readings} ค่า ช่องนั้นจะเป็น 0 เสมอ`;
-
-  return null;
-}
-
-function RowCard({
-  index,
-  row,
-  isFirst,
-  isLast,
-  onChange,
-  onMove,
-  onDuplicate,
-  onRemove,
-}: {
-  index: number;
-  row: QiRow;
-  isFirst: boolean;
-  isLast: boolean;
-  onChange: (next: Partial<QiRow>) => void;
-  onMove: (delta: number) => void;
-  onDuplicate: () => void;
-  onRemove: () => void;
-}) {
-  const p = paramOf(row.parameterId);
-  const formulaIssue = formulaProblem(row);
-  const unit = p?.unit ? ` (${p.unit})` : "";
-
-  return (
-    <div className="rounded-xl border border-border bg-card p-4">
-      <div className="flex items-start justify-between gap-3">
-        <p className="font-medium">หัวข้อที่ {index}</p>
-        {/* ย้าย/คัดลอก/ลบ อยู่ชิดขวาบนของการ์ด ไม่ต้องเปิดอะไรก่อน
-            ลำดับข้อในฟอร์มกระดาษตายตัว ตั้งผิดลำดับแล้วต้องลบพิมพ์ใหม่คือเสียเวลาเปล่า */}
-        <div className="flex shrink-0 items-center">
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            aria-label="ลบหัวข้อนี้"
-            onClick={onRemove}
-          >
-            <TrashIcon />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            aria-label="คัดลอกหัวข้อนี้"
-            onClick={onDuplicate}
-          >
-            <CopyIcon />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            disabled={isFirst}
-            aria-label="ย้ายขึ้น"
-            onClick={() => onMove(-1)}
-          >
-            <ChevronUpIcon />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            disabled={isLast}
-            aria-label="ย้ายลง"
-            onClick={() => onMove(1)}
-          >
-            <ChevronDownIcon />
-          </Button>
-        </div>
-      </div>
-
-      {/* สามช่องที่ทุกข้อต้องมีเหมือนกัน อยู่แถวเดียวกัน — เลื่อนดูทั้งฟอร์มแล้ว
-          อ่านไล่ลงมาเป็นคอลัมน์ได้ว่าข้อไหนตั้งเกณฑ์ไว้ ข้อไหนยังว่าง */}
-      <div className="mt-3 grid gap-3 @2xl:grid-cols-3">
-        <div className="space-y-1.5">
-          <Label htmlFor={`param-${row.id}`}>หัวข้อ</Label>
-          {/* พิมพ์ค้นหาได้ ไม่เจอก็กดสร้างใหม่ลงทะเบียนตรงนั้น
-              ไม่ต้องออกไปหน้าอื่นก่อนแล้วกลับมาหาว่าค้างไว้ตรงไหน */}
-          <ParamCombobox
-            id={`param-${row.id}`}
-            value={row.parameterId}
-            onChange={(v) => onChange({ parameterId: v })}
-          />
-          <FieldNote>
-            specification → Quality Inspection Parameter
-            {p?.group ? ` · parameter_group = ${p.group}` : ""}
-          </FieldNote>
-        </div>
-
-        {/* เกณฑ์ที่เขียนให้คนอ่าน — คนละอันกับ min/max หรือสูตรข้างล่าง
-            ข้อที่ให้ติ๊กเองไม่มีเกณฑ์ในระบบเลย บรรทัดนี้คือทั้งหมดที่ผู้ตรวจมี */}
-        <div className="space-y-1.5">
-          <Label htmlFor={`criteria-${row.id}`}>
-            เกณฑ์{" "}
-            {!row.manualInspection && (
-              <span className="font-normal text-muted-foreground">(ไม่บังคับ)</span>
-            )}
-          </Label>
-          <Input
-            id={`criteria-${row.id}`}
-            className="bg-card"
-            placeholder="ระบุเกณฑ์"
-            value={row.criteria}
-            onChange={(e) => onChange({ criteria: e.target.value })}
-          />
-          <FieldNote custom>custom_criteria · ตั้งต่างกันได้ทุกฟอร์ม</FieldNote>
-        </div>
-
-        <div className="space-y-1.5">
-          <Label htmlFor={`remark-${row.id}`}>หมายเหตุ</Label>
-          <Select
-            value={row.remark}
-            onValueChange={(v) => onChange({ remark: v as RemarkMode })}
-          >
-            <SelectTrigger id={`remark-${row.id}`} className="w-full bg-card">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {/* เรียงจากที่เข้มที่สุดลงไป — ค่าที่คนเลือกบ่อยที่สุดอยู่บนสุด */}
-              {(["onFail", "optional", "off"] as RemarkMode[]).map((m) => (
-                <SelectItem key={m} value={m}>
-                  {REMARK_LABEL[m]}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <FieldNote custom>custom_remark</FieldNote>
-        </div>
-      </div>
-
-      {/* คำอธิบายกลางของหัวข้อนี้ อ่านอย่างเดียว แก้ที่ทะเบียน
-          โชว์ไว้กันคนเขียนซ้ำกับที่มีอยู่แล้ว */}
-      {p?.description && (
-        <p className="mt-2 rounded-lg bg-surface px-3 py-2 text-sm text-muted-foreground">
-          คำอธิบายจากทะเบียน: {p.description}
-        </p>
-      )}
-
-      <div className="mt-3 space-y-3">
-        {/* ติ๊กสามตัวตรงกับ ERPNext ตัวต่อตัว ไม่ได้ยุบเป็นตัวเลือกเดียว
-            เพราะ manual_inspection ติ๊กคู่กับ numeric หรือ formula ได้จริง —
-            คีย์ค่าเก็บไว้เหมือนเดิม แต่คนเป็นคนชี้ขาดว่าผ่านหรือไม่ */}
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="text-sm text-muted-foreground">ประเภทการตัดสิน:</span>
-          {JUDGE_ORDER.map((k) => (
-            <CheckChip
-              key={k}
-              id={`${k}-${row.id}`}
-              label={FLAG[k].label}
-              checked={row[k]}
-              onChange={(on) => onChange({ [k]: on })}
-            />
-          ))}
-        </div>
-        {/* บรรทัดที่มีป้าย CUSTOM ต้องมีเฉพาะของที่เดฟต้องสร้างเพิ่ม —
-            ฟิลด์ของ ERPNext ที่ติ๊กอยู่แยกไปอีกบรรทัด ไม่งั้นอ่านเหมือนต้องสร้างทั้งแถว */}
-        <FieldNote>
-          {JUDGE_ORDER.filter((k) => row[k] && !FLAG[k].custom)
-            .map((k) => `${FLAG[k].field} = 1`)
-            .join(" · ") || "ไม่ติ๊กอะไรเลย = เทียบ reading_value กับ value"}
-        </FieldNote>
-        {row.manualInspection && (
-          <FieldNote custom>{FLAG.manualInspection.field}</FieldNote>
-        )}
-        {/* แปลติ๊กสามตัวเป็นประโยคเดียว — ชุดที่ใช้บ่อยที่สุดคือ "ติ๊กอย่างเดียว"
-            ซึ่งเกิดจากไม่ติ๊กตัวหนึ่งบวกติ๊กอีกตัวหนึ่ง มองจากติ๊กเปล่า ๆ ไม่ออก */}
-        <p className="rounded-lg bg-brand px-3 py-2 text-sm">
-          <span className="text-muted-foreground">แปลว่า: </span>
-          <span className="font-medium">{explainRow(row)}</span>
-        </p>
-
-        {/* ช่องเกณฑ์เปลี่ยนตามวิธีตัดสิน ไม่ใช่โชว์ทุกช่องแล้วให้เดาว่าอันไหนมีผล
-            ERPNext เองก็ซ่อน–โชว์ด้วย depends_on แบบเดียวกัน
-            depends_on ของจริง: min/max โชว์เมื่อ numeric และไม่ได้ใช้สูตร */}
-        {row.numeric && !row.formulaBased && (
-          <div className="grid gap-3 @lg:grid-cols-3">
-            <StepperField
-              id={`min-${row.id}`}
-              label={`เริ่มต้น${unit}`}
-              hint="min_value"
-              placeholder="0"
-              value={row.min}
-              onChange={(v) => onChange({ min: v })}
-            />
-            <StepperField
-              id={`max-${row.id}`}
-              label={`สูงสุด${unit}`}
-              hint="max_value"
-              placeholder="0"
-              value={row.max}
-              onChange={(v) => onChange({ max: v })}
-            />
-            <ReadingsField row={row} onChange={onChange} />
-            {/* เทียบทุกค่าที่คีย์ ไม่ใช่ค่าเฉลี่ย — ERPNext เขียนกำกับไว้เองว่า
-                Applied on each reading ถ้าเกณฑ์จริงคือค่าเฉลี่ยต้องไปใช้สูตร */}
-            <p className="text-sm text-muted-foreground @lg:col-span-3">
-              {row.manualInspection ? (
-                <span className="text-danger-strong">
-                  ติ๊กผู้ตรวจเลือกผลผ่าน/ไม่ผ่านเองอยู่ ช่วงนี้จะไม่ถูกใช้ตัดสิน เป็นแค่ตัวเลขอ้างอิงให้ผู้ตรวจดู
-                </span>
-              ) : (
-                "เทียบกับทุกค่าที่คีย์ ไม่ใช่ค่าเฉลี่ย — ถ้าเกณฑ์คือค่าเฉลี่ย ให้ติ๊กตัดสินด้วยสูตรแล้วเขียน mean"
-              )}
-            </p>
-            {/* ERPNext เทียบ flt(min) <= v <= flt(max) โดย flt ของค่าว่างคือ 0
-                ไม่มีฝั่งไหนแปลว่าไม่จำกัด ปล่อยสูงสุดเป็น 0 ไว้คือฟอร์มที่ตกทุกใบ */}
-            {!row.manualInspection && (row.max ?? 0) === 0 && (
-              <p className="text-sm text-danger-strong @lg:col-span-3">
-                ค่าสูงสุดเป็น 0 — ERPNext เทียบว่าต้องไม่เกิน 0 ค่าที่มากกว่านั้นจะไม่ผ่านทุกครั้ง
-              </p>
-            )}
-            {row.readings > 1 && (
-              <div className="@lg:col-span-3">
-                <ReadingLabelsField row={row} onChange={onChange} />
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* ค่าที่ถือว่าผ่านซ่อนไปเมื่อติ๊กตั้งผลเอง — ของ ERPNext ยังโชว์อยู่
-            เพราะ depends_on ของมันไม่ได้เช็ค manual (เทมเพลตของเขาไม่มี manual
-            ให้เช็คด้วยซ้ำ) แต่ของเราเพิ่มติ๊กนั้นเองที่เทมเพลต จึงกำหนดเองได้ว่า
-            ติ๊กแล้วช่องนี้หายไป ไม่ใช่โชว์ค้างไว้ให้กรอกแล้วไม่มีผล */}
-        {!row.numeric && !row.formulaBased && !row.manualInspection && (
-          <div className="space-y-1.5">
-            {/* ไม่ติดป้าย (ไม่บังคับ) ทั้งที่ ERPNext ไม่ได้ตั้ง reqd ไว้ —
-                เพราะช่องนี้โผล่เฉพาะข้อที่ผู้ตรวจต้องคีย์ข้อความจริง ๆ
-                เว้นว่างแล้วข้อนั้นไม่ผ่านทุกใบ บอกว่าไม่บังคับคือบอกผิด */}
-            <Label htmlFor={`value-${row.id}`}>
-              ค่าที่ถือว่าผ่าน{" "}
-              <span className="font-normal text-muted-foreground">
-                (เทียบแบบตรงตัวอักษร)
-              </span>
-            </Label>
-            <Input
-              id={`value-${row.id}`}
-              className="bg-card"
-              placeholder="ระบุค่า"
-              value={row.value}
-              onChange={(e) => onChange({ value: e.target.value })}
-            />
-            <FieldNote>value</FieldNote>
-            {/* ERPNext ไม่ได้บังคับกรอกช่องนี้ แต่เว้นว่างแล้วมันเทียบกับค่าว่าง
-                ซึ่งแปลว่าผู้ตรวจคีย์อะไรลงไปก็ไม่ผ่าน ต้องเขียนเตือนไว้
-                ไม่งั้นจะกลายเป็นฟอร์มที่ตกทุกใบโดยไม่มีใครรู้ว่าเพราะอะไร */}
-            {row.value.trim() === "" && (
-              <p className="text-sm text-danger-strong">
-                เว้นว่าง = ไม่มีค่าให้เทียบ ผู้ตรวจคีย์อะไรลงไปข้อนี้จะไม่ผ่านทุกครั้ง
-              </p>
-            )}
-          </div>
-        )}
-
-        {row.formulaBased && (
-          <div className="space-y-3">
-            {row.numeric && (
-              <div className="@lg:w-1/3">
-                <ReadingsField row={row} onChange={onChange} />
-              </div>
-            )}
-            {row.numeric && row.readings > 1 && (
-              <ReadingLabelsField row={row} onChange={onChange} />
-            )}
-            <div className="space-y-1.5">
-              <Label htmlFor={`formula-${row.id}`} className="gap-1.5">
-                สูตร
-                <InfoIcon className="size-3.5 text-muted-foreground" />
-              </Label>
-              <Textarea
-                id={`formula-${row.id}`}
-                className="bg-card font-mono text-sm"
-                rows={2}
-                placeholder="ระบุสูตร เช่น (reading_1 + reading_2) / 2 >= 0.4"
-                value={row.formula}
-                onChange={(e) => onChange({ formula: e.target.value })}
-              />
-              {/* สูตรอ้างชื่อช่องตามจำนวนที่ตั้งไว้ ลดจำนวนช่องแล้วสูตรที่อ้าง
-                  ช่องที่หายไปจะพังเงียบ ๆ ตอนตรวจจริง จึงพิมพ์ชื่อช่องที่ใช้ได้ไว้ตรงนี้
-
-                  ERPNext ใส่ mean มาให้ในสูตรของข้อที่คีย์ตัวเลข — เขียน
-                  mean >= 0.4 ได้เลย ไม่ต้องบวกเองแล้วหารจำนวนครั้ง ซึ่งพังทันที
-                  ที่มีคนเปลี่ยนจำนวนค่าที่คีย์ */}
-              <FieldNote>
-                acceptance_formula · ใช้ได้:{" "}
-                {row.numeric ? `${readingRefs(row)} · mean` : "reading_value"}
-              </FieldNote>
-              {formulaIssue && (
-                <p className="rounded-lg border border-danger-border bg-danger px-3 py-2 text-sm text-danger-strong">
-                  {formulaIssue}
-                </p>
-              )}
-              {/* ตัวอย่างสามบรรทัดลอกจากใต้ช่องสูตรของ ERPNext เอง —
-                  คนที่ไม่เคยเขียนสูตรต้องเห็นหน้าตาของจริงก่อน ไม่ใช่เห็นแค่ชื่อตัวแปร */}
-              <div className="rounded-lg bg-surface px-3 py-2 text-xs text-muted-foreground">
-                <p>เขียนเป็นเงื่อนไขที่ตอบได้ว่าจริงหรือเท็จ จริง = ผ่าน</p>
-                <ul className="mt-1 space-y-0.5 font-mono">
-                  <li>reading_1 &gt; 0.2 and reading_1 &lt; 0.5</li>
-                  <li>mean &gt; 3.5</li>
-                  <li>reading_value in (&quot;A&quot;, &quot;B&quot;, &quot;C&quot;)</li>
-                </ul>
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-/** ลำดับติ๊กตามที่คนอ่านฟอร์มคิด — ใครตัดสินก่อน แล้วค่อยว่าด้วยวิธีคีย์ค่า */
-const JUDGE_ORDER: FlagKey[] = ["manualInspection", "numeric", "formulaBased"];
-
-/**
- * ชื่อกำกับช่องคีย์ทีละช่อง
- *
- * ERPNext ตั้งป้ายไว้ตายตัวว่า Reading 1 … Reading 10 แก้ได้แต่ทั้งระบบ ไม่ได้
- * แก้รายหัวข้อ — ฟอร์มกระดาษที่ใช้ตะแกรงคนละขนาดในหัวข้อเดียวจึงอ่านไม่ออกว่า
- * ช่องไหนคือช่องไหน ช่องนี้คือที่เก็บชื่อพวกนั้น
- */
-function ReadingLabelsField({
-  row,
-  onChange,
-}: {
-  row: QiRow;
-  onChange: (next: Partial<QiRow>) => void;
-}) {
-  const setLabel = (i: number, v: string) => {
-    const next = Array.from(
-      { length: row.readings },
-      (_, n) => row.labels?.[n] ?? ""
-    );
-    next[i] = v;
-    onChange({ labels: next });
-  };
-
-  return (
-    <div className="space-y-1.5">
-      <Label>
-        ชื่อช่องคีย์{" "}
-        <span className="font-normal text-muted-foreground">(ไม่บังคับ)</span>
-      </Label>
-      <div className="grid gap-2 @lg:grid-cols-2">
-        {Array.from({ length: row.readings }, (_, i) => (
-          <Input
-            key={i}
-            className="bg-card"
-            aria-label={`ชื่อช่องที่ ${i + 1}`}
-            placeholder={`ครั้งที่ ${i + 1}`}
-            value={row.labels?.[i] ?? ""}
-            onChange={(e) => setLabel(i, e.target.value)}
-          />
-        ))}
-      </div>
-      <FieldNote custom>
-        custom_reading_labels · ERPNext มีป้ายให้แค่ Reading 1 … Reading{" "}
-        {MAX_READINGS}
-      </FieldNote>
-    </div>
-  );
-}
-
-/** จำนวนช่องที่ผู้ตรวจต้องคีย์ — โผล่เฉพาะข้อที่คีย์เป็นตัวเลข */
-function ReadingsField({
-  row,
-  onChange,
-}: {
-  row: QiRow;
-  onChange: (next: Partial<QiRow>) => void;
-}) {
-  return (
-    <div className="space-y-1.5">
-      <Label htmlFor={`readings-${row.id}`}>จำนวนค่าที่ต้องระบุ</Label>
-      <Select
-        value={String(row.readings)}
-        onValueChange={(v) => onChange({ readings: Number(v) })}
-      >
-        <SelectTrigger id={`readings-${row.id}`} className="w-full bg-card">
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          {Array.from({ length: MAX_READINGS }, (_, i) => i + 1).map((n) => (
-            <SelectItem key={n} value={String(n)}>
-              {n === 1 ? "คีย์ค่าเดียว" : `${n} ค่า`}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-      {/* แยกสองบรรทัดเพราะเป็นคนละเรื่อง — ช่องคีย์เป็นของ ERPNext ที่มีครบทุกแถว
-          อยู่แล้ว ส่วนที่ต้องสร้างเพิ่มคือ "โชว์กี่ช่อง" ซึ่งของเดิมไม่มีแนวคิดนี้
-          เขียนรวมบรรทัดเดียวจะอ่านเหมือนช่องคีย์เองก็ต้องสร้าง */}
-      <FieldNote>
-        reading_1 … reading_{MAX_READINGS} มีครบทุกแถวอยู่แล้ว (ใบตรวจ · ของ ERPNext)
-      </FieldNote>
-      <FieldNote custom>
-        custom_readings · เก็บว่าโชว์กี่ช่อง ของเดิมโชว์ครบสิบแล้วคีย์เท่าที่ใช้
-      </FieldNote>
-    </div>
-  );
-}
-
 /* ---------- หัวใบในหน้าตัวอย่าง ----------
      ของที่ตรวจกับยอดของมัน — ส่วนนี้คือที่ที่เดฟต้องระวังที่สุด เพราะดูเหมือน
      เป็นหน้าเดียวกันแต่ข้อมูลมาจากสาม doctype
@@ -1744,6 +1426,99 @@ function overallStatus(
 }
 
 /* ---------- หนึ่งหัวข้อในหน้าตัวอย่าง = หนึ่งแถวใน readings ---------- */
+/** ช่องเลือกจากรายการของระบบ — ใช้ทั้งหัวเอกสารและหัวข้อที่ดึงจากระบบ */
+function SourceSelect({
+  id,
+  source,
+}: {
+  id: string;
+  source: SourceId | "";
+}) {
+  const pool = source === "" ? [] : sourcePool(source);
+  return (
+    <Select>
+      <SelectTrigger id={id} className="w-full bg-card">
+        <SelectValue
+          placeholder={pool.length === 0 ? "ยังไม่ได้ตั้งแหล่งข้อมูล" : "เลือก"}
+        />
+      </SelectTrigger>
+      <SelectContent>
+        {pool.map((o) => (
+          <SelectItem key={o} value={o}>
+            {o}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  );
+}
+
+/* ------------------------------------------------------------------
+   หนึ่งหัวข้อที่ดึงจากระบบในใบตรวจ
+
+   ไม่มีเกณฑ์ให้ระบบตัดสิน ผู้ตรวจเลือกจากรายการแล้วชี้ขาดเอง จึงมีแต่ดรอปดาวน์
+   กับปุ่มผ่าน/ไม่ผ่าน ไม่มีช่องคีย์ตัวเลขและไม่มีแถบบอกว่าระบบตัดสินให้แล้ว
+------------------------------------------------------------------ */
+
+function PreviewSystemRow({
+  index,
+  row,
+  plain,
+  verdict = "passFail",
+  state,
+  onChange,
+}: {
+  index: number;
+  row: QiRow;
+  plain?: boolean;
+  verdict?: VerdictWords;
+  state: RoundState;
+  onChange: (next: Partial<RoundState>) => void;
+}) {
+  const words = VERDICT[plain ? "passFail" : verdict];
+  const title = rowTitle(row) || "ยังไม่ได้เลือกหัวข้อ";
+
+  return (
+    <div className="rounded-xl border border-border bg-card p-4">
+      <p className="font-medium">
+        {index}. {title}
+      </p>
+      {row.criteria !== "" && !plain && (
+        <p className="mt-0.5 text-sm text-muted-foreground">
+          เกณฑ์: {row.criteria}
+        </p>
+      )}
+
+      <div className="mt-3 flex flex-wrap items-end gap-4">
+        <div className="min-w-56 space-y-1.5">
+          <Label htmlFor={`pv-sys-${row.id}`} className="text-sm">
+            {title}
+          </Label>
+          <SourceSelect id={`pv-sys-${row.id}`} source={row.source ?? ""} />
+        </div>
+
+        <div className="flex gap-2">
+          {(["pass", "fail"] as const).map((k) => (
+            <CheckChip
+              key={k}
+              id={`pv-sys-${row.id}-${k}`}
+              label={k === "pass" ? words.pass : words.fail}
+              checked={state.manual === k}
+              onChange={(v) => onChange({ manual: v ? k : null })}
+            />
+          ))}
+        </div>
+      </div>
+
+      {!plain && (
+        <FieldNote custom={!!row.source && SOURCE[row.source].custom}>
+          {row.source ? SOURCE[row.source].store : "ยังไม่ได้เลือกแหล่งข้อมูล"}
+        </FieldNote>
+      )}
+    </div>
+  );
+}
+
 function PreviewRow({
   index,
   row,
@@ -2144,9 +1919,3 @@ function formulaReadout(
   if (typeof value !== "number" || !Number.isFinite(value)) return null;
   return { value, op: m[2], bound: m[3].trim() };
 }
-
-const readingRefs = (row: QiRow) =>
-  Array.from({ length: row.readings }, (_, i) => {
-    const named = row.labels?.[i]?.trim();
-    return named ? `reading_${i + 1} = ${named}` : `reading_${i + 1}`;
-  }).join(" · ");
