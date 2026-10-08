@@ -261,40 +261,30 @@ const blankCheck = (): CheckRow => ({
 
 const mk = (p: Partial<CheckRow>): CheckRow => ({ ...blankCheck(), ...p });
 
+/* สี่คอลัมน์ตรงตามกระดาษ FM-QC-02-06 — สูตร เครื่องผลิต น้ำหนัก สลิง
+   ส่วนคอลัมน์ วันที่ / ตรวจสอบ ผ่าน-ไม่ผ่าน / หมายเหตุ ไม่ต้องตั้ง เพราะมากับ
+   ตัวใบอยู่แล้ว (report_date · status · remarks) ตั้งซ้ำคือได้สองที่ที่ขัดกันเอง
+
+   เกณฑ์บนหัวกระดาษ "การเย็บด้ายต้องติด ตัวเลขของกระสอบต้องชัด" เป็นเกณฑ์ของ
+   ทั้งแถว ไม่ใช่ของคอลัมน์ไหนคอลัมน์หนึ่ง วางไว้ที่สูตรซึ่งเป็นตัวระบุกระสอบ */
 const SEED_CHECKS: CheckRow[] = [
   mk({
     kind: "system",
     source: "item",
-    readings: 3,
-    labels: ["กระสอบที่ 1", "กระสอบที่ 2", "กระสอบที่ 3"],
-    criteria: "สุ่มจากกองที่เพิ่งออกจากไลน์",
-  }),
-  mk({
-    paramId: "p-weight",
-    numeric: true,
-    manual: false,
-    min: "50.2",
-    max: "50.8",
-    readings: 3,
-    criteria: "ชั่งทุกกระสอบที่สุ่ม",
-  }),
-  mk({
-    paramId: "p-seam",
-    criteria: "ด้ายต้องติดตลอดแนว ฝีเข็มสม่ำเสมอ ไม่หลุดไม่ขาด",
-  }),
-  mk({
-    paramId: "p-moist",
-    numeric: true,
-    formulaBased: true,
-    manual: false,
-    formula: "mean < 80",
-    readings: 3,
-    criteria: "เฉลี่ยทั้งชุดต้องไม่เกินเกณฑ์",
+    criteria: "การเย็บด้ายต้องติด ตัวเลขของกระสอบต้องชัด",
   }),
   mk({
     kind: "system",
     source: "machine",
-    criteria: "ระบุเครื่องที่ผลิตล็อตนี้",
+  }),
+  mk({
+    paramId: "p-weight",
+    numeric: true,
+    criteria: "ชั่งแล้วบันทึกน้ำหนักที่ได้",
+  }),
+  mk({
+    paramId: "p-sling",
+    value: "30 / 35 / 40",
   }),
 ];
 
@@ -309,10 +299,9 @@ type DocField = {
   required: boolean;
 };
 
-const SEED_HEADER: DocField[] = [
-  { id: nid(), label: "วัตถุดิบสินค้า", source: "item", required: true },
-  { id: nid(), label: "เลขที่เอกสาร", source: "docPr", required: true },
-];
+/* กระดาษใบนี้ไม่มีหัวเอกสาร — วันที่อยู่ในแถวและมากับตัวใบอยู่แล้ว
+   เว้นว่างไว้ ไม่ได้ใส่ช่องหลอกให้ดูไม่โล่ง */
+const SEED_HEADER: DocField[] = [];
 
 // ---------------------------------------------------------------
 // อ่านจากที่ตั้งไว้ ไม่ได้เก็บแยก
@@ -432,7 +421,7 @@ export default function SetupErpDemoPage() {
         สุ่มตรวจผลิตภัณฑ์สำเร็จรูป
       </h1>
       <p className="mt-1 text-sm text-muted-foreground">
-        FM-QC-02-06 — ตารางเก็บของที่ต้องเทียบข้ามแถว ที่เหลืออยู่ในกล่องแก้ไข
+        FM-QC-02-06 — สี่คอลัมน์ตรงตามกระดาษ สูตร · เครื่องผลิต · น้ำหนัก · สลิง
       </p>
 
       <Alert className="mt-4">

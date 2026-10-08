@@ -281,6 +281,7 @@ export const QI_PARAMETERS: QiParameter[] = [
   { id: "p-touch", name: "การตรวจสอบด้วยการสัมผัส", group: "กายภาพ", unit: "" },
   { id: "p-bag-formula", name: "กระสอบตรงกับสูตร", group: "บรรจุภัณฑ์", unit: "" },
   { id: "p-sticker", name: "สติ๊กเกอร์แลกแต้ม", group: "บรรจุภัณฑ์", unit: "" },
+  { id: "p-sling", name: "ขนาดสลิง", group: "บรรจุภัณฑ์", unit: "" },
   { id: "p-caking", name: "การจับตัวเป็นก้อน", group: "กายภาพ", unit: "" },
   { id: "p-wall-gap", name: "ระยะห่างจากผนัง", group: "เครื่องจักร", unit: "" },
   { id: "p-stack-height", name: "ความสูงของการวางซ้อน", group: "บรรจุภัณฑ์", unit: "" },
