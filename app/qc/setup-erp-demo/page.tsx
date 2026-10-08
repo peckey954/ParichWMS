@@ -51,6 +51,7 @@ import {
   TabsTrigger,
 } from "@peckey954/ui/components/ui/tabs";
 import { Switch } from "@peckey954/ui/components/ui/switch";
+import { Textarea } from "@peckey954/ui/components/ui/textarea";
 import {
   RadioGroup,
   RadioGroupItem,
@@ -332,7 +333,12 @@ const readingLabels = (r: CheckRow) =>
 
 /** สรุปเกณฑ์ลงช่องเดียวในตาราง — ตรงกับที่ ERPNext จะเอาไปตัดสินจริง */
 function describeCriteria(r: CheckRow) {
-  if (r.formulaBased) return r.formula.trim() || "ยังไม่ได้เขียนสูตร";
+  if (r.formulaBased) {
+    // สูตรหลายบรรทัดย่อให้เหลือบรรทัดเดียวตอนโชว์ในตาราง ไม่งั้นแถวจะสูงไม่เท่ากัน
+    const one = r.formula.trim().replace(/\s+/g, " ");
+    if (one === "") return "ยังไม่ได้เขียนสูตร";
+    return one.length > 48 ? `${one.slice(0, 48)}…` : one;
+  }
   if (r.numeric) return `${r.min || "0"} – ${r.max || "0"}`;
   if (r.value.trim() !== "") return `ต้องเป็น ${r.value}`;
   return "ไม่มีเกณฑ์ในระบบ";
@@ -351,6 +357,14 @@ export default function SetupErpDemoPage() {
   const [subject, setSubject] = React.useState<"item" | "other">("other");
   const [targets, setTargets] = React.useState<string[]>([]);
   const [requireBefore, setRequireBefore] = React.useState(false);
+
+  /* ตรวจหลายตัวอย่างต่อใบ — เปิดแล้วใบนี้ออกจาก Quality Inspection ทันที
+     ไม่ใช่เพราะเราเลือกให้เป็นแบบนั้น แต่เพราะ reading_1…reading_10 ไม่ได้
+     แปลว่า "ของสิบชิ้น" มันแปลว่า "วัดของชิ้นเดียวสิบครั้ง" ซึ่งพิสูจน์ได้จาก
+     calculate_mean ที่เอาทุกค่ามาเฉลี่ยกัน — เฉลี่ยน้ำหนักข้ามสูตรที่ต่างกัน
+     ไม่มีความหมาย และหนึ่งแถวมี status เดียว บอกไม่ได้ว่ากระสอบไหนตก */
+  const [multiSample, setMultiSample] = React.useState(true);
+  const [samples, setSamples] = React.useState<string[]>([nid(), nid(), nid()]);
 
   // ---- 4 ผลตรวจที่ไม่ผ่าน ----
   const [dispositions, setDispositions] = React.useState<string[]>([
@@ -385,6 +399,7 @@ export default function SetupErpDemoPage() {
     ...(subject === "item" && targets.length === 0
       ? ["ยังไม่ได้ผูกกับสินค้าตัวไหน"]
       : []),
+    ...(multiSample ? ["เปิดตรวจหลายตัวอย่างต่อใบ"] : []),
     ...header
       .filter((f) => f.source !== "" && SOURCE[f.source].custom)
       .map((f) => `ส่วนหัว “${f.label || "ไม่มีชื่อ"}”`),
@@ -645,7 +660,45 @@ export default function SetupErpDemoPage() {
             index={3}
             title={`หัวข้อตรวจ (${checks.length})`}
             note="หนึ่งหัวข้อ = หนึ่งแถวใน readings · กดดินสอเพื่อตั้งเกณฑ์ จำนวนค่า และหมายเหตุ"
+            action={
+              <label className="flex items-center gap-2 text-sm">
+                <Switch checked={multiSample} onCheckedChange={setMultiSample} />
+                ตรวจหลายตัวอย่างต่อใบ
+              </label>
+            }
           >
+            {/* เปิดแล้วออกจาก ERPNext ทั้งใบ ต้องบอกว่าได้อะไรเสียอะไร ตรงนี้เลย
+                ไม่ใช่ให้ไปเจอเองว่าแถบบนเปลี่ยนสีแล้วงงว่าทำไม */}
+            <div
+              className={cn(
+                "mb-3 rounded-xl border px-4 py-3 text-sm",
+                multiSample ? "border-border bg-brand" : "border-border bg-card"
+              )}
+            >
+              {multiSample ? (
+                <>
+                  <p className="font-medium">
+                    ตารางตัวอย่าง — แถวไม่จำกัด แต่ละแถวมีผลผ่าน/ไม่ผ่านของตัวเอง
+                  </p>
+                  <p className="mt-1 text-muted-foreground">
+                    สุ่มกี่ตัวอย่างก็เพิ่มแถวเท่านั้น และตัดสินแยกรายแถวได้ —
+                    แลกกับใบนี้ไปอยู่ QC Check ทั้งใบ
+                  </p>
+                </>
+              ) : (
+                <>
+                  <p className="font-medium">
+                    วัดซ้ำได้สูงสุด {MAX_READINGS} ครั้งต่อหัวข้อ
+                    ผลผ่าน/ไม่ผ่านมีอันเดียวต่อหัวข้อ
+                  </p>
+                  <p className="mt-1 text-muted-foreground">
+                    ใช้กับการวัดของชิ้นเดียวซ้ำหลายครั้งแล้วเอามาเฉลี่ย
+                    ซึ่งเป็นสิ่งที่ reading_1…reading_10 ถูกทำมาเพื่อรองรับ
+                  </p>
+                </>
+              )}
+            </div>
+
             <CheckTable
               rows={checks}
               onChange={setChecks}
@@ -827,11 +880,22 @@ export default function SetupErpDemoPage() {
             )}
 
             <h3 className="mt-6 mb-3 font-semibold">การตรวจสอบ</h3>
-            <div className="space-y-3">
-              {checks.map((r, i) => (
-                <PreviewCheck key={r.id} index={i + 1} row={r} />
-              ))}
-            </div>
+            {multiSample ? (
+              <SampleGrid
+                checks={checks}
+                samples={samples}
+                onAdd={() => setSamples((p) => [...p, nid()])}
+                onRemove={(id) =>
+                  setSamples((p) => (p.length > 1 ? p.filter((x) => x !== id) : p))
+                }
+              />
+            ) : (
+              <div className="space-y-3">
+                {checks.map((r, i) => (
+                  <PreviewCheck key={r.id} index={i + 1} row={r} />
+                ))}
+              </div>
+            )}
 
             {subject === "item" && dispositions.length > 0 && (
               <div className="mt-6">
@@ -1194,11 +1258,17 @@ function EditDialog({
           {row.formulaBased ? (
             <div className="space-y-1.5">
               <Label htmlFor={`${row.id}-f`}>สูตร</Label>
-              <Input
+              {/* กล่องยาว ไม่ใช่ช่องบรรทัดเดียว — สูตรจริงยาวกว่าที่คิด เช่น
+                  ตรวจทุกค่าพร้อมกัน หรือซ้อน and/or หลายชั้น พิมพ์ในช่องบรรทัด
+                  เดียวแล้วอ่านทวนไม่ออกว่าวงเล็บปิดตรงไหน */}
+              <Textarea
                 id={`${row.id}-f`}
                 className="bg-card font-mono text-sm"
+                rows={4}
                 value={row.formula}
-                placeholder="เช่น mean < 80"
+                placeholder={
+                  "เช่น\nmean < 80\n\nหรือยาวกว่านั้น\nreading_1 < 80 and reading_2 < 80 and reading_3 < 80"
+                }
                 onChange={(e) => onChange({ formula: e.target.value })}
               />
               {/* ตัวแปรที่ใช้ได้เปลี่ยนตามว่าติ๊กตัวเลขไว้ไหม เขียนผิดชุดแล้ว
@@ -1548,6 +1618,124 @@ function PreviewCheck({ index, row }: { index: number; row: CheckRow }) {
         </div>
       )}
     </div>
+  );
+}
+
+/* ------------------------------------------------------------------
+   ตารางตัวอย่าง — หนึ่งแถวคือหนึ่งตัวอย่างที่สุ่มมา
+
+   ต่างจากการวัดซ้ำสิบครั้งตรงที่แต่ละแถวมีผลผ่าน/ไม่ผ่านของตัวเอง
+   ซึ่งเป็นสิ่งที่ Quality Inspection ทำไม่ได้ เพราะหนึ่งแถวใน readings
+   มี status ช่องเดียว บอกได้แค่ว่า "หัวข้อน้ำหนักตก" ไม่ได้บอกว่ากระสอบไหนตก
+------------------------------------------------------------------ */
+
+function SampleGrid({
+  checks,
+  samples,
+  onAdd,
+  onRemove,
+}: {
+  checks: CheckRow[];
+  samples: string[];
+  onAdd: () => void;
+  onRemove: (id: string) => void;
+}) {
+  return (
+    <>
+      <div className="overflow-x-auto rounded-xl border border-border">
+        <table className="w-full min-w-[720px] text-sm">
+          <thead className="bg-muted">
+            <tr>
+              <th className="px-3 py-2 text-left font-medium">#</th>
+              {checks.map((r) => (
+                <th
+                  key={r.id}
+                  className="px-3 py-2 text-left font-medium whitespace-nowrap"
+                >
+                  {rowName(r) || "ยังไม่ได้เลือกหัวข้อ"}
+                </th>
+              ))}
+              <th className="px-3 py-2 text-left font-medium">ผล</th>
+              <th className="w-12 px-3 py-2" />
+            </tr>
+          </thead>
+          <tbody>
+            {samples.map((sid, i) => (
+              <tr key={sid} className="border-t border-border">
+                <td className="px-3 py-2 text-muted-foreground tabular-nums">
+                  {i + 1}
+                </td>
+                {checks.map((r) => (
+                  <td key={r.id} className="px-3 py-2">
+                    <CellInput id={`${sid}-${r.id}`} row={r} />
+                  </td>
+                ))}
+                <td className="px-3 py-2">
+                  <VerdictPick id={sid} />
+                </td>
+                <td className="px-3 py-2">
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    aria-label={`ลบตัวอย่างที่ ${i + 1}`}
+                    disabled={samples.length <= 1}
+                    onClick={() => onRemove(sid)}
+                  >
+                    <Trash2Icon />
+                  </Button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      <div className="mt-3 flex justify-center">
+        <Button variant="outline-primary" onClick={onAdd}>
+          <PlusIcon />
+          เพิ่มตัวอย่าง
+        </Button>
+      </div>
+      <FieldNote custom>
+        QC Check Sample — แถวไม่จำกัด และ status อยู่ที่แถว ไม่ใช่ที่หัวข้อ
+      </FieldNote>
+    </>
+  );
+}
+
+/** ช่องกรอกหนึ่งช่องในตารางตัวอย่าง — หน้าตาเดียวกับในการ์ด แต่ไม่มีป้ายกำกับ */
+function CellInput({ id, row }: { id: string; row: CheckRow }) {
+  const choices = row.value
+    .split("/")
+    .map((o) => o.trim())
+    .filter(Boolean);
+
+  if (row.kind === "system") return <PoolSelect id={id} source={row.source} />;
+
+  if (!row.numeric && !row.formulaBased && choices.length > 1) {
+    return (
+      <Select>
+        <SelectTrigger id={id} className="w-full min-w-28 bg-card">
+          <SelectValue placeholder="เลือก" />
+        </SelectTrigger>
+        <SelectContent>
+          {choices.map((o) => (
+            <SelectItem key={o} value={o}>
+              {o}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    );
+  }
+
+  return (
+    <Input
+      id={id}
+      className="min-w-24 bg-card"
+      inputMode={row.numeric ? "decimal" : "text"}
+      placeholder={row.numeric ? "0" : row.value || "ระบุ"}
+    />
   );
 }
 
