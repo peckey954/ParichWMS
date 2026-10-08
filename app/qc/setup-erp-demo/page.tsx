@@ -358,11 +358,14 @@ export default function SetupErpDemoPage() {
   const [targets, setTargets] = React.useState<string[]>([]);
   const [requireBefore, setRequireBefore] = React.useState(false);
 
-  /* ตรวจหลายตัวอย่างต่อใบ — เปิดแล้วใบนี้ออกจาก Quality Inspection ทันที
-     ไม่ใช่เพราะเราเลือกให้เป็นแบบนั้น แต่เพราะ reading_1…reading_10 ไม่ได้
-     แปลว่า "ของสิบชิ้น" มันแปลว่า "วัดของชิ้นเดียวสิบครั้ง" ซึ่งพิสูจน์ได้จาก
-     calculate_mean ที่เอาทุกค่ามาเฉลี่ยกัน — เฉลี่ยน้ำหนักข้ามสูตรที่ต่างกัน
-     ไม่มีความหมาย และหนึ่งแถวมี status เดียว บอกไม่ได้ว่ากระสอบไหนตก */
+  /* สุ่มหลายตัวอย่างต่อครั้ง — เป็นเรื่องของ "กี่ใบ" ไม่ใช่ "doctype ไหน"
+     หนึ่งแถวบนจอ = หนึ่งใบ Quality Inspection ไม่ใช่หนึ่งคอลัมน์ในใบเดียว
+     ERPNext มี make_quality_inspections ที่สร้างทีละหลายใบจากรายการสินค้าอยู่แล้ว
+     ตารางนี้จึงเป็นแค่หน้าจอ ที่เก็บยังเป็นของมาตรฐานทุกใบ
+
+     ห้ามเอา reading_1…reading_10 มาใช้แทน เพราะมันไม่ได้แปลว่า "ของสิบชิ้น"
+     มันแปลว่า "วัดของชิ้นเดียวสิบครั้ง" ซึ่งพิสูจน์ได้จาก calculate_mean ที่เอา
+     ทุกค่ามาเฉลี่ยกัน และหนึ่งแถวมี status เดียว บอกไม่ได้ว่ากระสอบไหนตก */
   const [multiSample, setMultiSample] = React.useState(true);
   const [samples, setSamples] = React.useState<string[]>([nid(), nid(), nid()]);
 
@@ -399,7 +402,6 @@ export default function SetupErpDemoPage() {
     ...(subject === "item" && targets.length === 0
       ? ["ยังไม่ได้ผูกกับสินค้าตัวไหน"]
       : []),
-    ...(multiSample ? ["เปิดตรวจหลายตัวอย่างต่อใบ"] : []),
     ...header
       .filter((f) => f.source !== "" && SOURCE[f.source].custom)
       .map((f) => `ส่วนหัว “${f.label || "ไม่มีชื่อ"}”`),
@@ -667,33 +669,34 @@ export default function SetupErpDemoPage() {
               </label>
             }
           >
-            {/* เปิดแล้วออกจาก ERPNext ทั้งใบ ต้องบอกว่าได้อะไรเสียอะไร ตรงนี้เลย
-                ไม่ใช่ให้ไปเจอเองว่าแถบบนเปลี่ยนสีแล้วงงว่าทำไม */}
-            <div
-              className={cn(
-                "mb-3 rounded-xl border px-4 py-3 text-sm",
-                multiSample ? "border-border bg-brand" : "border-border bg-card"
-              )}
-            >
+            {/* toggle นี้เปลี่ยนว่า "กี่ใบ" ไม่ได้เปลี่ยนว่า "doctype ไหน"
+                จึงไม่ไปยุ่งกับแถบปลายทางด้านบน ต้องเขียนให้ชัดตรงนี้
+                ไม่งั้นจะเข้าใจว่าเปิดแล้วหลุดจาก ERPNext */}
+            <div className="mb-3 rounded-xl border border-border bg-card px-4 py-3 text-sm">
               {multiSample ? (
                 <>
                   <p className="font-medium">
-                    ตารางตัวอย่าง — แถวไม่จำกัด แต่ละแถวมีผลผ่าน/ไม่ผ่านของตัวเอง
+                    หนึ่งตัวอย่าง = หนึ่งใบตรวจ สุ่มกี่ตัวอย่างก็ได้
+                    แต่ละตัวอย่างมีผลผ่าน/ไม่ผ่านของตัวเอง
                   </p>
                   <p className="mt-1 text-muted-foreground">
-                    สุ่มกี่ตัวอย่างก็เพิ่มแถวเท่านั้น และตัดสินแยกรายแถวได้ —
-                    แลกกับใบนี้ไปอยู่ QC Check ทั้งใบ
+                    ตารางเป็นแค่หน้าจอ กดบันทึกทีเดียวแล้วระบบแตกเป็นหลายใบให้ —
+                    ที่เก็บยังเป็นของมาตรฐานทุกใบ ไม่ได้ทำให้ฟอร์มนี้กลายเป็น custom
                   </p>
+                  <FieldNote>
+                    make_quality_inspections(company, doctype, docname, items,
+                    inspection_type) — ของ ERPNext เอง ไม่ต้องเขียนเพิ่ม
+                  </FieldNote>
                 </>
               ) : (
                 <>
                   <p className="font-medium">
-                    วัดซ้ำได้สูงสุด {MAX_READINGS} ครั้งต่อหัวข้อ
-                    ผลผ่าน/ไม่ผ่านมีอันเดียวต่อหัวข้อ
+                    หนึ่งใบต่อครั้ง วัดซ้ำได้สูงสุด {MAX_READINGS} ครั้งต่อหัวข้อ
                   </p>
                   <p className="mt-1 text-muted-foreground">
-                    ใช้กับการวัดของชิ้นเดียวซ้ำหลายครั้งแล้วเอามาเฉลี่ย
+                    ใช้กับการวัดของชิ้นเดียวซ้ำหลายจุดแล้วเอามาเฉลี่ย
                     ซึ่งเป็นสิ่งที่ reading_1…reading_10 ถูกทำมาเพื่อรองรับ
+                    ผลผ่าน/ไม่ผ่านจึงมีอันเดียวต่อหัวข้อ
                   </p>
                 </>
               )}
@@ -882,6 +885,7 @@ export default function SetupErpDemoPage() {
             <h3 className="mt-6 mb-3 font-semibold">การตรวจสอบ</h3>
             {multiSample ? (
               <SampleGrid
+                onErpnext={onErpnext}
                 checks={checks}
                 samples={samples}
                 onAdd={() => setSamples((p) => [...p, nid()])}
@@ -1630,11 +1634,13 @@ function PreviewCheck({ index, row }: { index: number; row: CheckRow }) {
 ------------------------------------------------------------------ */
 
 function SampleGrid({
+  onErpnext,
   checks,
   samples,
   onAdd,
   onRemove,
 }: {
+  onErpnext: boolean;
   checks: CheckRow[];
   samples: string[];
   onAdd: () => void;
@@ -1646,7 +1652,9 @@ function SampleGrid({
         <table className="w-full min-w-[720px] text-sm">
           <thead className="bg-muted">
             <tr>
-              <th className="px-3 py-2 text-left font-medium">#</th>
+              <th className="px-3 py-2 text-left font-medium whitespace-nowrap">
+                ใบที่
+              </th>
               {checks.map((r) => (
                 <th
                   key={r.id}
@@ -1696,8 +1704,10 @@ function SampleGrid({
           เพิ่มตัวอย่าง
         </Button>
       </div>
-      <FieldNote custom>
-        QC Check Sample — แถวไม่จำกัด และ status อยู่ที่แถว ไม่ใช่ที่หัวข้อ
+      <FieldNote custom={!onErpnext}>
+        {onErpnext
+          ? `${samples.length} แถว = ${samples.length} ใบ Quality Inspection · status อยู่ที่ใบ ไม่ได้ยัดลง reading_1…reading_10`
+          : `QC Check Sample — ${samples.length} แถวในใบเดียว status อยู่ที่แถว`}
       </FieldNote>
     </>
   );
