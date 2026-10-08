@@ -50,8 +50,28 @@ import {
   TabsList,
   TabsTrigger,
 } from "@peckey954/ui/components/ui/tabs";
+import { Switch } from "@peckey954/ui/components/ui/switch";
+import {
+  RadioGroup,
+  RadioGroupItem,
+} from "@peckey954/ui/components/ui/radio-group";
 import { cn } from "@peckey954/ui/lib/utils";
-import { ITEM_POOL, QI_PARAMETERS } from "@/lib/qc-erp";
+import { CheckChip } from "@/components/check-chip";
+import { MultiSelectChips } from "@/components/multi-select-chips";
+import { TimeField } from "@/components/time-field";
+import { ParamCombobox } from "@/components/qc/param-picker";
+import { SchedulePreviewCalendar } from "@/components/qc/schedule-calendar";
+import {
+  DISPOSITIONS,
+  INSPECTION_TYPE_LABEL,
+  INSPECTION_TYPE_VALUE,
+  ITEM_POOL,
+  REF_DOCS_OF,
+  REF_DOC_LABEL,
+  paramOf,
+  type InspectionType,
+} from "@/lib/qc-erp";
+import { newSlot, type TimeSlot } from "@/lib/qc-template";
 
 /* ------------------------------------------------------------------
    ตัวอย่างหน้าตั้งค่าแบบใหม่ — หน้าแยก ไม่แตะของจริง
@@ -194,8 +214,8 @@ const REMARK_KEYS = Object.keys(REMARK) as RemarkMode[];
 type CheckRow = {
   id: string;
   kind: Kind;
-  /** ชื่อหัวข้อจากทะเบียน — ใช้เมื่อ kind = text */
-  name: string;
+  /** id ของหัวข้อในทะเบียน — ใช้เมื่อ kind = text ว่าง = ยังไม่ได้เลือก */
+  paramId: string;
   /** ของที่ดึงมา — ใช้เมื่อ kind = system และเป็นชื่อหัวข้อไปในตัว */
   source: SourceId | "";
   /** numeric — คีย์ตัวเลขหลายค่า ไม่ติ๊กคือคีย์ข้อความช่องเดียว */
@@ -223,7 +243,7 @@ const nid = () => `n-${++seq}`;
 const blankCheck = (): CheckRow => ({
   id: nid(),
   kind: "text",
-  name: "",
+  paramId: "",
   source: "",
   numeric: false,
   formulaBased: false,
@@ -249,7 +269,7 @@ const SEED_CHECKS: CheckRow[] = [
     criteria: "สุ่มจากกองที่เพิ่งออกจากไลน์",
   }),
   mk({
-    name: "น้ำหนักบรรจุ",
+    paramId: "p-weight",
     numeric: true,
     manual: false,
     min: "50.2",
@@ -258,11 +278,11 @@ const SEED_CHECKS: CheckRow[] = [
     criteria: "ชั่งทุกกระสอบที่สุ่ม",
   }),
   mk({
-    name: "การเย็บกระสอบ",
+    paramId: "p-seam",
     criteria: "ด้ายต้องติดตลอดแนว ฝีเข็มสม่ำเสมอ ไม่หลุดไม่ขาด",
   }),
   mk({
-    name: "ความชื้น",
+    paramId: "p-moist",
     numeric: true,
     formulaBased: true,
     manual: false,
@@ -302,7 +322,7 @@ const rowName = (r: CheckRow) =>
     ? r.source === ""
       ? ""
       : SOURCE[r.source].label
-    : r.name;
+    : (paramOf(r.paramId)?.name ?? "");
 
 const readingLabels = (r: CheckRow) =>
   Array.from(
@@ -323,12 +343,48 @@ export default function SetupErpDemoPage() {
   const [checks, setChecks] = React.useState<CheckRow[]>(SEED_CHECKS);
   const [editing, setEditing] = React.useState<string | null>(null);
 
+  // ---- 1 ข้อมูลรายงาน ----
+  const [name, setName] = React.useState("สุ่มตรวจผลิตภัณฑ์สำเร็จรูป");
+  const [code, setCode] = React.useState("FM-QC-02-06");
+  const [type, setType] = React.useState<InspectionType>("inProcess");
+  const [refDocs, setRefDocs] = React.useState<string[]>([]);
+  const [subject, setSubject] = React.useState<"item" | "other">("other");
+  const [targets, setTargets] = React.useState<string[]>([]);
+  const [requireBefore, setRequireBefore] = React.useState(false);
+
+  // ---- 4 ผลตรวจที่ไม่ผ่าน ----
+  const [dispositions, setDispositions] = React.useState<string[]>([
+    "accept",
+    "repack",
+  ]);
+  const [requireDisposition, setRequireDisposition] = React.useState(true);
+
+  // ---- 5 เปิดใบตามรอบเวลาทำงาน ----
+  const [recurring, setRecurring] = React.useState(true);
+  const [slots, setSlots] = React.useState<TimeSlot[]>([
+    newSlot("08:30", "12:00"),
+    newSlot("13:00", "18:00"),
+    newSlot("19:00", "23:00"),
+    newSlot("01:00", "05:00"),
+  ]);
+
   const patch = (id: string, next: Partial<CheckRow>) =>
     setChecks((p) => p.map((r) => (r.id === id ? { ...r, ...next } : r)));
 
   /* เหตุผลที่ลง ERPNext ไม่ได้ — อ่านจากแหล่งข้อมูลที่ตั้งไว้ ไม่มีช่องให้เลือกเอง
      ทั้งส่วนหัวเอกสารและหัวข้อตรวจนับรวมกัน เพราะทั้งคู่ชี้ไปของชิ้นเดียวกัน */
   const blockers = [
+    // ตรวจของที่ไม่ใช่สินค้า — Quality Inspection ไม่มีช่องเก็บเครื่องจักรหรือคลัง
+    ...(subject === "other" ? ["ประเภทการตรวจไม่ใช่สินค้า"] : []),
+    // reference_type / reference_name เป็น reqd=1 ที่ไม่มี depends_on
+    // ไม่มีเอกสารคือบันทึกแม้แต่ draft ไม่ได้
+    ...(subject === "item" && refDocs.length === 0
+      ? ["ไม่ได้อ้างอิงเอกสาร"]
+      : []),
+    // item_code ก็ reqd=1 เหมือนกัน ไม่ผูกสินค้าคือไม่มีใบให้เปิด
+    ...(subject === "item" && targets.length === 0
+      ? ["ยังไม่ได้ผูกกับสินค้าตัวไหน"]
+      : []),
     ...header
       .filter((f) => f.source !== "" && SOURCE[f.source].custom)
       .map((f) => `ส่วนหัว “${f.label || "ไม่มีชื่อ"}”`),
@@ -401,7 +457,7 @@ export default function SetupErpDemoPage() {
         <p className="mt-1 text-sm text-muted-foreground">
           {onErpnext
             ? "ทุกช่องมีที่เก็บใน doctype มาตรฐาน — บล็อกการรับของได้ อยู่ใต้ Stock Settings และเข้ารายงานมาตรฐาน"
-            : `เพราะ ${blockers.join(" · ")} ดึงจากของที่ Quality Inspection ไม่มีช่องเก็บ`}
+            : `เพราะ ${blockers.join(" · ")} — ไม่ได้ให้เลือกเอง อ่านจากที่ตั้งไว้ทั้งหมด`}
         </p>
       </div>
 
@@ -415,6 +471,170 @@ export default function SetupErpDemoPage() {
         <TabsContent value="structure">
           <Section
             index={1}
+            title="ข้อมูลรายงาน"
+            note="ชื่อรายงาน ช่วงที่ใช้ เอกสารที่อ้างอิง และของที่ฟอร์มนี้ผูกอยู่"
+          >
+            <div className="grid gap-4 @2xl:grid-cols-2">
+              <div className="space-y-1.5">
+                <Label htmlFor="d-name">ชื่อรายงาน</Label>
+                <Input
+                  id="d-name"
+                  className="bg-card"
+                  value={name}
+                  placeholder="ระบุชื่อรายงาน"
+                  onChange={(e) => setName(e.target.value)}
+                />
+                {/* ชื่อนี้คือ ID ของเอกสาร เปลี่ยนทีหลังคือ rename ที่ Frappe
+                    ต้องตามไปแก้ลิงก์ในใบตรวจเก่าให้ด้วย ไม่ใช่แค่แก้ข้อความ */}
+                <FieldNote>
+                  quality_inspection_template_name · ชื่อนี้คือ ID ของเอกสาร
+                </FieldNote>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="d-code">
+                  รหัสรายงาน{" "}
+                  <span className="font-normal text-muted-foreground">
+                    (ไม่บังคับ)
+                  </span>
+                </Label>
+                <Input
+                  id="d-code"
+                  className="bg-card"
+                  value={code}
+                  placeholder="ระบุรหัสรายงาน"
+                  onChange={(e) => setCode(e.target.value)}
+                />
+                <FieldNote custom>custom_code ที่เทมเพลต</FieldNote>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="d-type">ช่วงการตรวจสอบ</Label>
+                <Select
+                  value={type}
+                  onValueChange={(v) => {
+                    // เปลี่ยนช่วงแล้วเอกสารอ้างอิงต้องล้างตาม ใบรับของกับใบส่งของ
+                    // อยู่คนละช่วง ค้างไว้จะได้ฟอร์มที่ยิงเข้า ERPNext ไม่ผ่าน
+                    setType(v as InspectionType);
+                    setRefDocs([]);
+                  }}
+                >
+                  <SelectTrigger id="d-type" className="w-full bg-card">
+                    <SelectValue placeholder="เลือกช่วงการตรวจ" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {(Object.keys(INSPECTION_TYPE_LABEL) as InspectionType[]).map(
+                      (t) => (
+                        <SelectItem key={t} value={t}>
+                          {INSPECTION_TYPE_LABEL[t]} — {INSPECTION_TYPE_VALUE[t]}
+                        </SelectItem>
+                      )
+                    )}
+                  </SelectContent>
+                </Select>
+                <FieldNote>inspection_type</FieldNote>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="d-ref">
+                  เอกสารอ้างอิง{" "}
+                  <span className="font-normal text-muted-foreground">
+                    {subject === "item" ? "(บังคับถ้าจะลง ERPNext)" : "(ไม่ใช้)"}
+                  </span>
+                </Label>
+                <MultiSelectChips
+                  id="d-ref"
+                  className="w-full bg-card"
+                  disabled={subject !== "item"}
+                  placeholder={
+                    subject === "item"
+                      ? "เลือกเอกสาร"
+                      : "ฟอร์มที่ไม่ได้ตรวจสินค้าไม่มีเอกสารสต็อกมาเกี่ยว"
+                  }
+                  options={REF_DOCS_OF[type].map((d) => ({
+                    label: REF_DOC_LABEL[d],
+                    value: d,
+                  }))}
+                  value={refDocs}
+                  onValueChange={setRefDocs}
+                />
+                <FieldNote>reference_type · reference_name</FieldNote>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label>ประเภทการตรวจ</Label>
+                <RadioGroup
+                  className="grid gap-2 @lg:grid-cols-2"
+                  value={subject}
+                  onValueChange={(v) => {
+                    setSubject(v as "item" | "other");
+                    if (v !== "item") {
+                      setRefDocs([]);
+                      setTargets([]);
+                      setRequireBefore(false);
+                    }
+                  }}
+                >
+                  {(
+                    [
+                      ["item", "สินค้า"],
+                      ["other", "คลัง/สินค้าในคลัง/เครื่องจักร/อื่นๆ"],
+                    ] as const
+                  ).map(([v, l]) => (
+                    <Label
+                      key={v}
+                      htmlFor={`d-sub-${v}`}
+                      className={cn(
+                        "flex items-center gap-2 rounded-lg border px-3 py-2.5 font-normal",
+                        subject === v
+                          ? "border-primary bg-brand"
+                          : "border-border bg-card"
+                      )}
+                    >
+                      <RadioGroupItem id={`d-sub-${v}`} value={v} />
+                      {l}
+                    </Label>
+                  ))}
+                </RadioGroup>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="d-items">สินค้า</Label>
+                <MultiSelectChips
+                  id="d-items"
+                  className="w-full bg-card"
+                  disabled={subject !== "item"}
+                  placeholder={
+                    subject === "item"
+                      ? "เลือกสินค้า"
+                      : "ไม่ได้ผูกที่ฟอร์ม — ผู้ตรวจเลือกตอนเปิดใบ"
+                  }
+                  options={ITEM_POOL.map((i) => ({ label: i, value: i }))}
+                  value={targets}
+                  onValueChange={setTargets}
+                />
+                <FieldNote>
+                  Item · quality_inspection_template (เขียนกลับไปที่ข้อมูลสินค้า)
+                </FieldNote>
+              </div>
+            </div>
+
+            {subject === "item" && (
+              <label className="mt-4 flex items-center gap-3">
+                <Switch
+                  checked={requireBefore}
+                  disabled={targets.length === 0}
+                  onCheckedChange={setRequireBefore}
+                />
+                <span className="text-sm font-medium">
+                  ต้องตรวจก่อนรับของเข้าคลัง
+                </span>
+              </label>
+            )}
+          </Section>
+
+          <Section
+            index={2}
             title="ส่วนหัวเอกสาร"
             note="ช่องที่ผู้ตรวจกรอกครั้งเดียวต่อใบ เช่น เลขที่เอกสาร สินค้า เครื่องจักร"
           >
@@ -422,7 +642,7 @@ export default function SetupErpDemoPage() {
           </Section>
 
           <Section
-            index={2}
+            index={3}
             title={`หัวข้อตรวจ (${checks.length})`}
             note="หนึ่งหัวข้อ = หนึ่งแถวใน readings · กดดินสอเพื่อตั้งเกณฑ์ จำนวนค่า และหมายเหตุ"
           >
@@ -433,13 +653,159 @@ export default function SetupErpDemoPage() {
               onPatch={patch}
             />
           </Section>
+
+          {/* ---------- 4 ผลตรวจที่ไม่ผ่าน ---------- */}
+          {/* repack / รับสภาพ / ส่งคืน เป็นการตัดสินใจกับ "ของ" ฟอร์มที่ตรวจ
+              เครื่องจักรหรือคลังไม่มีของให้ตัดสิน ซ่อนทั้งก้อนไปเลย */}
+          {subject === "item" && (
+            <Section
+              index={4}
+              title="ผลตรวจที่ไม่ผ่าน"
+              note="ผู้ตรวจต้องเลือกว่าจะจัดการสินค้าที่ไม่ผ่านอย่างไร"
+              action={
+                <label className="flex items-center gap-2 text-sm">
+                  <Switch
+                    checked={requireDisposition}
+                    disabled={dispositions.length === 0}
+                    onCheckedChange={setRequireDisposition}
+                  />
+                  บังคับเลือกเมื่อมีข้อไม่ผ่าน
+                </label>
+              }
+            >
+              <div className="flex flex-wrap gap-2">
+                {DISPOSITIONS.map((d) => (
+                  <CheckChip
+                    key={d.id}
+                    id={`d-disp-${d.id}`}
+                    label={d.label}
+                    checked={dispositions.includes(d.id)}
+                    onChange={(v) =>
+                      setDispositions((p) =>
+                        v ? [...p, d.id] : p.filter((x) => x !== d.id)
+                      )
+                    }
+                  />
+                ))}
+              </div>
+              {/* ERPNext ไม่มีช่องนี้เลย status มีแค่ Accepted/Rejected
+                  และ validate_qi_rejection อ่านแค่ status ถ้า Stock Settings
+                  ตั้ง Stop ไว้ มันจะบล็อกการรับของก่อนที่สคริปต์จะได้ทำงาน
+                  ฟอร์มที่ใช้ช่องนี้จึงต้องตั้งเป็น Warn */}
+              <FieldNote custom>
+                custom_disposition ที่ใบตรวจ · ต้องตั้ง Stock Settings เป็น Warn
+                ไม่งั้น Stop จะบล็อกการรับของก่อนที่จะได้เลือก
+              </FieldNote>
+            </Section>
+          )}
+
+          {/* ---------- 5 เปิดใบตามรอบเวลาทำงาน ---------- */}
+          <Section
+            index={subject === "item" ? 5 : 4}
+            title="เปิดใบตามรอบเวลาทำงาน"
+            note="ระบบจะขึ้นข้อมูลให้ทำเอกสารตามช่วงเวลาที่ตั้งไว้ ไม่รวมวันหยุดทำงานและวันหยุดนักขัตฤกษ์ วันไหนไม่มีข้อมูลแปลว่ายังไม่มีใครทำ"
+            action={
+              <label className="flex items-center gap-2 text-sm">
+                <Switch checked={recurring} onCheckedChange={setRecurring} />
+                ดูเป็นปฏิทินทั้งเดือนได้
+              </label>
+            }
+          >
+            {recurring ? (
+              <>
+                <div className="space-y-3">
+                  {slots.map((sl, i) => (
+                    <div
+                      key={sl.id}
+                      className="flex flex-wrap items-center gap-3 rounded-xl border border-border bg-card p-4"
+                    >
+                      <span className="w-16 shrink-0 font-medium">
+                        ช่วงที่ {i + 1}
+                      </span>
+                      <TimeField
+                        aria-label={`เวลาเริ่มช่วงที่ ${i + 1}`}
+                        className="w-36"
+                        value={sl.from}
+                        onValueChange={(v) =>
+                          setSlots((p) =>
+                            p.map((x) => (x.id === sl.id ? { ...x, from: v } : x))
+                          )
+                        }
+                      />
+                      <span className="text-muted-foreground">ถึง</span>
+                      <TimeField
+                        aria-label={`เวลาสิ้นสุดช่วงที่ ${i + 1}`}
+                        className="w-36"
+                        value={sl.to}
+                        onValueChange={(v) =>
+                          setSlots((p) =>
+                            p.map((x) => (x.id === sl.id ? { ...x, to: v } : x))
+                          )
+                        }
+                      />
+                      {/* ช่วงที่เวลาจบน้อยกว่าเวลาเริ่ม = ข้ามเที่ยงคืน อ่านจากเวลาเอง
+                          ไม่ให้ติ๊กบอก จะได้ไม่ขัดกับเวลาที่กรอกไว้จริง */}
+                      {sl.to <= sl.from && (
+                        <Badge appearance="soft" tone="neutral">
+                          ข้ามเที่ยงคืน
+                        </Badge>
+                      )}
+                      <div className="ml-auto">
+                        <Button
+                          variant="ghost"
+                          size="icon-sm"
+                          aria-label={`ลบช่วงที่ ${i + 1}`}
+                          onClick={() =>
+                            setSlots((p) => p.filter((x) => x.id !== sl.id))
+                          }
+                        >
+                          <Trash2Icon />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="mt-3 flex justify-center">
+                  <Button
+                    variant="outline-primary"
+                    onClick={() => setSlots((p) => [...p, newSlot()])}
+                  >
+                    <PlusIcon />
+                    เพิ่มช่วงเวลา
+                  </Button>
+                </div>
+
+                <div className="mt-5 rounded-xl border border-border bg-card p-4">
+                  <SchedulePreviewCalendar
+                    schedule={{ mode: "recurring", slots, skipDays: "weekend" }}
+                  />
+                </div>
+
+                {/* ERPNext ไม่มีอะไรที่เปิดใบตามเวลาเลย ทั้ง Quality Inspection
+                    และ QC Check ต้องเขียน scheduled job เพิ่มเองทั้งคู่ */}
+                <FieldNote custom>
+                  ไม่มีใน ERPNext — ต้องเขียน scheduled job เพิ่ม ·
+                  วันทำงานอ่านจาก Holiday List ของบริษัท ไม่ได้ตั้งซ้ำที่ฟอร์ม
+                </FieldNote>
+              </>
+            ) : (
+              <div className="rounded-xl border border-dashed border-border px-6 py-10 text-center">
+                <p className="font-medium">เปิดใบตามเหตุ ไม่ใช่ตามเวลา</p>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  มีของเข้า-ออก หรือมีใบสั่งผลิต ถึงจะมีใบให้ทำ
+                  จำนวนใบต่อวันไม่แน่นอน จึงไม่มีปฏิทินให้ดู
+                </p>
+              </div>
+            )}
+          </Section>
         </TabsContent>
 
         {/* ================= ตัวอย่างรายงาน ================= */}
         <TabsContent value="preview">
           <div className="mt-6 rounded-2xl border border-border bg-card p-5">
             <h2 className="text-xl font-semibold tracking-tight">
-              ใบสุ่มตรวจผลิตภัณฑ์สำเร็จรูป QC260115/01-01
+              ใบ{name || "ยังไม่ได้ตั้งชื่อรายงาน"} QC260115/01-01
             </h2>
 
             {header.length > 0 && (
@@ -465,6 +831,52 @@ export default function SetupErpDemoPage() {
               {checks.map((r, i) => (
                 <PreviewCheck key={r.id} index={i + 1} row={r} />
               ))}
+            </div>
+
+            {subject === "item" && dispositions.length > 0 && (
+              <div className="mt-6">
+                <p className="font-semibold">
+                  ของที่ไม่ผ่านจะจัดการยังไง{" "}
+                  {requireDisposition && (
+                    <span className="font-normal text-danger-strong">
+                      (บังคับเลือก)
+                    </span>
+                  )}
+                </p>
+                <RadioGroup className="mt-2 grid gap-2 @lg:grid-cols-3">
+                  {dispositions.map((id) => {
+                    const d = DISPOSITIONS.find((x) => x.id === id);
+                    return (
+                      <Label
+                        key={id}
+                        htmlFor={`pv-disp-${id}`}
+                        className="flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-2.5 font-normal"
+                      >
+                        <RadioGroupItem id={`pv-disp-${id}`} value={id} />
+                        {d?.label ?? id}
+                      </Label>
+                    );
+                  })}
+                </RadioGroup>
+                <FieldNote custom>custom_disposition ที่ใบตรวจ</FieldNote>
+              </div>
+            )}
+
+            {/* หมายเหตุท้ายใบเป็นของ ERPNext เอง ไม่ต้องสร้างเพิ่ม —
+                คนละช่องกับหมายเหตุรายข้อที่ต้องทำเป็น custom field */}
+            <div className="mt-6 space-y-1.5">
+              <Label htmlFor="pv-remarks">
+                หมายเหตุ{" "}
+                <span className="font-normal text-muted-foreground">
+                  (ไม่บังคับ)
+                </span>
+              </Label>
+              <Input
+                id="pv-remarks"
+                className="bg-card"
+                placeholder="ระบุหมายเหตุ"
+              />
+              <FieldNote>remarks</FieldNote>
             </div>
           </div>
         </TabsContent>
@@ -532,36 +944,34 @@ function CheckTable({
                   {/* ดรอปดาวน์เสมอ ไม่ใช่ช่องพิมพ์ — ของ ERPNext specification
                       เป็น Link ไปทะเบียน พิมพ์อิสระไม่ได้อยู่แล้ว
                       เลือกดึงจากระบบแล้วรายการเหลือสามอย่างที่ "ตรวจ" ได้จริง */}
-                  <Select
-                    value={r.kind === "system" ? r.source : r.name}
-                    onValueChange={(v) =>
-                      onPatch(
-                        r.id,
-                        r.kind === "system"
-                          ? { source: v as SourceId }
-                          : { name: v }
-                      )
-                    }
-                  >
-                    <SelectTrigger aria-label="หัวข้อตรวจ" className="w-full bg-card">
-                      <SelectValue placeholder="เลือกหัวข้อ" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {r.kind === "system"
-                        ? CHECK_SOURCES.map((s) => (
-                            <SelectItem key={s} value={s}>
-                              {SOURCE[s].label}
-                              {SOURCE[s].custom && " — ไม่มีใน ERPNext"}
-                            </SelectItem>
-                          ))
-                        : QI_PARAMETERS.map((p) => (
-                            <SelectItem key={p.id} value={p.name}>
-                              {p.name}
-                              {p.unit && ` (${p.unit})`}
-                            </SelectItem>
-                          ))}
-                    </SelectContent>
-                  </Select>
+                  {r.kind === "system" ? (
+                    <Select
+                      value={r.source}
+                      onValueChange={(v) => onPatch(r.id, { source: v as SourceId })}
+                    >
+                      <SelectTrigger aria-label="หัวข้อตรวจ" className="w-full bg-card">
+                        <SelectValue placeholder="เลือกหัวข้อ" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {CHECK_SOURCES.map((s) => (
+                          <SelectItem key={s} value={s}>
+                            {SOURCE[s].label}
+                            {SOURCE[s].custom && " — ไม่มีใน ERPNext"}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  ) : (
+                    /* ไม่ใช่ดรอปดาวน์ธรรมดา — ค้นได้ และพิมพ์ชื่อที่ยังไม่มีแล้วกด
+                       สร้างใหม่ลงทะเบียนได้ในช่องเดียวกัน เพราะถ้าสร้างหัวข้อใหม่
+                       ต้องออกไปหน้าทะเบียนก่อน คนจะเลือกหัวข้อที่ใกล้เคียงไปก่อน
+                       แล้วทะเบียนก็จะไม่ตรงกับฟอร์มตลอดไป */
+                    <ParamCombobox
+                      id={`${r.id}-param`}
+                      value={r.paramId}
+                      onChange={(v) => onPatch(r.id, { paramId: v })}
+                    />
+                  )}
                   <FieldNote
                     custom={
                       r.kind === "system" &&
@@ -573,7 +983,7 @@ function CheckTable({
                       ? r.source === ""
                         ? "ยังไม่ได้เลือกแหล่งข้อมูล"
                         : SOURCE[r.source].store
-                      : "Quality Inspection Parameter · ทะเบียนหัวข้อตรวจ"}
+                      : "specification → Quality Inspection Parameter · พิมพ์ชื่อใหม่แล้วกดสร้างลงทะเบียนได้"}
                   </FieldNote>
                 </td>
 
@@ -583,7 +993,7 @@ function CheckTable({
                     onValueChange={(v) =>
                       // สลับประเภทแล้วชื่อหัวข้อใช้ร่วมกันไม่ได้ ล้างทั้งคู่
                       // ไม่งั้นจะเหลือชื่อจากทะเบียนค้างอยู่ในข้อที่ดึงจากระบบ
-                      onPatch(r.id, { kind: v as Kind, name: "", source: "" })
+                      onPatch(r.id, { kind: v as Kind, paramId: "", source: "" })
                     }
                   >
                     <SelectTrigger aria-label="ประเภทข้อมูล" className="w-full bg-card">
@@ -726,6 +1136,26 @@ function EditDialog({
         </DialogHeader>
 
         <div className="max-h-[60vh] space-y-5 overflow-y-auto px-1">
+          {/* อยู่ทั้งในตารางและในกล่อง — ในตารางไว้กวาดตาเทียบว่าข้อไหนระบบตัดสิน
+              ข้อไหนคนตัดสิน ในกล่องไว้ตั้งตอนกำลังตั้งเกณฑ์อยู่ จะได้ไม่ต้อง
+              ปิดกล่องออกไปติ๊กข้างนอกแล้วเปิดกลับเข้ามาใหม่ */}
+          <label className="flex items-start gap-3 rounded-lg border border-border bg-muted px-3 py-2.5">
+            <Checkbox
+              className="mt-0.5"
+              checked={row.manual}
+              onCheckedChange={(v) => onChange({ manual: v === true })}
+            />
+            <span className="text-sm">
+              <span className="font-medium">ผู้ตรวจตัดสินเอง</span>
+              <span className="block text-muted-foreground">
+                ระบบเก็บค่าที่วัดไว้เหมือนเดิม แต่ไม่ชี้ขาดให้ — ติ๊กคู่กับเกณฑ์ข้างล่างได้
+              </span>
+              <FieldNote custom>
+                custom_manual_inspection → manual_inspection ของแถวในใบตรวจ
+              </FieldNote>
+            </span>
+          </label>
+
           <div className="space-y-2">
             <Label>วิธีตัดสิน</Label>
             {/* สองใบนี้ติ๊กพร้อมกันได้จริง ไม่ใช่ตัวเลือกที่แข่งกัน */}
@@ -1172,23 +1602,30 @@ function Section({
   index,
   title,
   note,
+  action,
   children,
 }: {
   index?: number;
   title: string;
   note?: string;
+  action?: React.ReactNode;
   children: React.ReactNode;
 }) {
   return (
     <section className="mt-6">
-      <div className="min-w-0">
-        <h2 className="font-semibold">
-          {index !== undefined && (
-            <span className="text-muted-foreground">{index}. </span>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h2 className="font-semibold">
+            {index !== undefined && (
+              <span className="text-muted-foreground">{index}. </span>
+            )}
+            {title}
+          </h2>
+          {note && (
+            <p className="mt-0.5 text-sm text-muted-foreground">{note}</p>
           )}
-          {title}
-        </h2>
-        {note && <p className="mt-0.5 text-sm text-muted-foreground">{note}</p>}
+        </div>
+        {action}
       </div>
       <div className="mt-3">{children}</div>
     </section>
