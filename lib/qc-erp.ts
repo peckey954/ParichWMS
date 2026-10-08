@@ -1285,32 +1285,45 @@ export function removeParameter(id: string): boolean {
   return i >= 0;
 }
 
-export function addTemplate(input: {
-  name: string;
-  code: string;
-  inspectionType: InspectionType;
-}): QiTemplate {
-  const t: QiTemplate = {
-    id: uid("t"),
-    name: input.name,
-    code: input.code,
-    active: false,
-    owner: "อลิสา พรสุขสิริ",
-    updatedAt: "24/09/2026",
-    inspectionType: input.inspectionType,
-    schedule: { ...DEFAULT_SCHEDULE },
-    // เอกสารอ้างอิงตั้งตัวแรกของประเภทนั้นไว้ให้ ไม่ปล่อยว่าง — ฟอร์มที่ไม่มี
-    // เอกสารอ้างอิงเรียกใช้ไม่ได้เลย ให้เริ่มจากค่าที่ใช้ได้แล้วค่อยแก้ ดีกว่า
-    // เริ่มจากค่าที่ยังใช้ไม่ได้แล้วต้องจำว่าต้องกลับมาตั้ง
-    refDocs: [REF_DOCS_OF[input.inspectionType][0]],
-    rows: [],
-    subject: "item",
-    targets: [],
-    requireBefore: true,
-    dispositions: [],
-    requireDisposition: false,
-  };
-  QI_TEMPLATES.push(t);
+/**
+ * id ปลอมของรายงานที่ยังไม่ได้สร้าง — /qc/setup-erp/new
+ *
+ * กด "เพิ่มรายงาน" แล้วเข้าหน้าตั้งค่าเลย ไม่ผ่านกล่องถามชื่อก่อน หน้าที่เปิด
+ * ขึ้นมาจึงต้องมีร่างให้แก้ทั้งที่ยังไม่มีอะไรในรายการ ใช้ id นี้เป็นตัวบอก
+ */
+export const NEW_TEMPLATE_ID = "new";
+
+/**
+ * ร่างรายงานเปล่า — ยังไม่ได้ลงรายการ
+ *
+ * ตั้งใจไม่ push เข้า QI_TEMPLATES ตรงนี้ เพราะคนที่กดเพิ่มแล้วเปลี่ยนใจกดย้อนกลับ
+ * ต้องไม่ทิ้งรายงานไร้ชื่อค้างไว้ในรายการให้คนอื่นมาเจอ เข้ารายการตอนกดบันทึก
+ */
+export const blankTemplate = (): QiTemplate => ({
+  id: uid("t"),
+  name: "",
+  code: "",
+  active: false,
+  owner: "อลิสา พรสุขสิริ",
+  updatedAt: "24/09/2026",
+  // ตั้งรับเข้าไว้ก่อนเพราะเป็นประเภทที่ใช้บ่อยสุด และช่องเอกสารอ้างอิงต้องรู้
+  // ประเภทก่อนถึงจะรู้ว่ามีเอกสารอะไรให้เลือก — ปล่อยว่างแล้วช่องนั้นจะว่างตาม
+  inspectionType: "incoming",
+  schedule: { ...DEFAULT_SCHEDULE },
+  // เอกสารอ้างอิงปล่อยว่าง ให้คนตั้งค่าเลือกเอง — เดาให้แล้วเขาไม่ได้ดู
+  // จะได้ฟอร์มที่ผูกกับเอกสารผิดใบโดยไม่มีใครรู้
+  refDocs: [],
+  rows: [],
+  subject: "item",
+  targets: [],
+  requireBefore: true,
+  dispositions: [],
+  requireDisposition: false,
+});
+
+/** เอาร่างเข้ารายการจริง — เรียกตอนกดบันทึกครั้งแรกเท่านั้น */
+export function commitTemplate(t: QiTemplate): QiTemplate {
+  if (!QI_TEMPLATES.some((x) => x.id === t.id)) QI_TEMPLATES.push(t);
   return t;
 }
 

@@ -97,6 +97,9 @@ import {
   paramOf,
   readingLabels,
   templateOf,
+  blankTemplate,
+  commitTemplate,
+  NEW_TEMPLATE_ID,
   type FlagKey,
   type InspectionType,
   type QiRow,
@@ -129,7 +132,12 @@ import {
 
 export default function SetupQcTemplatePage() {
   const params = useParams<{ id: string }>();
-  const seed = React.useMemo(() => templateOf(params.id), [params.id]);
+  // /qc/setup-erp/new = กดเพิ่มรายงานมา ยังไม่มีอะไรในรายการ สร้างร่างให้แก้เลย
+  const seed = React.useMemo(
+    () =>
+      params.id === NEW_TEMPLATE_ID ? blankTemplate() : templateOf(params.id),
+    [params.id]
+  );
 
   if (!seed) {
     return (
@@ -144,10 +152,12 @@ export default function SetupQcTemplatePage() {
     );
   }
 
-  return <Editor key={seed.id} seed={seed} />;
+  return (
+    <Editor key={seed.id} seed={seed} isNew={params.id === NEW_TEMPLATE_ID} />
+  );
 }
 
-function Editor({ seed }: { seed: QiTemplate }) {
+function Editor({ seed, isNew }: { seed: QiTemplate; isNew: boolean }) {
   const router = useRouter();
   const [tpl, setTpl] = React.useState<QiTemplate>(seed);
   // ดูใบแบบที่ยังไม่ได้สร้าง custom field อะไรเลย — ของแท็บตัวอย่างอย่างเดียว
@@ -226,7 +236,25 @@ function Editor({ seed }: { seed: QiTemplate }) {
     patch({ inspectionType: t, refDocs: [] });
 
   const save = () => {
-    toast.success("บันทึกเทมเพลตแล้ว", {
+    /* ชื่อรายงานคือ ID ของเอกสารใน ERPNext (autoname: field:quality_inspection_
+       template_name) ไม่มีชื่อก็ไม่มีเอกสาร จึงเป็นช่องเดียวที่กันไว้ตรงนี้
+       ที่เหลือปล่อยให้บันทึกร่างไว้ก่อนได้ ฟอร์มกระดาษกว่าจะตั้งครบใช้หลายรอบ */
+    if (tpl.name.trim() === "") {
+      toast.error("กรุณาตั้งชื่อรายงาน");
+      return;
+    }
+
+    if (isNew) {
+      commitTemplate({ ...tpl, name: tpl.name.trim() });
+      toast.success("เพิ่มรายงานแล้ว", {
+        description: `${tpl.name.trim()} · ${tpl.rows.length} หัวข้อ — ตัวอย่างหน้าตั้งค่า ยังไม่ได้ต่อหลังบ้าน`,
+      });
+      // เปลี่ยน URL จาก /new เป็น id จริง กดรีเฟรชแล้วจะได้ไม่กลายเป็นร่างเปล่าอีกใบ
+      router.replace(`/qc/setup-erp/${tpl.id}`);
+      return;
+    }
+
+    toast.success("บันทึกรายงานแล้ว", {
       description: `${tpl.name} · ${tpl.rows.length} หัวข้อ — ตัวอย่างหน้าตั้งค่า ยังไม่ได้ต่อหลังบ้าน`,
     });
   };

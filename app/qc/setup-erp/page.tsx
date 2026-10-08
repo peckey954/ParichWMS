@@ -66,7 +66,6 @@ import {
   GUARD_LABEL,
   INSPECTION_TYPE_LABEL,
   INSPECTION_TYPE_VALUE,
-  INSPECTION_TYPE_LABEL as TYPE_LABEL,
   QI_PARAMETERS,
   QI_TEMPLATES,
   DISPOSITIONS,
@@ -74,7 +73,7 @@ import {
   REF_DOC_LABEL,
   addGroup,
   addDisposition,
-  addTemplate,
+  NEW_TEMPLATE_ID,
   dispositionUsedBy,
   groupUsedBy,
   removeDisposition,
@@ -85,7 +84,6 @@ import {
   updateDisposition,
   type Disposition,
   type GuardAction,
-  type InspectionType,
   type StockGuard,
 } from "@/lib/qc-erp";
 
@@ -112,10 +110,10 @@ import {
 type TabId = "templates" | "system";
 
 export default function SetupQcPage() {
+  const router = useRouter();
   const [tab, setTab] = React.useState<TabId>("templates");
   const [query, setQuery] = React.useState("");
   const [guard, setGuard] = React.useState<StockGuard>(DEFAULT_GUARD);
-  const [newTemplate, setNewTemplate] = React.useState(false);
   // ของที่สร้างใหม่ต่อท้ายอาเรย์ในโมดูล ไม่ได้อยู่ใน state — ต้องสั่งวาดใหม่เอง
   const [, bump] = React.useReducer((n: number) => n + 1, 0);
 
@@ -177,9 +175,15 @@ export default function SetupQcPage() {
               onChange={(e) => setQuery(e.target.value)}
             />
           </InputGroup>
-          <Button variant="outline-primary" onClick={() => setNewTemplate(true)}>
+          {/* ไปหน้าตั้งค่าเลย ไม่ถามชื่อในกล่องก่อน — กล่องที่ถามสามช่องแล้วค่อย
+              เปิดหน้าที่มีอีกยี่สิบช่อง คือด่านที่ไม่ได้กันอะไร ได้แค่ให้กรอก
+              สองรอบ และสามช่องนั้นก็เป็นช่องเดียวกับที่อยู่ในหัวข้อ 1 อยู่แล้ว */}
+          <Button
+            variant="outline-primary"
+            onClick={() => router.push(`/qc/setup-erp/${NEW_TEMPLATE_ID}`)}
+          >
             <PlusIcon />
-            สร้างเทมเพลต
+            เพิ่มรายงาน
           </Button>
         </div>
       )}
@@ -190,113 +194,7 @@ export default function SetupQcPage() {
       {tab === "system" && (
         <SystemSettings guard={guard} onChange={setGuard} onParamsChanged={bump} />
       )}
-
-      {/* เมานต์เฉพาะตอนเปิด ช่องที่กรอกค้างไว้รอบก่อนจึงไม่ตามมาหลอกรอบถัดไป */}
-      {newTemplate && (
-        <NewTemplateDialog onClose={() => setNewTemplate(false)} />
-      )}
     </main>
-  );
-}
-
-/* ---------- สร้างเทมเพลตใหม่ ----------
-     ถามแค่สามอย่างที่ตั้งทีหลังไม่ได้/ตั้งทีหลังแล้วเสียเวลา — ชื่อ รหัส
-     และประเภทการตรวจ ที่เหลือไปตั้งในหน้าของมันซึ่งเห็นผลทันทีทุกช่อง
-     ถามครบทุกช่องตั้งแต่กล่องนี้ = ฟอร์มยาวที่ยังไม่เห็นว่ากำลังตั้งอะไรอยู่ */
-function NewTemplateDialog({ onClose }: { onClose: () => void }) {
-  const router = useRouter();
-  const [name, setName] = React.useState("");
-  const [code, setCode] = React.useState("");
-  const [type, setType] = React.useState<InspectionType>("incoming");
-
-  const create = () => {
-    if (name.trim() === "") {
-      toast.error("กรุณาตั้งชื่อฟอร์ม");
-      return;
-    }
-    const t = addTemplate({
-      name: name.trim(),
-      code: code.trim() || "ยังไม่มีรหัส",
-      inspectionType: type,
-    });
-    onClose();
-    // พาไปตั้งค่าต่อเลย สร้างเสร็จแล้วเด้งกลับมาหน้ารายการคือให้หาเองอีกรอบ
-    router.push(`/qc/setup-erp/${t.id}`);
-  };
-
-  return (
-    <Dialog open onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className="sm:max-w-lg">
-        <DialogHeader>
-          <DialogTitle>สร้างเทมเพลต</DialogTitle>
-          <DialogDescription>
-            ตั้งสามอย่างนี้ก่อน แล้วไปใส่หัวข้อตรวจกับเกณฑ์ในหน้าถัดไป
-          </DialogDescription>
-        </DialogHeader>
-
-        <div className="space-y-4">
-          <div className="space-y-1.5">
-            <Label htmlFor="tpl-name">ชื่อฟอร์ม</Label>
-            <Input
-              id="tpl-name"
-              autoFocus
-              className="bg-card"
-              placeholder="เช่น ตรวจรับวัตถุดิบ"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-            />
-            <p className="font-mono text-xs text-muted-foreground">
-              quality_inspection_template_name · ชื่อนี้คือ ID ของเอกสาร
-            </p>
-          </div>
-
-          <div className="space-y-1.5">
-            <Label htmlFor="tpl-code">
-              รหัสฟอร์ม{" "}
-              <span className="font-normal text-muted-foreground">(ไม่บังคับ)</span>
-            </Label>
-            <Input
-              id="tpl-code"
-              className="bg-card"
-              placeholder="เช่น FM-QC-01-02"
-              value={code}
-              onChange={(e) => setCode(e.target.value)}
-            />
-          </div>
-
-          <div className="space-y-1.5">
-            <Label htmlFor="tpl-type">ประเภทการตรวจ</Label>
-            <Select
-              value={type}
-              onValueChange={(v) => setType(v as InspectionType)}
-            >
-              <SelectTrigger id="tpl-type" className="w-full bg-card">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {/* โชว์ค่าจริงของ ERPNext คู่ชื่อไทยเหมือนหน้าตั้งค่าเทมเพลต
-                    สามค่านี้ ERPNext กำหนดมาตายตัว เพิ่มเองไม่ได้ */}
-                {(Object.keys(TYPE_LABEL) as InspectionType[]).map((t) => (
-                  <SelectItem key={t} value={t}>
-                    {TYPE_LABEL[t]} — {INSPECTION_TYPE_VALUE[t]}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <p className="font-mono text-xs text-muted-foreground">
-              inspection_type · เป็นตัวกำหนดว่าเลือกเอกสารอ้างอิงอะไรได้บ้าง
-            </p>
-          </div>
-        </div>
-
-        <DialogFooter className="grid grid-cols-2 gap-3">
-          <Button variant="outline-primary" onClick={onClose}>
-            ยกเลิก
-          </Button>
-          <Button onClick={create}>สร้างแล้วไปตั้งค่า</Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
   );
 }
 
