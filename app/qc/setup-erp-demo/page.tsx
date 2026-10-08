@@ -248,40 +248,130 @@ const SEED_SAMPLE: DocField[] = [
   },
 ];
 
-const SEED_ROWS = [
+// ---------------------------------------------------------------
+// หนึ่งหัวข้อตรวจ — Item Quality Inspection Parameter
+//
+// ชื่อหัวข้อคือ Link ไปทะเบียน Quality Inspection Parameter ไม่ใช่ข้อความอิสระ
+// ส่วนวิธีตัดสินมีสามทางที่ ERPNext รองรับตรงตัว และติ๊ก "ตรวจสอบเอง" ซ้อนทับได้
+// ---------------------------------------------------------------
+
+type CheckKind = "number" | "formula" | "text" | "tick";
+
+const CHECK_KIND: Record<CheckKind, { label: string; store: string }> = {
+  number: {
+    label: "ตัวเลข",
+    store: "numeric = 1 · min_value / max_value",
+  },
+  formula: {
+    label: "สูตร",
+    store: "formula_based_criteria = 1 · acceptance_formula",
+  },
+  text: {
+    label: "ข้อความ",
+    store: "numeric = 0 · value = ค่าที่ถือว่าผ่าน",
+  },
+  tick: {
+    label: "ติ๊กอย่างเดียว",
+    store: "numeric = 0 · ไม่มีเกณฑ์ในระบบ ผู้ตรวจชี้ขาด",
+  },
+};
+
+const CHECK_KINDS = Object.keys(CHECK_KIND) as CheckKind[];
+
+type CheckRow = {
+  id: string;
+  name: string;
+  kind: CheckKind;
+  min: string;
+  max: string;
+  formula: string;
+  value: string;
+  /** manual_inspection — ซ้อนทับวิธีตัดสินข้างบนได้ ระบบจะไม่ตัดสินให้ */
+  manual: boolean;
+  /** เกณฑ์ที่เขียนให้คนยืนตรวจอ่าน — ไม่มีใน ERPNext */
+  criteria: string;
+};
+
+const blankCheck = (): CheckRow => ({
+  id: nid(),
+  name: "",
+  kind: "tick",
+  min: "",
+  max: "",
+  formula: "",
+  value: "",
+  manual: true,
+  criteria: "",
+});
+
+const SEED_ROWS: CheckRow[] = [
   {
+    ...blankCheck(),
     name: "การเย็บกระสอบ",
     criteria: "ด้ายต้องติดตลอดแนว ฝีเข็มสม่ำเสมอ ไม่หลุดไม่ขาด",
   },
   {
+    ...blankCheck(),
     name: "ความคมชัดของสูตรปุ๋ย",
     criteria: "ตัวเลขสูตรปุ๋ยบนกระสอบต้องอ่านออกชัดเจน",
+  },
+  {
+    ...blankCheck(),
+    name: "น้ำหนักบรรจุ",
+    kind: "number",
+    min: "50.2",
+    max: "50.8",
+    manual: false,
+    criteria: "ชั่งทุกกระสอบที่สุ่ม",
+  },
+  {
+    ...blankCheck(),
+    name: "น้ำหนักรวมของที่สุ่ม",
+    kind: "formula",
+    formula: "mean > 50.2",
+    manual: false,
+    criteria: "เฉลี่ยทั้งชุดต้องไม่ต่ำกว่าเกณฑ์",
   },
 ];
 
 /**
  * ช่องนี้ ERPNext มีที่เก็บให้ไหม
  *
- * ช่องข้อความช่องแรกลง description ของ Quality Inspection ได้จริง แต่มีช่องเดียว
- * ช่องที่สองขึ้นไปจึงต้องเป็น custom — ไม่ใช่เพราะเป็นข้อความ แต่เพราะที่เก็บเต็ม
+ * ช่องที่ผู้ตรวจกรอกเองไม่ต้อง custom เลยสักช่อง — ตั้งชื่อหัวข้อแล้วลงทะเบียน
+ * Quality Inspection Parameter ช่องนั้นก็กลายเป็นแถวในตาราง readings ทันที
+ * ตาราง readings เพิ่มแถวได้ไม่จำกัด จึงเป็นที่เก็บช่องกรอกอิสระของ ERPNext อยู่แล้ว
+ *
+ * เคยแมปช่องข้อความไปที่ description ซึ่งผิด — description เป็นคำอธิบายของใบ
+ * ไม่ใช่ช่องเก็บค่าที่ผู้ตรวจกรอก และมีช่องเดียวต่อใบ
+ *
+ * ที่เป็น custom จริงเหลือทางเดียวคือดึงจากระบบจากของที่ Quality Inspection
+ * ไม่มีช่อง Link ไปหา — คลังสินค้ากับเครื่องจักร
  */
-function fieldStore(f: DocField, all: DocField[]) {
+function fieldStore(f: DocField) {
   if (f.kind === "system") {
     if (f.source === "") return { custom: false, text: "ยังไม่ได้เลือกแหล่งข้อมูล" };
     return { custom: SOURCE[f.source].custom, text: SOURCE[f.source].store };
   }
-  if (f.kind === "text") {
-    const firstText = all.find((x) => x.kind === "text");
-    if (firstText?.id === f.id)
-      return { custom: false, text: "Quality Inspection · description" };
-    return { custom: true, text: "custom_* — description มีช่องเดียว ถูกใช้ไปแล้ว" };
-  }
-  return { custom: true, text: `custom_* — Quality Inspection ไม่มีช่อง${KIND_LABEL[f.kind]}ที่หัวใบ` };
+  if (f.kind === "number")
+    return {
+      custom: false,
+      text: "ทะเบียนหัวข้อตรวจ → readings · numeric = 1 · reading_1",
+    };
+  if (f.kind === "choice")
+    return {
+      custom: false,
+      text: "ทะเบียนหัวข้อตรวจ → readings · numeric = 0 · value = คำที่ให้เลือก",
+    };
+  return {
+    custom: false,
+    text: "ทะเบียนหัวข้อตรวจ → readings · numeric = 0 · reading_value",
+  };
 }
 
 export default function SetupErpDemoPage() {
   const [header, setHeader] = React.useState<DocField[]>(SEED_HEADER);
   const [sample, setSample] = React.useState<DocField[]>(SEED_SAMPLE);
+  const [checks, setChecks] = React.useState<CheckRow[]>(SEED_ROWS);
   const [samples, setSamples] = React.useState<{ id: string }[]>([
     { id: nid() },
     { id: nid() },
@@ -292,7 +382,7 @@ export default function SetupErpDemoPage() {
      ใบหนึ่งใบเก็บสินค้าได้ตัวเดียว สุ่มคนละสูตรมาแผ่นเดียวจึงลงไม่ได้ */
   const blockers = [
     ...header
-      .filter((f) => fieldStore(f, header).custom)
+      .filter((f) => fieldStore(f).custom)
       .map((f) => `ส่วนหัวเอกสาร “${f.label || "ช่องที่ยังไม่ได้ตั้งชื่อ"}”`),
     ...(sample.length > 0 ? [`ตารางข้อมูลตัวอย่าง (${sample.length} คอลัมน์)`] : []),
   ];
@@ -413,27 +503,10 @@ export default function SetupErpDemoPage() {
 
           <Section
             index={3}
-            title="หัวข้อตรวจ"
-            note="ส่วนนี้ไม่เปลี่ยน ใส่ไว้ให้เห็นว่าทุกก้อนอยู่ด้วยกันแล้วหน้าตาเป็นยังไง"
+            title={`หัวข้อตรวจ (${checks.length})`}
+            note="สิ่งที่ตัดสินว่าผ่านหรือไม่ผ่าน · หนึ่งหัวข้อ = หนึ่งแถวใน readings = หนึ่งเกณฑ์"
           >
-            <div className="space-y-3">
-              {SEED_ROWS.map((r, i) => (
-                <div
-                  key={r.name}
-                  className="rounded-xl border border-border bg-card p-4"
-                >
-                  <p className="font-medium">
-                    {i + 1}. {r.name}
-                  </p>
-                  <p className="mt-0.5 text-sm text-muted-foreground">
-                    เกณฑ์: {r.criteria}
-                  </p>
-                  <FieldNote>
-                    Item Quality Inspection Parameter · specification
-                  </FieldNote>
-                </div>
-              ))}
-            </div>
+            <CheckTable rows={checks} onChange={setChecks} />
           </Section>
         </TabsContent>
 
@@ -529,14 +602,43 @@ export default function SetupErpDemoPage() {
 
             <h3 className="mt-6 mb-2 font-semibold">การตรวจสอบ</h3>
             <div className="space-y-3">
-              {SEED_ROWS.map((r, i) => (
-                <div key={r.name} className="rounded-xl border border-border p-4">
+              {checks.map((r, i) => (
+                <div key={r.id} className="rounded-xl border border-border p-4">
                   <p className="font-medium">
-                    {i + 1}. {r.name}
+                    {i + 1}. {r.name || "ยังไม่ได้ตั้งชื่อหัวข้อ"}
                   </p>
-                  <p className="mt-0.5 text-sm text-muted-foreground">
-                    เกณฑ์: {r.criteria}
-                  </p>
+                  {r.criteria && (
+                    <p className="mt-0.5 text-sm text-muted-foreground">
+                      เกณฑ์: {r.criteria}
+                    </p>
+                  )}
+                  <div className="mt-3 flex flex-wrap items-end gap-4">
+                    {/* ช่องคีย์โผล่เฉพาะหัวข้อที่มีอะไรให้คีย์ ข้อที่ติ๊กอย่างเดียว
+                        มีแต่ปุ่มผ่าน/ไม่ผ่าน ไม่มีช่องว่างเปล่าให้งงว่าต้องกรอกอะไร */}
+                    {r.kind !== "tick" && (
+                      <div className="space-y-1.5">
+                        <Label htmlFor={`pvc-${r.id}`} className="text-sm">
+                          {r.kind === "number" || r.kind === "formula"
+                            ? `ค่าที่วัดได้${r.kind === "number" && r.min && r.max ? ` (${r.min}–${r.max})` : ""}`
+                            : "ค่าที่ตรวจพบ"}
+                        </Label>
+                        <Input
+                          id={`pvc-${r.id}`}
+                          className="w-48 bg-card"
+                          inputMode={r.kind === "text" ? "text" : "decimal"}
+                          placeholder={r.kind === "text" ? r.value || "ระบุ" : "0"}
+                        />
+                      </div>
+                    )}
+                    <VerdictPick id={r.id} />
+                  </div>
+                  {/* ข้อที่ติ๊กตรวจสอบเองระบบไม่ตัดสินให้ ต้องบอกไว้ ไม่งั้นคนคีย์
+                      จะรอให้มันเปลี่ยนสีเองแล้วไม่เปลี่ยน */}
+                  {r.manual && r.kind !== "tick" && (
+                    <FieldNote custom>
+                      ติ๊กตรวจสอบเอง — เก็บค่าที่วัดไว้ แต่ระบบไม่ตัดสินให้
+                    </FieldNote>
+                  )}
                 </div>
               ))}
             </div>
@@ -603,7 +705,7 @@ function FieldTable({
             {fields.map((f, i) => {
               const store = alwaysCustom
                 ? { custom: true, text: `${alwaysCustom} · ${KIND_LABEL[f.kind]}` }
-                : fieldStore(f, fields);
+                : fieldStore(f);
 
               return (
                 <tr key={f.id} className="border-b border-border last:border-0">
@@ -757,6 +859,210 @@ function FieldTable({
         >
           <PlusIcon />
           {addLabel}
+        </Button>
+      </div>
+    </>
+  );
+}
+
+/* ------------------------------------------------------------------
+   ตารางหัวข้อตรวจ — ของที่หายไปรอบก่อน เอากลับมาครบ
+
+   สามคอลัมน์ขวาคือสิ่งที่ ERPNext ใช้ตัดสินจริง
+     ประเภทข้อมูล   numeric / formula_based_criteria
+     เกณฑ์ตัดสิน     min_value-max_value / acceptance_formula / value
+     ตรวจสอบเอง     manual_inspection ซ้อนทับสองอันบนได้ ติ๊กแล้วระบบไม่ตัดสินให้
+------------------------------------------------------------------ */
+
+function CheckTable({
+  rows,
+  onChange,
+}: {
+  rows: CheckRow[];
+  onChange: (next: CheckRow[]) => void;
+}) {
+  const patch = (id: string, next: Partial<CheckRow>) =>
+    onChange(rows.map((r) => (r.id === id ? { ...r, ...next } : r)));
+
+  return (
+    <>
+      <div className="overflow-x-auto rounded-xl border border-border bg-card">
+        <table className="w-full min-w-[1020px]">
+          <thead>
+            <tr className="border-b border-border text-sm text-muted-foreground">
+              <th className="px-4 py-3 text-left font-normal">หัวข้อตรวจ</th>
+              <th className="w-40 px-4 py-3 text-left font-normal">
+                ประเภทข้อมูล
+              </th>
+              <th className="w-64 px-4 py-3 text-left font-normal">เกณฑ์ตัดสิน</th>
+              <th className="px-4 py-3 text-left font-normal">
+                เกณฑ์ที่ผู้ตรวจอ่าน
+              </th>
+              <th className="w-28 px-4 py-3 text-center font-normal">
+                ตรวจสอบเอง
+              </th>
+              <th className="w-16 px-4 py-3" />
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((r) => (
+              <tr key={r.id} className="border-b border-border last:border-0">
+                <td className="px-4 py-3 align-top">
+                  <Input
+                    aria-label="หัวข้อตรวจ"
+                    className="bg-card"
+                    value={r.name}
+                    placeholder="พิมพ์ชื่อหัวข้อ"
+                    onChange={(e) => patch(r.id, { name: e.target.value })}
+                  />
+                  {/* ชื่อหัวข้อไม่ใช่ข้อความอิสระ — เป็น Link ไปทะเบียนกลาง
+                      พิมพ์ชื่อที่ยังไม่มีคือสร้างหัวข้อใหม่ลงทะเบียนไปด้วย
+                      ซึ่งเป็นเหตุผลว่าทำไมช่องกรอกอิสระไม่ต้อง custom สักช่อง */}
+                  <FieldNote>
+                    Quality Inspection Parameter · ลงทะเบียนหัวข้อตรวจกลาง
+                  </FieldNote>
+                </td>
+
+                <td className="px-4 py-3 align-top">
+                  <Select
+                    value={r.kind}
+                    onValueChange={(v) =>
+                      // ล้างเกณฑ์ของประเภทเดิม ไม่งั้นจะเหลือสูตรค้างอยู่ในข้อ
+                      // ที่เปลี่ยนไปเป็นช่วงตัวเลขแล้ว ซึ่งมองไม่เห็นจากหน้าจอ
+                      patch(r.id, {
+                        kind: v as CheckKind,
+                        min: "",
+                        max: "",
+                        formula: "",
+                        value: "",
+                      })
+                    }
+                  >
+                    <SelectTrigger aria-label="ประเภทข้อมูล" className="w-full bg-card">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {CHECK_KINDS.map((k) => (
+                        <SelectItem key={k} value={k}>
+                          {CHECK_KIND[k].label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </td>
+
+                <td className="px-4 py-3 align-top">
+                  {r.kind === "number" ? (
+                    <div className="flex items-center gap-2">
+                      <Input
+                        aria-label="ค่าต่ำสุด"
+                        className="bg-card"
+                        inputMode="decimal"
+                        value={r.min}
+                        placeholder="ต่ำสุด"
+                        onChange={(e) => patch(r.id, { min: e.target.value })}
+                      />
+                      <span className="text-muted-foreground">–</span>
+                      <Input
+                        aria-label="ค่าสูงสุด"
+                        className="bg-card"
+                        inputMode="decimal"
+                        value={r.max}
+                        placeholder="สูงสุด"
+                        onChange={(e) => patch(r.id, { max: e.target.value })}
+                      />
+                    </div>
+                  ) : r.kind === "formula" ? (
+                    <Input
+                      aria-label="สูตร"
+                      className="bg-card font-mono text-sm"
+                      value={r.formula}
+                      placeholder="เช่น mean > 50.2"
+                      onChange={(e) => patch(r.id, { formula: e.target.value })}
+                    />
+                  ) : r.kind === "text" ? (
+                    <Input
+                      aria-label="ค่าที่ถือว่าผ่าน"
+                      className="bg-card"
+                      value={r.value}
+                      placeholder="ค่าที่ถือว่าผ่าน"
+                      onChange={(e) => patch(r.id, { value: e.target.value })}
+                    />
+                  ) : (
+                    <p className="py-2 text-sm text-muted-foreground">
+                      ไม่มีเกณฑ์ในระบบ ผู้ตรวจติ๊กเอง
+                    </p>
+                  )}
+                  <FieldNote>{CHECK_KIND[r.kind].store}</FieldNote>
+                  {/* ค่าสูงสุดว่าง = ศูนย์ ไม่ใช่ไม่จำกัด เพราะ ERPNext เทียบ
+                      flt(min) <= v <= flt(max) แล้ว flt ของค่าว่างคือ 0 —
+                      ปล่อยว่างไว้คือฟอร์มที่ตกทุกใบโดยไม่มีใครรู้ */}
+                  {r.kind === "number" && r.max.trim() === "" && !r.manual && (
+                    <p className="mt-1 text-sm text-danger-strong">
+                      ไม่ใส่ค่าสูงสุด ERPNext อ่านเป็น 0 แล้วทุกใบจะไม่ผ่าน
+                    </p>
+                  )}
+                </td>
+
+                <td className="px-4 py-3 align-top">
+                  <Input
+                    aria-label="เกณฑ์ที่ผู้ตรวจอ่าน"
+                    className="bg-card"
+                    value={r.criteria}
+                    placeholder="เขียนให้คนที่ยืนตรวจอ่าน"
+                    onChange={(e) => patch(r.id, { criteria: e.target.value })}
+                  />
+                  <FieldNote custom>custom_criteria ที่แถวเทมเพลต</FieldNote>
+                </td>
+
+                <td className="px-4 py-3 text-center align-top">
+                  <Checkbox
+                    aria-label="ตรวจสอบเอง"
+                    className="mt-2.5"
+                    checked={r.manual}
+                    disabled={r.kind === "tick"}
+                    onCheckedChange={(v) => patch(r.id, { manual: v === true })}
+                  />
+                </td>
+
+                <td className="px-4 py-3 align-top">
+                  <div className="mt-1 flex justify-end">
+                    <Button
+                      variant="ghost"
+                      size="icon-sm"
+                      aria-label="ลบหัวข้อนี้"
+                      onClick={() =>
+                        onChange(rows.filter((x) => x.id !== r.id))
+                      }
+                    >
+                      <Trash2Icon />
+                    </Button>
+                  </div>
+                </td>
+              </tr>
+            ))}
+
+            {rows.length === 0 && (
+              <tr>
+                <td colSpan={6} className="px-4 py-10 text-center">
+                  <p className="font-medium">ยังไม่มีหัวข้อตรวจในฟอร์มนี้</p>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    กด “เพิ่มหัวข้อตรวจ” แล้วพิมพ์ชื่อหัวข้อที่ต้องการ
+                  </p>
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      <div className="mt-3 flex justify-center">
+        <Button
+          variant="outline-primary"
+          onClick={() => onChange([...rows, blankCheck()])}
+        >
+          <PlusIcon />
+          เพิ่มหัวข้อตรวจ
         </Button>
       </div>
     </>
