@@ -757,6 +757,53 @@ export const ORIGIN: Record<
 
 export const ORIGIN_KEYS = Object.keys(ORIGIN) as Origin[];
 
+// ---------------------------------------------------------------
+// เทมเพลตนี้ไปเป็นค่าตั้งต้นที่ไหน — ตัวที่ทำให้ใบตรวจเด้งมาเอง
+//
+// ไม่ผูกไว้ที่ไหนเลย เทมเพลตก็ยังใช้ได้ แต่ผู้ตรวจต้องเลือกเองทุกใบ
+// ซึ่งแปลว่าวันหนึ่งจะมีคนเลือกผิดใบ และไม่มีอะไรบอกว่าเลือกผิด
+//
+// สามที่นี้เป็นของ ERPNext ทั้งหมด ไม่ใช่ของที่เราคิดขึ้นเอง —
+// get_quality_inspection_template() อ่าน BOM ก่อน แล้วค่อยตกไป Item
+// ---------------------------------------------------------------
+
+export type BindTarget = "item" | "bom" | "operation";
+
+export const BIND: Record<
+  BindTarget,
+  { label: string; store: string; hint: string; custom: boolean }
+> = {
+  item: {
+    label: "ข้อมูลสินค้า",
+    store: "Item · quality_inspection_template",
+    hint: "ใบเด้งมาตอนรับของเข้าหรือส่งของออก คู่กับติ๊กบังคับตรวจที่สินค้าตัวนั้น",
+    custom: false,
+  },
+  bom: {
+    label: "สูตรการผลิต (BOM)",
+    store: "BOM · quality_inspection_template + inspection_required",
+    hint: "ใบเด้งมาตอนผลิตเสร็จ และเป็นตัวสำรองให้ใบงานผลิตด้วย — สินค้าตัวเดียวกันจึงใช้คนละแบบระหว่างรับเข้ากับผลิตได้",
+    custom: false,
+  },
+  operation: {
+    label: "ขั้นตอนการผลิต",
+    store: "BOM Operation · quality_inspection_required → Job Card",
+    hint: "ใบเด้งมาต่อขั้นตอน ปิดใบงานไม่ได้ถ้ายังไม่ตรวจ — ตั้งหลายขั้นตอนก็ได้หลายใบ",
+    custom: false,
+  },
+};
+
+export const BIND_KEYS = Object.keys(BIND) as BindTarget[];
+
+/** ขั้นตอนการผลิตที่โรงงานมี — Operation ของ ERPNext */
+export const OPERATION_POOL = [
+  "ผสมปุ๋ย",
+  "ปั้นเม็ด",
+  "อบแห้ง",
+  "ร่อนคัดขนาด",
+  "บรรจุกระสอบ",
+];
+
 /** รูปถ่ายประกอบ — บังคับเมื่อไม่ผ่านคือแบบที่ฟอร์มกระดาษใช้จริง */
 export type PhotoMode = "off" | "optional" | "onFail";
 
@@ -799,6 +846,10 @@ export type QiTemplate = {
    * ERPNext แนบไฟล์ได้อยู่แล้วทุก doctype แต่บังคับว่า "ต้องแนบเมื่อไม่ผ่าน"
    * ไม่ได้ เพราะเงื่อนไขนั้นขึ้นกับ status ที่เพิ่งคำนวณเสร็จ ต้องเขียน validate เพิ่ม
    */
+  /** เทมเพลตนี้ไปเป็นค่าตั้งต้นที่ไหน — ตัวที่ทำให้ใบตรวจเด้งมาเอง */
+  bindTo: BindTarget;
+  /** ขั้นตอนไหน — ใช้เมื่อ bindTo = operation ว่างคือยังไม่ได้เลือก */
+  operation: string;
   photo: PhotoMode;
   /** วันที่ฟอร์มนี้เริ่มใช้ได้ — ใบที่เปิดก่อนหน้านี้ยังใช้โครงเดิม */
   effectiveFrom: string;
@@ -1049,6 +1100,8 @@ export const QI_TEMPLATES: QiTemplate[] = [
       formula("p-hard", "mean >= 0.4", 5, "ค่าเฉลี่ยความแข็งของเม็ดปุ๋ย ไม่น้อยกว่า 0.4 กก."),
       range("p-moist", 0, 10, 1, "ความชื้นของเม็ดปุ๋ย น้อยกว่า 10%"),
     ],
+    bindTo: "item",
+    operation: "",
     photo: "onFail",
     effectiveFrom: "01/09/2026",
     effectiveTo: "",
@@ -1075,6 +1128,8 @@ export const QI_TEMPLATES: QiTemplate[] = [
       value("p-formula", "ตรง"),
       range("p-temp", 20, 35, 1, "off"),
     ],
+    bindTo: "operation",
+    operation: "ผสมปุ๋ย",
     photo: "onFail",
     effectiveFrom: "01/09/2026",
     effectiveTo: "",
@@ -1102,6 +1157,8 @@ export const QI_TEMPLATES: QiTemplate[] = [
       range("p-moist", 0, 2),
       formula("p-size", "(reading_2 + reading_3) / 2500 * 100 >= 80", 4),
     ],
+    bindTo: "bom",
+    operation: "",
     photo: "onFail",
     effectiveFrom: "01/09/2026",
     effectiveTo: "",
@@ -1147,6 +1204,8 @@ export const QI_TEMPLATES: QiTemplate[] = [
       manual("p-sewing", "ตรวจเช็คกลไกและการทำงานของเครื่องเย็บ"),
       manual("p-printer", "ตรวจสอบความคมชัดและระบบการพิมพ์ให้ถูกต้อง"),
     ],
+    bindTo: "item",
+    operation: "",
     photo: "onFail",
     effectiveFrom: "01/09/2026",
     effectiveTo: "",
@@ -1180,6 +1239,8 @@ export const QI_TEMPLATES: QiTemplate[] = [
       manual("p-area-climate", "อุณหภูมิและความชื้นในบริเวณอยู่ในเกณฑ์ที่กำหนด"),
       manual("p-clean-area", "พื้นที่จัดเก็บสะอาด ไม่มีเศษวัสดุตกค้าง"),
     ],
+    bindTo: "item",
+    operation: "",
     photo: "onFail",
     effectiveFrom: "01/09/2026",
     effectiveTo: "",
@@ -1215,6 +1276,8 @@ export const QI_TEMPLATES: QiTemplate[] = [
       range("p-weight", null, null, 1, "ชั่งแล้วบันทึกน้ำหนักที่ได้"),
       value("p-sling", "30 / 35 / 40", "ต้องตรงกับที่ระบุในใบสั่งผลิต"),
     ],
+    bindTo: "item",
+    operation: "",
     photo: "onFail",
     effectiveFrom: "01/09/2026",
     effectiveTo: "",
@@ -1245,6 +1308,8 @@ export const QI_TEMPLATES: QiTemplate[] = [
        แปดแถว ไม่ใช่ยี่สิบสี่ — "ตรวจครั้งที่ 1/2/3" บนกระดาษคือเปิดใบด้วย
        เทมเพลตนี้สามรอบ ไม่ใช่สามชุดแถวในใบเดียว */
     rows: fgRound(),
+    bindTo: "item",
+    operation: "",
     photo: "onFail",
     effectiveFrom: "01/09/2026",
     effectiveTo: "",
@@ -1283,6 +1348,8 @@ export const QI_TEMPLATES: QiTemplate[] = [
       manual("p-rm-amsu"),
       manual("p-rm-urea"),
     ],
+    bindTo: "item",
+    operation: "",
     photo: "onFail",
     effectiveFrom: "01/09/2026",
     effectiveTo: "",
@@ -1315,6 +1382,8 @@ export const QI_TEMPLATES: QiTemplate[] = [
       range("p-warehouse-temp", 20, 35),
       value("p-bag", "ปกติ"),
     ],
+    bindTo: "item",
+    operation: "",
     photo: "onFail",
     effectiveFrom: "01/09/2026",
     effectiveTo: "",
@@ -1342,6 +1411,8 @@ export const QI_TEMPLATES: QiTemplate[] = [
     inspectionType: "outgoing",
     refDocs: ["deliveryNote"],
     rows: [range("p-weight", 49.5, 50.5, 3), value("p-bag", "ปกติ")],
+    bindTo: "item",
+    operation: "",
     photo: "onFail",
     effectiveFrom: "01/09/2026",
     effectiveTo: "",
@@ -1367,6 +1438,8 @@ export const QI_TEMPLATES: QiTemplate[] = [
     inspectionType: "outgoing",
     refDocs: [],
     rows: [value("p-complaint", "รับเรื่องแล้ว"), manual("p-trace")],
+    bindTo: "item",
+    operation: "",
     photo: "onFail",
     effectiveFrom: "01/09/2026",
     effectiveTo: "",
@@ -1390,6 +1463,8 @@ export const QI_TEMPLATES: QiTemplate[] = [
     inspectionType: "incoming",
     refDocs: [],
     rows: [value("p-coa-complete", "ครบ"), value("p-coa-match", "ตรง")],
+    bindTo: "item",
+    operation: "",
     photo: "onFail",
     effectiveFrom: "01/09/2026",
     effectiveTo: "",
@@ -1599,6 +1674,8 @@ export const blankTemplate = (): QiTemplate => ({
   // จะได้ฟอร์มที่ผูกกับเอกสารผิดใบโดยไม่มีใครรู้
   refDocs: [],
   rows: [],
+  bindTo: "item",
+  operation: "",
   photo: "onFail",
   effectiveFrom: "01/09/2026",
   effectiveTo: "",
