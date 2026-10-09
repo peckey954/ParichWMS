@@ -260,15 +260,15 @@ function Editor({ seed, isNew }: { seed: QiTemplate; isNew: boolean }) {
     if (total === 0) return;
 
     const parts = [
-      alwaysPass.length > 0 ? `${alwaysPass.length} ข้อจะผ่านทุกใบ` : "",
-      alwaysFail.length > 0 ? `${alwaysFail.length} ข้อจะไม่ผ่านทุกใบ` : "",
+      alwaysPass.length > 0 ? `${alwaysPass.length} ข้อจะขึ้นว่าผ่านทุกใบ` : "",
+      alwaysFail.length > 0 ? `${alwaysFail.length} ข้อจะขึ้นว่าไม่ผ่านทุกใบ` : "",
     ].filter(Boolean);
 
-    toast.warning(`มี ${total} ข้อที่ยังไม่ได้ตั้งเกณฑ์`, {
-      description: `${parts.join(" · ")} — ถ้าตั้งใจให้ผู้ตรวจตัดสินเอง กดติ๊กให้ทุกข้อได้เลย`,
+    toast.warning(`มี ${total} หัวข้อที่ระบบตัดสินให้ไม่ได้`, {
+      description: `ยังไม่ได้ใส่ค่าที่ถือว่าผ่าน — ${parts.join(" · ")} ถ้าตั้งใจให้ผู้ตรวจตัดสินเอง กดปุ่มนี้ได้เลย`,
       duration: 10000,
       action: {
-        label: "ติ๊กให้ทุกข้อ",
+        label: "ให้ผู้ตรวจตัดสินเอง",
         onClick: () => {
           const ids = new Set(
             [...alwaysPass, ...alwaysFail].map((r) => r.id)

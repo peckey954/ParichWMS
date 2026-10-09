@@ -87,9 +87,9 @@ export const rowTitle = (r: QiRow) =>
 export function blankCriteriaWarning(r: QiRow): string | null {
   if (r.manualInspection || r.formulaBased) return null;
   if (r.numeric && r.max === null)
-    return "ไม่ใส่ค่าสูงสุด ERPNext อ่านเป็น 0 แล้วข้อนี้จะไม่ผ่านทุกใบ";
+    return "หัวข้อนี้ยังไม่ได้ใส่ช่วงที่ถือว่าผ่าน ระบบจึงไม่มีอะไรไว้ตัดสิน ต้องให้ผู้ตรวจตัดสินเอง ไม่งั้นข้อนี้จะขึ้นว่าไม่ผ่านทุกใบ";
   if (!r.numeric && r.value.trim() === "")
-    return "ไม่ตั้งค่าที่ถือว่าผ่าน ERPNext เทียบช่องว่างกับช่องว่างแล้วข้อนี้จะผ่านทุกใบ";
+    return "หัวข้อนี้ยังไม่ได้ใส่ค่าที่ถือว่าผ่าน ระบบจึงไม่มีอะไรไว้ตัดสิน ต้องให้ผู้ตรวจตัดสินเอง ไม่งั้นข้อนี้จะขึ้นว่าผ่านทุกใบ";
   return null;
 }
 
@@ -137,7 +137,7 @@ function CriteriaWarning({
         className="mt-2 bg-card"
         onClick={onFix}
       >
-        ตั้งใจให้ผู้ตรวจตัดสินเอง — ติ๊กให้เลย
+        ให้ผู้ตรวจตัดสินเอง
       </Button>
     </div>
   );
