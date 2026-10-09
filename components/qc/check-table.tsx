@@ -2,9 +2,9 @@
 
 import * as React from "react";
 import {
-  ChevronDownIcon,
-  ChevronUpIcon,
+  ChevronsUpDownIcon,
   CircleXIcon,
+  CopyIcon,
   MinusIcon,
   PencilIcon,
   PlusIcon,
@@ -32,6 +32,7 @@ import {
 } from "@peckey954/ui/components/ui/select";
 import { Textarea } from "@peckey954/ui/components/ui/textarea";
 import { cn } from "@peckey954/ui/lib/utils";
+import { CheckChip } from "@/components/check-chip";
 import { ParamCombobox } from "@/components/qc/param-picker";
 import {
   CHECK_SOURCES,
@@ -41,7 +42,7 @@ import {
   ROW_KINDS,
   SOURCE,
   SOURCE_IDS,
-  describeCriteria,
+  cloneRow,
   paramOf,
   type DocField,
   type QiRow,
@@ -53,8 +54,12 @@ import {
 /* ------------------------------------------------------------------
    ตารางตั้งหัวข้อตรวจ + กล่องแก้ไข — ใช้ร่วมกันทุกฟอร์ม
 
-   ตารางเก็บเฉพาะสี่ช่องที่ต้องกวาดตาเทียบข้ามแถว — หัวข้อ ประเภทข้อมูล
-   เกณฑ์ ใครตัดสิน ที่เหลือไปอยู่ในกล่อง
+   ตารางเก็บสี่ช่องที่ต้องกวาดตาเทียบข้ามแถว — ประเภทข้อมูล หัวข้อ เกณฑ์
+   ใครตัดสิน ที่เหลือไปอยู่ในกล่องแก้ไข
+
+   ช่องเกณฑ์ในตารางโชว์ "เกณฑ์ที่ผู้ตรวจอ่าน" เป็นบรรทัดหลัก แล้วสรุปวิธีตัดสิน
+   ของเครื่องไว้บรรทัดรอง — คนที่กวาดตาดูตารางอยากรู้ว่าข้อนี้ตรวจอะไร
+   ไม่ได้อยากรู้ว่า min_value เท่าไหร่ ตัวเลขพวกนั้นดูในกล่องตอนจะแก้ก็ทัน
 
    ใช้กล่องแทนการกางแถว เพราะตารางนี้เลื่อนแนวนอนได้ แถวที่กางออกมาจะอยู่ใน
    พื้นที่เลื่อนไปด้วย กางแล้วต้องเลื่อนกลับมาซ้ายถึงจะเห็นของที่เพิ่งเปิด
@@ -73,6 +78,21 @@ export const rowTitle = (r: QiRow) =>
     : (paramOf(r.parameterId)?.name ?? "");
 
 /**
+ * สรุปวิธีตัดสินของเครื่องเป็นบรรทัดเดียว — ไว้ใต้เกณฑ์ที่คนอ่าน
+ *
+ * ไล่ตามติ๊กสามตัวของ ERPNext ตรงตัว เพราะสามตัวนั้นคือทั้งหมดที่กำหนดว่า
+ * ผู้ตรวจจะเจอช่องแบบไหนและใครเป็นคนชี้ขาด
+ */
+export function judgeSummary(r: QiRow): string {
+  if (r.kind === "system") return "ดึงจากระบบ · ผู้ตรวจเลือกจากรายการ";
+  const bits = [r.numeric ? "ตัวเลข" : "ข้อความ"];
+  if (r.formulaBased) bits.push("สูตร");
+  if (r.manualInspection) bits.push("ผู้ตรวจตัดสินเอง");
+  if (r.numeric && r.readings > 1) bits.push(`ระบุ ${r.readings} ค่า`);
+  return bits.join(" · ");
+}
+
+/**
  * ข้อที่เว้นเกณฑ์ว่างแล้วระบบยังตัดสินให้ — เป็นกับดักคนละแบบกันสองฝั่ง
  *
  * ฝั่งตัวเลข min_max_criteria_passed คืน has_reading ซึ่งเป็น False เมื่อไม่มี
@@ -87,7 +107,7 @@ export const rowTitle = (r: QiRow) =>
  * ข้ามแถวที่ manual_inspection ทั้งแถว ไม่ประเมินเกณฑ์อะไรเลย
  */
 export function blankCriteriaWarning(r: QiRow): string | null {
-  if (r.manualInspection || r.formulaBased) return null;
+  if (r.kind === "system" || r.manualInspection || r.formulaBased) return null;
   if (r.numeric && r.max === null)
     return "หัวข้อนี้ยังไม่ได้ใส่ช่วงที่ถือว่าผ่าน ระบบจึงไม่มีอะไรไว้ตัดสิน ต้องให้ผู้ตรวจตัดสินเอง ไม่งั้นข้อนี้จะขึ้นว่าไม่ผ่านทุกใบ";
   if (!r.numeric && r.value.trim() === "")
@@ -98,76 +118,27 @@ export function blankCriteriaWarning(r: QiRow): string | null {
 /**
  * นับข้อที่เว้นเกณฑ์ว่างไว้ แยกตามว่าจะเพี้ยนไปทางไหน
  *
- * ใช้ตอนกดบันทึกเป็นด่านสุดท้าย — แถบเตือนที่แถวมองข้ามได้ถ้าฟอร์มยาวยี่สิบสี่ข้อ
- * แล้วเลื่อนผ่านไป ตอนบันทึกคือจังหวะเดียวที่ยังทันแก้ก่อนเอาไปใช้จริง
+ * ใช้ตอนกดบันทึกเป็นด่านสุดท้าย — แถบเตือนที่หัวตารางมองข้ามได้ถ้าเลื่อนผ่านไป
+ * ตอนบันทึกคือจังหวะเดียวที่ยังทันแก้ก่อนเอาไปใช้จริง
  */
 export function criteriaProblems(rows: QiRow[]) {
   const alwaysPass = rows.filter(
-    (r) => !r.manualInspection && !r.formulaBased && !r.numeric && r.value.trim() === ""
+    (r) =>
+      r.kind !== "system" &&
+      !r.manualInspection &&
+      !r.formulaBased &&
+      !r.numeric &&
+      r.value.trim() === ""
   );
   const alwaysFail = rows.filter(
-    (r) => !r.manualInspection && !r.formulaBased && r.numeric && r.max === null
+    (r) =>
+      r.kind !== "system" &&
+      !r.manualInspection &&
+      !r.formulaBased &&
+      r.numeric &&
+      r.max === null
   );
   return { alwaysPass, alwaysFail, total: alwaysPass.length + alwaysFail.length };
-}
-
-/**
- * แถบเตือนรวมเหนือตาราง — ไม่ติ๊กให้เองเงียบ ๆ
- *
- * เคยอยู่ในช่องเกณฑ์ของแต่ละแถว ซึ่งทำให้แถวสูงไม่เท่ากันจนกวาดตาอ่านตารางไม่ได้
- * และถ้ามีหลายข้อก็ได้กล่องแดงซ้ำ ๆ ที่เขียนเหมือนกันทุกอัน ย้ายมารวมข้างบน
- * แล้วชี้แถวด้วยขอบแดงที่ช่องติ๊กแทน
- *
- * ข้อที่เว้นเกณฑ์ว่างมีสองความหมายที่หน้าตาเหมือนกันเป๊ะ คือ "ตั้งใจให้คนตัดสิน"
- * กับ "ลืมใส่เกณฑ์" ติ๊กให้เองอัตโนมัติคือเลือกข้างให้ว่าเป็นอันแรกเสมอ
- * ซึ่งทำให้ข้อที่ลืมใส่เกณฑ์กลายเป็นข้อที่ไม่มีวันถูกตรวจอัตโนมัติอีกเลย
- * โดยคนตั้งค่าไม่เคยรู้ว่าตัวเองลืม — เป็นปัญหาชนิดเดียวกับที่กำลังจะแก้
- *
- * ให้ปุ่มกดแทน จบในคลิกเดียวเหมือนกัน แต่คนกดเป็นคนตัดสินว่าอันไหนคืออันไหน
- */
-function CriteriaBanner({
-  rows,
-  onFixAll,
-}: {
-  rows: QiRow[];
-  onFixAll: (ids: string[]) => void;
-}) {
-  const bad = rows.filter((r) => blankCriteriaWarning(r) !== null);
-  if (bad.length === 0) return null;
-
-  // ชื่อหัวข้อไล่ให้ครบถ้าไม่เยอะ เกินสามข้อค่อยสรุปเป็นจำนวน เพราะรายชื่อยาว
-  // สิบข้อก็ไม่ได้ช่วยให้หาเจอเร็วขึ้น ขอบแดงที่ช่องติ๊กเป็นตัวชี้ที่แม่นกว่า
-  const names = bad
-    .map((r) => rowTitle(r) || "หัวข้อที่ยังไม่ได้เลือก")
-    .filter(Boolean);
-  const head =
-    bad.length === 1
-      ? `หัวข้อตรวจ ${names[0]} ยังไม่ได้กำหนดวิธีการตัดสินผล`
-      : bad.length <= 3
-        ? `หัวข้อตรวจ ${names.join(" · ")} ยังไม่ได้กำหนดวิธีการตัดสินผล`
-        : `มี ${bad.length} หัวข้อตรวจที่ยังไม่ได้กำหนดวิธีการตัดสินผล`;
-
-  return (
-    <div className="mb-3 flex flex-wrap items-start justify-between gap-3 rounded-xl border border-danger-border bg-danger px-4 py-3">
-      <div className="flex min-w-0 items-start gap-2">
-        <CircleXIcon className="mt-0.5 size-4 shrink-0 text-danger-strong" />
-        <div className="min-w-0">
-          <p className="font-medium text-danger-strong">{head}</p>
-          <p className="mt-0.5 text-sm">
-            ระบบไม่สามารถประเมินผลได้ กรุณากำหนดการตัดสิน
-            หรือเลือกให้ผู้ตรวจตัดสินผลเอง
-          </p>
-        </div>
-      </div>
-      <Button
-        variant="outline"
-        className="shrink-0 bg-card"
-        onClick={() => onFixAll(bad.map((r) => r.id))}
-      >
-        ผู้ตรวจตัดสินเอง
-      </Button>
-    </div>
-  );
 }
 
 const numText = (v: number | null) => (v === null ? "" : String(v));
@@ -177,6 +148,10 @@ const toNum = (v: string) => {
   const n = Number(t);
   return Number.isFinite(n) ? n : null;
 };
+
+/* ==================================================================
+   ตาราง
+================================================================== */
 
 export function CheckTable({
   rows,
@@ -198,6 +173,12 @@ export function CheckTable({
     onChange(next);
   };
 
+  const duplicate = (i: number) => {
+    const next = [...rows];
+    next.splice(i + 1, 0, cloneRow(rows[i]));
+    onChange(next);
+  };
+
   return (
     <>
       <CriteriaBanner
@@ -212,23 +193,62 @@ export function CheckTable({
       />
 
       <div className="overflow-x-auto rounded-xl border border-border bg-card">
-        <table className="w-full min-w-[880px]">
+        <table className="w-full min-w-[900px]">
           <thead>
             <tr className="border-b border-border text-sm text-muted-foreground">
-              <th className="px-4 py-3 text-left font-normal">หัวข้อตรวจ</th>
-              <th className="w-44 px-4 py-3 text-left font-normal">
+              <th className="w-40 px-4 py-3 text-left font-normal">
                 ประเภทข้อมูล
               </th>
-              <th className="w-56 px-4 py-3 text-left font-normal">เกณฑ์</th>
+              <th className="px-4 py-3 text-left font-normal">หัวข้อตรวจ</th>
+              <th className="px-4 py-3 text-left font-normal">เกณฑ์</th>
               <th className="w-32 px-4 py-3 text-center font-normal">
                 ผู้ตรวจตัดสินเอง
               </th>
-              <th className="w-32 px-4 py-3" />
+              <th className="w-36 px-4 py-3" />
             </tr>
           </thead>
           <tbody>
             {rows.map((r, i) => (
               <tr key={r.id} className="border-b border-border last:border-0">
+                <td className="px-4 py-3 align-top">
+                  <Select
+                    value={r.kind}
+                    onValueChange={(v) =>
+                      // สลับประเภทแล้วชื่อหัวข้อใช้ร่วมกันไม่ได้ ล้างทั้งคู่
+                      // ไม่งั้นจะเหลือชื่อจากทะเบียนค้างในข้อที่ดึงจากระบบ
+                      onPatch(r.id, {
+                        kind: v as RowKind,
+                        parameterId: "",
+                        source: undefined,
+                        // แถวที่ดึงจากระบบไม่มีเกณฑ์ให้ระบบตัดสิน ผู้ตรวจเลือก
+                        // จากรายการแล้วชี้ขาดเอง ตั้งให้ตรงกันตั้งแต่สลับประเภท
+                        ...(v === "system"
+                          ? {
+                              numeric: false,
+                              formulaBased: false,
+                              manualInspection: true,
+                              readings: 1,
+                            }
+                          : {}),
+                      })
+                    }
+                  >
+                    <SelectTrigger
+                      aria-label="ประเภทข้อมูล"
+                      className="w-full bg-card"
+                    >
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {ROW_KINDS.map((k) => (
+                        <SelectItem key={k} value={k}>
+                          {ROW_KIND[k].label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </td>
+
                 <td className="px-4 py-3 align-top">
                   {r.kind === "system" ? (
                     <Select
@@ -262,78 +282,27 @@ export function CheckTable({
                       onChange={(v) => onPatch(r.id, { parameterId: v })}
                     />
                   )}
-                  <FieldNote
-                    custom={
-                      r.kind === "system" && !!r.source && SOURCE[r.source].custom
-                    }
-                  >
-                    {r.kind === "system"
-                      ? r.source
-                        ? SOURCE[r.source].store
-                        : "ยังไม่ได้เลือกแหล่งข้อมูล"
-                      : "specification → Quality Inspection Parameter"}
-                  </FieldNote>
                 </td>
 
                 <td className="px-4 py-3 align-top">
-                  <Select
-                    value={r.kind}
-                    onValueChange={(v) =>
-                      // สลับประเภทแล้วชื่อหัวข้อใช้ร่วมกันไม่ได้ ล้างทั้งคู่
-                      // ไม่งั้นจะเหลือชื่อจากทะเบียนค้างในข้อที่ดึงจากระบบ
-                      onPatch(r.id, {
-                        kind: v as RowKind,
-                        parameterId: "",
-                        source: undefined,
-                        // แถวที่ดึงจากระบบไม่มีเกณฑ์ให้ระบบตัดสิน ผู้ตรวจเลือก
-                        // จากรายการแล้วชี้ขาดเอง ตั้งให้ตรงกันตั้งแต่สลับประเภท
-                        // ไม่ใช่ปล่อยให้เหลือ numeric ค้างแล้วตัดสินมั่ว
-                        ...(v === "system"
-                          ? {
-                              numeric: false,
-                              formulaBased: false,
-                              manualInspection: true,
-                              readings: 1,
-                            }
-                          : {}),
-                      })
-                    }
-                  >
-                    <SelectTrigger
-                      aria-label="ประเภทข้อมูล"
-                      className="w-full bg-card"
-                    >
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {ROW_KINDS.map((k) => (
-                        <SelectItem key={k} value={k}>
-                          {ROW_KIND[k].label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </td>
-
-                <td className="px-4 py-3 align-top">
-                  {/* แถวที่ดึงจากระบบไม่มีเกณฑ์ให้ตัดสินโดยธรรมชาติ ผู้ตรวจเลือก
-                      จากรายการแล้วชี้ขาดเอง เขียนบอกไปเลยว่าทำไมช่องนี้ว่าง
-                      ไม่ใช่ปล่อยขีดไว้แล้วให้เดาว่าลืมตั้งหรือตั้งไม่ได้ */}
                   {r.kind === "system" ? (
                     <p className="py-2 text-sm text-muted-foreground">
                       ไม่มีการตัดสิน เนื่องจากเป็นการเลือกข้อมูลที่ใช้ตรวจสอบ
                     </p>
                   ) : (
-                    <>
-                      <p className="py-2 text-sm">{describeCriteria(r)}</p>
-                      <p className="text-sm text-muted-foreground">
-                        {r.numeric ? "ตัวเลข" : "ข้อความ"}
-                        {r.formulaBased && " · สูตร"}
-                        {r.readings > 1 && ` · ระบุ ${r.readings} ค่า`}
+                    <div className="py-1">
+                      <p className="text-sm">
+                        {r.criteria.trim() || (
+                          <span className="text-muted-foreground">
+                            ยังไม่ได้เขียนเกณฑ์
+                          </span>
+                        )}
                       </p>
-                    </>
+                      <p className="text-sm text-muted-foreground">
+                        {judgeSummary(r)}
+                      </p>
+                    </div>
                   )}
-
                 </td>
 
                 <td className="px-4 py-3 text-center align-top">
@@ -347,6 +316,7 @@ export function CheckTable({
                         "border-danger-strong data-[state=unchecked]:border-danger-strong"
                     )}
                     checked={r.manualInspection}
+                    disabled={r.kind === "system"}
                     onCheckedChange={(v) =>
                       onPatch(r.id, { manualInspection: v === true })
                     }
@@ -355,6 +325,8 @@ export function CheckTable({
 
                 <td className="px-4 py-3 align-top">
                   <div className="mt-1 flex items-center justify-end">
+                    {/* ไอคอนเดียวสลับขึ้นลง — คลิกซ้ายครึ่งบนคือขึ้น ครึ่งล่างคือลง
+                        ใช้ปุ่มเดียวแทนลูกศรสองอัน ตารางจะได้ไม่กว้างเกินจำเป็น */}
                     <Button
                       variant="ghost"
                       size="icon-sm"
@@ -362,21 +334,21 @@ export function CheckTable({
                       disabled={i === 0}
                       onClick={() => move(i, -1)}
                     >
-                      <ChevronUpIcon />
+                      <ChevronsUpDownIcon />
                     </Button>
                     <Button
                       variant="ghost"
                       size="icon-sm"
-                      aria-label="เลื่อนลง"
-                      disabled={i === rows.length - 1}
-                      onClick={() => move(i, 1)}
+                      aria-label="คัดลอกหัวข้อนี้"
+                      onClick={() => duplicate(i)}
                     >
-                      <ChevronDownIcon />
+                      <CopyIcon />
                     </Button>
                     <Button
                       variant="ghost"
                       size="icon-sm"
                       aria-label="ตั้งค่าหัวข้อนี้"
+                      disabled={r.kind === "system"}
                       onClick={() => setEditing(r.id)}
                     >
                       <PencilIcon />
@@ -396,11 +368,10 @@ export function CheckTable({
 
             {rows.length === 0 && (
               <tr>
-                <td colSpan={5} className="px-4 py-10 text-center">
-                  <p className="font-medium">ยังไม่มีหัวข้อตรวจในฟอร์มนี้</p>
+                <td colSpan={5} className="px-4 py-14 text-center">
+                  <p className="font-medium">ไม่มีข้อมูล</p>
                   <p className="mt-1 text-sm text-muted-foreground">
-                    กด “เพิ่มหัวข้อตรวจ” แล้วเลือกหัวข้อจากทะเบียน
-                    ไม่เจอก็พิมพ์ชื่อใหม่แล้วกดสร้างได้ในช่องเดียวกัน
+                    กรุณาเพิ่มหัวข้อตรวจ
                   </p>
                 </td>
               </tr>
@@ -420,13 +391,66 @@ export function CheckTable({
   );
 }
 
-/* ------------------------------------------------------------------
-   กล่องตั้งค่าหัวข้อ — ของที่ไม่ต้องเทียบข้ามแถว
+/* ==================================================================
+   แถบเตือนรวมเหนือตาราง — ไม่ติ๊กให้เองเงียบ ๆ
 
-   ติ๊กตัวเลขกับติ๊กสูตรเป็นกล่องติ๊กสองใบที่ติ๊กพร้อมกันได้ ตรงกับ ERPNext
-   ที่ numeric กับ formula_based_criteria เป็น Check คนละตัว และติ๊กคู่กันแล้ว
-   ความหมายเปลี่ยน — สูตรจะได้ reading_1…reading_10 กับ mean แทน reading_value
------------------------------------------------------------------- */
+   ข้อที่เว้นเกณฑ์ว่างมีสองความหมายที่หน้าตาเหมือนกันเป๊ะ คือ "ตั้งใจให้คนตัดสิน"
+   กับ "ลืมใส่เกณฑ์" ติ๊กให้เองอัตโนมัติคือเลือกข้างให้ว่าเป็นอันแรกเสมอ
+   ซึ่งทำให้ข้อที่ลืมใส่เกณฑ์กลายเป็นข้อที่ไม่มีวันถูกตรวจอัตโนมัติอีกเลย
+   โดยคนตั้งค่าไม่เคยรู้ว่าตัวเองลืม — เป็นปัญหาชนิดเดียวกับที่กำลังจะแก้
+
+   ให้ปุ่มกดแทน จบในคลิกเดียวเหมือนกัน แต่คนกดเป็นคนตัดสินว่าอันไหนคืออันไหน
+================================================================== */
+
+function CriteriaBanner({
+  rows,
+  onFixAll,
+}: {
+  rows: QiRow[];
+  onFixAll: (ids: string[]) => void;
+}) {
+  const bad = rows.filter((r) => blankCriteriaWarning(r) !== null);
+  if (bad.length === 0) return null;
+
+  const names = bad.map((r) => rowTitle(r) || "หัวข้อที่ยังไม่ได้เลือก");
+  const head =
+    bad.length <= 3
+      ? `หัวข้อตรวจ ${names.join(" · ")} ยังไม่ได้กำหนดวิธีการตัดสินผล`
+      : `มี ${bad.length} หัวข้อตรวจที่ยังไม่ได้กำหนดวิธีการตัดสินผล`;
+
+  return (
+    <div className="mb-3 flex flex-wrap items-start justify-between gap-3 rounded-xl border border-danger-border bg-danger px-4 py-3">
+      <div className="flex min-w-0 items-start gap-2">
+        <CircleXIcon className="mt-0.5 size-4 shrink-0 text-danger-strong" />
+        <div className="min-w-0">
+          <p className="font-medium text-danger-strong">{head}</p>
+          <p className="mt-0.5 text-sm">
+            ระบบไม่สามารถประเมินผลได้ กรุณากำหนดการตัดสิน
+            หรือเลือกให้ผู้ตรวจตัดสินผลเอง
+          </p>
+        </div>
+      </div>
+      <Button
+        variant="outline"
+        className="shrink-0 bg-card"
+        onClick={() => onFixAll(bad.map((r) => r.id))}
+      >
+        ผู้ตรวจตัดสินเอง
+      </Button>
+    </div>
+  );
+}
+
+/* ==================================================================
+   กล่องตั้งค่าหัวข้อ
+
+   ติ๊กสามตัวเรียงติดกันเป็นชิปใต้คำว่า "ประเภทการตัดสิน" ตรงกับ ERPNext ที่
+   numeric / formula_based_criteria / manual_inspection เป็น Check สามตัวที่
+   ไม่มี depends_on ทั้งสามตัว ติ๊กครบทุกแบบได้ และแต่ละแบบให้ผลคนละอย่าง
+
+   ช่องใต้ชิปเปลี่ยนตามที่ติ๊ก — สูตร / ช่วงต่ำ-สูง / ค่าที่ถือว่าผ่าน
+   ซึ่งตรงกับ depends_on ของ ERPNext ตัวต่อตัว
+================================================================== */
 
 function RowEditDialog({
   row,
@@ -438,99 +462,115 @@ function RowEditDialog({
   onClose: () => void;
 }) {
   const unit = paramOf(row.parameterId)?.unit ?? "";
+  const u = unit ? ` (${unit})` : "";
+  const labels = row.labels ?? [];
+
+  const setLabel = (i: number, v: string) => {
+    const next = [...labels];
+    while (next.length < row.readings) next.push("");
+    next[i] = v;
+    onChange({ labels: next });
+  };
+
+  const addReading = () => {
+    if (row.readings >= MAX_READINGS) return;
+    onChange({ readings: row.readings + 1, labels: [...labels, ""] });
+  };
+
+  const removeReading = (i: number) => {
+    if (row.readings <= 1) return;
+    const next = [...labels];
+    next.splice(i, 1);
+    onChange({ readings: row.readings - 1, labels: next });
+  };
 
   return (
     <Dialog open onOpenChange={(v) => !v && onClose()}>
       <DialogContent className="sm:max-w-xl">
         <DialogHeader>
-          <DialogTitle>{rowTitle(row) || "หัวข้อที่ยังไม่ได้เลือก"}</DialogTitle>
+          <DialogTitle>หัวข้อตรวจ</DialogTitle>
           <DialogDescription>
-            ตั้งเกณฑ์ จำนวนค่าที่คีย์ และหมายเหตุของหัวข้อนี้
+            กำหนดหัวข้อ เกณฑ์ การตัดสิน จำนวนค่าที่ต้องระบุ และหมายเหตุของหัวข้อ
           </DialogDescription>
         </DialogHeader>
 
-        <div className="max-h-[60vh] space-y-5 overflow-y-auto px-1">
-          {/* อยู่ทั้งในตารางและในกล่อง — ในตารางไว้กวาดตาเทียบว่าข้อไหนระบบตัดสิน
-              ข้อไหนคนตัดสิน ในกล่องไว้ตั้งตอนกำลังตั้งเกณฑ์อยู่ จะได้ไม่ต้อง
-              ปิดกล่องออกไปติ๊กข้างนอกแล้วเปิดกลับเข้ามาใหม่ */}
-          <label className="flex items-start gap-3 rounded-lg border border-border bg-muted px-3 py-2.5">
-            <Checkbox
-              className="mt-0.5"
-              checked={row.manualInspection}
-              onCheckedChange={(v) =>
-                onChange({ manualInspection: v === true })
-              }
-            />
-            <span className="text-sm">
-              <span className="font-medium">ผู้ตรวจตัดสินเอง</span>
-              <span className="block text-muted-foreground">
-                ระบบเก็บค่าที่วัดไว้เหมือนเดิม แต่ไม่ชี้ขาดให้ —
-                ติ๊กคู่กับเกณฑ์ข้างล่างได้
-              </span>
-              <FieldNote custom>
-                custom_manual_inspection → manual_inspection ของแถวในใบตรวจ
-              </FieldNote>
-            </span>
-          </label>
+        <div className="max-h-[60vh] space-y-4 overflow-y-auto px-1">
+          <div className="grid gap-4 sm:grid-cols-[10rem_1fr]">
+            <div className="space-y-1.5">
+              <Label htmlFor={`${row.id}-kind`}>ประเภทข้อมูล</Label>
+              <Select value={row.kind} disabled>
+                <SelectTrigger id={`${row.id}-kind`} className="w-full bg-card">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {ROW_KINDS.map((k) => (
+                    <SelectItem key={k} value={k}>
+                      {ROW_KIND[k].label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
 
-          {/* สองคำถามนี้แยกจากกันจริง ไม่ใช่ตัวเลือกที่แข่งกัน — ของ ERPNext
-              numeric กับ formula_based_criteria ไม่มี depends_on ทั้งคู่
-              ติ๊กครบทั้งสี่แบบได้ และแต่ละแบบให้ผลคนละอย่าง */}
-          <div className="space-y-2">
-            <Label>ผู้ตรวจคีย์อะไร</Label>
-            <label className="flex items-start gap-3 rounded-lg border border-border px-3 py-2.5">
-              <Checkbox
-                className="mt-0.5"
-                checked={row.numeric}
-                onCheckedChange={(v) =>
-                  // ไม่ติ๊กตัวเลข = เหลือ reading_value ช่องเดียว ช่องคีย์ 1-10
-                  // ถูกซ่อนทั้งก้อน (section_break_14 depends_on numeric)
-                  // จำนวนค่าจึงต้องตกกลับเป็น 1 ไม่ใช่ค้างเลขเดิมไว้หลอก
-                  onChange({
-                    numeric: v === true,
-                    ...(v === true ? {} : { readings: 1 }),
-                  })
-                }
+            <div className="space-y-1.5">
+              <Label htmlFor={`${row.id}-param`}>หัวข้อตรวจ</Label>
+              <ParamCombobox
+                id={`${row.id}-param`}
+                value={row.parameterId}
+                onChange={(v) => onChange({ parameterId: v })}
               />
-              <span className="text-sm">
-                <span className="font-medium">คีย์เป็นตัวเลข</span>
-                <span className="block text-muted-foreground">
-                  ติ๊ก = ช่องตัวเลข reading_1…reading_{MAX_READINGS} ·
-                  ไม่ติ๊ก = ช่องข้อความ reading_value ช่องเดียว
-                </span>
-              </span>
-            </label>
-            <FieldNote>numeric</FieldNote>
+            </div>
           </div>
 
-          <div className="space-y-2">
-            <Label>ตัดสินยังไง</Label>
-            <label className="flex items-start gap-3 rounded-lg border border-border px-3 py-2.5">
-              <Checkbox
-                className="mt-0.5"
-                checked={row.formulaBased}
-                onCheckedChange={(v) => onChange({ formulaBased: v === true })}
-              />
-              <span className="text-sm">
-                <span className="font-medium">ตัดสินด้วยสูตร</span>
-                <span className="block text-muted-foreground">
-                  ติ๊กแล้วช่วงต่ำ–สูงกับค่าที่ถือว่าผ่านจะถูกซ่อน
-                  ใช้สูตรแทนทั้งคู่
-                </span>
+          <div className="space-y-1.5">
+            <Label htmlFor={`${row.id}-c`}>
+              เกณฑ์{" "}
+              <span className="font-normal text-muted-foreground">
+                (ไม่บังคับ)
               </span>
-            </label>
-            {/* บอกผลของสองติ๊กรวมกันเป็นประโยคเดียว เพราะสี่แบบที่เป็นไปได้
-                ให้ตัวแปรในสูตรคนละชุด เขียนผิดชุดแล้วสูตรจะพังตอนรันจริง */}
-            <p className="rounded-lg bg-muted px-3 py-2 text-sm text-muted-foreground">
-              {row.formulaBased
-                ? row.numeric
-                  ? "คีย์ตัวเลขหลายค่า แล้วตัดสินด้วยสูตรที่ใช้ reading_1…reading_10 และ mean ได้"
-                  : "คีย์ข้อความช่องเดียว แล้วตัดสินด้วยสูตรที่ใช้ได้แต่ reading_value"
-                : row.numeric
-                  ? "คีย์ตัวเลขหลายค่า แล้วตัดสินด้วยช่วงต่ำ–สูง ทุกค่าต้องอยู่ในช่วง"
-                  : "คีย์ข้อความช่องเดียว แล้วเทียบกับค่าที่ถือว่าผ่านตรงตัว"}
-            </p>
-            <FieldNote>formula_based_criteria</FieldNote>
+            </Label>
+            <Textarea
+              id={`${row.id}-c`}
+              className="bg-card"
+              rows={3}
+              value={row.criteria}
+              placeholder="ระบุเกณฑ์"
+              onChange={(e) => onChange({ criteria: e.target.value })}
+            />
+            <FieldNote custom>
+              custom_criteria — เขียนให้คนที่ยืนตรวจอ่าน คนละช่องกับเกณฑ์ที่
+              เครื่องใช้ตัดสินข้างล่าง
+            </FieldNote>
+          </div>
+
+          {/* สามตัวนี้ติ๊กพร้อมกันได้จริง ไม่ใช่ตัวเลือกที่แข่งกัน */}
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-sm text-muted-foreground">
+              ประเภทการตัดสิน:
+            </span>
+            <CheckChip
+              id={`${row.id}-numeric`}
+              label="ตัวเลข"
+              checked={row.numeric}
+              onChange={(v) =>
+                // ไม่ติ๊กตัวเลข = เหลือ reading_value ช่องเดียว ช่องคีย์ 1-10
+                // ถูกซ่อนทั้งก้อน (section_break_14 depends_on numeric)
+                // จำนวนค่าจึงต้องตกกลับเป็น 1 ไม่ใช่ค้างเลขเดิมไว้หลอก
+                onChange({ numeric: v, ...(v ? {} : { readings: 1 }) })
+              }
+            />
+            <CheckChip
+              id={`${row.id}-formula`}
+              label="สูตร"
+              checked={row.formulaBased}
+              onChange={(v) => onChange({ formulaBased: v })}
+            />
+            <CheckChip
+              id={`${row.id}-manual`}
+              label="ผู้ตรวจตัดสินเอง"
+              checked={row.manualInspection}
+              onChange={(v) => onChange({ manualInspection: v })}
+            />
           </div>
 
           {row.formulaBased ? (
@@ -545,7 +585,7 @@ function RowEditDialog({
                 rows={4}
                 value={row.formula}
                 placeholder={
-                  "เช่น\nmean < 80\n\nหรือยาวกว่านั้น\nreading_1 < 80 and reading_2 < 80 and reading_3 < 80"
+                  "เช่น\nmean < 80\n\nหรือยาวกว่านั้น\n(reading_2 + reading_3) / 2500 * 100 >= 80"
                 }
                 onChange={(e) => onChange({ formula: e.target.value })}
               />
@@ -558,146 +598,104 @@ function RowEditDialog({
               </FieldNote>
             </div>
           ) : row.numeric ? (
-            <div className="space-y-1.5">
-              <Label>
-                ช่วงที่ถือว่าผ่าน
-                {unit && (
-                  <span className="font-normal text-muted-foreground">
-                    {" "}
-                    ({unit})
-                  </span>
-                )}
-              </Label>
-              <div className="flex items-center gap-2">
-                <Input
-                  aria-label="ค่าต่ำสุด"
-                  className="w-32 bg-card"
-                  inputMode="decimal"
-                  value={numText(row.min)}
-                  placeholder="ต่ำสุด"
-                  onChange={(e) => onChange({ min: toNum(e.target.value) })}
-                />
-                <span className="text-muted-foreground">–</span>
-                <Input
-                  aria-label="ค่าสูงสุด"
-                  className="w-32 bg-card"
-                  inputMode="decimal"
-                  value={numText(row.max)}
-                  placeholder="สูงสุด"
-                  onChange={(e) => onChange({ max: toNum(e.target.value) })}
-                />
-              </div>
-              <FieldNote>min_value / max_value</FieldNote>
-              {blankCriteriaWarning(row) && (
-                <p className="text-sm text-danger-strong">
-                  {blankCriteriaWarning(row)}
-                </p>
-              )}
+            <div className="grid gap-4 sm:grid-cols-2">
+              <StepperField
+                id={`${row.id}-min`}
+                label={`เริ่มต้น${u}`}
+                value={row.min}
+                onChange={(v) => onChange({ min: v })}
+              />
+              <StepperField
+                id={`${row.id}-max`}
+                label={`สูงสุด${u}`}
+                value={row.max}
+                onChange={(v) => onChange({ max: v })}
+              />
             </div>
           ) : (
             <div className="space-y-1.5">
               <Label htmlFor={`${row.id}-v`}>
                 ค่าที่ถือว่าผ่าน{" "}
                 <span className="font-normal text-muted-foreground">
-                  (ไม่ใส่ = ไม่มีเกณฑ์ ผู้ตรวจชี้ขาดอย่างเดียว)
+                  (ไม่บังคับ)
                 </span>
               </Label>
               <Input
                 id={`${row.id}-v`}
                 className="bg-card"
                 value={row.value}
-                placeholder="เช่น ปกติ  หรือ  30 / 35 / 40"
+                placeholder="เช่น ปกติ  หรือ  30"
                 onChange={(e) => onChange({ value: e.target.value })}
               />
               {/* คั่นด้วย / = ให้เลือก ไม่ใช่ให้พิมพ์ — ในใบตรวจจะขึ้นเป็น
                   ดรอปดาวน์ให้เอง ไม่ต้องตั้งประเภทเพิ่มอีกช่อง */}
               <FieldNote>value · คั่นด้วย / จะขึ้นเป็นดรอปดาวน์ในใบตรวจ</FieldNote>
-              {blankCriteriaWarning(row) && (
-                <p className="text-sm text-danger-strong">
-                  {blankCriteriaWarning(row)}
-                </p>
-              )}
             </div>
           )}
 
-          {/* ไม่ติ๊กตัวเลขก็ไม่มีช่องให้นับ — reading_value มีช่องเดียวตายตัว
-              โชว์สเต็ปเปอร์ไว้ก็ปรับได้แต่ไม่มีผลอะไรกับใบจริง */}
-          {row.numeric && (
-          <div className="space-y-1.5">
-            <Label>คีย์กี่ค่าในหัวข้อนี้</Label>
-            <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                size="icon-sm"
-                aria-label="ลดจำนวนค่า"
-                disabled={row.readings <= 1}
-                onClick={() => onChange({ readings: row.readings - 1 })}
-              >
-                <MinusIcon />
-              </Button>
-              <span className="w-10 text-center font-medium tabular-nums">
-                {row.readings}
-              </span>
-              <Button
-                variant="outline"
-                size="icon-sm"
-                aria-label="เพิ่มจำนวนค่า"
-                disabled={row.readings >= MAX_READINGS}
-                onClick={() => onChange({ readings: row.readings + 1 })}
-              >
-                <PlusIcon />
-              </Button>
-              <span className="text-sm text-muted-foreground">
-                สูงสุด {MAX_READINGS} — เพดานของ ERPNext ไม่ใช่ของที่เราตั้งเอง
-              </span>
-            </div>
-            {/* ใช้กับการวัดของชิ้นเดียวซ้ำหลายจุดแล้วเอามาเฉลี่ย ไม่ใช่ของหลายชิ้น
-                ของหลายชิ้นคือเปิดสวิตช์สุ่มหลายตัวอย่าง ซึ่งแตกเป็นหลายใบให้ */}
-            <p className="text-sm text-muted-foreground">
-              วัดของชิ้นเดียวซ้ำหลายจุดแล้วเอามาเฉลี่ย —
-              ถ้าเป็นของคนละชิ้นให้เปิดสวิตช์สุ่มหลายตัวอย่างแทน
+          {blankCriteriaWarning(row) && (
+            <p className="text-sm text-danger-strong">
+              {blankCriteriaWarning(row)}
             </p>
+          )}
 
-            {row.readings > 1 && (
-              <div className="mt-2 grid gap-2 sm:grid-cols-2">
-                {Array.from({ length: row.readings }, (_, i) => (
-                  <Input
-                    key={i}
-                    aria-label={`ชื่อค่าที่ ${i + 1}`}
-                    className="bg-card"
-                    value={row.labels?.[i] ?? ""}
-                    placeholder={`ครั้งที่ ${i + 1}`}
-                    onChange={(e) => {
-                      const next = [...(row.labels ?? [])];
-                      next[i] = e.target.value;
-                      onChange({ labels: next });
-                    }}
-                  />
-                ))}
+          {/* จำนวนค่า = จำนวนช่องที่ตั้งชื่อไว้ ไม่ใช่ตัวเลขแยกอีกช่อง
+              นับจากรายการตรง ๆ แล้วตั้งชื่อไปพร้อมกัน จะได้ไม่มีทางที่จำนวนกับ
+              ชื่อไม่ตรงกัน ซึ่งเกิดได้แน่ถ้าให้ปรับเลขกับแก้ชื่อคนละที่ */}
+          {row.numeric && (
+            <div className="space-y-2">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className="font-semibold">จำนวนค่าที่ต้องระบุ</p>
+                <Button
+                  variant="outline-primary"
+                  size="sm"
+                  disabled={row.readings >= MAX_READINGS}
+                  onClick={addReading}
+                >
+                  <PlusIcon />
+                  เพิ่มจำนวน
+                </Button>
               </div>
-            )}
-            <FieldNote custom={row.readings > 1}>
-              {row.readings > 1
-                ? "custom_reading_labels — ERPNext ตั้งป้ายไว้ตายตัวว่า Reading 1…10 แก้รายหัวข้อไม่ได้"
-                : "reading_1"}
-            </FieldNote>
-          </div>
+
+              {Array.from({ length: row.readings }, (_, i) => (
+                <div key={i} className="space-y-1.5">
+                  <Label htmlFor={`${row.id}-l${i}`}>
+                    ชื่อช่องที่ต้องระบุ{" "}
+                    <span className="font-normal text-muted-foreground">
+                      (ไม่บังคับ)
+                    </span>
+                  </Label>
+                  <div className="flex items-center gap-2">
+                    <Input
+                      id={`${row.id}-l${i}`}
+                      className="bg-card"
+                      value={labels[i] ?? ""}
+                      placeholder={`ครั้งที่ ${i + 1}`}
+                      onChange={(e) => setLabel(i, e.target.value)}
+                    />
+                    <Button
+                      variant="ghost"
+                      size="icon-sm"
+                      aria-label={`ลบช่องที่ ${i + 1}`}
+                      disabled={row.readings <= 1}
+                      onClick={() => removeReading(i)}
+                    >
+                      <Trash2Icon />
+                    </Button>
+                  </div>
+                </div>
+              ))}
+
+              <FieldNote custom={row.readings > 1}>
+                {row.readings > 1
+                  ? `reading_1…reading_${row.readings} · custom_reading_labels — ERPNext ตั้งป้ายไว้ตายตัวว่า Reading 1…10 แก้รายหัวข้อไม่ได้`
+                  : "reading_1"}
+              </FieldNote>
+            </div>
           )}
 
           <div className="space-y-1.5">
-            <Label htmlFor={`${row.id}-c`}>เกณฑ์ที่ผู้ตรวจอ่าน</Label>
-            <Input
-              id={`${row.id}-c`}
-              className="bg-card"
-              value={row.criteria}
-              placeholder="เขียนให้คนที่ยืนตรวจอ่าน"
-              onChange={(e) => onChange({ criteria: e.target.value })}
-            />
-            <FieldNote custom>custom_criteria ที่แถวเทมเพลต</FieldNote>
-          </div>
-
-          <div className="space-y-1.5">
-            <Label htmlFor={`${row.id}-r`}>หมายเหตุรายข้อ</Label>
+            <Label htmlFor={`${row.id}-r`}>หมายเหตุหัวข้อ</Label>
             <Select
               value={row.remark}
               onValueChange={(v) => onChange({ remark: v as RemarkMode })}
@@ -717,17 +715,68 @@ function RowEditDialog({
           </div>
         </div>
 
-        <DialogFooter>
-          <Button onClick={onClose}>เสร็จแล้ว</Button>
+        <DialogFooter className="grid grid-cols-2 gap-3">
+          <Button variant="outline-primary" onClick={onClose}>
+            ย้อนกลับ
+          </Button>
+          <Button onClick={onClose}>บันทึก</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
   );
 }
 
-/* ------------------------------------------------------------------
+/** ช่องตัวเลขที่มีปุ่มบวกลบ — ว่างได้ ซึ่งไม่ใช่เรื่องเดียวกับศูนย์ */
+function StepperField({
+  id,
+  label,
+  value,
+  onChange,
+}: {
+  id: string;
+  label: string;
+  value: number | null;
+  onChange: (v: number | null) => void;
+}) {
+  const step = (d: number) => onChange((value ?? 0) + d);
+  return (
+    <div className="space-y-1.5">
+      <Label htmlFor={id}>{label}</Label>
+      <div className="flex items-center rounded-lg border border-border bg-card">
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          className="m-1"
+          aria-label={`ลด ${label}`}
+          onClick={() => step(-1)}
+        >
+          <MinusIcon />
+        </Button>
+        <Input
+          id={id}
+          inputMode="decimal"
+          className="border-0 bg-transparent text-center shadow-none focus-visible:ring-0"
+          value={numText(value)}
+          placeholder="ไม่ระบุ"
+          onChange={(e) => onChange(toNum(e.target.value))}
+        />
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          className="m-1"
+          aria-label={`เพิ่ม ${label}`}
+          onClick={() => step(1)}
+        >
+          <PlusIcon />
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+/* ==================================================================
    ตารางส่วนหัวเอกสาร — ช่องที่กรอกครั้งเดียวต่อใบ
------------------------------------------------------------------- */
+================================================================== */
 
 export function HeaderFieldTable({
   fields,

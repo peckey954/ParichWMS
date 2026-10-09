@@ -32,6 +32,7 @@ import {
   BreadcrumbSeparator,
 } from "@peckey954/ui/components/ui/breadcrumb";
 import { Button } from "@peckey954/ui/components/ui/button";
+import { Checkbox } from "@peckey954/ui/components/ui/checkbox";
 import {
   InputGroup,
   InputGroupAddon,
@@ -98,6 +99,9 @@ import {
   paramOf,
   readingLabels,
   templateOf,
+  PHOTO_KEYS,
+  PHOTO_LABEL,
+  type PhotoMode,
   blockersOf,
   sourcePool,
   uid,
@@ -577,6 +581,70 @@ function Editor({ seed, isNew }: { seed: QiTemplate; isNew: boolean }) {
             </div>
           </div>
 
+          {/* สามช่องนี้เป็นของเทมเพลต ไม่ใช่ของใบตรวจ — ตอบว่าฟอร์มนี้ใช้ช่วงไหน
+              และผู้ตรวจต้องแนบรูปไหม ทั้งสามอย่างไม่มีใน Quality Inspection
+              Template ที่มีแค่ชื่อกับตารางหัวข้อ ต้องสร้างฟิลด์เพิ่มทั้งหมด */}
+          <div className="mt-4 grid gap-4 @2xl:grid-cols-3">
+            <div className="space-y-1.5">
+              <Label htmlFor="tpl-photo">แนบรูปภาพ</Label>
+              <Select
+                value={tpl.photo}
+                onValueChange={(v) => patch({ photo: v as PhotoMode })}
+              >
+                <SelectTrigger id="tpl-photo" className="w-full bg-card">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {PHOTO_KEYS.map((k) => (
+                    <SelectItem key={k} value={k}>
+                      {PHOTO_LABEL[k]}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {/* ERPNext แนบไฟล์ได้ทุก doctype อยู่แล้ว แต่บังคับตามผลตรวจไม่ได้
+                  เพราะเงื่อนไขขึ้นกับ status ที่เพิ่งคำนวณเสร็จ ต้องเขียน validate เพิ่ม */}
+              <FieldNote custom={tpl.photo === "onFail"}>
+                {tpl.photo === "onFail"
+                  ? "custom_require_photo — ต้องเขียน validate เพิ่ม บังคับตามผลตรวจเองไม่ได้"
+                  : "แนบไฟล์เป็นของที่ ERPNext มีให้ทุก doctype อยู่แล้ว"}
+              </FieldNote>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="tpl-from">วันที่เริ่มใช้</Label>
+              <Input
+                id="tpl-from"
+                className="bg-card"
+                placeholder="วว/ดด/ปปปป"
+                value={tpl.effectiveFrom}
+                onChange={(e) => patch({ effectiveFrom: e.target.value })}
+              />
+              <FieldNote custom>custom_effective_from</FieldNote>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="tpl-to">
+                วันที่เลิกใช้{" "}
+                <span className="font-normal text-muted-foreground">
+                  (ไม่บังคับ)
+                </span>
+              </Label>
+              <Input
+                id="tpl-to"
+                className="bg-card"
+                placeholder="เลือกวันที่"
+                value={tpl.effectiveTo}
+                onChange={(e) => patch({ effectiveTo: e.target.value })}
+              />
+              {/* ปิดใช้งานกับเลิกใช้ตามวันที่เป็นคนละเรื่อง — ปิดคือหยุดทันที
+                  ส่วนวันที่เลิกใช้คือตั้งไว้ล่วงหน้าแล้วไม่ต้องมาจำว่าต้องมาปิด */}
+              <FieldNote custom>
+                custom_effective_to · ว่างคือใช้ไปเรื่อย ๆ จนกว่าจะปิดใช้งานเอง
+              </FieldNote>
+            </div>
+          </div>
+
           {/* เตือนเฉพาะฟอร์มตรวจสินค้า เพราะมีแต่ฟอร์มพวกนี้ที่ระบบเป็นคนเรียกใช้
               ฟอร์มตรวจเครื่องจักรหรือคลังคนเปิดใบเอง ไม่ผูกไว้ก็ยังใช้ได้ */}
           {usesQualityInspection(tpl) && tpl.targets.length === 0 && (
@@ -685,13 +753,25 @@ function Editor({ seed, isNew }: { seed: QiTemplate; isNew: boolean }) {
           title={`หัวข้อตรวจ (${tpl.rows.length})`}
           note="หนึ่งหัวข้อ = หนึ่งแถวใน readings · กดดินสอเพื่อตั้งเกณฑ์ จำนวนค่า และหมายเหตุ"
           action={
-            <label className="flex items-center gap-2 text-sm">
-              <Switch
-                checked={tpl.multiSample}
-                onCheckedChange={(v) => patch({ multiSample: v })}
-              />
-              สุ่มหลายตัวอย่างต่อครั้ง
-            </label>
+            <div className="flex flex-wrap items-center gap-4">
+              {/* คนละตัวกับติ๊กรายข้อในตาราง — ตัวนี้คือ manual_inspection
+                  ที่หัวใบ ทำให้ inspect_and_set_status ไม่เขียนทับผลรวมทั้งใบ
+                  ส่วนผลรายข้อยังคำนวณให้ตามปกติ */}
+              <label className="flex items-center gap-2 text-sm">
+                <Checkbox
+                  checked={tpl.manualWholeDoc}
+                  onCheckedChange={(v) => patch({ manualWholeDoc: v === true })}
+                />
+                ผู้ตรวจตัดสินเองทั้งใบ
+              </label>
+              <label className="flex items-center gap-2 text-sm">
+                <Switch
+                  checked={tpl.multiSample}
+                  onCheckedChange={(v) => patch({ multiSample: v })}
+                />
+                สุ่มหลายตัวอย่างต่อครั้ง
+              </label>
+            </div>
           }
         >
           {/* สวิตช์นี้เปลี่ยนว่า "กี่ใบ" ไม่ได้เปลี่ยนว่า "doctype ไหน"

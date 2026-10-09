@@ -761,6 +761,17 @@ export const ORIGIN: Record<
 
 export const ORIGIN_KEYS = Object.keys(ORIGIN) as Origin[];
 
+/** รูปถ่ายประกอบ — บังคับเมื่อไม่ผ่านคือแบบที่ฟอร์มกระดาษใช้จริง */
+export type PhotoMode = "off" | "optional" | "onFail";
+
+export const PHOTO_LABEL: Record<PhotoMode, string> = {
+  off: "ไม่ต้องแนบ",
+  optional: "แนบได้ ไม่บังคับ",
+  onFail: "บังคับเมื่อไม่ผ่าน",
+};
+
+export const PHOTO_KEYS = Object.keys(PHOTO_LABEL) as PhotoMode[];
+
 export type QiTemplate = {
   id: string;
   /** quality_inspection_template_name */
@@ -788,6 +799,25 @@ export type QiTemplate = {
   rows: QiRow[];
   /** ช่องที่ผู้ตรวจกรอกครั้งเดียวต่อใบ — ว่างได้ แปลว่าใบนี้ไม่มีหัวเอกสาร */
   headerFields: DocField[];
+  /**
+   * รูปถ่ายประกอบใบตรวจ — ไม่มีใน Quality Inspection ต้องทำเป็น custom field
+   *
+   * ERPNext แนบไฟล์ได้อยู่แล้วทุก doctype แต่บังคับว่า "ต้องแนบเมื่อไม่ผ่าน"
+   * ไม่ได้ เพราะเงื่อนไขนั้นขึ้นกับ status ที่เพิ่งคำนวณเสร็จ ต้องเขียน validate เพิ่ม
+   */
+  photo: PhotoMode;
+  /** วันที่ฟอร์มนี้เริ่มใช้ได้ — ใบที่เปิดก่อนหน้านี้ยังใช้โครงเดิม */
+  effectiveFrom: string;
+  /** วันที่เลิกใช้ — ว่างคือยังไม่กำหนด */
+  effectiveTo: string;
+  /**
+   * ผู้ตรวจตัดสินผลรวมทั้งใบเอง — manual_inspection ที่หัวใบ
+   *
+   * คนละตัวกับ manual_inspection รายแถว ตัวนี้ทำให้ inspect_and_set_status
+   * ไม่เขียนทับ status ของหัวใบ ส่วนรายข้อยังคำนวณให้ตามปกติ
+   * ใช้กับใบที่ข้อย่อยตกได้บ้าง แต่คนตรวจชี้ว่าทั้งใบยังรับได้
+   */
+  manualWholeDoc: boolean;
   /**
    * สุ่มได้หลายตัวอย่างต่อครั้ง — เป็นเรื่องของ "กี่ใบ" ไม่ใช่ "doctype ไหน"
    *
@@ -1020,6 +1050,10 @@ export const QI_TEMPLATES: QiTemplate[] = [
       formula("p-hard", "mean >= 0.4", 5, "ค่าเฉลี่ยความแข็งของเม็ดปุ๋ย ไม่น้อยกว่า 0.4 กก."),
       range("p-moist", 0, 10, 1, "ความชื้นของเม็ดปุ๋ย น้อยกว่า 10%"),
     ],
+    photo: "onFail",
+    effectiveFrom: "01/09/2026",
+    effectiveTo: "",
+    manualWholeDoc: false,
     headerFields: [],
     multiSample: false,
     targets: ["21-0-0 ฟูเจียน ผง", "46-0-0 ยูเรีย", "18-46-0 DAP"],
@@ -1043,6 +1077,10 @@ export const QI_TEMPLATES: QiTemplate[] = [
       value("p-formula", "ตรง"),
       range("p-temp", 20, 35, 1, "off"),
     ],
+    photo: "onFail",
+    effectiveFrom: "01/09/2026",
+    effectiveTo: "",
+    manualWholeDoc: false,
     headerFields: [],
     multiSample: false,
     targets: ["ปุ๋ยสูตร 15-15-15 กระสอบ 50 กก."],
@@ -1067,6 +1105,10 @@ export const QI_TEMPLATES: QiTemplate[] = [
       range("p-moist", 0, 2),
       formula("p-size", "(reading_2 + reading_3) / 2500 * 100 >= 80", 4),
     ],
+    photo: "onFail",
+    effectiveFrom: "01/09/2026",
+    effectiveTo: "",
+    manualWholeDoc: false,
     headerFields: [],
     multiSample: false,
     targets: ["ปุ๋ยสูตร 15-15-15 กระสอบ 50 กก.", "ปุ๋ยสูตร 16-20-0 กระสอบ 50 กก."],
@@ -1109,6 +1151,10 @@ export const QI_TEMPLATES: QiTemplate[] = [
       manual("p-sewing", "ตรวจเช็คกลไกและการทำงานของเครื่องเย็บ"),
       manual("p-printer", "ตรวจสอบความคมชัดและระบบการพิมพ์ให้ถูกต้อง"),
     ],
+    photo: "onFail",
+    effectiveFrom: "01/09/2026",
+    effectiveTo: "",
+    manualWholeDoc: false,
     headerFields: [
       { id: rid(), label: "เครื่องจักรที่ตรวจ", source: "machine", required: true },
     ],
@@ -1141,6 +1187,10 @@ export const QI_TEMPLATES: QiTemplate[] = [
       manual("p-area-climate", "อุณหภูมิและความชื้นในบริเวณอยู่ในเกณฑ์ที่กำหนด"),
       manual("p-clean-area", "พื้นที่จัดเก็บสะอาด ไม่มีเศษวัสดุตกค้าง"),
     ],
+    photo: "onFail",
+    effectiveFrom: "01/09/2026",
+    effectiveTo: "",
+    manualWholeDoc: false,
     headerFields: [
       { id: rid(), label: "คลังสินค้าที่ตรวจ", source: "warehouse", required: true },
     ],
@@ -1175,6 +1225,10 @@ export const QI_TEMPLATES: QiTemplate[] = [
       range("p-weight", null, null, 1, "ชั่งแล้วบันทึกน้ำหนักที่ได้"),
       value("p-sling", "30 / 35 / 40", "ต้องตรงกับที่ระบุในใบสั่งผลิต"),
     ],
+    photo: "onFail",
+    effectiveFrom: "01/09/2026",
+    effectiveTo: "",
+    manualWholeDoc: false,
     headerFields: [],
     // หนึ่งกระสอบที่สุ่ม = หนึ่งใบ ไม่ใช่หนึ่งคอลัมน์ในใบเดียว
     multiSample: true,
@@ -1199,6 +1253,10 @@ export const QI_TEMPLATES: QiTemplate[] = [
        ช่องติ๊กกับคอลัมน์เกณฑ์มาตรฐานให้อ่าน แม้แต่ข้อน้ำหนักกับความชื้นที่มี
        ตัวเลขในเกณฑ์ ผู้ตรวจก็ชั่งแล้วติ๊กเอา ไม่ได้คีย์ตัวเลขลงใบ */
     rows: [...fgRound(), ...fgRound(), ...fgRound()],
+    photo: "onFail",
+    effectiveFrom: "01/09/2026",
+    effectiveTo: "",
+    manualWholeDoc: false,
     headerFields: [],
     multiSample: false,
     targets: ["ปุ๋ยสูตร 15-15-15 กระสอบ 50 กก."],
@@ -1234,6 +1292,10 @@ export const QI_TEMPLATES: QiTemplate[] = [
       manual("p-rm-amsu"),
       manual("p-rm-urea"),
     ],
+    photo: "onFail",
+    effectiveFrom: "01/09/2026",
+    effectiveTo: "",
+    manualWholeDoc: false,
     headerFields: [],
     multiSample: false,
     targets: [],
@@ -1263,6 +1325,10 @@ export const QI_TEMPLATES: QiTemplate[] = [
       range("p-warehouse-temp", 20, 35),
       value("p-bag", "ปกติ"),
     ],
+    photo: "onFail",
+    effectiveFrom: "01/09/2026",
+    effectiveTo: "",
+    manualWholeDoc: false,
     headerFields: [],
     multiSample: false,
     targets: ["ปุ๋ยสูตร 15-15-15 กระสอบ 50 กก."],
@@ -1287,6 +1353,10 @@ export const QI_TEMPLATES: QiTemplate[] = [
     inspectionType: "outgoing",
     refDocs: ["deliveryNote"],
     rows: [range("p-weight", 49.5, 50.5, 3), value("p-bag", "ปกติ")],
+    photo: "onFail",
+    effectiveFrom: "01/09/2026",
+    effectiveTo: "",
+    manualWholeDoc: false,
     headerFields: [],
     multiSample: false,
     targets: ["ปุ๋ยสูตร 15-15-15 กระสอบ 50 กก.", "ปุ๋ยสูตร 16-20-0 กระสอบ 50 กก."],
@@ -1309,6 +1379,10 @@ export const QI_TEMPLATES: QiTemplate[] = [
     inspectionType: "outgoing",
     refDocs: [],
     rows: [value("p-complaint", "รับเรื่องแล้ว"), manual("p-trace")],
+    photo: "onFail",
+    effectiveFrom: "01/09/2026",
+    effectiveTo: "",
+    manualWholeDoc: false,
     headerFields: [],
     multiSample: false,
     targets: [],
@@ -1329,6 +1403,10 @@ export const QI_TEMPLATES: QiTemplate[] = [
     inspectionType: "incoming",
     refDocs: [],
     rows: [value("p-coa-complete", "ครบ"), value("p-coa-match", "ตรง")],
+    photo: "onFail",
+    effectiveFrom: "01/09/2026",
+    effectiveTo: "",
+    manualWholeDoc: false,
     headerFields: [],
     multiSample: false,
     targets: [],
@@ -1535,6 +1613,10 @@ export const blankTemplate = (): QiTemplate => ({
   // จะได้ฟอร์มที่ผูกกับเอกสารผิดใบโดยไม่มีใครรู้
   refDocs: [],
   rows: [],
+  photo: "onFail",
+  effectiveFrom: "01/09/2026",
+  effectiveTo: "",
+  manualWholeDoc: false,
   headerFields: [],
   multiSample: false,
   subject: "item",
