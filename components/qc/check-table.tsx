@@ -70,6 +70,29 @@ export const rowTitle = (r: QiRow) =>
       : ""
     : (paramOf(r.parameterId)?.name ?? "");
 
+/**
+ * ข้อที่เว้นเกณฑ์ว่างแล้วระบบยังตัดสินให้ — เป็นกับดักคนละแบบกันสองฝั่ง
+ *
+ * ฝั่งตัวเลข min_max_criteria_passed คืน has_reading ซึ่งเป็น False เมื่อไม่มี
+ * ค่าไหนถูกคีย์เลย และต่อให้คีย์ ก็เทียบ flt(min) <= v <= flt(max) โดย flt ของ
+ * ค่าว่างคือ 0 — เว้นค่าสูงสุดไว้คือข้อที่ "ตกทุกใบ"
+ *
+ * ฝั่งข้อความกลับกันคนละทาง set_status_based_on_acceptance_values เทียบ
+ * (reading_value or "") == (value or "") — ไม่ได้ตั้งค่าที่ผ่านและผู้ตรวจไม่คีย์
+ * อะไร จะได้ "" == "" ซึ่งเป็นจริง กลายเป็นข้อที่ "ผ่านทุกใบ" ทั้งที่ไม่มีใครตรวจ
+ *
+ * ทั้งสองแบบหายไปทันทีที่ติ๊กผู้ตรวจตัดสินเอง เพราะ inspect_and_set_status
+ * ข้ามแถวที่ manual_inspection ทั้งแถว ไม่ประเมินเกณฑ์อะไรเลย
+ */
+export function blankCriteriaWarning(r: QiRow): string | null {
+  if (r.manualInspection || r.formulaBased) return null;
+  if (r.numeric && r.max === null)
+    return "ไม่ใส่ค่าสูงสุด ERPNext อ่านเป็น 0 แล้วทุกใบจะไม่ผ่าน — ถ้าตั้งใจให้คนตัดสินเอง ให้ติ๊กผู้ตรวจตัดสินเอง";
+  if (!r.numeric && r.value.trim() === "")
+    return "ไม่ตั้งค่าที่ถือว่าผ่าน ERPNext จะเทียบช่องว่างกับช่องว่างแล้วให้ผ่านทุกใบ — ถ้าตั้งใจให้คนตัดสินเอง ให้ติ๊กผู้ตรวจตัดสินเอง";
+  return null;
+}
+
 const numText = (v: number | null) => (v === null ? "" : String(v));
 const toNum = (v: string) => {
   const t = v.trim();
@@ -211,17 +234,11 @@ export function CheckTable({
                     {r.formulaBased && " · สูตร"}
                     {r.readings > 1 && ` · คีย์ ${r.readings} ค่า`}
                   </p>
-                  {/* ค่าสูงสุดว่าง = ศูนย์ ไม่ใช่ไม่จำกัด เพราะ ERPNext เทียบ
-                      flt(min) <= v <= flt(max) แล้ว flt ของค่าว่างคือ 0 —
-                      ปล่อยว่างไว้คือข้อที่ตกทุกใบโดยไม่มีใครรู้ว่าทำไม */}
-                  {r.numeric &&
-                    !r.formulaBased &&
-                    !r.manualInspection &&
-                    r.max === null && (
-                      <p className="mt-1 text-sm text-danger-strong">
-                        ไม่ใส่ค่าสูงสุด ERPNext อ่านเป็น 0 แล้วทุกใบจะไม่ผ่าน
-                      </p>
-                    )}
+                  {blankCriteriaWarning(r) && (
+                    <p className="mt-1 text-sm text-danger-strong">
+                      {blankCriteriaWarning(r)}
+                    </p>
+                  )}
                 </td>
 
                 <td className="px-4 py-3 text-center align-top">
@@ -470,9 +487,9 @@ function RowEditDialog({
                 />
               </div>
               <FieldNote>min_value / max_value</FieldNote>
-              {row.max === null && !row.manualInspection && (
+              {blankCriteriaWarning(row) && (
                 <p className="text-sm text-danger-strong">
-                  ไม่ใส่ค่าสูงสุด ERPNext อ่านเป็น 0 แล้วทุกใบจะไม่ผ่าน
+                  {blankCriteriaWarning(row)}
                 </p>
               )}
             </div>
@@ -494,6 +511,11 @@ function RowEditDialog({
               {/* คั่นด้วย / = ให้เลือก ไม่ใช่ให้พิมพ์ — ในใบตรวจจะขึ้นเป็น
                   ดรอปดาวน์ให้เอง ไม่ต้องตั้งประเภทเพิ่มอีกช่อง */}
               <FieldNote>value · คั่นด้วย / จะขึ้นเป็นดรอปดาวน์ในใบตรวจ</FieldNote>
+              {blankCriteriaWarning(row) && (
+                <p className="text-sm text-danger-strong">
+                  {blankCriteriaWarning(row)}
+                </p>
+              )}
             </div>
           )}
 
