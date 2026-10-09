@@ -4,6 +4,7 @@ import * as React from "react";
 import {
   ChevronDownIcon,
   ChevronUpIcon,
+  CircleXIcon,
   MinusIcon,
   PencilIcon,
   PlusIcon,
@@ -30,6 +31,7 @@ import {
   SelectValue,
 } from "@peckey954/ui/components/ui/select";
 import { Textarea } from "@peckey954/ui/components/ui/textarea";
+import { cn } from "@peckey954/ui/lib/utils";
 import { ParamCombobox } from "@/components/qc/param-picker";
 import {
   CHECK_SOURCES,
@@ -110,7 +112,11 @@ export function criteriaProblems(rows: QiRow[]) {
 }
 
 /**
- * แถบเตือนพร้อมปุ่มแก้ — ไม่ติ๊กให้เองเงียบ ๆ
+ * แถบเตือนรวมเหนือตาราง — ไม่ติ๊กให้เองเงียบ ๆ
+ *
+ * เคยอยู่ในช่องเกณฑ์ของแต่ละแถว ซึ่งทำให้แถวสูงไม่เท่ากันจนกวาดตาอ่านตารางไม่ได้
+ * และถ้ามีหลายข้อก็ได้กล่องแดงซ้ำ ๆ ที่เขียนเหมือนกันทุกอัน ย้ายมารวมข้างบน
+ * แล้วชี้แถวด้วยขอบแดงที่ช่องติ๊กแทน
  *
  * ข้อที่เว้นเกณฑ์ว่างมีสองความหมายที่หน้าตาเหมือนกันเป๊ะ คือ "ตั้งใจให้คนตัดสิน"
  * กับ "ลืมใส่เกณฑ์" ติ๊กให้เองอัตโนมัติคือเลือกข้างให้ว่าเป็นอันแรกเสมอ
@@ -119,25 +125,46 @@ export function criteriaProblems(rows: QiRow[]) {
  *
  * ให้ปุ่มกดแทน จบในคลิกเดียวเหมือนกัน แต่คนกดเป็นคนตัดสินว่าอันไหนคืออันไหน
  */
-function CriteriaWarning({
-  row,
-  onFix,
+function CriteriaBanner({
+  rows,
+  onFixAll,
 }: {
-  row: QiRow;
-  onFix: () => void;
+  rows: QiRow[];
+  onFixAll: (ids: string[]) => void;
 }) {
-  const msg = blankCriteriaWarning(row);
-  if (!msg) return null;
+  const bad = rows.filter((r) => blankCriteriaWarning(r) !== null);
+  if (bad.length === 0) return null;
+
+  // ชื่อหัวข้อไล่ให้ครบถ้าไม่เยอะ เกินสามข้อค่อยสรุปเป็นจำนวน เพราะรายชื่อยาว
+  // สิบข้อก็ไม่ได้ช่วยให้หาเจอเร็วขึ้น ขอบแดงที่ช่องติ๊กเป็นตัวชี้ที่แม่นกว่า
+  const names = bad
+    .map((r) => rowTitle(r) || "หัวข้อที่ยังไม่ได้เลือก")
+    .filter(Boolean);
+  const head =
+    bad.length === 1
+      ? `หัวข้อตรวจ ${names[0]} ยังไม่ได้กำหนดวิธีการตัดสินผล`
+      : bad.length <= 3
+        ? `หัวข้อตรวจ ${names.join(" · ")} ยังไม่ได้กำหนดวิธีการตัดสินผล`
+        : `มี ${bad.length} หัวข้อตรวจที่ยังไม่ได้กำหนดวิธีการตัดสินผล`;
+
   return (
-    <div className="mt-1 rounded-lg border border-danger-border bg-danger px-3 py-2">
-      <p className="text-sm text-danger-strong">{msg}</p>
+    <div className="mb-3 flex flex-wrap items-start justify-between gap-3 rounded-xl border border-danger-border bg-danger px-4 py-3">
+      <div className="flex min-w-0 items-start gap-2">
+        <CircleXIcon className="mt-0.5 size-4 shrink-0 text-danger-strong" />
+        <div className="min-w-0">
+          <p className="font-medium text-danger-strong">{head}</p>
+          <p className="mt-0.5 text-sm">
+            ระบบไม่สามารถประเมินผลได้ กรุณากำหนดการตัดสิน
+            หรือเลือกให้ผู้ตรวจตัดสินผลเอง
+          </p>
+        </div>
+      </div>
       <Button
         variant="outline"
-        size="sm"
-        className="mt-2 bg-card"
-        onClick={onFix}
+        className="shrink-0 bg-card"
+        onClick={() => onFixAll(bad.map((r) => r.id))}
       >
-        ให้ผู้ตรวจตัดสินเอง
+        ผู้ตรวจตัดสินเอง
       </Button>
     </div>
   );
@@ -173,6 +200,17 @@ export function CheckTable({
 
   return (
     <>
+      <CriteriaBanner
+        rows={rows}
+        onFixAll={(ids) =>
+          onChange(
+            rows.map((r) =>
+              ids.includes(r.id) ? { ...r, manualInspection: true } : r
+            )
+          )
+        }
+      />
+
       <div className="overflow-x-auto rounded-xl border border-border bg-card">
         <table className="w-full min-w-[880px]">
           <thead>
@@ -278,22 +316,36 @@ export function CheckTable({
                 </td>
 
                 <td className="px-4 py-3 align-top">
-                  <p className="py-2 text-sm">{describeCriteria(r)}</p>
-                  <p className="text-sm text-muted-foreground">
-                    {r.numeric ? "ตัวเลข" : "ข้อความ"}
-                    {r.formulaBased && " · สูตร"}
-                    {r.readings > 1 && ` · คีย์ ${r.readings} ค่า`}
-                  </p>
-                  <CriteriaWarning
-                    row={r}
-                    onFix={() => onPatch(r.id, { manualInspection: true })}
-                  />
+                  {/* แถวที่ดึงจากระบบไม่มีเกณฑ์ให้ตัดสินโดยธรรมชาติ ผู้ตรวจเลือก
+                      จากรายการแล้วชี้ขาดเอง เขียนบอกไปเลยว่าทำไมช่องนี้ว่าง
+                      ไม่ใช่ปล่อยขีดไว้แล้วให้เดาว่าลืมตั้งหรือตั้งไม่ได้ */}
+                  {r.kind === "system" ? (
+                    <p className="py-2 text-sm text-muted-foreground">
+                      ไม่มีการตัดสิน เนื่องจากเป็นการเลือกข้อมูลที่ใช้ตรวจสอบ
+                    </p>
+                  ) : (
+                    <>
+                      <p className="py-2 text-sm">{describeCriteria(r)}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {r.numeric ? "ตัวเลข" : "ข้อความ"}
+                        {r.formulaBased && " · สูตร"}
+                        {r.readings > 1 && ` · ระบุ ${r.readings} ค่า`}
+                      </p>
+                    </>
+                  )}
+
                 </td>
 
                 <td className="px-4 py-3 text-center align-top">
                   <Checkbox
                     aria-label="ผู้ตรวจตัดสินเอง"
-                    className="mt-3"
+                    // ขอบแดงชี้ว่าแถบเตือนข้างบนกำลังพูดถึงแถวไหน ฟอร์มยี่สิบสี่ข้อ
+                    // ถ้าบอกแต่ชื่อหัวข้อก็ยังต้องไล่หาเองอยู่ดี
+                    className={cn(
+                      "mt-3",
+                      blankCriteriaWarning(r) &&
+                        "border-danger-strong data-[state=unchecked]:border-danger-strong"
+                    )}
                     checked={r.manualInspection}
                     onCheckedChange={(v) =>
                       onPatch(r.id, { manualInspection: v === true })
@@ -536,10 +588,11 @@ function RowEditDialog({
                 />
               </div>
               <FieldNote>min_value / max_value</FieldNote>
-              <CriteriaWarning
-                row={row}
-                onFix={() => onChange({ manualInspection: true })}
-              />
+              {blankCriteriaWarning(row) && (
+                <p className="text-sm text-danger-strong">
+                  {blankCriteriaWarning(row)}
+                </p>
+              )}
             </div>
           ) : (
             <div className="space-y-1.5">
@@ -559,10 +612,11 @@ function RowEditDialog({
               {/* คั่นด้วย / = ให้เลือก ไม่ใช่ให้พิมพ์ — ในใบตรวจจะขึ้นเป็น
                   ดรอปดาวน์ให้เอง ไม่ต้องตั้งประเภทเพิ่มอีกช่อง */}
               <FieldNote>value · คั่นด้วย / จะขึ้นเป็นดรอปดาวน์ในใบตรวจ</FieldNote>
-              <CriteriaWarning
-                row={row}
-                onFix={() => onChange({ manualInspection: true })}
-              />
+              {blankCriteriaWarning(row) && (
+                <p className="text-sm text-danger-strong">
+                  {blankCriteriaWarning(row)}
+                </p>
+              )}
             </div>
           )}
 
