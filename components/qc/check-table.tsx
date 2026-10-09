@@ -87,10 +87,44 @@ export const rowTitle = (r: QiRow) =>
 export function blankCriteriaWarning(r: QiRow): string | null {
   if (r.manualInspection || r.formulaBased) return null;
   if (r.numeric && r.max === null)
-    return "ไม่ใส่ค่าสูงสุด ERPNext อ่านเป็น 0 แล้วทุกใบจะไม่ผ่าน — ถ้าตั้งใจให้คนตัดสินเอง ให้ติ๊กผู้ตรวจตัดสินเอง";
+    return "ไม่ใส่ค่าสูงสุด ERPNext อ่านเป็น 0 แล้วข้อนี้จะไม่ผ่านทุกใบ";
   if (!r.numeric && r.value.trim() === "")
-    return "ไม่ตั้งค่าที่ถือว่าผ่าน ERPNext จะเทียบช่องว่างกับช่องว่างแล้วให้ผ่านทุกใบ — ถ้าตั้งใจให้คนตัดสินเอง ให้ติ๊กผู้ตรวจตัดสินเอง";
+    return "ไม่ตั้งค่าที่ถือว่าผ่าน ERPNext เทียบช่องว่างกับช่องว่างแล้วข้อนี้จะผ่านทุกใบ";
   return null;
+}
+
+/**
+ * แถบเตือนพร้อมปุ่มแก้ — ไม่ติ๊กให้เองเงียบ ๆ
+ *
+ * ข้อที่เว้นเกณฑ์ว่างมีสองความหมายที่หน้าตาเหมือนกันเป๊ะ คือ "ตั้งใจให้คนตัดสิน"
+ * กับ "ลืมใส่เกณฑ์" ติ๊กให้เองอัตโนมัติคือเลือกข้างให้ว่าเป็นอันแรกเสมอ
+ * ซึ่งทำให้ข้อที่ลืมใส่เกณฑ์กลายเป็นข้อที่ไม่มีวันถูกตรวจอัตโนมัติอีกเลย
+ * โดยคนตั้งค่าไม่เคยรู้ว่าตัวเองลืม — เป็นปัญหาชนิดเดียวกับที่กำลังจะแก้
+ *
+ * ให้ปุ่มกดแทน จบในคลิกเดียวเหมือนกัน แต่คนกดเป็นคนตัดสินว่าอันไหนคืออันไหน
+ */
+function CriteriaWarning({
+  row,
+  onFix,
+}: {
+  row: QiRow;
+  onFix: () => void;
+}) {
+  const msg = blankCriteriaWarning(row);
+  if (!msg) return null;
+  return (
+    <div className="mt-1 rounded-lg border border-danger-border bg-danger px-3 py-2">
+      <p className="text-sm text-danger-strong">{msg}</p>
+      <Button
+        variant="outline"
+        size="sm"
+        className="mt-2 bg-card"
+        onClick={onFix}
+      >
+        ตั้งใจให้ผู้ตรวจตัดสินเอง — ติ๊กให้เลย
+      </Button>
+    </div>
+  );
 }
 
 const numText = (v: number | null) => (v === null ? "" : String(v));
@@ -234,11 +268,10 @@ export function CheckTable({
                     {r.formulaBased && " · สูตร"}
                     {r.readings > 1 && ` · คีย์ ${r.readings} ค่า`}
                   </p>
-                  {blankCriteriaWarning(r) && (
-                    <p className="mt-1 text-sm text-danger-strong">
-                      {blankCriteriaWarning(r)}
-                    </p>
-                  )}
+                  <CriteriaWarning
+                    row={r}
+                    onFix={() => onPatch(r.id, { manualInspection: true })}
+                  />
                 </td>
 
                 <td className="px-4 py-3 text-center align-top">
@@ -487,11 +520,10 @@ function RowEditDialog({
                 />
               </div>
               <FieldNote>min_value / max_value</FieldNote>
-              {blankCriteriaWarning(row) && (
-                <p className="text-sm text-danger-strong">
-                  {blankCriteriaWarning(row)}
-                </p>
-              )}
+              <CriteriaWarning
+                row={row}
+                onFix={() => onChange({ manualInspection: true })}
+              />
             </div>
           ) : (
             <div className="space-y-1.5">
@@ -511,11 +543,10 @@ function RowEditDialog({
               {/* คั่นด้วย / = ให้เลือก ไม่ใช่ให้พิมพ์ — ในใบตรวจจะขึ้นเป็น
                   ดรอปดาวน์ให้เอง ไม่ต้องตั้งประเภทเพิ่มอีกช่อง */}
               <FieldNote>value · คั่นด้วย / จะขึ้นเป็นดรอปดาวน์ในใบตรวจ</FieldNote>
-              {blankCriteriaWarning(row) && (
-                <p className="text-sm text-danger-strong">
-                  {blankCriteriaWarning(row)}
-                </p>
-              )}
+              <CriteriaWarning
+                row={row}
+                onFix={() => onChange({ manualInspection: true })}
+              />
             </div>
           )}
 
