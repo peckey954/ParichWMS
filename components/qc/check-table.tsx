@@ -355,38 +355,64 @@ function RowEditDialog({
             </span>
           </label>
 
+          {/* สองคำถามนี้แยกจากกันจริง ไม่ใช่ตัวเลือกที่แข่งกัน — ของ ERPNext
+              numeric กับ formula_based_criteria ไม่มี depends_on ทั้งคู่
+              ติ๊กครบทั้งสี่แบบได้ และแต่ละแบบให้ผลคนละอย่าง */}
           <div className="space-y-2">
-            <Label>วิธีตัดสิน</Label>
-            <div className="space-y-2">
-              <label className="flex items-start gap-3 rounded-lg border border-border px-3 py-2.5">
-                <Checkbox
-                  className="mt-0.5"
-                  checked={row.numeric}
-                  onCheckedChange={(v) => onChange({ numeric: v === true })}
-                />
-                <span className="text-sm">
-                  <span className="font-medium">คีย์เป็นตัวเลข</span>
-                  <span className="block text-muted-foreground">
-                    ได้ช่องคีย์หลายค่า · ไม่ติ๊กคือได้ช่องเดียวให้คีย์ข้อความ
-                  </span>
+            <Label>ผู้ตรวจคีย์อะไร</Label>
+            <label className="flex items-start gap-3 rounded-lg border border-border px-3 py-2.5">
+              <Checkbox
+                className="mt-0.5"
+                checked={row.numeric}
+                onCheckedChange={(v) =>
+                  // ไม่ติ๊กตัวเลข = เหลือ reading_value ช่องเดียว ช่องคีย์ 1-10
+                  // ถูกซ่อนทั้งก้อน (section_break_14 depends_on numeric)
+                  // จำนวนค่าจึงต้องตกกลับเป็น 1 ไม่ใช่ค้างเลขเดิมไว้หลอก
+                  onChange({
+                    numeric: v === true,
+                    ...(v === true ? {} : { readings: 1 }),
+                  })
+                }
+              />
+              <span className="text-sm">
+                <span className="font-medium">คีย์เป็นตัวเลข</span>
+                <span className="block text-muted-foreground">
+                  ติ๊ก = ช่องตัวเลข reading_1…reading_{MAX_READINGS} ·
+                  ไม่ติ๊ก = ช่องข้อความ reading_value ช่องเดียว
                 </span>
-              </label>
+              </span>
+            </label>
+            <FieldNote>numeric</FieldNote>
+          </div>
 
-              <label className="flex items-start gap-3 rounded-lg border border-border px-3 py-2.5">
-                <Checkbox
-                  className="mt-0.5"
-                  checked={row.formulaBased}
-                  onCheckedChange={(v) => onChange({ formulaBased: v === true })}
-                />
-                <span className="text-sm">
-                  <span className="font-medium">ตัดสินด้วยสูตร</span>
-                  <span className="block text-muted-foreground">
-                    ใช้สูตรแทนช่วงต่ำ–สูง หรือค่าที่ถือว่าผ่าน
-                  </span>
+          <div className="space-y-2">
+            <Label>ตัดสินยังไง</Label>
+            <label className="flex items-start gap-3 rounded-lg border border-border px-3 py-2.5">
+              <Checkbox
+                className="mt-0.5"
+                checked={row.formulaBased}
+                onCheckedChange={(v) => onChange({ formulaBased: v === true })}
+              />
+              <span className="text-sm">
+                <span className="font-medium">ตัดสินด้วยสูตร</span>
+                <span className="block text-muted-foreground">
+                  ติ๊กแล้วช่วงต่ำ–สูงกับค่าที่ถือว่าผ่านจะถูกซ่อน
+                  ใช้สูตรแทนทั้งคู่
                 </span>
-              </label>
-            </div>
-            <FieldNote>numeric · formula_based_criteria</FieldNote>
+              </span>
+            </label>
+            {/* บอกผลของสองติ๊กรวมกันเป็นประโยคเดียว เพราะสี่แบบที่เป็นไปได้
+                ให้ตัวแปรในสูตรคนละชุด เขียนผิดชุดแล้วสูตรจะพังตอนรันจริง */}
+            <p className="rounded-lg bg-muted px-3 py-2 text-sm text-muted-foreground">
+              {row.formulaBased
+                ? row.numeric
+                  ? "คีย์ตัวเลขหลายค่า แล้วตัดสินด้วยสูตรที่ใช้ reading_1…reading_10 และ mean ได้"
+                  : "คีย์ข้อความช่องเดียว แล้วตัดสินด้วยสูตรที่ใช้ได้แต่ reading_value"
+                : row.numeric
+                  ? "คีย์ตัวเลขหลายค่า แล้วตัดสินด้วยช่วงต่ำ–สูง ทุกค่าต้องอยู่ในช่วง"
+                  : "คีย์ข้อความช่องเดียว แล้วเทียบกับค่าที่ถือว่าผ่านตรงตัว"}
+            </p>
+            <FieldNote>formula_based_criteria</FieldNote>
           </div>
 
           {row.formulaBased ? (
@@ -471,6 +497,9 @@ function RowEditDialog({
             </div>
           )}
 
+          {/* ไม่ติ๊กตัวเลขก็ไม่มีช่องให้นับ — reading_value มีช่องเดียวตายตัว
+              โชว์สเต็ปเปอร์ไว้ก็ปรับได้แต่ไม่มีผลอะไรกับใบจริง */}
+          {row.numeric && (
           <div className="space-y-1.5">
             <Label>คีย์กี่ค่าในหัวข้อนี้</Label>
             <div className="flex items-center gap-2">
@@ -530,6 +559,7 @@ function RowEditDialog({
                 : "reading_1"}
             </FieldNote>
           </div>
+          )}
 
           <div className="space-y-1.5">
             <Label htmlFor={`${row.id}-c`}>เกณฑ์ที่ผู้ตรวจอ่าน</Label>
