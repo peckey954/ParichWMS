@@ -94,6 +94,22 @@ export function blankCriteriaWarning(r: QiRow): string | null {
 }
 
 /**
+ * นับข้อที่เว้นเกณฑ์ว่างไว้ แยกตามว่าจะเพี้ยนไปทางไหน
+ *
+ * ใช้ตอนกดบันทึกเป็นด่านสุดท้าย — แถบเตือนที่แถวมองข้ามได้ถ้าฟอร์มยาวยี่สิบสี่ข้อ
+ * แล้วเลื่อนผ่านไป ตอนบันทึกคือจังหวะเดียวที่ยังทันแก้ก่อนเอาไปใช้จริง
+ */
+export function criteriaProblems(rows: QiRow[]) {
+  const alwaysPass = rows.filter(
+    (r) => !r.manualInspection && !r.formulaBased && !r.numeric && r.value.trim() === ""
+  );
+  const alwaysFail = rows.filter(
+    (r) => !r.manualInspection && !r.formulaBased && r.numeric && r.max === null
+  );
+  return { alwaysPass, alwaysFail, total: alwaysPass.length + alwaysFail.length };
+}
+
+/**
  * แถบเตือนพร้อมปุ่มแก้ — ไม่ติ๊กให้เองเงียบ ๆ
  *
  * ข้อที่เว้นเกณฑ์ว่างมีสองความหมายที่หน้าตาเหมือนกันเป๊ะ คือ "ตั้งใจให้คนตัดสิน"

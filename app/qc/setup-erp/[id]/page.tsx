@@ -67,7 +67,12 @@ import { ChipGroup } from "@/components/chip-group";
 import { SchedulePreviewCalendar } from "@/components/qc/schedule-calendar";
 import { TimeField } from "@/components/time-field";
 import { MultiSelectChips } from "@/components/multi-select-chips";
-import { CheckTable, HeaderFieldTable, rowTitle } from "@/components/qc/check-table";
+import {
+  CheckTable,
+  HeaderFieldTable,
+  criteriaProblems,
+  rowTitle,
+} from "@/components/qc/check-table";
 import {
   DEFAULT_SCHEDULE,
   ORIGIN,
@@ -230,11 +235,53 @@ function Editor({ seed, isNew }: { seed: QiTemplate; isNew: boolean }) {
       });
       // เปลี่ยน URL จาก /new เป็น id จริง กดรีเฟรชแล้วจะได้ไม่กลายเป็นร่างเปล่าอีกใบ
       router.replace(`/qc/setup-erp/${tpl.id}`);
+      warnBlankCriteria();
       return;
     }
 
     toast.success("บันทึกรายงานแล้ว", {
       description: `${tpl.name} · ${tpl.rows.length} หัวข้อ — ตัวอย่างหน้าตั้งค่า ยังไม่ได้ต่อหลังบ้าน`,
+    });
+    warnBlankCriteria();
+  };
+
+  /**
+   * ด่านสุดท้ายก่อนเอาฟอร์มไปใช้ — เตือนรวม ไม่บล็อกการบันทึก
+   *
+   * แถบเตือนที่แถวมองข้ามได้ถ้าฟอร์มยาวยี่สิบสี่ข้อแล้วเลื่อนผ่านไป ตรงนี้คือ
+   * จังหวะเดียวที่ยังทันแก้ แต่ไม่บล็อกเพราะฟอร์มกระดาษกว่าจะตั้งครบใช้หลายรอบ
+   * ต้องเซฟร่างค้างไว้ได้ บล็อกเมื่อไหร่คนจะเลี่ยงด้วยการใส่เกณฑ์มั่ว ๆ ไปก่อน
+   * ซึ่งแย่กว่าเว้นว่างไว้ตรง ๆ
+   *
+   * ปุ่มติ๊กให้ทุกข้อรวดเดียว — คนกดยังเป็นคนตัดสินอยู่ ไม่ได้ติ๊กให้เองเงียบ ๆ
+   */
+  const warnBlankCriteria = () => {
+    const { alwaysPass, alwaysFail, total } = criteriaProblems(tpl.rows);
+    if (total === 0) return;
+
+    const parts = [
+      alwaysPass.length > 0 ? `${alwaysPass.length} ข้อจะผ่านทุกใบ` : "",
+      alwaysFail.length > 0 ? `${alwaysFail.length} ข้อจะไม่ผ่านทุกใบ` : "",
+    ].filter(Boolean);
+
+    toast.warning(`มี ${total} ข้อที่ยังไม่ได้ตั้งเกณฑ์`, {
+      description: `${parts.join(" · ")} — ถ้าตั้งใจให้ผู้ตรวจตัดสินเอง กดติ๊กให้ทุกข้อได้เลย`,
+      duration: 10000,
+      action: {
+        label: "ติ๊กให้ทุกข้อ",
+        onClick: () => {
+          const ids = new Set(
+            [...alwaysPass, ...alwaysFail].map((r) => r.id)
+          );
+          setTpl((p) => ({
+            ...p,
+            rows: p.rows.map((r) =>
+              ids.has(r.id) ? { ...r, manualInspection: true } : r
+            ),
+          }));
+          toast.success(`ติ๊กผู้ตรวจตัดสินเองให้ ${ids.size} ข้อแล้ว`);
+        },
+      },
     });
   };
 

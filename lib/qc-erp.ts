@@ -1559,13 +1559,23 @@ export const newShift = (from = "08:00", to = "12:00"): QcShift => ({
 /** คัดลอกหัวข้อทั้งแถว — ได้ id ใหม่ ไม่ชนของเดิม เรียกได้ใน event handler เท่านั้น */
 export const cloneRow = (row: QiRow): QiRow => ({ ...row, id: uid("row") });
 
+/**
+ * แถวใหม่ — เริ่มที่คนตัดสิน แล้วค่อยเอาติ๊กออกตอนใส่เกณฑ์
+ *
+ * เคยเริ่มที่ numeric โดยไม่ติ๊ก manual ซึ่งแปลว่าแถวที่เพิ่งกดเพิ่มอยู่ในสถานะ
+ * "ตกทุกใบ" ตั้งแต่วินาทีแรก เพราะ min_max_criteria_passed คืน has_reading
+ * ที่เป็น False เมื่อยังไม่มีค่าไหนถูกคีย์
+ *
+ * กลับด้านเป็นปลอดภัยไว้ก่อน — ข้อที่ยังตั้งไม่เสร็จได้ผลว่า "คนตัดสิน"
+ * ซึ่งไม่โกหกใคร ดีกว่าได้ผลว่า "ตก" ที่ดูเหมือนระบบตรวจแล้ว
+ */
 export const newRow = (): QiRow => ({
   id: uid("row"),
   kind: "text",
   parameterId: "",
   numeric: true,
   formulaBased: false,
-  manualInspection: false,
+  manualInspection: true,
   min: null,
   max: null,
   value: "",
