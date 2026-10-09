@@ -41,10 +41,8 @@ import {
   ROW_KIND,
   ROW_KINDS,
   SOURCE,
-  SOURCE_IDS,
   cloneRow,
   paramOf,
-  type DocField,
   type QiRow,
   type RemarkMode,
   type RowKind,
@@ -770,111 +768,6 @@ function StepperField({
           <PlusIcon />
         </Button>
       </div>
-    </div>
-  );
-}
-
-/* ==================================================================
-   ตารางส่วนหัวเอกสาร — ช่องที่กรอกครั้งเดียวต่อใบ
-================================================================== */
-
-export function HeaderFieldTable({
-  fields,
-  onChange,
-}: {
-  fields: DocField[];
-  onChange: (next: DocField[]) => void;
-}) {
-  const patch = (id: string, next: Partial<DocField>) =>
-    onChange(fields.map((f) => (f.id === id ? { ...f, ...next } : f)));
-
-  return (
-    <div className="overflow-x-auto rounded-xl border border-border bg-card">
-      <table className="w-full min-w-[760px]">
-        <thead>
-          <tr className="border-b border-border text-sm text-muted-foreground">
-            <th className="px-4 py-3 text-left font-normal">หัวเอกสาร</th>
-            <th className="px-4 py-3 text-left font-normal">แหล่งข้อมูล</th>
-            <th className="w-28 px-4 py-3 text-center font-normal">
-              บังคับกรอก
-            </th>
-            <th className="w-16 px-4 py-3" />
-          </tr>
-        </thead>
-        <tbody>
-          {fields.map((f) => (
-            <tr key={f.id} className="border-b border-border last:border-0">
-              <td className="px-4 py-3 align-top">
-                <Input
-                  aria-label="หัวเอกสาร"
-                  className="bg-card"
-                  value={f.label}
-                  placeholder="ระบุชื่อช่อง"
-                  onChange={(e) => patch(f.id, { label: e.target.value })}
-                />
-              </td>
-              <td className="px-4 py-3 align-top">
-                <Select
-                  value={f.source}
-                  onValueChange={(v) => patch(f.id, { source: v as SourceId })}
-                >
-                  <SelectTrigger
-                    aria-label="แหล่งข้อมูล"
-                    className="w-full bg-card"
-                  >
-                    <SelectValue placeholder="เลือกแหล่งข้อมูล" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {SOURCE_IDS.map((sid) => (
-                      <SelectItem key={sid} value={sid}>
-                        {SOURCE[sid].label}
-                        {SOURCE[sid].custom && " — ไม่มีใน ERPNext"}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <FieldNote custom={f.source !== "" && SOURCE[f.source].custom}>
-                  {f.source === ""
-                    ? "ยังไม่ได้เลือกแหล่งข้อมูล"
-                    : SOURCE[f.source].store}
-                </FieldNote>
-              </td>
-              <td className="px-4 py-3 text-center align-top">
-                <Checkbox
-                  aria-label="บังคับกรอก"
-                  className="mt-2.5"
-                  checked={f.required}
-                  onCheckedChange={(v) => patch(f.id, { required: v === true })}
-                />
-              </td>
-              <td className="px-4 py-3 align-top">
-                <div className="mt-1 flex justify-end">
-                  <Button
-                    variant="ghost"
-                    size="icon-sm"
-                    aria-label="ลบช่องนี้"
-                    onClick={() => onChange(fields.filter((x) => x.id !== f.id))}
-                  >
-                    <Trash2Icon />
-                  </Button>
-                </div>
-              </td>
-            </tr>
-          ))}
-
-          {fields.length === 0 && (
-            <tr>
-              <td colSpan={4} className="px-4 py-10 text-center">
-                <p className="font-medium">ฟอร์มนี้ไม่มีหัวเอกสาร</p>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  วันที่ ผู้ตรวจ และเลขที่ใบ มากับตัวใบอยู่แล้ว
-                  ตั้งเพิ่มเฉพาะช่องที่ฟอร์มนี้ต้องกรอกเองก่อนเริ่มตรวจ
-                </p>
-              </td>
-            </tr>
-          )}
-        </tbody>
-      </table>
     </div>
   );
 }

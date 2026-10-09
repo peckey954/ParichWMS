@@ -703,29 +703,25 @@ export const targetPool = (subject: Subject): string[] =>
 export function blockersOf(t: QiTemplate): string[] {
   const out: string[] = [];
 
-  // Quality Inspection ไม่มีช่องเก็บเครื่องจักรหรือคลัง มีแต่ item_code
-  if (t.subject !== "item") out.push("ประเภทการตรวจไม่ใช่สินค้า");
+  /* เงื่อนไขเดียวที่หัวใบ — ไม่มีเอกสารอ้างอิง = ไม่มีตัวเปิดใบ
 
-  // reference_type / reference_name เป็น reqd=1 ที่ไม่มี depends_on และ
-  // frappe._validate_mandatory ทำงานตอน save ไม่ใช่ตอน submit —
-  // ฟอร์มที่ไม่มีเอกสารเป็นต้นเรื่องจึงบันทึกแม้แต่ draft ไม่ได้
-  if (t.subject === "item" && t.refDocs.length === 0)
-    out.push("ไม่ได้อ้างอิงเอกสาร");
+     reference_type กับ reference_name เป็น reqd=1 ที่ไม่มี depends_on และ
+     frappe._validate_mandatory ทำงานตอน save ไม่ใช่ตอน submit ใบที่ไม่มีเอกสาร
+     เป็นต้นเรื่องจึงบันทึกแม้แต่ draft ไม่ได้ ต้องไปอยู่ doctype ของเราเอง
 
-  // item_code ก็ reqd=1 เหมือนกัน ไม่ผูกสินค้าคือไม่มีใบให้เปิด
-  if (t.subject === "item" && t.targets.length === 0)
-    out.push("ยังไม่ได้ผูกกับสินค้าตัวไหน");
+     เคยนับประเภทการตรวจกับการผูกสินค้าเป็นเงื่อนไขด้วย ซึ่งเป็นการถามเรื่อง
+     เดียวกันสามรอบ — ฟอร์มที่ตรวจเครื่องจักรก็คือฟอร์มที่ไม่มีเอกสารอ้างอิง
+     อยู่แล้ว ถามช่องเดียวพอ แล้วตั้งขัดกันเองไม่ได้ด้วย */
+  if (t.refDocs.length === 0) out.push("ไม่ได้เลือกเอกสารอ้างอิง");
 
-  for (const f of t.headerFields)
-    if (f.source !== "" && SOURCE[f.source].custom)
-      out.push(`ส่วนหัว “${f.label || "ไม่มีชื่อ"}”`);
-
+  // หัวข้อที่ดึงคลังหรือเครื่องจักรมา — Quality Inspection ไม่มีช่อง Link ไปหา
   for (const r of t.rows)
     if (r.kind === "system" && r.source && SOURCE[r.source].custom)
       out.push(`หัวข้อ “${SOURCE[r.source].label}”`);
 
   return out;
 }
+
 
 /**
  * ใบตรวจของฟอร์มนี้ลง Quality Inspection ได้ไหม
@@ -797,8 +793,6 @@ export type QiTemplate = {
    */
   href?: string;
   rows: QiRow[];
-  /** ช่องที่ผู้ตรวจกรอกครั้งเดียวต่อใบ — ว่างได้ แปลว่าใบนี้ไม่มีหัวเอกสาร */
-  headerFields: DocField[];
   /**
    * รูปถ่ายประกอบใบตรวจ — ไม่มีใน Quality Inspection ต้องทำเป็น custom field
    *
@@ -1054,7 +1048,6 @@ export const QI_TEMPLATES: QiTemplate[] = [
     effectiveFrom: "01/09/2026",
     effectiveTo: "",
     manualWholeDoc: false,
-    headerFields: [],
     multiSample: false,
     targets: ["21-0-0 ฟูเจียน ผง", "46-0-0 ยูเรีย", "18-46-0 DAP"],
     requireBefore: true,
@@ -1081,7 +1074,6 @@ export const QI_TEMPLATES: QiTemplate[] = [
     effectiveFrom: "01/09/2026",
     effectiveTo: "",
     manualWholeDoc: false,
-    headerFields: [],
     multiSample: false,
     targets: ["ปุ๋ยสูตร 15-15-15 กระสอบ 50 กก."],
     requireBefore: false,
@@ -1109,7 +1101,6 @@ export const QI_TEMPLATES: QiTemplate[] = [
     effectiveFrom: "01/09/2026",
     effectiveTo: "",
     manualWholeDoc: false,
-    headerFields: [],
     multiSample: false,
     targets: ["ปุ๋ยสูตร 15-15-15 กระสอบ 50 กก.", "ปุ๋ยสูตร 16-20-0 กระสอบ 50 กก."],
     requireBefore: false,
@@ -1155,9 +1146,6 @@ export const QI_TEMPLATES: QiTemplate[] = [
     effectiveFrom: "01/09/2026",
     effectiveTo: "",
     manualWholeDoc: false,
-    headerFields: [
-      { id: rid(), label: "เครื่องจักรที่ตรวจ", source: "machine", required: true },
-    ],
     multiSample: false,
     targets: [],
     requireBefore: false,
@@ -1191,9 +1179,6 @@ export const QI_TEMPLATES: QiTemplate[] = [
     effectiveFrom: "01/09/2026",
     effectiveTo: "",
     manualWholeDoc: false,
-    headerFields: [
-      { id: rid(), label: "คลังสินค้าที่ตรวจ", source: "warehouse", required: true },
-    ],
     multiSample: false,
     targets: [],
     requireBefore: false,
@@ -1229,7 +1214,6 @@ export const QI_TEMPLATES: QiTemplate[] = [
     effectiveFrom: "01/09/2026",
     effectiveTo: "",
     manualWholeDoc: false,
-    headerFields: [],
     // หนึ่งกระสอบที่สุ่ม = หนึ่งใบ ไม่ใช่หนึ่งคอลัมน์ในใบเดียว
     multiSample: true,
     targets: [],
@@ -1257,7 +1241,6 @@ export const QI_TEMPLATES: QiTemplate[] = [
     effectiveFrom: "01/09/2026",
     effectiveTo: "",
     manualWholeDoc: false,
-    headerFields: [],
     multiSample: false,
     targets: ["ปุ๋ยสูตร 15-15-15 กระสอบ 50 กก."],
     requireBefore: true,
@@ -1296,7 +1279,6 @@ export const QI_TEMPLATES: QiTemplate[] = [
     effectiveFrom: "01/09/2026",
     effectiveTo: "",
     manualWholeDoc: false,
-    headerFields: [],
     multiSample: false,
     targets: [],
     requireBefore: false,
@@ -1329,7 +1311,6 @@ export const QI_TEMPLATES: QiTemplate[] = [
     effectiveFrom: "01/09/2026",
     effectiveTo: "",
     manualWholeDoc: false,
-    headerFields: [],
     multiSample: false,
     targets: ["ปุ๋ยสูตร 15-15-15 กระสอบ 50 กก."],
     requireBefore: false,
@@ -1357,7 +1338,6 @@ export const QI_TEMPLATES: QiTemplate[] = [
     effectiveFrom: "01/09/2026",
     effectiveTo: "",
     manualWholeDoc: false,
-    headerFields: [],
     multiSample: false,
     targets: ["ปุ๋ยสูตร 15-15-15 กระสอบ 50 กก.", "ปุ๋ยสูตร 16-20-0 กระสอบ 50 กก."],
     requireBefore: false,
@@ -1383,7 +1363,6 @@ export const QI_TEMPLATES: QiTemplate[] = [
     effectiveFrom: "01/09/2026",
     effectiveTo: "",
     manualWholeDoc: false,
-    headerFields: [],
     multiSample: false,
     targets: [],
     requireBefore: false,
@@ -1407,7 +1386,6 @@ export const QI_TEMPLATES: QiTemplate[] = [
     effectiveFrom: "01/09/2026",
     effectiveTo: "",
     manualWholeDoc: false,
-    headerFields: [],
     multiSample: false,
     targets: [],
     requireBefore: false,
@@ -1617,7 +1595,6 @@ export const blankTemplate = (): QiTemplate => ({
   effectiveFrom: "01/09/2026",
   effectiveTo: "",
   manualWholeDoc: false,
-  headerFields: [],
   multiSample: false,
   subject: "item",
   targets: [],

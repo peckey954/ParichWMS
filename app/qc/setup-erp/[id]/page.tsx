@@ -70,7 +70,6 @@ import { TimeField } from "@/components/time-field";
 import { MultiSelectChips } from "@/components/multi-select-chips";
 import {
   CheckTable,
-  HeaderFieldTable,
   criteriaProblems,
   rowTitle,
 } from "@/components/qc/check-table";
@@ -80,13 +79,10 @@ import {
   DISPOSITIONS,
   INSPECTION_TYPE_LABEL,
   INSPECTION_TYPE_VALUE,
-  SUBJECT,
-  SUBJECT_KEYS,
   MAX_READINGS,
   REF_DOCS_OF,
   REF_DOC_LABEL,
   REF_DOC_VALUE,
-  targetPool,
   usesQualityInspection,
   cloneRow,
   describeCriteria,
@@ -104,7 +100,6 @@ import {
   type PhotoMode,
   blockersOf,
   sourcePool,
-  uid,
   SOURCE,
   blankTemplate,
   commitTemplate,
@@ -115,7 +110,6 @@ import {
   type QiTemplate,
   type RefDoc,
   type SourceId,
-  type Subject,
 } from "@/lib/qc-erp";
 
 /* ------------------------------------------------------------------
@@ -174,13 +168,6 @@ function Editor({ seed, isNew }: { seed: QiTemplate; isNew: boolean }) {
      จากทุกแถวพร้อมกัน — ERPNext เองก็ตัดสินทั้งใบจาก readings ทั้งตาราง */
   const [tries, setTries] = React.useState<Record<string, RoundState>>({});
   const tryOf = (id: string) => tries[id] ?? EMPTY_ROUND;
-  /* สองคำถามที่ต่างกัน อย่าเอามาใช้แทนกัน
-       inspectsItem   ฟอร์มนี้ตรวจ "ของ" หรือตรวจสถานที่/เครื่องจักร
-                      → ตัดสินว่ามีช่องผูกสินค้า เอกสารอ้างอิง และผลตรวจที่ไม่ผ่านไหม
-       usesQualityInspection  ใบของฟอร์มนี้ลง doctype ของ ERPNext ได้ไหม
-                      → ต้องตรวจของ "และ" มีเอกสารเป็นตัวเปิดใบ
-     ฟอร์มสุ่มตรวจผลิตภัณฑ์สำเร็จรูปคือตัวที่คำตอบสองอันนี้ไม่ตรงกัน */
-  const inspectsItem = tpl.subject === "item";
   // เหตุผลที่ลง Quality Inspection ไม่ได้ — อ่านสด ๆ จากที่ตั้งไว้ ไม่ได้เก็บแยก
   const blockers = blockersOf(tpl);
   // ใบที่ลง Quality Inspection ติดคำว่า Accepted/Rejected ตายตัว ส่วนใบที่ไปอยู่
@@ -468,9 +455,10 @@ function Editor({ seed, isNew }: { seed: QiTemplate; isNew: boolean }) {
               </FieldNote>
             </div>
 
-            {/* เอกสารสต็อกมีความหมายเฉพาะตอนตรวจสินค้า ตรวจเครื่องจักรหรือคลัง
-                ไม่มีใบรับของมาเกี่ยวข้องเลย — ปิดช่องไว้แทนที่จะซ่อนทั้งช่อง
-                เพราะซ่อนแล้วช่องที่เหลือจะเลื่อนขึ้นมาแทนที่ทุกครั้งที่สลับประเภท */}
+            {/* ช่องเดียวที่ตัดสินว่าใบไปเก็บที่ไหน — เว้นว่างคือฟอร์มที่ไม่มี
+                เอกสารเป็นตัวเปิดใบ ซึ่ง Quality Inspection รับไม่ได้ เพราะ
+                reference_type เป็น reqd=1 ที่ไม่มี depends_on ใบแบบนั้นจึงไป
+                อยู่ doctype ของเรา ไม่ต้องมีช่องให้เลือกซ้ำอีกช่อง */}
             <div className="space-y-1.5">
               <Label htmlFor="ref-docs">
                 เอกสารอ้างอิง{" "}
@@ -481,27 +469,13 @@ function Editor({ seed, isNew }: { seed: QiTemplate; isNew: boolean }) {
               <MultiSelectChips
                 id="ref-docs"
                 className="w-full bg-card"
-                disabled={!inspectsItem}
-                placeholder={
-                  inspectsItem
-                    ? "เลือกเอกสาร"
-                    : "ฟอร์มที่ไม่ได้ตรวจสินค้าไม่มีเอกสารสต็อกมาเกี่ยว"
-                }
+                placeholder="ไม่เลือก = เปิดใบเองโดยไม่มีเอกสาร"
                 options={REF_DOCS_OF[tpl.inspectionType].map((d) => ({
                   label: `${REF_DOC_LABEL[d]} — ${REF_DOC_VALUE[d]}`,
                   value: d,
                 }))}
                 value={tpl.refDocs}
-                onValueChange={(v) =>
-                  setTpl((p) => ({
-                    ...p,
-                    refDocs: v as RefDoc[],
-                    requireBefore:
-                      p.refDocs.length === 0 && v.length > 0
-                        ? true
-                        : p.requireBefore,
-                  }))
-                }
+                onValueChange={(v) => patch({ refDocs: v as RefDoc[] })}
               />
               {/* ตัวเลือกเปลี่ยนตามช่วงการตรวจ ไม่ใช่โชว์ทั้งเจ็ดตัวตลอด
                   เลือกใบส่งของให้การตรวจรับเข้าได้ = ตั้งค่าที่ไม่มีทางถูกใช้
@@ -514,71 +488,6 @@ function Editor({ seed, isNew }: { seed: QiTemplate; isNew: boolean }) {
               </FieldNote>
             </div>
 
-            {/* ช่องนี้เป็นตัวตัดสินว่าใบตรวจจะไปเก็บที่ Quality Inspection
-                หรือ doctype ของเรา — เลือกผิดคือเลือกฐานข้อมูลผิด ไม่ใช่แค่ป้ายผิด
-
-                สองตัวเลือกตายตัว ไม่ใช่สี่ และกริดล็อกไว้สองคอลัมน์
-                สลับไปมากี่ครั้งปุ่มก็อยู่ตำแหน่งเดิมเสมอ */}
-            <div className="space-y-2">
-              <Label>ประเภทการตรวจ</Label>
-              <RadioGroup
-                className="grid grid-cols-2 gap-2"
-                value={tpl.subject}
-                onValueChange={(v) =>
-                  patch({
-                    subject: v as Subject,
-                    // ของที่ผูกไว้เป็นคนละชนิดกันแล้ว ล้างทิ้ง ไม่ใช่ค้างสินค้า
-                    // ไว้ในฟอร์มตรวจเครื่องจักร
-                    targets: [],
-                    // ไม่ใช่สินค้า = ไม่มีเอกสารสต็อกมาเกี่ยว และไม่มีของให้ตัดสิน
-                    ...(v === "item" ? null : { refDocs: [], dispositions: [] }),
-                  })
-                }
-              >
-                {SUBJECT_KEYS.map((k) => (
-                  <Label
-                    key={k}
-                    htmlFor={`subject-${k}`}
-                    className={cn(
-                      "flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-2.5 font-normal",
-                      tpl.subject === k && "border-primary bg-brand font-medium"
-                    )}
-                  >
-                    <RadioGroupItem id={`subject-${k}`} value={k} />
-                    {SUBJECT[k].label}
-                  </Label>
-                ))}
-              </RadioGroup>
-              <FieldNote custom>
-                custom_subject · เก็บใบที่ {SUBJECT[tpl.subject].store}
-              </FieldNote>
-            </div>
-
-            {/* ของที่ผูก — ERPNext เรียกฟอร์มจากของที่ตรวจ ไม่ได้เรียกจากคนเปิดใบ
-                ไม่ผูกไว้ ฟอร์มจะไม่มีวันถูกเรียกใช้
-
-                โชว์เสมอทั้งสองประเภท เปลี่ยนแค่ป้ายกับรายการที่เลือกได้ —
-                ฟอร์มที่ไม่ผูกกับอะไรเลยคือเว้นช่องนี้ว่าง ไม่ใช่ช่องหายไป */}
-            <div className="space-y-1.5">
-              <Label htmlFor="targets">{SUBJECT[tpl.subject].label}</Label>
-              <MultiSelectChips
-                id="targets"
-                className="w-full bg-card"
-                disabled={!inspectsItem}
-                placeholder={SUBJECT[tpl.subject].placeholder}
-                options={targetPool(tpl.subject).map((i) => ({
-                  label: i,
-                  value: i,
-                }))}
-                value={tpl.targets}
-                onValueChange={(v) => patch({ targets: v })}
-              />
-              <FieldNote custom={!inspectsItem}>
-                {inspectsItem
-                  ? "Item · quality_inspection_template (เขียนกลับไปที่ข้อมูลสินค้า)"
-                  : SUBJECT[tpl.subject].store}
-              </FieldNote>
-            </div>
           </div>
 
           {/* สามช่องนี้เป็นของเทมเพลต ไม่ใช่ของใบตรวจ — ตอบว่าฟอร์มนี้ใช้ช่วงไหน
@@ -712,44 +621,12 @@ function Editor({ seed, isNew }: { seed: QiTemplate; isNew: boolean }) {
             ))}
         </Section>
 
-        {/* ---------- 2 ส่วนหัวเอกสาร ---------- */}
-        {/* ของเดิมไม่มีก้อนนี้เลย ช่องหัวใบถูกตั้งตายตัวไว้ในโค้ด ฟอร์มที่ต้องการ
-             ช่องอื่น (เช่นเครื่องผลิต หรือคลังที่เดินไปตรวจ) จึงทำไม่ได้
-             เว้นว่างไว้ได้ ไม่ใช่ทุกฟอร์มที่ต้องกรอกอะไรก่อนเริ่มตรวจ */}
-        <Section
-          index={2}
-          title={`ส่วนหัวเอกสาร (${tpl.headerFields.length})`}
-          note="ช่องที่ผู้ตรวจกรอกครั้งเดียวต่อใบ เช่น เลขที่เอกสาร สินค้า เครื่องจักร"
-        >
-          <HeaderFieldTable
-            fields={tpl.headerFields}
-            onChange={(headerFields) => patch({ headerFields })}
-          />
-          <div className="mt-3 flex justify-center">
-            <Button
-              variant="outline-primary"
-              size="sm"
-              onClick={() =>
-                patch({
-                  headerFields: [
-                    ...tpl.headerFields,
-                    { id: uid("hf"), label: "", source: "", required: false },
-                  ],
-                })
-              }
-            >
-              <PlusIcon />
-              เพิ่มหัวเอกสาร
-            </Button>
-          </div>
-        </Section>
-
-        {/* ---------- 3 หัวข้อตรวจ ---------- */}
+        {/* ---------- 2 หัวข้อตรวจ ---------- */}
         {/* เพิ่มหัวข้อที่นี่ = หยิบชื่อจากทะเบียนมาใส่ฟอร์มนี้ แล้วตั้งเกณฑ์ของมัน
              ชื่อที่ยังไม่มีในทะเบียนก็พิมพ์สร้างได้จากในช่องเลย ทะเบียนเต็ม ๆ
              (ไว้แก้ชื่อ/ดูตัวที่ไม่มีใครใช้) อยู่ท้ายแท็บตั้งค่าระบบของหน้า Setup QC */}
         <Section
-          index={3}
+          index={2}
           title={`หัวข้อตรวจ (${tpl.rows.length})`}
           note="หนึ่งหัวข้อ = หนึ่งแถวใน readings · กดดินสอเพื่อตั้งเกณฑ์ จำนวนค่า และหมายเหตุ"
           action={
@@ -836,9 +713,8 @@ function Editor({ seed, isNew }: { seed: QiTemplate; isNew: boolean }) {
         {/* ---------- 3 ผลตรวจที่ไม่ผ่าน ---------- */}
         {/* repack / รับสภาพ / ส่งคืน เป็นการตัดสินใจกับ "ของ" ตรวจเครื่องจักร
             กับตรวจคลังไม่มีของให้ตัดสิน ซ่อนทั้งก้อนไปเลย */}
-        {inspectsItem && (
         <Section
-          index={4}
+          index={3}
           title="ผลตรวจที่ไม่ผ่าน"
           note="ผู้ตรวจต้องเลือกว่าจะจัดการสินค้าที่ไม่ผ่านอย่างไร"
           action={
@@ -906,7 +782,6 @@ function Editor({ seed, isNew }: { seed: QiTemplate; isNew: boolean }) {
             </>
           )}
         </Section>
-        )}
 
         {/* ---------- 4 รอบเวลาทำงาน ----------
              ของใหม่ทั้งก้อน และเป็นก้อนเดียวในหน้านี้ที่ ERPNext ไม่มีที่เก็บให้เลย
@@ -915,7 +790,7 @@ function Editor({ seed, isNew }: { seed: QiTemplate; isNew: boolean }) {
              อยู่ท้ายสุดเพราะเป็นก้อนที่ฟอร์มส่วนใหญ่ไม่ได้เปิด — ฟอร์มที่เกิดจาก
              ใบรับของไม่มีรอบเวลา เปิดมาเจอกะสี่ช่องก่อนจะงงว่าต้องกรอกไหม */}
         <Section
-          index={5}
+          index={4}
           title="เปิดใบตามรอบเวลาทำงาน"
           note="ระบบจะขึ้นข้อมูลให้ทำเอกสารตามช่วงเวลาการทำงานที่ตั้งไว้ ไม่รวมวันหยุดทำงานและวันหยุดนักขัตฤกษ์ วันไหนไม่มีข้อมูล ระบบจะขึ้นว่ายังไม่มีใครทำ จึงดูเป็นปฏิทินทั้งเดือนได้"
           action={
@@ -1037,35 +912,6 @@ function Editor({ seed, isNew }: { seed: QiTemplate; isNew: boolean }) {
                 ต้องดึงข้าม doctype มาแสดง ไม่ได้เก็บซ้ำไว้ที่ใบตรวจ */}
             {usesQualityInspection(tpl) && (
               <PreviewDocHeader item={tpl.targets[0]} />
-            )}
-
-            {/* ช่องที่ตั้งไว้ในส่วนหัวเอกสาร — ผู้ตรวจกรอกก่อนเริ่มตรวจ
-                ต่างจาก PreviewDocHeader ข้างบนที่เป็นของที่ ERPNext เติมมาให้เอง */}
-            {tpl.headerFields.length > 0 && (
-              <div className="mt-5 grid gap-4 @2xl:grid-cols-3">
-                {tpl.headerFields.map((f) => (
-                  <div key={f.id} className="space-y-1.5">
-                    <Label htmlFor={`pv-hf-${f.id}`}>
-                      {f.label || "ยังไม่ได้ตั้งชื่อ"}{" "}
-                      {!f.required && (
-                        <span className="font-normal text-muted-foreground">
-                          (ไม่บังคับ)
-                        </span>
-                      )}
-                    </Label>
-                    <SourceSelect id={`pv-hf-${f.id}`} source={f.source} />
-                    {!plain && (
-                      <FieldNote
-                        custom={f.source !== "" && SOURCE[f.source].custom}
-                      >
-                        {f.source === ""
-                          ? "ยังไม่ได้เลือกแหล่งข้อมูล"
-                          : SOURCE[f.source].store}
-                      </FieldNote>
-                    )}
-                  </div>
-                ))}
-              </div>
             )}
 
             <div className="mt-6 mb-3 flex flex-wrap items-center justify-between gap-3">
