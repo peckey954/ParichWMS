@@ -159,6 +159,19 @@ export const MODULES: ModuleItem[] = [
     href: "/qc/goods-receiving",
   },
   {
+    /* ใบเดียวครอบสามจุดของการผลิต — ก่อนผลิต ระหว่างผลิต หลังผลิต
+       จึงไม่ได้แยกเป็นสามเมนูอย่างที่ qc-pre / qc-inline / qc-post ตั้งไว้เดิม
+       คิวในหน้านี้เดินตามเทมเพลต FM-QC-02-03 ที่ติ๊กจุดไว้ครบทั้งสาม */
+    id: "qc-production",
+    group: "qc",
+    label: "ตรวจสอบสินค้าสำเร็จรูป",
+    shortLabel: "ตรวจสินค้าสำเร็จรูป",
+    code: "FM-QC-02-03",
+    icon: "packageCheck",
+    href: "/qc/production-check",
+    pending: 3,
+  },
+  {
     id: "qc-pre",
     group: "qc",
     label: "ตรวจวัตถุดิบก่อนผลิต",
