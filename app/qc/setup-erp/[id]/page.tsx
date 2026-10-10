@@ -80,9 +80,11 @@ import {
   INSPECTION_TYPE_LABEL,
   INSPECTION_TYPE_VALUE,
   MAX_READINGS,
-  REF_DOC_LABEL,
-  refDocsOf,
+  REF_DOC_VALUE,
   STAGE_TYPE,
+  TRIGGER,
+  triggersFor,
+  type TriggerMenu,
   usesQualityInspection,
   cloneRow,
   describeCriteria,
@@ -425,29 +427,43 @@ function Editor({ seed, isNew }: { seed: QiTemplate; isNew: boolean }) {
               <FieldNote custom>custom_code</FieldNote>
             </div>
 
-            {/* อ่านจากจุดที่ติ๊ก ไม่ใช่ช่องให้เลือก — ติ๊กก่อนผลิตแล้วไม่เลือก
-                ใบเบิก-โอนสต็อกก็ไม่ได้อยู่แล้ว เพราะการโอนวัตถุดิบเข้าไลน์เกิดเป็น
-                Stock Entry เสมอ ไม่มีทางเป็นอย่างอื่น ให้เลือกเองได้อย่างเดียว
-                คือตั้งขัดกับจุดที่ติ๊กไว้ */}
+            {/* เลือกเป็นชื่อเมนูของเรา ไม่ใช่ชื่อ doctype — คนตั้งค่ารู้จัก
+                "ชั่งน้ำหนัก" ไม่ได้รู้จัก Purchase Receipt และจุดที่ติ๊กอย่างเดียว
+                บอกไม่ได้ว่าเมนูไหน เพราะรับเข้าผ่านชั่งน้ำหนักกับผ่านสต็อกทั่วไป
+                เป็นคนละเอกสารกัน รายการจึงกรองตามจุด แต่ยังต้องเลือกเอง */}
             <div className="space-y-1.5">
-              <Label>เอกสารอ้างอิง</Label>
-              <div className="flex min-h-10 flex-wrap items-center gap-1.5 rounded-lg border border-border bg-muted px-3 py-2">
-                {refDocsOf(tpl).length === 0 ? (
-                  <span className="text-sm text-muted-foreground">
-                    ยังไม่ได้ติ๊กจุดที่ต้องตรวจ — ใบนี้ไม่มีเอกสารเป็นตัวเปิด
-                  </span>
-                ) : (
-                  refDocsOf(tpl).map((d) => (
-                    <Badge key={d} appearance="outline" tone="neutral">
-                      {REF_DOC_LABEL[d]}
-                    </Badge>
-                  ))
-                )}
-              </div>
-              <FieldNote>
-                reference_type (ใบตรวจ · บังคับกรอก) · อ่านจากจุดที่ต้องตรวจ
-                ข้างล่าง ไม่ได้เก็บแยก
-              </FieldNote>
+              <Label htmlFor="tpl-trig">เมนูที่เป็นตัวเปิดใบ</Label>
+              <MultiSelectChips
+                id="tpl-trig"
+                className="w-full bg-card"
+                disabled={tpl.stages.length === 0}
+                placeholder={
+                  tpl.stages.length === 0
+                    ? "ติ๊กจุดที่ต้องตรวจก่อน"
+                    : "เลือกเมนู — ไม่เลือก = ผู้ตรวจเปิดใบเอง"
+                }
+                options={triggersFor(tpl.stages).map((m) => ({
+                  label: `${TRIGGER[m].label} · ${TRIGGER[m].group}`,
+                  value: m,
+                }))}
+                value={tpl.triggers}
+                onValueChange={(v) => patch({ triggers: v as TriggerMenu[] })}
+              />
+              {tpl.triggers.length > 0 ? (
+                <div className="mt-1 space-y-0.5">
+                  {tpl.triggers.map((m) => (
+                    <FieldNote key={m}>
+                      {TRIGGER[m].label} → reference_type ={" "}
+                      {REF_DOC_VALUE[TRIGGER[m].refDoc]} · {TRIGGER[m].note}
+                    </FieldNote>
+                  ))}
+                </div>
+              ) : (
+                <FieldNote>
+                  reference_type (ใบตรวจ · บังคับกรอก) —
+                  ไม่เลือกเมนูคือไม่มีเอกสารเป็นตัวเปิดใบ
+                </FieldNote>
+              )}
             </div>
           </div>
 

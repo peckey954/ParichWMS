@@ -712,7 +712,7 @@ export function blockersOf(t: QiTemplate): string[] {
      เคยนับประเภทการตรวจกับการผูกสินค้าเป็นเงื่อนไขด้วย ซึ่งเป็นการถามเรื่อง
      เดียวกันสามรอบ — ฟอร์มที่ตรวจเครื่องจักรก็คือฟอร์มที่ไม่มีเอกสารอ้างอิง
      อยู่แล้ว ถามช่องเดียวพอ แล้วตั้งขัดกันเองไม่ได้ด้วย */
-  if (t.stages.length === 0) out.push("ไม่ได้ติ๊กจุดที่ต้องตรวจ");
+  if (t.triggers.length === 0) out.push("ไม่ได้เลือกเมนูที่เป็นตัวเปิดใบ");
 
   // หัวข้อที่ดึงคลังหรือเครื่องจักรมา — Quality Inspection ไม่มีช่อง Link ไปหา
   for (const r of t.rows)
@@ -894,6 +894,8 @@ export type QiTemplate = {
    */
   /** จุดที่ต้องตรวจ — ติ๊กได้หลายจุด ว่างคือผู้ตรวจเปิดใบเองล้วน */
   stages: Stage[];
+  /** เมนูที่เป็นตัวเปิดใบ — ตัวที่กลายเป็น reference_type ของใบตรวจ */
+  triggers: TriggerMenu[];
   /** ขั้นตอนไหนบ้าง — ใช้เมื่อติ๊กระหว่างผลิต หนึ่งขั้นตอน = หนึ่งใบงาน = หนึ่งใบตรวจ */
   operations: string[];
   photo: PhotoMode;
@@ -1146,6 +1148,7 @@ export const QI_TEMPLATES: QiTemplate[] = [
       range("p-moist", 0, 10, 1, "ความชื้นของเม็ดปุ๋ย น้อยกว่า 10%"),
     ],
     stages: ["receive"],
+    triggers: ["weighing"],
     operations: [],
     photo: "onFail",
     effectiveFrom: "01/09/2026",
@@ -1173,6 +1176,7 @@ export const QI_TEMPLATES: QiTemplate[] = [
       range("p-temp", 20, 35, 1, "off"),
     ],
     stages: ["preProd"],
+    triggers: ["stockToLine"],
     operations: [],
     photo: "onFail",
     effectiveFrom: "01/09/2026",
@@ -1201,6 +1205,7 @@ export const QI_TEMPLATES: QiTemplate[] = [
       formula("p-size", "(reading_2 + reading_3) / 2500 * 100 >= 80", 4),
     ],
     stages: ["postProd"],
+    triggers: ["bulk", "packing"],
     operations: [],
     photo: "onFail",
     effectiveFrom: "01/09/2026",
@@ -1247,6 +1252,7 @@ export const QI_TEMPLATES: QiTemplate[] = [
       manual("p-printer", "ตรวจสอบความคมชัดและระบบการพิมพ์ให้ถูกต้อง"),
     ],
     stages: [],
+    triggers: [],
     operations: [],
     photo: "onFail",
     effectiveFrom: "01/09/2026",
@@ -1281,6 +1287,7 @@ export const QI_TEMPLATES: QiTemplate[] = [
       manual("p-clean-area", "พื้นที่จัดเก็บสะอาด ไม่มีเศษวัสดุตกค้าง"),
     ],
     stages: [],
+    triggers: [],
     operations: [],
     photo: "onFail",
     effectiveFrom: "01/09/2026",
@@ -1317,6 +1324,7 @@ export const QI_TEMPLATES: QiTemplate[] = [
       value("p-sling", "30 / 35 / 40", "ต้องตรงกับที่ระบุในใบสั่งผลิต"),
     ],
     stages: [],
+    triggers: [],
     operations: [],
     photo: "onFail",
     effectiveFrom: "01/09/2026",
@@ -1351,6 +1359,7 @@ export const QI_TEMPLATES: QiTemplate[] = [
        ก่อนผลิต = ตอนโอนวัตถุดิบเข้าไลน์ · ระหว่างผลิต = ใบงานของขั้นตอนที่ติ๊กไว้
        หลังผลิตเสร็จ = ตอนรับสินค้าสำเร็จรูปเข้าคลัง */
     stages: ["preProd", "inProd", "postProd"],
+    triggers: ["stockToLine", "wo", "bulk"],
     operations: ["ผสมปุ๋ย", "บรรจุกระสอบ"],
     photo: "onFail",
     effectiveFrom: "01/09/2026",
@@ -1390,6 +1399,7 @@ export const QI_TEMPLATES: QiTemplate[] = [
       manual("p-rm-urea"),
     ],
     stages: [],
+    triggers: [],
     operations: [],
     photo: "onFail",
     effectiveFrom: "01/09/2026",
@@ -1423,6 +1433,7 @@ export const QI_TEMPLATES: QiTemplate[] = [
       value("p-bag", "ปกติ"),
     ],
     stages: ["transfer"],
+    triggers: ["stockTransfer"],
     operations: [],
     photo: "onFail",
     effectiveFrom: "01/09/2026",
@@ -1451,6 +1462,7 @@ export const QI_TEMPLATES: QiTemplate[] = [
     inspectionType: "outgoing",
     rows: [range("p-weight", 49.5, 50.5, 3), value("p-bag", "ปกติ")],
     stages: ["deliver"],
+    triggers: ["delivery"],
     operations: [],
     photo: "onFail",
     effectiveFrom: "01/09/2026",
@@ -1477,6 +1489,7 @@ export const QI_TEMPLATES: QiTemplate[] = [
     inspectionType: "outgoing",
     rows: [value("p-complaint", "รับเรื่องแล้ว"), manual("p-trace")],
     stages: [],
+    triggers: [],
     operations: [],
     photo: "onFail",
     effectiveFrom: "01/09/2026",
@@ -1501,6 +1514,7 @@ export const QI_TEMPLATES: QiTemplate[] = [
     inspectionType: "incoming",
     rows: [value("p-coa-complete", "ครบ"), value("p-coa-match", "ตรง")],
     stages: [],
+    triggers: [],
     operations: [],
     photo: "onFail",
     effectiveFrom: "01/09/2026",
@@ -1535,6 +1549,107 @@ export function setTemplateActive(id: string, on: boolean) {
  * แล้วไม่เลือกใบเบิก-โอนสต็อกก็ไม่ได้อยู่แล้ว เพราะการโอนวัตถุดิบเข้าไลน์
  * เกิดเป็น Stock Entry เสมอ ไม่มีทางเป็นอย่างอื่น ตั้งขัดกันได้อย่างเดียว
  */
+// ---------------------------------------------------------------
+// เมนูที่เป็นตัวเปิดใบ — พูดเป็นภาษาเมนูของ Parich ไม่ใช่ชื่อ doctype
+//
+// คนตั้งค่ารู้จัก "ชั่งน้ำหนัก" กับ "สั่งผลิตสินค้า" ไม่ได้รู้จัก Purchase Receipt
+// กับ Job Card และจุดที่ต้องตรวจอย่างเดียวบอกไม่ได้ว่าเมนูไหน เพราะหลายเมนู
+// ไปลง doctype เดียวกัน — รับเข้าผ่านชั่งน้ำหนักกับผ่านสต็อกทั่วไป เป็นคนละ
+// หน้าจอแต่เป็น Purchase Receipt กับ Stock Entry คนละตัว
+//
+// จุดที่ต้องตรวจ = ตรวจตอนไหนของสายงาน (ตัวกรองรายการเมนู)
+// เมนูที่เป็นตัวเปิดใบ = กดจากหน้าไหน (ตัวที่กลายเป็น reference_type)
+// ---------------------------------------------------------------
+
+export type TriggerMenu =
+  | "weighing"
+  | "stockIn"
+  | "stockToLine"
+  | "stockTransfer"
+  | "wo"
+  | "packing"
+  | "bulk"
+  | "delivery";
+
+export const TRIGGER: Record<
+  TriggerMenu,
+  {
+    label: string;
+    /** หมวดเมนูใน Parich — ไว้บอกว่าไปหาเมนูนี้ได้ที่ไหน */
+    group: string;
+    refDoc: RefDoc;
+    /** purpose ของเอกสาร ตัวที่ทำให้ ERPNext รู้ว่าต้องตรวจแถวไหน */
+    note: string;
+    /** เมนูนี้ใช้กับจุดไหนได้บ้าง */
+    stages: Stage[];
+  }
+> = {
+  weighing: {
+    label: "ชั่งน้ำหนัก",
+    group: "การสั่งซื้อสินค้า",
+    refDoc: "purchaseReceipt",
+    note: "ของเข้าจากผู้ขาย",
+    stages: ["receive"],
+  },
+  stockIn: {
+    label: "สต็อกทั่วไป · รับเข้า",
+    group: "การคลังสินค้า",
+    refDoc: "stockEntry",
+    note: "purpose = Material Receipt",
+    stages: ["receive"],
+  },
+  stockToLine: {
+    label: "สต็อกทั่วไป · เบิกเข้าไลน์ผลิต",
+    group: "การคลังสินค้า",
+    refDoc: "stockEntry",
+    note: "purpose = Material Transfer for Manufacture",
+    stages: ["preProd"],
+  },
+  stockTransfer: {
+    label: "สต็อกทั่วไป · เบิก-โอน",
+    group: "การคลังสินค้า",
+    refDoc: "stockEntry",
+    note: "purpose = Material Issue · Material Transfer",
+    stages: ["transfer"],
+  },
+  wo: {
+    label: "สั่งผลิตสินค้า",
+    group: "การผลิตสินค้า",
+    refDoc: "jobCard",
+    note: "ใบงานผลิตที่แตกจากใบสั่งผลิต หนึ่งใบต่อหนึ่งขั้นตอน",
+    stages: ["inProd"],
+  },
+  packing: {
+    label: "ผลิตแบ่งบรรจุ",
+    group: "การผลิตสินค้า",
+    refDoc: "stockEntry",
+    note: "purpose = Repack",
+    stages: ["postProd"],
+  },
+  bulk: {
+    label: "ผลิตปุ๋ย Bulk Blend",
+    group: "การผลิตสินค้า",
+    refDoc: "stockEntry",
+    note: "purpose = Manufacture · แถวที่ is_finished_item",
+    stages: ["postProd"],
+  },
+  delivery: {
+    label: "ส่งของออก",
+    group: "ยังไม่มีเมนูนี้ใน Parich",
+    refDoc: "deliveryNote",
+    note: "ใบส่งของ",
+    stages: ["deliver"],
+  },
+};
+
+export const TRIGGER_KEYS = Object.keys(TRIGGER) as TriggerMenu[];
+
+/** เมนูที่เลือกได้ — กรองตามจุดที่ติ๊กไว้ ไม่โชว์เมนูที่ไม่มีทางใช้ */
+export const triggersFor = (stages: Stage[]): TriggerMenu[] =>
+  TRIGGER_KEYS.filter((m) =>
+    TRIGGER[m].stages.some((st) => stages.includes(st))
+  );
+
 /**
  * ช่วงการตรวจของแต่ละจุด — อ่านจากจุด ไม่ใช่ช่องให้เลือก
  *
@@ -1567,26 +1682,12 @@ export function inspectionTypesOf(t: QiTemplate): InspectionType[] {
 }
 
 export function refDocsOf(t: QiTemplate): RefDoc[] {
-  const out = new Set<RefDoc>();
-  for (const st of t.stages) {
-    if (st === "receive") {
-      out.add("purchaseReceipt");
-      out.add("purchaseInvoice");
-      out.add("subcontractingReceipt");
-    }
-    if (st === "deliver") {
-      out.add("deliveryNote");
-      out.add("salesInvoice");
-    }
-    if (st === "preProd" || st === "postProd" || st === "transfer")
-      out.add("stockEntry");
-    if (st === "inProd") out.add("jobCard");
-  }
-  return [...out];
+  return [...new Set(t.triggers.map((m) => TRIGGER[m].refDoc))];
 }
 
+
 export const originOf = (t: QiTemplate): Origin =>
-  t.schedule.recurring ? "shift" : t.stages.length > 0 ? "doc" : "manual";
+  t.schedule.recurring ? "shift" : t.triggers.length > 0 ? "doc" : "manual";
 
 // ---------------------------------------------------------------
 // การบังคับใช้ระดับระบบ — Stock Settings
@@ -1768,6 +1869,7 @@ export const blankTemplate = (): QiTemplate => ({
   // จะได้ฟอร์มที่ผูกกับเอกสารผิดใบโดยไม่มีใครรู้
   rows: [],
   stages: [],
+  triggers: [],
   operations: [],
   photo: "onFail",
   effectiveFrom: "01/09/2026",
