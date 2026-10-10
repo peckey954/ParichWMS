@@ -758,42 +758,76 @@ export const ORIGIN: Record<
 export const ORIGIN_KEYS = Object.keys(ORIGIN) as Origin[];
 
 // ---------------------------------------------------------------
-// เทมเพลตนี้ไปเป็นค่าตั้งต้นที่ไหน — ตัวที่ทำให้ใบตรวจเด้งมาเอง
+// จุดที่ต้องตรวจ — ติ๊กได้หลายจุด สินค้าตัวเดียวกันตรวจได้หลายรอบในหนึ่งการผลิต
 //
-// ไม่ผูกไว้ที่ไหนเลย เทมเพลตก็ยังใช้ได้ แต่ผู้ตรวจต้องเลือกเองทุกใบ
-// ซึ่งแปลว่าวันหนึ่งจะมีคนเลือกผิดใบ และไม่มีอะไรบอกว่าเลือกผิด
+// แต่ละจุดมีที่ผูกเทมเพลตกับตัวบังคับของตัวเอง ไม่ใช่ของชุดเดียวกัน
+// เลือกหลายจุด = เทมเพลตอันเดียวไปโผล่หลายที่ ซึ่ง ERPNext รองรับอยู่แล้ว
+// เพราะเทมเพลตเอาไปใช้กี่ใบก็ได้ ไม่มีการจองและไม่มีเช็คซ้ำ
 //
-// สามที่นี้เป็นของ ERPNext ทั้งหมด ไม่ใช่ของที่เราคิดขึ้นเอง —
-// get_quality_inspection_template() อ่าน BOM ก่อน แล้วค่อยตกไป Item
+// ที่ต้องแยกเป็นจุด ๆ แทนที่จะเป็นช่องเดียวว่า "ผูกไว้ที่ไหน" เพราะก่อนผลิต
+// กับหลังผลิตใช้คนละกลไกกันทั้งที่เป็นการผลิตรอบเดียวกัน บอกแค่ว่าผูกที่ BOM
+// จึงตอบไม่ได้ว่าใบจะเด้งมาตอนไหนบ้าง
 // ---------------------------------------------------------------
 
-export type BindTarget = "item" | "bom" | "operation";
+export type Stage = "receive" | "preProd" | "inProd" | "postProd" | "deliver";
 
-export const BIND: Record<
-  BindTarget,
-  { label: string; store: string; hint: string; custom: boolean }
+export const STAGE: Record<
+  Stage,
+  {
+    label: string;
+    /** เอกสารที่เป็นตัวเปิดใบ */
+    doc: string;
+    /** เทมเพลตมาจากช่องไหน */
+    template: string;
+    /** อะไรเป็นตัวบังคับว่าต้องตรวจ */
+    enforce: string;
+    /** ต้องเขียนโค้ดเพิ่มไหม — ไม่ใช่ทุกจุดที่คลิกเอาได้ */
+    todo: string | null;
+  }
 > = {
-  item: {
-    label: "ข้อมูลสินค้า",
-    store: "Item · quality_inspection_template",
-    hint: "ใบเด้งมาตอนรับของเข้าหรือส่งของออก คู่กับติ๊กบังคับตรวจที่สินค้าตัวนั้น",
-    custom: false,
+  receive: {
+    label: "รับของเข้า",
+    doc: "Purchase Receipt · Purchase Invoice · Subcontracting Receipt",
+    template: "Item · quality_inspection_template",
+    enforce: "Item · inspection_required_before_purchase",
+    todo: null,
   },
-  bom: {
-    label: "สูตรการผลิต (BOM)",
-    store: "BOM · quality_inspection_template + inspection_required",
-    hint: "ใบเด้งมาตอนผลิตเสร็จ และเป็นตัวสำรองให้ใบงานผลิตด้วย — สินค้าตัวเดียวกันจึงใช้คนละแบบระหว่างรับเข้ากับผลิตได้",
-    custom: false,
+  preProd: {
+    label: "ก่อนผลิต (โอนวัตถุดิบเข้าไลน์)",
+    doc: "Stock Entry · Material Transfer for Manufacture",
+    template: "Item · quality_inspection_template",
+    enforce: "Stock Entry · inspection_required (ติ๊กรายใบ ตั้งล่วงหน้าไม่ได้)",
+    todo: null,
   },
-  operation: {
-    label: "ขั้นตอนการผลิต",
-    store: "BOM Operation · quality_inspection_required → Job Card",
-    hint: "ใบเด้งมาต่อขั้นตอน ปิดใบงานไม่ได้ถ้ายังไม่ตรวจ — ตั้งหลายขั้นตอนก็ได้หลายใบ",
-    custom: false,
+  inProd: {
+    label: "ระหว่างผลิต (ต่อขั้นตอน)",
+    doc: "Job Card · หนึ่งใบต่อหนึ่งขั้นตอน",
+    template: "Job Card · quality_inspection_template",
+    enforce:
+      "BOM · inspection_required และ BOM Operation · quality_inspection_required (ต้องติ๊กคู่กัน)",
+    /* job_card.js ส่ง quality_inspection_template ของใบงานไปให้ใบตรวจใหม่ตรง ๆ
+       และไม่ได้ส่ง bom_no ไปด้วย — ใบตรวจจึงไม่มีทางตกไปอ่านเทมเพลตของ BOM
+       ว่างไว้เมื่อไหร่มันจะตกไปอ่าน Item.quality_inspection_template แทน
+       ซึ่งคือแบบฟอร์มตรวจรับเข้า ไม่ใช่แบบตรวจระหว่างผลิต และไม่มีอะไรเตือน */
+    todo: "ต้องเขียน script เติม Job Card.quality_inspection_template ตอนสร้างใบงาน — ช่องมีอยู่แล้วแต่ job_card.py ไม่เคยเขียนค่าลงไป ปล่อยว่างแล้วใบตรวจจะหยิบแบบฟอร์มของ Item มาแทนเงียบ ๆ",
+  },
+  postProd: {
+    label: "หลังผลิตเสร็จ ก่อนเข้าคลัง",
+    doc: "Stock Entry · Manufacture (แถวที่เป็นสินค้าสำเร็จรูป)",
+    template: "BOM · quality_inspection_template",
+    enforce: "BOM · inspection_required + Stock Entry · inspection_required",
+    todo: null,
+  },
+  deliver: {
+    label: "ก่อนส่งของออก",
+    doc: "Delivery Note · Sales Invoice",
+    template: "Item · quality_inspection_template",
+    enforce: "Item · inspection_required_before_delivery",
+    todo: null,
   },
 };
 
-export const BIND_KEYS = Object.keys(BIND) as BindTarget[];
+export const STAGE_KEYS = Object.keys(STAGE) as Stage[];
 
 /** ขั้นตอนการผลิตที่โรงงานมี — Operation ของ ERPNext */
 export const OPERATION_POOL = [
@@ -846,10 +880,10 @@ export type QiTemplate = {
    * ERPNext แนบไฟล์ได้อยู่แล้วทุก doctype แต่บังคับว่า "ต้องแนบเมื่อไม่ผ่าน"
    * ไม่ได้ เพราะเงื่อนไขนั้นขึ้นกับ status ที่เพิ่งคำนวณเสร็จ ต้องเขียน validate เพิ่ม
    */
-  /** เทมเพลตนี้ไปเป็นค่าตั้งต้นที่ไหน — ตัวที่ทำให้ใบตรวจเด้งมาเอง */
-  bindTo: BindTarget;
-  /** ขั้นตอนไหน — ใช้เมื่อ bindTo = operation ว่างคือยังไม่ได้เลือก */
-  operation: string;
+  /** จุดที่ต้องตรวจ — ติ๊กได้หลายจุด ว่างคือผู้ตรวจเปิดใบเองล้วน */
+  stages: Stage[];
+  /** ขั้นตอนไหนบ้าง — ใช้เมื่อติ๊กระหว่างผลิต หนึ่งขั้นตอน = หนึ่งใบงาน = หนึ่งใบตรวจ */
+  operations: string[];
   photo: PhotoMode;
   /** วันที่ฟอร์มนี้เริ่มใช้ได้ — ใบที่เปิดก่อนหน้านี้ยังใช้โครงเดิม */
   effectiveFrom: string;
@@ -1100,8 +1134,8 @@ export const QI_TEMPLATES: QiTemplate[] = [
       formula("p-hard", "mean >= 0.4", 5, "ค่าเฉลี่ยความแข็งของเม็ดปุ๋ย ไม่น้อยกว่า 0.4 กก."),
       range("p-moist", 0, 10, 1, "ความชื้นของเม็ดปุ๋ย น้อยกว่า 10%"),
     ],
-    bindTo: "item",
-    operation: "",
+    stages: ["receive"],
+    operations: [],
     photo: "onFail",
     effectiveFrom: "01/09/2026",
     effectiveTo: "",
@@ -1128,8 +1162,8 @@ export const QI_TEMPLATES: QiTemplate[] = [
       value("p-formula", "ตรง"),
       range("p-temp", 20, 35, 1, "off"),
     ],
-    bindTo: "operation",
-    operation: "ผสมปุ๋ย",
+    stages: ["preProd"],
+    operations: [],
     photo: "onFail",
     effectiveFrom: "01/09/2026",
     effectiveTo: "",
@@ -1157,8 +1191,8 @@ export const QI_TEMPLATES: QiTemplate[] = [
       range("p-moist", 0, 2),
       formula("p-size", "(reading_2 + reading_3) / 2500 * 100 >= 80", 4),
     ],
-    bindTo: "bom",
-    operation: "",
+    stages: ["postProd"],
+    operations: [],
     photo: "onFail",
     effectiveFrom: "01/09/2026",
     effectiveTo: "",
@@ -1204,8 +1238,8 @@ export const QI_TEMPLATES: QiTemplate[] = [
       manual("p-sewing", "ตรวจเช็คกลไกและการทำงานของเครื่องเย็บ"),
       manual("p-printer", "ตรวจสอบความคมชัดและระบบการพิมพ์ให้ถูกต้อง"),
     ],
-    bindTo: "item",
-    operation: "",
+    stages: [],
+    operations: [],
     photo: "onFail",
     effectiveFrom: "01/09/2026",
     effectiveTo: "",
@@ -1239,8 +1273,8 @@ export const QI_TEMPLATES: QiTemplate[] = [
       manual("p-area-climate", "อุณหภูมิและความชื้นในบริเวณอยู่ในเกณฑ์ที่กำหนด"),
       manual("p-clean-area", "พื้นที่จัดเก็บสะอาด ไม่มีเศษวัสดุตกค้าง"),
     ],
-    bindTo: "item",
-    operation: "",
+    stages: [],
+    operations: [],
     photo: "onFail",
     effectiveFrom: "01/09/2026",
     effectiveTo: "",
@@ -1276,8 +1310,8 @@ export const QI_TEMPLATES: QiTemplate[] = [
       range("p-weight", null, null, 1, "ชั่งแล้วบันทึกน้ำหนักที่ได้"),
       value("p-sling", "30 / 35 / 40", "ต้องตรงกับที่ระบุในใบสั่งผลิต"),
     ],
-    bindTo: "item",
-    operation: "",
+    stages: [],
+    operations: [],
     photo: "onFail",
     effectiveFrom: "01/09/2026",
     effectiveTo: "",
@@ -1299,8 +1333,8 @@ export const QI_TEMPLATES: QiTemplate[] = [
     active: true,
     owner: "อลิสา พรสุขสิริ",
     updatedAt: "24/09/2026",
-    inspectionType: "incoming",
-    refDocs: ["purchaseReceipt", "subcontractingReceipt"],
+    inspectionType: "inProcess",
+    refDocs: ["stockEntry", "jobCard"],
     /* ทุกข้อเป็นติ๊กผ่าน/ไม่ผ่านล้วน ไม่มีช่องคีย์ค่า — ตรงกับกระดาษที่มีแต่
        ช่องติ๊กกับคอลัมน์เกณฑ์มาตรฐานให้อ่าน แม้แต่ข้อน้ำหนักกับความชื้นที่มี
        ตัวเลขในเกณฑ์ ผู้ตรวจก็ชั่งแล้วติ๊กเอา ไม่ได้คีย์ตัวเลขลงใบ
@@ -1308,8 +1342,11 @@ export const QI_TEMPLATES: QiTemplate[] = [
        แปดแถว ไม่ใช่ยี่สิบสี่ — "ตรวจครั้งที่ 1/2/3" บนกระดาษคือเปิดใบด้วย
        เทมเพลตนี้สามรอบ ไม่ใช่สามชุดแถวในใบเดียว */
     rows: fgRound(),
-    bindTo: "item",
-    operation: "",
+    /* สามรอบบนกระดาษคือสามจุดของการผลิตรอบเดียว ไม่ใช่สามครั้งที่รับของ
+       ก่อนผลิต = ตอนโอนวัตถุดิบเข้าไลน์ · ระหว่างผลิต = ใบงานของขั้นตอนที่ติ๊กไว้
+       หลังผลิตเสร็จ = ตอนรับสินค้าสำเร็จรูปเข้าคลัง */
+    stages: ["preProd", "inProd", "postProd"],
+    operations: ["ผสมปุ๋ย", "บรรจุกระสอบ"],
     photo: "onFail",
     effectiveFrom: "01/09/2026",
     effectiveTo: "",
@@ -1348,8 +1385,8 @@ export const QI_TEMPLATES: QiTemplate[] = [
       manual("p-rm-amsu"),
       manual("p-rm-urea"),
     ],
-    bindTo: "item",
-    operation: "",
+    stages: [],
+    operations: [],
     photo: "onFail",
     effectiveFrom: "01/09/2026",
     effectiveTo: "",
@@ -1382,8 +1419,8 @@ export const QI_TEMPLATES: QiTemplate[] = [
       range("p-warehouse-temp", 20, 35),
       value("p-bag", "ปกติ"),
     ],
-    bindTo: "item",
-    operation: "",
+    stages: [],
+    operations: [],
     photo: "onFail",
     effectiveFrom: "01/09/2026",
     effectiveTo: "",
@@ -1411,8 +1448,8 @@ export const QI_TEMPLATES: QiTemplate[] = [
     inspectionType: "outgoing",
     refDocs: ["deliveryNote"],
     rows: [range("p-weight", 49.5, 50.5, 3), value("p-bag", "ปกติ")],
-    bindTo: "item",
-    operation: "",
+    stages: ["deliver"],
+    operations: [],
     photo: "onFail",
     effectiveFrom: "01/09/2026",
     effectiveTo: "",
@@ -1438,8 +1475,8 @@ export const QI_TEMPLATES: QiTemplate[] = [
     inspectionType: "outgoing",
     refDocs: [],
     rows: [value("p-complaint", "รับเรื่องแล้ว"), manual("p-trace")],
-    bindTo: "item",
-    operation: "",
+    stages: [],
+    operations: [],
     photo: "onFail",
     effectiveFrom: "01/09/2026",
     effectiveTo: "",
@@ -1463,8 +1500,8 @@ export const QI_TEMPLATES: QiTemplate[] = [
     inspectionType: "incoming",
     refDocs: [],
     rows: [value("p-coa-complete", "ครบ"), value("p-coa-match", "ตรง")],
-    bindTo: "item",
-    operation: "",
+    stages: [],
+    operations: [],
     photo: "onFail",
     effectiveFrom: "01/09/2026",
     effectiveTo: "",
@@ -1674,8 +1711,8 @@ export const blankTemplate = (): QiTemplate => ({
   // จะได้ฟอร์มที่ผูกกับเอกสารผิดใบโดยไม่มีใครรู้
   refDocs: [],
   rows: [],
-  bindTo: "item",
-  operation: "",
+  stages: [],
+  operations: [],
   photo: "onFail",
   effectiveFrom: "01/09/2026",
   effectiveTo: "",

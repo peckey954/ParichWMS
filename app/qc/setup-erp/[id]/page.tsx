@@ -95,10 +95,10 @@ import {
   paramOf,
   readingLabels,
   templateOf,
-  BIND,
-  BIND_KEYS,
+  STAGE,
+  STAGE_KEYS,
   OPERATION_POOL,
-  type BindTarget,
+  type Stage,
   PHOTO_KEYS,
   PHOTO_LABEL,
   type PhotoMode,
@@ -494,151 +494,106 @@ function Editor({ seed, isNew }: { seed: QiTemplate; isNew: boolean }) {
 
           </div>
 
-          {/* ตัวที่ทำให้ใบตรวจเด้งมาเอง — ไม่ผูกไว้ที่ไหนเลยเทมเพลตก็ยังใช้ได้
-              แต่ผู้ตรวจต้องเลือกเองทุกใบ ซึ่งแปลว่าวันหนึ่งจะมีคนเลือกผิดใบ
-              และไม่มีอะไรบอกว่าเลือกผิด */}
+          {/* ตัวที่ทำให้ใบตรวจเด้งมาเอง — ไม่ติ๊กจุดไหนเลยเทมเพลตก็ยังใช้ได้
+              แต่ผู้ตรวจต้องเปิดใบเองและเลือกเทมเพลตเองทุกใบ ซึ่งแปลว่าวันหนึ่ง
+              จะมีคนเลือกผิด และไม่มีอะไรบอกว่าเลือกผิด
+
+              ติ๊กได้หลายจุด เพราะการผลิตรอบเดียวตรวจได้หลายครั้ง และแต่ละจุด
+              ใช้คนละกลไกกัน ไม่ใช่ของชุดเดียวกัน */}
           <div className="mt-4 grid gap-4 @2xl:grid-cols-2">
             <div className="space-y-1.5">
-              <Label htmlFor="tpl-bind">ผูกเทมเพลตไว้ที่</Label>
-              <Select
-                value={tpl.bindTo}
+              <Label htmlFor="tpl-stages">จุดที่ต้องตรวจ</Label>
+              <MultiSelectChips
+                id="tpl-stages"
+                className="w-full bg-card"
+                placeholder="ไม่ติ๊ก = ผู้ตรวจเปิดใบเองล้วน"
+                options={STAGE_KEYS.map((k) => ({
+                  label: STAGE[k].label,
+                  value: k,
+                }))}
+                value={tpl.stages}
                 onValueChange={(v) =>
-                  // เปลี่ยนที่ผูกแล้วขั้นตอนที่เลือกไว้ไม่มีความหมายอีก ล้างทิ้ง
+                  // เอาระหว่างผลิตออกแล้วขั้นตอนที่เลือกไว้ไม่มีความหมายอีก ล้างทิ้ง
                   patch({
-                    bindTo: v as BindTarget,
-                    ...(v === "operation" ? {} : { operation: "" }),
+                    stages: v as Stage[],
+                    ...(v.includes("inProd") ? {} : { operations: [] }),
                   })
                 }
-              >
-                <SelectTrigger id="tpl-bind" className="w-full bg-card">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {BIND_KEYS.map((k) => (
-                    <SelectItem key={k} value={k}>
-                      {BIND[k].label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <FieldNote>{BIND[tpl.bindTo].store}</FieldNote>
+              />
+              <FieldNote custom>
+                custom_stages ที่เทมเพลต — ตัวจริงกระจายอยู่หลาย doctype
+                เก็บรวมไว้ที่เดียวเพื่อให้ตั้งจบในหน้าเดียว
+              </FieldNote>
             </div>
 
-            {/* โชว์เสมอ ปิดไว้เมื่อไม่ได้ผูกกับขั้นตอน — ซ่อนแล้วช่องข้าง ๆ
+            {/* โชว์เสมอ ปิดไว้เมื่อไม่ได้ติ๊กระหว่างผลิต — ซ่อนแล้วช่องข้าง ๆ
                 จะเลื่อนมาแทนที่ทุกครั้งที่สลับ ซึ่งกวนตากว่าเห็นช่องที่กดไม่ได้ */}
             <div className="space-y-1.5">
-              <Label htmlFor="tpl-op">ขั้นตอนการผลิต</Label>
-              <Select
-                value={tpl.operation}
-                disabled={tpl.bindTo !== "operation"}
-                onValueChange={(v) => patch({ operation: v })}
-              >
-                <SelectTrigger id="tpl-op" className="w-full bg-card">
-                  <SelectValue
-                    placeholder={
-                      tpl.bindTo === "operation"
-                        ? "เลือกขั้นตอน"
-                        : "ใช้เมื่อผูกกับขั้นตอนการผลิตเท่านั้น"
-                    }
-                  />
-                </SelectTrigger>
-                <SelectContent>
-                  {OPERATION_POOL.map((o) => (
-                    <SelectItem key={o} value={o}>
-                      {o}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <FieldNote>Operation · ขั้นตอนในสูตรการผลิต</FieldNote>
+              <Label htmlFor="tpl-ops">ขั้นตอนการผลิตที่ต้องตรวจ</Label>
+              <MultiSelectChips
+                id="tpl-ops"
+                className="w-full bg-card"
+                disabled={!tpl.stages.includes("inProd")}
+                placeholder={
+                  tpl.stages.includes("inProd")
+                    ? "เลือกขั้นตอน — หนึ่งขั้นตอน = หนึ่งใบตรวจ"
+                    : "ใช้เมื่อติ๊กระหว่างผลิตเท่านั้น"
+                }
+                options={OPERATION_POOL.map((o) => ({ label: o, value: o }))}
+                value={tpl.operations}
+                onValueChange={(v) => patch({ operations: v })}
+              />
+              <FieldNote>
+                BOM Operation · quality_inspection_required · ติ๊กกี่ขั้นตอนก็ได้
+                ได้ใบงานเท่านั้นใบ บังคับตรวจทุกใบ
+              </FieldNote>
             </div>
           </div>
 
-          {/* บอกให้ครบว่าที่เลือกไปแล้วเดฟต้องไปทำอะไรบ้าง ไม่ใช่ปล่อยให้ไปเดาเอง
-              สามที่นี้ราคาไม่เท่ากัน สองอันแรกคลิกเอาในหน้าจอ อันที่สามต้องเขียน */}
-          <div className="mt-3 rounded-xl border border-border bg-card px-4 py-3 text-sm">
-            <p className="font-medium">{BIND[tpl.bindTo].hint}</p>
-            <ul className="mt-2 space-y-1 text-muted-foreground">
-              {tpl.bindTo === "item" && (
-                <>
-                  <li>
-                    เขียน{" "}
-                    <span className="font-mono text-xs">
-                      Item.quality_inspection_template
-                    </span>{" "}
-                    = ชื่อเทมเพลตนี้ ที่สินค้าทุกตัวที่ผูกไว้
-                  </li>
-                  <li>
-                    ติ๊ก{" "}
-                    <span className="font-mono text-xs">
-                      inspection_required_before_purchase
-                    </span>{" "}
-                    หรือ{" "}
-                    <span className="font-mono text-xs">
-                      _before_delivery
-                    </span>{" "}
-                    ตามช่วงการตรวจ
-                  </li>
-                  <li className="text-success-strong">
-                    ไม่ต้องเขียนโค้ดเพิ่ม — คลิกเอาในหน้าข้อมูลสินค้าได้เลย
-                  </li>
-                </>
-              )}
-              {tpl.bindTo === "bom" && (
-                <>
-                  <li>
-                    ติ๊ก{" "}
-                    <span className="font-mono text-xs">
-                      BOM.inspection_required
-                    </span>{" "}
-                    แล้วเลือก{" "}
-                    <span className="font-mono text-xs">
-                      BOM.quality_inspection_template
-                    </span>
-                  </li>
-                  <li>
-                    ช่องเทมเพลตโผล่เฉพาะตอนติ๊กแล้ว (
-                    <span className="font-mono text-xs">
-                      depends_on: inspection_required
-                    </span>
-                    )
-                  </li>
-                  <li className="text-success-strong">
-                    ไม่ต้องเขียนโค้ดเพิ่ม — และ BOM มาก่อน Item เสมอ
-                    สินค้าตัวเดียวกันจึงใช้คนละแบบระหว่างรับเข้ากับผลิตได้
-                  </li>
-                </>
-              )}
-              {tpl.bindTo === "operation" && (
-                <>
-                  <li>
-                    ติ๊ก{" "}
-                    <span className="font-mono text-xs">
-                      BOM Operation.quality_inspection_required
-                    </span>{" "}
-                    ที่ขั้นตอนนี้ในสูตรการผลิต — ไหลไป Work Order Operation เอง
-                  </li>
-                  <li>
-                    ติ๊ก{" "}
-                    <span className="font-mono text-xs">
-                      BOM.inspection_required
-                    </span>{" "}
-                    ด้วย เพราะ Job Card เช็คสองตัวนี้คู่กัน ขาดตัวใดตัวหนึ่งก็ไม่บังคับ
-                  </li>
-                  <li className="text-danger-strong">
-                    ต้องเขียนเพิ่ม —{" "}
-                    <span className="font-mono text-xs">
-                      Job Card.quality_inspection_template
-                    </span>{" "}
-                    มีช่องอยู่แล้วแต่ ERPNext ไม่เติมให้ ต้องเขียน script เติมตอน
-                    สร้างใบงาน ไม่งั้นผู้ตรวจต้องเลือกเทมเพลตเองทุกใบ
-                  </li>
-                </>
-              )}
-            </ul>
-          </div>
+          {/* ไล่ทีละจุดว่าเดฟต้องไปทำอะไร เพราะแต่ละจุดราคาไม่เท่ากัน
+              สี่จุดคลิกเอาในหน้าจอ มีจุดเดียวที่ต้องเขียนโค้ด */}
+          {tpl.stages.length > 0 && (
+            <div className="mt-3 space-y-2">
+              {tpl.stages.map((k) => (
+                <div
+                  key={k}
+                  className="rounded-xl border border-border bg-card px-4 py-3 text-sm"
+                >
+                  <p className="font-medium">{STAGE[k].label}</p>
+                  <dl className="mt-1 grid gap-x-3 gap-y-0.5 text-muted-foreground @lg:grid-cols-[7rem_1fr]">
+                    <dt>ใบเกิดจาก</dt>
+                    <dd className="font-mono text-xs">{STAGE[k].doc}</dd>
+                    <dt>เทมเพลตมาจาก</dt>
+                    <dd className="font-mono text-xs">{STAGE[k].template}</dd>
+                    <dt>บังคับด้วย</dt>
+                    <dd className="font-mono text-xs">{STAGE[k].enforce}</dd>
+                  </dl>
+                  {STAGE[k].todo ? (
+                    <p className="mt-2 text-sm text-danger-strong">
+                      ต้องเขียนเพิ่ม — {STAGE[k].todo}
+                    </p>
+                  ) : (
+                    <p className="mt-2 text-sm text-success-strong">
+                      ไม่ต้องเขียนโค้ดเพิ่ม คลิกเอาในหน้าจอของ ERPNext ได้เลย
+                    </p>
+                  )}
+                </div>
+              ))}
 
-          {/* สามช่องนี้เป็นของเทมเพลต ไม่ใช่ของใบตรวจ — ตอบว่าฟอร์มนี้ใช้ช่วงไหน
+              {/* เทมเพลตอันเดียวใช้ได้ทุกจุดจริง ๆ ต้องเขียนบอก ไม่งั้นจะนึกว่า
+                  ต้องสร้างเทมเพลตแยกจุดละอัน แล้วได้สามอันที่แก้ไม่ตรงกัน */}
+              {tpl.stages.length > 1 && (
+                <p className="px-1 text-sm text-muted-foreground">
+                  ติ๊ก {tpl.stages.length} จุด = เทมเพลตอันนี้อันเดียวไปโผล่{" "}
+                  {tpl.stages.length} ที่ ไม่ต้องสร้างแยก —
+                  get_item_specification_details() แค่คัดลอกแถวมา
+                  ไม่มีการจองและไม่มีเช็คซ้ำ แก้เทมเพลตทีเดียวจึงเปลี่ยนครบทุกจุด
+                </p>
+              )}
+            </div>
+          )}
+
+          {/* สามช่องนี้เป็นของเทมเพลต ไม่ใช่ของใบตรวจ          {/* สามช่องนี้เป็นของเทมเพลต ไม่ใช่ของใบตรวจ — ตอบว่าฟอร์มนี้ใช้ช่วงไหน
               และผู้ตรวจต้องแนบรูปไหม ทั้งสามอย่างไม่มีใน Quality Inspection
               Template ที่มีแค่ชื่อกับตารางหัวข้อ ต้องสร้างฟิลด์เพิ่มทั้งหมด */}
           <div className="mt-4 grid gap-4 @2xl:grid-cols-3">
