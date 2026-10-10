@@ -17,10 +17,13 @@ import {
   type ProdStep,
 } from "@/lib/qc-erp";
 
-/** เทมเพลตที่คิวนี้เดินตาม — ตรวจรับสินค้า (External / Finish Good) */
-export const DEMO_TEMPLATE_ID = "t-inproc";
-
-export const demoTemplate = () => templateOf(DEMO_TEMPLATE_ID);
+/**
+ * เทมเพลตที่คิวเดินตาม — ส่งเข้ามาทาง URL ไม่ได้ฝังไว้ตัวเดียว
+ *
+ * ตั้งเทมเพลตใหม่แล้วต้องมีที่ให้ทำงานทันที ถ้าผูกคิวไว้กับเทมเพลตตัวเดียว
+ * ทุกฟอร์มใหม่จะต้องรอให้มีคนมาเพิ่มเมนูมือ แล้ววันหนึ่งก็จะลืม
+ */
+export const queueTemplate = (tplId: string) => templateOf(tplId);
 
 /**
  * จุดเช็คหนึ่งจุด = หนึ่งใบตรวจ
@@ -46,8 +49,8 @@ export type Checkpoint = {
  * ลำดับในสูตรการผลิต (BOM Operation.sequence_id) — ไม่ได้เรียงตามที่คนติ๊ก
  * เพราะคนอาจติ๊กบรรจุกระสอบก่อนผสมปุ๋ย แต่สายการผลิตไม่ได้เดินแบบนั้น
  */
-export function checkpointsOfQueue(): Checkpoint[] {
-  const t = demoTemplate();
+export function checkpointsOfQueue(tplId: string): Checkpoint[] {
+  const t = queueTemplate(tplId);
   if (!t || t.phase !== "production") return [];
 
   const out: Checkpoint[] = [];
@@ -140,7 +143,7 @@ export const LOTS: Lot[] = [
     ton: 640,
     owner: "อลิสา พรสุขสิริ",
     done: {
-      pre: {
+      "t-inproc:pre": {
         qi: "MAT-QA-2026-00011",
         at: "16/01/2026 11:20",
         by: "อลิสา พรสุขสิริ",
@@ -165,7 +168,7 @@ export const LOTS: Lot[] = [
     ton: 420,
     owner: "ณัฐพล ศรีวิไล",
     done: {
-      pre: {
+      "t-inproc:pre": {
         qi: "MAT-QA-2026-00008",
         at: "14/01/2026 08:40",
         by: "ณัฐพล ศรีวิไล",
@@ -173,7 +176,7 @@ export const LOTS: Lot[] = [
         failed: [],
         note: "",
       },
-      "during:ผสมปุ๋ย": {
+      "t-inproc:during:ผสมปุ๋ย": {
         qi: "MAT-QA-2026-00009",
         at: "14/01/2026 13:05",
         by: "ณัฐพล ศรีวิไล",
@@ -196,23 +199,32 @@ export const lotOf = (id: string) => LOTS.find((l) => l.id === id);
  * ERPNext ไม่มีกฎนี้ให้ มันดูแค่ว่าแต่ละเอกสารมีใบตรวจหรือยัง ไม่ได้ดูข้ามเอกสาร
  * ลำดับจึงเป็นของที่ต้องบังคับเองที่หน้าจอและที่ validate ตอนบันทึก
  */
-export function currentCheckpoint(lot: Lot): Checkpoint | null {
-  for (const c of checkpointsOfQueue()) if (!lot.done[c.key]) return c;
+export function currentCheckpoint(lot: Lot, tplId: string): Checkpoint | null {
+  for (const c of checkpointsOfQueue(tplId))
+    if (!lot.done[`${tplId}:${c.key}`]) return c;
   return null;
 }
 
+/** ผลของจุดหนึ่งในเทมเพลตหนึ่ง — คีย์รวมเทมเพลตด้วย ฟอร์มคนละใบจึงไม่ปนกัน */
+export const resultOf = (lot: Lot, tplId: string, c: Checkpoint) =>
+  lot.done[`${tplId}:${c.key}`];
+
 export type StageState = "done" | "current" | "locked";
 
-export const checkpointStateOf = (lot: Lot, c: Checkpoint): StageState =>
-  lot.done[c.key]
+export const checkpointStateOf = (
+  lot: Lot,
+  tplId: string,
+  c: Checkpoint
+): StageState =>
+  resultOf(lot, tplId, c)
     ? "done"
-    : currentCheckpoint(lot)?.key === c.key
+    : currentCheckpoint(lot, tplId)?.key === c.key
       ? "current"
       : "locked";
 
 /** จำนวนงานที่ถึงคิวแล้ว — นับเป็นงาน ไม่ใช่นับเป็นใบ */
-export const pendingCount = () =>
-  LOTS.filter((l) => currentCheckpoint(l) !== null).length;
+export const pendingCount = (tplId: string) =>
+  LOTS.filter((l) => currentCheckpoint(l, tplId) !== null).length;
 
 /* เลขใบตรวจเดินต่อจากที่มีอยู่ — ERPNext ออกเลขจาก naming_series (MAT-QA-.YYYY.-)
    ไม่ได้สุ่ม ตัวอย่างนี้จึงเดินเลขเองให้เหมือน ไม่ใช่สุ่มเลขมั่ว */
@@ -221,7 +233,12 @@ export const nextQiName = () =>
   `MAT-QA-2026-${String(++qiSeq).padStart(5, "0")}`;
 
 /** บันทึกผลหนึ่งขั้น — ไม่มีหลังบ้าน แก้อาเรย์ในหน่วยความจำตรง ๆ */
-export function saveStage(lotId: string, key: string, r: StageResult) {
+export function saveStage(
+  lotId: string,
+  tplId: string,
+  key: string,
+  r: StageResult
+) {
   const lot = lotOf(lotId);
-  if (lot) lot.done[key] = r;
+  if (lot) lot.done[`${tplId}:${key}`] = r;
 }

@@ -32,9 +32,10 @@ import {
   checkpointStateOf,
   checkpointsOfQueue,
   currentCheckpoint,
-  demoTemplate,
+  queueTemplate,
   lotOf,
   nextQiName,
+  resultOf,
   saveStage,
   type Checkpoint,
   type Lot,
@@ -53,13 +54,14 @@ import {
 ------------------------------------------------------------------ */
 
 export default function ProductionCheckDetailPage() {
-  const params = useParams<{ id: string }>();
+  const params = useParams<{ tplId: string; lotId: string }>();
   const search = useSearchParams();
   const router = useRouter();
   const [, bump] = React.useReducer((n: number) => n + 1, 0);
 
-  const lot = lotOf(params.id);
-  const tpl = demoTemplate();
+  const tplId = params.tplId;
+  const lot = lotOf(params.lotId);
+  const tpl = queueTemplate(tplId);
 
   if (!lot || !tpl) {
     return (
@@ -67,15 +69,15 @@ export default function ProductionCheckDetailPage() {
         <div className="mt-10 rounded-xl border border-dashed border-border px-6 py-14 text-center">
           <p className="font-medium">ไม่พบใบสั่งผลิตนี้</p>
           <Button asChild variant="outline-primary" className="mt-4">
-            <Link href="/qc/production-check">กลับไปหน้ารายการ</Link>
+            <Link href={`/qc/queue/${tplId}`}>กลับไปหน้ารายการ</Link>
           </Button>
         </div>
       </main>
     );
   }
 
-  const points = checkpointsOfQueue();
-  const open = currentCheckpoint(lot);
+  const points = checkpointsOfQueue(tplId);
+  const open = currentCheckpoint(lot, tplId);
   // กดชิปมาจากรายการ = เจาะมาดูจุดนั้น ไม่ได้ส่งมา = ดูจุดที่ถึงคิว
   const want = search.get("at");
   const focus = points.find((c) => c.key === want) ?? open;
@@ -86,7 +88,7 @@ export default function ProductionCheckDetailPage() {
         <BreadcrumbList>
           <BreadcrumbItem>
             <BreadcrumbLink asChild>
-              <Link href="/qc/production-check">ตรวจสอบสินค้าสำเร็จรูป</Link>
+              <Link href={`/qc/queue/${tplId}`}>{tpl?.name ?? "คิวตรวจ"}</Link>
             </BreadcrumbLink>
           </BreadcrumbItem>
           <BreadcrumbSeparator />
@@ -111,7 +113,7 @@ export default function ProductionCheckDetailPage() {
           </Badge>
         ) : (
           <Badge appearance="soft" tone="warning">
-            เหลืออีก {points.filter((c) => !lot.done[c.key]).length} จุด
+            เหลืออีก {points.filter((c) => !resultOf(lot, tplId, c)).length} จุด
           </Badge>
         )}
       </div>
@@ -128,6 +130,7 @@ export default function ProductionCheckDetailPage() {
           <StageLogItem
             key={c.key}
             lot={lot}
+            tplId={tplId}
             point={c}
             index={i + 1}
             focused={c.key === focus?.key}
@@ -136,13 +139,14 @@ export default function ProductionCheckDetailPage() {
       </ol>
 
       {/* ---------- ฟอร์มของขั้นที่ถึงคิว ---------- */}
-      {focus && !lot.done[focus.key] && (
+      {focus && !resultOf(lot, tplId, focus) && (
         <StageForm
           lot={lot}
+          tplId={tplId}
           point={focus}
           onSaved={() => {
             bump();
-            router.replace(`/qc/production-check/${lot.id}`);
+            router.replace(`/qc/queue/${tplId}/${lot.id}`);
           }}
         />
       )}
@@ -156,17 +160,19 @@ export default function ProductionCheckDetailPage() {
 
 function StageLogItem({
   lot,
+  tplId,
   point,
   index,
   focused,
 }: {
   lot: Lot;
+  tplId: string;
   point: Checkpoint;
   index: number;
   focused: boolean;
 }) {
-  const state = checkpointStateOf(lot, point);
-  const res = lot.done[point.key];
+  const state = checkpointStateOf(lot, tplId, point);
+  const res = resultOf(lot, tplId, point);
 
   return (
     <li
@@ -257,14 +263,16 @@ function StageLogItem({
 
 function StageForm({
   lot,
+  tplId,
   point,
   onSaved,
 }: {
   lot: Lot;
+  tplId: string;
   point: Checkpoint;
   onSaved: () => void;
 }) {
-  const tpl = demoTemplate();
+  const tpl = queueTemplate(tplId);
   const [marks, setMarks] = React.useState<Record<string, "pass" | "fail">>({});
   const [note, setNote] = React.useState("");
 
@@ -280,7 +288,7 @@ function StageForm({
       toast.error(`ยังตรวจไม่ครบ — เหลืออีก ${rows.length - keyed} ข้อ`);
       return;
     }
-    saveStage(lot.id, point.key, {
+    saveStage(lot.id, tplId, point.key, {
       qi: nextQiName(),
       at: new Date().toLocaleString("th-TH", {
         dateStyle: "short",

@@ -6,6 +6,8 @@
 // จะได้ไม่หลอกให้กดแล้วเจอ 404
 // ============================================================
 
+import { QI_TEMPLATES } from "@/lib/qc-erp";
+
 export type ModuleGroupId =
   | "purchase"
   | "warehouse"
@@ -159,19 +161,6 @@ export const MODULES: ModuleItem[] = [
     href: "/qc/goods-receiving",
   },
   {
-    /* ใบเดียวครอบสามจุดของการผลิต — ก่อนผลิต ระหว่างผลิต หลังผลิต
-       จึงไม่ได้แยกเป็นสามเมนูอย่างที่ qc-pre / qc-inline / qc-post ตั้งไว้เดิม
-       คิวในหน้านี้เดินตามเทมเพลต FM-QC-02-03 ที่ติ๊กจุดไว้ครบทั้งสาม */
-    id: "qc-production",
-    group: "qc",
-    label: "ตรวจสอบสินค้าสำเร็จรูป",
-    shortLabel: "ตรวจสินค้าสำเร็จรูป",
-    code: "FM-QC-02-03",
-    icon: "packageCheck",
-    href: "/qc/production-check",
-    pending: 3,
-  },
-  {
     id: "qc-pre",
     group: "qc",
     label: "ตรวจวัตถุดิบก่อนผลิต",
@@ -261,16 +250,41 @@ export const SETTINGS_ITEMS: ModuleItem[] = MODULES.filter(
   (m) => m.group === "settings",
 );
 
-export const modulesOf = (group: ModuleGroupId) =>
-  MODULES.filter((m) => m.group === group);
+/**
+ * เมนูที่งอกจากเทมเพลต — ตั้งเทมเพลตเสร็จแล้วมีที่ให้ทำงานทันที
+ *
+ * เคยต้องมาเพิ่มเมนูมือทุกครั้งที่มีฟอร์มใหม่ ซึ่งแปลว่าวันหนึ่งจะลืม แล้ว
+ * เทมเพลตที่ตั้งไว้จะไม่มีใครเจอ — เกิดขึ้นแล้วกับฟอร์มตรวจสินค้าสำเร็จรูป
+ *
+ * ตอนนี้งอกเฉพาะฟอร์มที่มีขั้นย่อยของการผลิต เพราะหน้าคิวทำได้แค่รูปแบบนั้น
+ * ฟอร์มรับเข้ากับส่งออกมีหน้าของตัวเองอยู่แล้ว
+ */
+export const templateModules = (): ModuleItem[] =>
+  QI_TEMPLATES.filter(
+    (t) => t.active && t.phase === "production" && t.prodSteps.length > 0
+  ).map((t) => ({
+    id: `qc-queue-${t.id}`,
+    group: "qc" as const,
+    label: t.name,
+    code: t.code,
+    icon: "packageCheck",
+    href: `/qc/queue/${t.id}`,
+  }));
 
-export const readyModules = () => MODULES.filter((m) => m.href);
+/** เมนูทั้งหมด = ที่เขียนไว้ตายตัว + ที่งอกจากเทมเพลต */
+export const allModules = (): ModuleItem[] => [...MODULES, ...templateModules()];
+
+export const modulesOf = (group: ModuleGroupId) =>
+  allModules().filter((m) => m.group === group);
+
+export const readyModules = () => allModules().filter((m) => m.href);
 
 export function searchModules(q: string): ModuleItem[] {
   const s = q.trim().toLowerCase();
-  if (!s) return MODULES;
+  const all = allModules();
+  if (!s) return all;
   // ค้นชื่อย่อได้ด้วย คนที่เห็นชื่อย่อบนมือถือจะได้พิมพ์ตามที่เห็นแล้วเจอ
-  return MODULES.filter(
+  return all.filter(
     (m) =>
       m.label.toLowerCase().includes(s) ||
       m.shortLabel?.toLowerCase().includes(s) ||

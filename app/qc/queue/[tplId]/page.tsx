@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { CheckIcon, FlaskConicalIcon, SearchIcon } from "lucide-react";
 import { Badge } from "@peckey954/ui/components/ui/badge";
 import {
@@ -36,7 +36,7 @@ import {
   LOTS,
   checkpointsOfQueue,
   currentCheckpoint,
-  demoTemplate,
+  queueTemplate,
   pendingCount,
   type Lot,
 } from "@/lib/qc-production-demo";
@@ -54,17 +54,19 @@ import {
    ขั้นมาจาก tpl.stages ของเทมเพลตจริง ไม่ได้ตั้งซ้ำไว้ที่นี่
 ------------------------------------------------------------------ */
 
-export default function ProductionCheckPage() {
+export default function QcQueuePage() {
   const router = useRouter();
+  const params = useParams<{ tplId: string }>();
   const [tab, setTab] = React.useState("pending");
   const [query, setQuery] = React.useState("");
 
-  const tpl = demoTemplate();
-  const points = checkpointsOfQueue();
+  const tplId = params.tplId;
+  const tpl = queueTemplate(tplId);
+  const points = checkpointsOfQueue(tplId);
 
   const q = query.trim().toLowerCase();
   const rows = LOTS.filter((l) => {
-    const open = currentCheckpoint(l) !== null;
+    const open = currentCheckpoint(l, tplId) !== null;
     if (tab === "pending" ? !open : open) return false;
     return (
       q === "" ||
@@ -94,7 +96,7 @@ export default function ProductionCheckPage() {
       <p className="mt-1 text-sm text-muted-foreground">
         เดินตามเทมเพลต{" "}
         <Link
-          href="/qc/setup-erp/t-inproc"
+          href={`/qc/setup-erp/${tplId}`}
           className="text-primary underline underline-offset-2"
         >
           {tpl?.name ?? "—"}
@@ -116,10 +118,10 @@ export default function ProductionCheckPage() {
           {/* นับเป็น "ใบที่ยังมีงานค้าง" ไม่ใช่ "จำนวนขั้นที่ค้าง" เพราะตารางนี้
               หนึ่งแถวคือหนึ่งใบ ตัวเลขบนแท็บกับจำนวนแถวต้องตรงกัน */}
           <TabsTrigger value="pending" className="flex-1">
-            รอตรวจ ({pendingCount()})
+            รอตรวจ ({pendingCount(tplId)})
           </TabsTrigger>
           <TabsTrigger value="done" className="flex-1">
-            ตรวจครบแล้ว ({LOTS.length - pendingCount()})
+            ตรวจครบแล้ว ({LOTS.length - pendingCount(tplId)})
           </TabsTrigger>
         </TabsList>
       </Tabs>
@@ -152,7 +154,7 @@ export default function ProductionCheckPage() {
               <TableRow
                 key={lot.id}
                 className={cn("cursor-pointer", ROW_HOVER_NAV)}
-                onClick={() => router.push(`/qc/production-check/${lot.id}`)}
+                onClick={() => router.push(`/qc/queue/${tplId}/${lot.id}`)}
               >
                 <TableCell>
                   <span className="font-medium">{lot.code}</span>
@@ -172,7 +174,7 @@ export default function ProductionCheckPage() {
                   {lot.ton.toFixed(2)} ตัน
                 </TableCell>
                 <TableCell>
-                  <StageStatus lot={lot} />
+                  <StageStatus lot={lot} tplId={tplId} />
                 </TableCell>
               </TableRow>
             ))}
@@ -210,8 +212,8 @@ export default function ProductionCheckPage() {
    สถานะอ่านจากผลที่บันทึกไว้ ไม่ได้เก็บแยก
 ------------------------------------------------------------------ */
 
-function StageStatus({ lot }: { lot: Lot }) {
-  const open = currentCheckpoint(lot);
+function StageStatus({ lot, tplId }: { lot: Lot; tplId: string }) {
+  const open = currentCheckpoint(lot, tplId);
 
   if (!open)
     return (
