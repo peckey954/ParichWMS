@@ -1711,6 +1711,34 @@ export const DEFAULT_GUARD: StockGuard = {
 // ---------------------------------------------------------------
 
 /** เกณฑ์ที่ระบบใช้ตัดสิน เขียนเป็นคำอ่านได้ — ติ๊กผู้ตรวจเลือกผลผ่าน/ไม่ผ่านเองต่อท้ายถ้ามี */
+/**
+ * ค่าที่ถือว่าผ่านอาจมีหลายค่า — คั่นด้วย , หรือ /
+ *
+ * "30, 60, 70" แปลว่าได้ค่าใดค่าหนึ่งใน 30 60 70 ก็ถือว่าผ่าน
+ */
+export const passValues = (v: string) =>
+  v
+    .split(/[/,]/)
+    .map((x) => x.trim())
+    .filter(Boolean);
+
+/**
+ * หลายค่าเก็บลง value ตรง ๆ ไม่ได้ — ต้องแปลงเป็นสูตร
+ *
+ * set_status_based_on_acceptance_values เทียบ (reading_value or "") == (value or "")
+ * ซึ่งเป็นการเทียบข้อความแบบตรงตัว ใส่ "30, 60, 70" ลง value แล้วผู้ตรวจคีย์ 60
+ * จะได้ "60" != "30, 60, 70" คือตกทุกใบ
+ *
+ * ทางที่ ERPNext เตรียมไว้คือ acceptance_formula ซึ่งคำอธิบายของฟิลด์เองยกเป็น
+ * ตัวอย่างไว้เลย — Value based eg.: reading_value in ("A", "B", "C")
+ * ไม่ต้องสร้างฟิลด์ใหม่ แค่เขียนลงช่องที่มีอยู่แล้ว
+ */
+export function passFormula(v: string): string {
+  const list = passValues(v);
+  if (list.length < 2) return "";
+  return `reading_value in (${list.map((x) => `"${x}"`).join(", ")})`;
+}
+
 export function describeCriteria(row: QiRow): string {
   const unit = paramOf(row.parameterId)?.unit ?? "";
   const u = unit ? ` ${unit}` : "";
@@ -1725,7 +1753,12 @@ export function describeCriteria(row: QiRow): string {
     return `${row.min ?? 0}–${row.max ?? 0}${u}${manual}`;
   }
 
-  if (row.value) return `ต้องเป็น "${row.value}"${manual}`;
+  if (row.value) {
+    const list = passValues(row.value);
+    if (list.length > 1)
+      return `ต้องเป็นอย่างใดอย่างหนึ่งใน ${list.join(" · ")}${manual}`;
+    return `ต้องเป็น "${row.value}"${manual}`;
+  }
   return row.manualInspection ? "ผู้ตรวจเลือกผลผ่าน/ไม่ผ่านเอง" : "ยังไม่ได้ตั้งค่าที่ผ่าน";
 }
 

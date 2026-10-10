@@ -42,6 +42,8 @@ import {
   ROW_KINDS,
   SOURCE,
   cloneRow,
+  passFormula,
+  passValues,
   paramOf,
   type QiRow,
   type RemarkMode,
@@ -622,12 +624,28 @@ function RowEditDialog({
                 id={`${row.id}-v`}
                 className="bg-card"
                 value={row.value}
-                placeholder="เช่น ปกติ  หรือ  30"
+                placeholder="เช่น ปกติ  หรือ  30, 60, 70"
                 onChange={(e) => onChange({ value: e.target.value })}
               />
-              {/* คั่นด้วย / = ให้เลือก ไม่ใช่ให้พิมพ์ — ในใบตรวจจะขึ้นเป็น
-                  ดรอปดาวน์ให้เอง ไม่ต้องตั้งประเภทเพิ่มอีกช่อง */}
-              <FieldNote>value · คั่นด้วย / จะขึ้นเป็นดรอปดาวน์ในใบตรวจ</FieldNote>
+              {/* หลายค่าเก็บลง value ตรง ๆ ไม่ได้ เพราะ ERPNext เทียบข้อความ
+                  แบบตรงตัว ใส่ "30, 60, 70" แล้วผู้ตรวจคีย์ 60 จะได้ตกทุกใบ
+                  ต้องแปลงเป็น acceptance_formula ซึ่งเป็นทางที่ ERPNext
+                  เตรียมไว้เองอยู่แล้ว ไม่ต้องสร้างฟิลด์ใหม่ */}
+              {passFormula(row.value) ? (
+                <>
+                  <p className="text-sm text-muted-foreground">
+                    คั่นด้วย , หรือ / = ได้ค่าใดค่าหนึ่งก็ผ่าน —{" "}
+                    {passValues(row.value).join(" · ")}
+                  </p>
+                  <FieldNote>
+                    acceptance_formula = {passFormula(row.value)}
+                  </FieldNote>
+                </>
+              ) : (
+                <FieldNote>
+                  value · คั่นด้วย , ถ้ามีหลายค่าที่ถือว่าผ่าน
+                </FieldNote>
+              )}
             </div>
           )}
 

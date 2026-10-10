@@ -19,13 +19,23 @@ import {
   BreadcrumbSeparator,
 } from "@peckey954/ui/components/ui/breadcrumb";
 import { Button } from "@peckey954/ui/components/ui/button";
+import { Input } from "@peckey954/ui/components/ui/input";
 import { Label } from "@peckey954/ui/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@peckey954/ui/components/ui/select";
 import { Textarea } from "@peckey954/ui/components/ui/textarea";
 import { cn } from "@peckey954/ui/lib/utils";
 import { toast } from "sonner";
 import { rowTitle } from "@/components/qc/check-table";
 import {
   PROD_STEP,
+  passValues,
+  readingLabels,
   INSPECTION_TYPE_VALUE,
 } from "@/lib/qc-erp";
 import {
@@ -344,6 +354,49 @@ function StageForm({
                 เกณฑ์: {r.criteria}
               </p>
             )}
+            {/* ช่องคีย์ของข้อที่มีอะไรให้คีย์ — ข้อติ๊กล้วนไม่มีช่องว่างเปล่าให้งง
+                ว่าต้องกรอกอะไร หลายค่าที่ถือว่าผ่านขึ้นเป็นดรอปดาวน์ ไม่ใช่ให้
+                พิมพ์เอง เพราะพิมพ์แล้วสะกดต่างนิดเดียวก็ไม่ตรงกับที่ตั้งไว้ */}
+            {r.kind !== "system" && (r.numeric || r.value.trim() !== "") && (
+              <div className="mt-3 flex flex-wrap items-end gap-3">
+                {readingLabels(r).map((lb, k) => (
+                  <div key={k} className="space-y-1.5">
+                    <Label htmlFor={`${r.id}-v${k}`} className="text-sm">
+                      {lb}
+                    </Label>
+                    {passValues(r.value).length > 1 ? (
+                      <Select>
+                        <SelectTrigger
+                          id={`${r.id}-v${k}`}
+                          className="w-40 bg-card"
+                        >
+                          <SelectValue placeholder="เลือก" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {passValues(r.value).map((o) => (
+                            <SelectItem key={o} value={o}>
+                              {o}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    ) : (
+                      <Input
+                        id={`${r.id}-v${k}`}
+                        className="w-40 bg-card"
+                        inputMode={r.numeric ? "decimal" : "text"}
+                        placeholder={
+                          r.numeric
+                            ? `${r.min ?? 0}–${r.max ?? 0}`
+                            : r.value || "ระบุ"
+                        }
+                      />
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+
             {/* ชิปเปล่า ไม่มีกล่องติ๊ก — ผ่านกับไม่ผ่านเลือกได้อันเดียว
                 กล่องติ๊กในระบบนี้แปลว่าติ๊กได้หลายอัน ใส่ตรงนี้คือบอกกฎผิด
                 กดอันที่เลือกอยู่ซ้ำ = ยกเลิก กลับไปเป็นยังไม่ได้ตรวจ */}
