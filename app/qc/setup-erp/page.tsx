@@ -70,8 +70,8 @@ import {
   QI_TEMPLATES,
   DISPOSITIONS,
   QI_GROUPS,
-  REF_DOC_LABEL,
-  refDocsOf,
+  PHASE,
+  REF_MENU,
   addGroup,
   addDisposition,
   NEW_TEMPLATE_ID,
@@ -314,14 +314,16 @@ function TemplateList({
               <ChevronRightIcon className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
             </div>
             <div className="mt-3 flex flex-wrap gap-1.5">
-              <Badge appearance="soft" tone="brand">
-                {INSPECTION_TYPE_LABEL[t.inspectionType]}
-              </Badge>
-              {refDocsOf(t).map((d) => (
-                <Badge key={d} appearance="outline" tone="neutral">
-                  {REF_DOC_LABEL[d]}
+              {t.phase !== "" && (
+                <Badge appearance="soft" tone="brand">
+                  {PHASE[t.phase].label}
                 </Badge>
-              ))}
+              )}
+              {t.refMenu !== "" && (
+                <Badge appearance="outline" tone="neutral">
+                  {REF_MENU[t.refMenu].label}
+                </Badge>
+              )}
             </div>
             <p className="mt-2 text-sm text-muted-foreground">
               {t.editor ?? t.owner} · {t.updatedAt}
@@ -376,9 +378,7 @@ function TemplateList({
                   </span>
                 </TableCell>
                 <TableCell className="text-sm">
-                  {refDocsOf(t).length > 0
-                    ? refDocsOf(t).map((d) => REF_DOC_LABEL[d]).join(", ")
-                    : "-"}
+                  {t.refMenu === "" ? "-" : REF_MENU[t.refMenu].label}
                 </TableCell>
                 <TableCell>
                   <span className="font-medium">{t.owner}</span>

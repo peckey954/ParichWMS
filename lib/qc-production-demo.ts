@@ -9,27 +9,24 @@
    วันหนึ่งจะมีคนแก้ที่เดียวแล้วอีกที่ค้าง
 ------------------------------------------------------------------ */
 
-import { templateOf, type Stage } from "@/lib/qc-erp";
+import { PROD_STEP_KEYS, templateOf, type ProdStep } from "@/lib/qc-erp";
 
 /** เทมเพลตที่คิวนี้เดินตาม — ตรวจรับสินค้า (External / Finish Good) */
 export const DEMO_TEMPLATE_ID = "t-inproc";
 
 export const demoTemplate = () => templateOf(DEMO_TEMPLATE_ID);
 
-/** ขั้นที่ต้องตรวจของคิวนี้ เรียงตามลำดับที่ต้องทำจริง */
-export const STAGE_ORDER: Stage[] = [
-  "receive",
-  "preProd",
-  "inProd",
-  "transfer",
-  "postProd",
-  "deliver",
-];
-
-export const stagesOfQueue = (): Stage[] => {
+/**
+ * ขั้นที่ต้องตรวจของคิวนี้ เรียงตามลำดับที่ต้องทำจริง
+ *
+ * ลำดับมาจาก PROD_STEP_KEYS ที่ประกาศเรียง ก่อน → ระหว่าง → หลัง ไว้แล้ว
+ * ไม่ได้เรียงตามที่คนติ๊กในหน้าตั้งค่า เพราะคนอาจติ๊กหลังผลิตก่อนก่อนผลิต
+ * แต่สายการผลิตไม่ได้เดินแบบนั้น
+ */
+export const stagesOfQueue = (): ProdStep[] => {
   const t = demoTemplate();
-  if (!t) return [];
-  return STAGE_ORDER.filter((s) => t.stages.includes(s));
+  if (!t || t.phase !== "production") return [];
+  return PROD_STEP_KEYS.filter((s) => t.prodSteps.includes(s));
 };
 
 /** ผลของหนึ่งขั้นที่ตรวจไปแล้ว — หนึ่งขั้น = หนึ่งใบ Quality Inspection */
@@ -60,7 +57,7 @@ export type Lot = {
   ton: number;
   owner: string;
   /** ผลของขั้นที่ตรวจไปแล้ว — ขั้นที่ยังไม่มีคีย์ในนี้คือยังไม่ได้ตรวจ */
-  done: Partial<Record<Stage, StageResult>>;
+  done: Partial<Record<ProdStep, StageResult>>;
 };
 
 export const LOTS: Lot[] = [
@@ -95,7 +92,7 @@ export const LOTS: Lot[] = [
     ton: 640,
     owner: "อลิสา พรสุขสิริ",
     done: {
-      preProd: {
+      pre: {
         qi: "MAT-QA-2026-00011",
         at: "16/01/2026 11:20",
         by: "อลิสา พรสุขสิริ",
@@ -120,7 +117,7 @@ export const LOTS: Lot[] = [
     ton: 420,
     owner: "ณัฐพล ศรีวิไล",
     done: {
-      preProd: {
+      pre: {
         qi: "MAT-QA-2026-00008",
         at: "14/01/2026 08:40",
         by: "ณัฐพล ศรีวิไล",
@@ -128,7 +125,7 @@ export const LOTS: Lot[] = [
         failed: [],
         note: "",
       },
-      inProd: {
+      during: {
         qi: "MAT-QA-2026-00009",
         at: "14/01/2026 13:05",
         by: "ณัฐพล ศรีวิไล",
@@ -151,14 +148,14 @@ export const lotOf = (id: string) => LOTS.find((l) => l.id === id);
  * ERPNext ไม่มีกฎนี้ให้ มันดูแค่ว่าแต่ละเอกสารมีใบตรวจหรือยัง ไม่ได้ดูข้ามเอกสาร
  * ลำดับจึงเป็นของที่ต้องบังคับเองที่หน้าจอและที่ validate ตอนบันทึก
  */
-export function currentStage(lot: Lot): Stage | null {
+export function currentStage(lot: Lot): ProdStep | null {
   for (const s of stagesOfQueue()) if (!lot.done[s]) return s;
   return null;
 }
 
 export type StageState = "done" | "current" | "locked";
 
-export const stageStateOf = (lot: Lot, s: Stage): StageState =>
+export const stageStateOf = (lot: Lot, s: ProdStep): StageState =>
   lot.done[s] ? "done" : currentStage(lot) === s ? "current" : "locked";
 
 /** จำนวนงานที่ถึงคิวแล้ว — นับเป็นงาน ไม่ใช่นับเป็นใบ */
@@ -172,7 +169,7 @@ export const nextQiName = () =>
   `MAT-QA-2026-${String(++qiSeq).padStart(5, "0")}`;
 
 /** บันทึกผลหนึ่งขั้น — ไม่มีหลังบ้าน แก้อาเรย์ในหน่วยความจำตรง ๆ */
-export function saveStage(lotId: string, stage: Stage, r: StageResult) {
+export function saveStage(lotId: string, stage: ProdStep, r: StageResult) {
   const lot = lotOf(lotId);
   if (lot) lot.done[stage] = r;
 }

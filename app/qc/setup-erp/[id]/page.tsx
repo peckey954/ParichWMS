@@ -77,16 +77,17 @@ import {
   DEFAULT_SCHEDULE,
   ORIGIN,
   DISPOSITIONS,
-  INSPECTION_TYPE_LABEL,
   INSPECTION_TYPE_VALUE,
   MAX_READINGS,
-  REF_DOC_VALUE,
-  STAGE_TYPE,
-  mixesStageKinds,
-  stagesByKind,
-  TRIGGER,
-  triggersFor,
-  type TriggerMenu,
+  PHASE,
+  PHASE_KEYS,
+  PROD_STEP,
+  PROD_STEP_KEYS,
+  REF_MENU,
+  refMenusFor,
+  type Phase,
+  type ProdStep,
+  type RefMenu,
   usesQualityInspection,
   cloneRow,
   describeCriteria,
@@ -99,10 +100,7 @@ import {
   paramOf,
   readingLabels,
   templateOf,
-  STAGE,
-  STAGE_KEYS,
   OPERATION_POOL,
-  type Stage,
   PHOTO_KEYS,
   PHOTO_LABEL,
   type PhotoMode,
@@ -429,184 +427,177 @@ function Editor({ seed, isNew }: { seed: QiTemplate; isNew: boolean }) {
               <FieldNote custom>custom_code</FieldNote>
             </div>
 
-            {/* เลือกเป็นชื่อเมนูของเรา ไม่ใช่ชื่อ doctype — คนตั้งค่ารู้จัก
-                "ชั่งน้ำหนัก" ไม่ได้รู้จัก Purchase Receipt และจุดที่ติ๊กอย่างเดียว
-                บอกไม่ได้ว่าเมนูไหน เพราะรับเข้าผ่านชั่งน้ำหนักกับผ่านสต็อกทั่วไป
-                เป็นคนละเอกสารกัน รายการจึงกรองตามจุด แต่ยังต้องเลือกเอง */}
+            {/* ช่วงใหญ่เลือกอันเดียว ตรงกับ inspection_type ของ ERPNext ที่มี
+                สามค่าตายตัว เคยให้ติ๊กหลายจุดรวมกันซึ่งเอาคนละเรื่องมาปน */}
             <div className="space-y-1.5">
-              <Label htmlFor="tpl-trig">เมนูที่เป็นตัวเปิดใบ</Label>
-              <MultiSelectChips
-                id="tpl-trig"
-                className="w-full bg-card"
-                disabled={tpl.stages.length === 0}
-                placeholder={
-                  tpl.stages.length === 0
-                    ? "ติ๊กจุดที่ต้องตรวจก่อน"
-                    : "เลือกเมนู — ไม่เลือก = ผู้ตรวจเปิดใบเอง"
+              <Label htmlFor="tpl-phase">ช่วงการตรวจสอบ</Label>
+              <Select
+                value={tpl.phase}
+                onValueChange={(v) =>
+                  // ออกจากช่วงการผลิตแล้วขั้นย่อยกับขั้นตอนไม่มีความหมายอีก
+                  // และเอกสารที่เลือกไว้อาจใช้กับช่วงใหม่ไม่ได้ ล้างทั้งหมด
+                  patch({
+                    phase: v as Phase,
+                    prodSteps: v === "production" ? tpl.prodSteps : [],
+                    operations: v === "production" ? tpl.operations : [],
+                    refMenu: "",
+                  })
                 }
-                options={triggersFor(tpl.stages).map((m) => ({
-                  label: `${TRIGGER[m].label} · ${TRIGGER[m].group}`,
-                  value: m,
-                }))}
-                value={tpl.triggers}
-                onValueChange={(v) => patch({ triggers: v as TriggerMenu[] })}
-              />
-              {tpl.triggers.length > 0 ? (
-                <div className="mt-1 space-y-0.5">
-                  {tpl.triggers.map((m) => (
-                    <FieldNote key={m}>
-                      {TRIGGER[m].label} → reference_type ={" "}
-                      {REF_DOC_VALUE[TRIGGER[m].refDoc]} · {TRIGGER[m].note}
-                    </FieldNote>
+              >
+                <SelectTrigger id="tpl-phase" className="w-full bg-card">
+                  <SelectValue placeholder="เลือกช่วงการตรวจ" />
+                </SelectTrigger>
+                <SelectContent>
+                  {PHASE_KEYS.map((k) => (
+                    <SelectItem key={k} value={k}>
+                      {PHASE[k].label} — {PHASE[k].erp}
+                    </SelectItem>
                   ))}
-                </div>
-              ) : (
-                <FieldNote>
-                  reference_type (ใบตรวจ · บังคับกรอก) —
-                  ไม่เลือกเมนูคือไม่มีเอกสารเป็นตัวเปิดใบ
-                </FieldNote>
-              )}
+                </SelectContent>
+              </Select>
+              <FieldNote>inspection_type · สามค่านี้ ERPNext กำหนดมาตายตัว</FieldNote>
             </div>
-          </div>
 
-          {/* ตัวที่ทำให้ใบตรวจเด้งมาเอง — ไม่ติ๊กจุดไหนเลยเทมเพลตก็ยังใช้ได้
-              แต่ผู้ตรวจต้องเปิดใบเองและเลือกเทมเพลตเองทุกใบ ซึ่งแปลว่าวันหนึ่ง
-              จะมีคนเลือกผิด และไม่มีอะไรบอกว่าเลือกผิด
-
-              ติ๊กได้หลายจุด เพราะการผลิตรอบเดียวตรวจได้หลายครั้ง และแต่ละจุด
-              ใช้คนละกลไกกัน ไม่ใช่ของชุดเดียวกัน */}
-          <div className="mt-4 grid gap-4 @2xl:grid-cols-2">
+            {/* โชว์เสมอ ปิดไว้เมื่อไม่ใช่ช่วงการผลิต — ซ่อนแล้วช่องข้าง ๆ
+                จะเลื่อนมาแทนที่ทุกครั้งที่สลับ ซึ่งกวนตากว่าเห็นช่องที่กดไม่ได้ */}
             <div className="space-y-1.5">
-              <Label htmlFor="tpl-stages">จุดที่ต้องตรวจ</Label>
+              <Label htmlFor="tpl-steps">ช่วงการผลิต</Label>
               <MultiSelectChips
-                id="tpl-stages"
+                id="tpl-steps"
                 className="w-full bg-card"
-                placeholder="ไม่ติ๊ก = ผู้ตรวจเปิดใบเองล้วน"
-                options={STAGE_KEYS.map((k) => ({
-                  // ติดกลุ่มไว้ท้ายชื่อ ให้เห็นตั้งแต่ตอนเลือกว่าอันไหนเป็นลำดับ
-                  // อันไหนจบในตัว ไม่ใช่ไปรู้ตอนเห็นคิวออกมาผิดจากที่คิด
-                  label: `${STAGE[k].label} · ${
-                    STAGE[k].kind === "run" ? "รอบการผลิต" : "เหตุการณ์เดี่ยว"
-                  }`,
+                disabled={tpl.phase !== "production"}
+                placeholder={
+                  tpl.phase === "production"
+                    ? "เลือกขั้น — ล็อตเดียวกันเดินไปตามลำดับ"
+                    : "ใช้เมื่อเลือกช่วงระหว่างผลิตเท่านั้น"
+                }
+                options={PROD_STEP_KEYS.map((k) => ({
+                  label: `${PROD_STEP[k].label} — ${PROD_STEP[k].erp}`,
                   value: k,
                 }))}
-                value={tpl.stages}
+                value={tpl.prodSteps}
                 onValueChange={(v) =>
-                  // เอาระหว่างผลิตออกแล้วขั้นตอนที่เลือกไว้ไม่มีความหมายอีก ล้างทิ้ง
                   patch({
-                    stages: v as Stage[],
-                    ...(v.includes("inProd") ? {} : { operations: [] }),
+                    prodSteps: v as ProdStep[],
+                    ...(v.includes("during") ? {} : { operations: [] }),
                   })
                 }
               />
               <FieldNote custom>
-                custom_stages ที่เทมเพลต — ตัวจริงกระจายอยู่หลาย doctype
-                เก็บรวมไว้ที่เดียวเพื่อให้ตั้งจบในหน้าเดียว
+                custom_prod_steps ที่เทมเพลต — ERPNext ไม่มีแนวคิดขั้นย่อย
+                ตัวจริงกระจายอยู่ที่ Stock Entry, Job Card และ BOM
               </FieldNote>
             </div>
 
-            {/* โชว์เสมอ ปิดไว้เมื่อไม่ได้ติ๊กระหว่างผลิต — ซ่อนแล้วช่องข้าง ๆ
-                จะเลื่อนมาแทนที่ทุกครั้งที่สลับ ซึ่งกวนตากว่าเห็นช่องที่กดไม่ได้ */}
+            {/* เลือกเป็นชื่อเมนูของเรา ไม่ใช่ชื่อ doctype — คนตั้งค่ารู้จัก
+                "ใบรับวัตถุดิบ" ไม่ได้รู้จัก Purchase Receipt และสองเมนูอาจลง
+                doctype เดียวกันแต่เป็นคนละหน้าจอ เลือกเองจึงยังจำเป็น */}
+            <div className="space-y-1.5">
+              <Label htmlFor="tpl-ref">เอกสารอ้างอิง</Label>
+              <Select
+                value={tpl.refMenu}
+                disabled={tpl.phase === ""}
+                onValueChange={(v) => patch({ refMenu: v as RefMenu })}
+              >
+                <SelectTrigger id="tpl-ref" className="w-full bg-card">
+                  <SelectValue
+                    placeholder={
+                      tpl.phase === ""
+                        ? "เลือกช่วงการตรวจก่อน"
+                        : "เลือกเอกสาร"
+                    }
+                  />
+                </SelectTrigger>
+                <SelectContent>
+                  {refMenusFor(tpl.phase).map((m) => (
+                    <SelectItem key={m} value={m}>
+                      {REF_MENU[m].label} — {REF_MENU[m].erp}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <FieldNote>
+                reference_type (ใบตรวจ · บังคับกรอก)
+                {tpl.refMenu !== "" && ` = ${REF_MENU[tpl.refMenu].erp}`}
+              </FieldNote>
+            </div>
+
+            {/* โชว์เสมอ ปิดไว้เมื่อไม่ได้ติ๊กระหว่างผลิต */}
             <div className="space-y-1.5">
               <Label htmlFor="tpl-ops">ขั้นตอนการผลิตที่ต้องตรวจ</Label>
               <MultiSelectChips
                 id="tpl-ops"
                 className="w-full bg-card"
-                disabled={!tpl.stages.includes("inProd")}
+                disabled={!tpl.prodSteps.includes("during")}
                 placeholder={
-                  tpl.stages.includes("inProd")
+                  tpl.prodSteps.includes("during")
                     ? "เลือกขั้นตอน — หนึ่งขั้นตอน = หนึ่งใบตรวจ"
-                    : "ใช้เมื่อติ๊กระหว่างผลิตเท่านั้น"
+                    : "ใช้เมื่อเลือกช่วงระหว่างผลิตเท่านั้น"
                 }
                 options={OPERATION_POOL.map((o) => ({ label: o, value: o }))}
                 value={tpl.operations}
                 onValueChange={(v) => patch({ operations: v })}
               />
               <FieldNote>
-                BOM Operation · quality_inspection_required · ติ๊กกี่ขั้นตอนก็ได้
-                ได้ใบงานเท่านั้นใบ บังคับตรวจทุกใบ
+                BOM Operation · quality_inspection_required · เรียงตาม
+                sequence_id ของสูตรการผลิต ไม่ได้เรียงตามที่เลือกตรงนี้
               </FieldNote>
             </div>
           </div>
 
-          {/* ติ๊กข้ามกลุ่มไม่ผิด แต่ได้คิวสองแบบ ต้องเขียนบอก ไม่งั้นคนที่คิดว่า
-              ติ๊กแล้วได้ลำดับยาวขึ้นจะเข้าใจผิดจนกว่าจะไปเห็นคิวจริง */}
-          {mixesStageKinds(tpl.stages) && (
-            <div className="mt-3 rounded-xl border border-border bg-brand px-4 py-3 text-sm">
-              <p className="font-medium">
-                ฟอร์มนี้ติ๊กข้ามสองกลุ่ม — คิวจะออกมาสองแบบ ไม่ได้ต่อกันเป็นลำดับเดียว
-              </p>
-              <p className="mt-1 text-muted-foreground">
-                <span className="font-medium text-foreground">
-                  {stagesByKind(tpl.stages, "run")
-                    .map((k) => STAGE[k].label.replace(/\s*\(.*\)$/, ""))
-                    .join(" → ")}
-                </span>{" "}
-                เป็นล็อตเดียวกันเดินไปตามลำดับ ต้องผ่านครบถึงจะจบ · ส่วน{" "}
-                <span className="font-medium text-foreground">
-                  {stagesByKind(tpl.stages, "event")
-                    .map((k) => STAGE[k].label.replace(/\s*\(.*\)$/, ""))
-                    .join(" · ")}
-                </span>{" "}
-                เป็นคนละเหตุการณ์ จบในตัวครั้งเดียว ไม่ได้รอใคร
-              </p>
-              {/* ที่ไม่ห้าม เพราะ ERPNext เองก็ให้ Item มี
-                  quality_inspection_template ช่องเดียวใช้ทั้งขารับและขาส่ง
-                  เทมเพลตอันเดียวทำหลายเหตุการณ์จึงเป็นเรื่องปกติของมัน */}
-              <p className="mt-1 text-muted-foreground">
-                ไม่ต้องแยกเทมเพลตถ้าหัวข้อตรวจเหมือนกัน — Item มีช่อง
-                quality_inspection_template ช่องเดียวใช้ทั้งขารับและขาส่งอยู่แล้ว
-                แยกไปก็ได้สองอันที่ต้องแก้ให้ตรงกันตลอด
-              </p>
-            </div>
-          )}
-
-          {/* ไล่ทีละจุดว่าเดฟต้องไปทำอะไร เพราะแต่ละจุดราคาไม่เท่ากัน
-              สี่จุดคลิกเอาในหน้าจอ มีจุดเดียวที่ต้องเขียนโค้ด */}
-          {tpl.stages.length > 0 && (
+          {/* ไล่ทีละขั้นว่าเดฟต้องไปทำอะไร เพราะสามขั้นราคาไม่เท่ากัน
+              สองขั้นคลิกเอาในหน้าจอ มีขั้นเดียวที่ต้องเขียนโค้ด */}
+          {tpl.phase === "production" && tpl.prodSteps.length > 0 && (
             <div className="mt-3 space-y-2">
-              {[
-                ...stagesByKind(tpl.stages, "run"),
-                ...stagesByKind(tpl.stages, "event"),
-              ].map((k) => (
-                <div
-                  key={k}
-                  className="rounded-xl border border-border bg-card px-4 py-3 text-sm"
-                >
-                  <p className="font-medium">{STAGE[k].label}</p>
-                  <dl className="mt-1 grid gap-x-3 gap-y-0.5 text-muted-foreground @lg:grid-cols-[7rem_1fr]">
-                    <dt>ช่วงการตรวจ</dt>
-                    <dd className="font-mono text-xs">
-                      {INSPECTION_TYPE_LABEL[STAGE_TYPE[k]]} —{" "}
-                      {INSPECTION_TYPE_VALUE[STAGE_TYPE[k]]}
-                    </dd>
-                    <dt>ใบเกิดจาก</dt>
-                    <dd className="font-mono text-xs">{STAGE[k].doc}</dd>
-                    <dt>เทมเพลตมาจาก</dt>
-                    <dd className="font-mono text-xs">{STAGE[k].template}</dd>
-                    <dt>บังคับด้วย</dt>
-                    <dd className="font-mono text-xs">{STAGE[k].enforce}</dd>
-                  </dl>
-                  {STAGE[k].todo ? (
-                    <p className="mt-2 text-sm text-danger-strong">
-                      ต้องเขียนเพิ่ม — {STAGE[k].todo}
+              {PROD_STEP_KEYS.filter((k) => tpl.prodSteps.includes(k)).map(
+                (k) => (
+                  <div
+                    key={k}
+                    className="rounded-xl border border-border bg-card px-4 py-3 text-sm"
+                  >
+                    <p className="font-medium">
+                      {PROD_STEP[k].label} — {PROD_STEP[k].erp}
                     </p>
-                  ) : (
-                    <p className="mt-2 text-sm text-success-strong">
-                      ไม่ต้องเขียนโค้ดเพิ่ม คลิกเอาในหน้าจอของ ERPNext ได้เลย
-                    </p>
-                  )}
-                </div>
-              ))}
+                    <dl className="mt-1 grid gap-x-3 gap-y-0.5 text-muted-foreground @lg:grid-cols-[8rem_1fr]">
+                      <dt>ใบเกิดจาก</dt>
+                      <dd className="font-mono text-xs">{PROD_STEP[k].doc}</dd>
+                      <dt>เทมเพลตมาจาก</dt>
+                      <dd className="font-mono text-xs">
+                        {PROD_STEP[k].template}
+                      </dd>
+                      <dt>บังคับด้วย</dt>
+                      <dd className="font-mono text-xs">
+                        {PROD_STEP[k].enforce}
+                      </dd>
+                      {/* ป้ายที่ ERPNext แปะจริง ไม่ใช่ In Process ทั้งสามขั้น
+                          ต้องเขียนไว้ ไม่งั้นจะงงตอนไปเปิดดูใบจริงแล้วป้ายไม่ตรง
+                          กับช่วงที่เลือกไว้ในหน้านี้ */}
+                      <dt>ป้ายที่ได้จริง</dt>
+                      <dd className="font-mono text-xs">
+                        inspection_type ={" "}
+                        {INSPECTION_TYPE_VALUE[PROD_STEP[k].actualType]}
+                      </dd>
+                    </dl>
+                    {PROD_STEP[k].todo ? (
+                      <p className="mt-2 text-sm text-danger-strong">
+                        ต้องเขียนเพิ่ม — {PROD_STEP[k].todo}
+                      </p>
+                    ) : (
+                      <p className="mt-2 text-sm text-success-strong">
+                        ไม่ต้องเขียนโค้ดเพิ่ม คลิกเอาในหน้าจอของ ERPNext ได้เลย
+                      </p>
+                    )}
+                  </div>
+                )
+              )}
 
-              {/* เทมเพลตอันเดียวใช้ได้ทุกจุดจริง ๆ ต้องเขียนบอก ไม่งั้นจะนึกว่า
-                  ต้องสร้างเทมเพลตแยกจุดละอัน แล้วได้สามอันที่แก้ไม่ตรงกัน */}
-              {tpl.stages.length > 1 && (
+              {/* สามขั้นได้ป้ายคนละค่ากัน ซึ่งขัดกับช่วงใหญ่ที่เลือกว่า In Process
+                  ไม่ใช่บั๊ก แต่เป็นวิธีที่ ERPNext คิดป้ายจากเอกสาร ต้องบอกไว้ */}
+              {tpl.prodSteps.length > 1 && (
                 <p className="px-1 text-sm text-muted-foreground">
-                  ติ๊ก {tpl.stages.length} จุด = เทมเพลตอันนี้อันเดียวไปโผล่{" "}
-                  {tpl.stages.length} ที่ ไม่ต้องสร้างแยก —
-                  get_item_specification_details() แค่คัดลอกแถวมา
-                  ไม่มีการจองและไม่มีเช็คซ้ำ แก้เทมเพลตทีเดียวจึงเปลี่ยนครบทุกจุด
+                  สามขั้นนี้ใช้เทมเพลตอันนี้อันเดียว ไม่ต้องสร้างแยก —
+                  แต่ ERPNext จะแปะ inspection_type ให้คนละค่ากันตามเอกสารที่
+                  เปิดใบ ไม่ได้เป็น In Process ทั้งสามขั้นอย่างที่ชื่อช่วงบอก
                 </p>
               )}
             </div>

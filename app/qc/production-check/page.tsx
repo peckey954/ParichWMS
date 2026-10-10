@@ -31,7 +31,7 @@ import {
 import { Tabs, TabsList, TabsTrigger } from "@peckey954/ui/components/ui/tabs";
 import { cn } from "@peckey954/ui/lib/utils";
 import { ROW_HOVER_NAV } from "@/components/stock/doc-parts";
-import { STAGE, type Stage } from "@/lib/qc-erp";
+import { PROD_STEP, type ProdStep } from "@/lib/qc-erp";
 import {
   LOTS,
   currentStage,
@@ -229,13 +229,13 @@ function StageChip({
   onOpen,
 }: {
   lot: Lot;
-  stage: Stage;
+  stage: ProdStep;
   onOpen: () => void;
 }) {
   const state = stageStateOf(lot, stage);
   const res = lot.done[stage];
   // ชื่อขั้นตัดคำว่าอะไรในวงเล็บออก ชิปในตารางต้องสั้นพอให้สามอันอยู่บรรทัดเดียว
-  const label = STAGE[stage].label.replace(/\s*\(.*\)$/, "");
+  const label = PROD_STEP[stage].label;
 
   return (
     <button

@@ -25,7 +25,11 @@ import { cn } from "@peckey954/ui/lib/utils";
 import { toast } from "sonner";
 import { CheckChip } from "@/components/check-chip";
 import { rowTitle } from "@/components/qc/check-table";
-import { STAGE, STAGE_TYPE, INSPECTION_TYPE_LABEL, type Stage } from "@/lib/qc-erp";
+import {
+  PROD_STEP,
+  INSPECTION_TYPE_VALUE,
+  type ProdStep,
+} from "@/lib/qc-erp";
 import {
   currentStage,
   demoTemplate,
@@ -74,7 +78,7 @@ export default function ProductionCheckDetailPage() {
   const stages = stagesOfQueue();
   const open = currentStage(lot);
   // กดชิปมาจากรายการ = เจาะมาดูขั้นนั้น ไม่ได้ส่งมา = ดูขั้นที่ถึงคิว
-  const want = search.get("stage") as Stage | null;
+  const want = search.get("stage") as ProdStep | null;
   const focus = want && stages.includes(want) ? want : open;
 
   return (
@@ -158,7 +162,7 @@ function StageLogItem({
   focused,
 }: {
   lot: Lot;
-  stage: Stage;
+  stage: ProdStep;
   index: number;
   focused: boolean;
 }) {
@@ -189,12 +193,12 @@ function StageLogItem({
           </span>
 
           <div className="min-w-0">
-            <p className="font-medium">{STAGE[stage].label}</p>
+            <p className="font-medium">{PROD_STEP[stage].label}</p>
             {/* ป้ายช่วงการตรวจที่ ERPNext จะแปะให้ — สามขั้นนี้ได้คนละค่ากัน
                 ซึ่งเป็นตัวที่ใช้แยกว่าใบไหนเป็นขั้นไหนโดยไม่ต้องสร้างฟิลด์เพิ่ม */}
             <p className="mt-0.5 font-mono text-xs text-muted-foreground">
-              {STAGE[stage].doc} · inspection_type ={" "}
-              {INSPECTION_TYPE_LABEL[STAGE_TYPE[stage]]}
+              {PROD_STEP[stage].doc} · inspection_type ={" "}
+              {INSPECTION_TYPE_VALUE[PROD_STEP[stage].actualType]}
             </p>
 
             {res && (
@@ -258,7 +262,7 @@ function StageForm({
   onSaved,
 }: {
   lot: Lot;
-  stage: Stage;
+  stage: ProdStep;
   onSaved: () => void;
 }) {
   const tpl = demoTemplate();
@@ -288,7 +292,7 @@ function StageForm({
       failed: failed.map((r) => rowTitle(r)),
       note: note.trim(),
     });
-    toast.success(`บันทึก${STAGE[stage].label}แล้ว`, {
+    toast.success(`บันทึก${PROD_STEP[stage].label}แล้ว`, {
       description:
         verdict === "pass"
           ? "ผ่านทุกข้อ — ขั้นถัดไปเปิดให้ตรวจแล้ว"
@@ -301,7 +305,7 @@ function StageForm({
     <section className="mt-6 rounded-2xl border border-border bg-card p-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
-          <h2 className="font-semibold">ตรวจ{STAGE[stage].label}</h2>
+          <h2 className="font-semibold">ตรวจ{PROD_STEP[stage].label}</h2>
           <p className="mt-0.5 text-sm text-muted-foreground">
             {rows.length} หัวข้อ จากเทมเพลต {tpl.name}
           </p>
@@ -377,7 +381,7 @@ function StageForm({
           ไม่ผ่านข้อเดียวถือว่าทั้งขั้นไม่ผ่าน ตรงกับ inspect_and_set_status
           ของ ERPNext — แต่ขั้นถัดไปยังเปิดให้ตรวจต่อ
         </p>
-        <Button onClick={save}>บันทึก{STAGE[stage].label}</Button>
+        <Button onClick={save}>บันทึก{PROD_STEP[stage].label}</Button>
       </div>
     </section>
   );

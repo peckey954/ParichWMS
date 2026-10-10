@@ -712,7 +712,8 @@ export function blockersOf(t: QiTemplate): string[] {
      เคยนับประเภทการตรวจกับการผูกสินค้าเป็นเงื่อนไขด้วย ซึ่งเป็นการถามเรื่อง
      เดียวกันสามรอบ — ฟอร์มที่ตรวจเครื่องจักรก็คือฟอร์มที่ไม่มีเอกสารอ้างอิง
      อยู่แล้ว ถามช่องเดียวพอ แล้วตั้งขัดกันเองไม่ได้ด้วย */
-  if (t.triggers.length === 0) out.push("ไม่ได้เลือกเมนูที่เป็นตัวเปิดใบ");
+  if (t.phase === "") out.push("ยังไม่ได้เลือกช่วงการตรวจสอบ");
+  else if (t.refMenu === "") out.push("ยังไม่ได้เลือกเอกสารอ้างอิง");
 
   // หัวข้อที่ดึงคลังหรือเครื่องจักรมา — Quality Inspection ไม่มีช่อง Link ไปหา
   for (const r of t.rows)
@@ -758,137 +759,101 @@ export const ORIGIN: Record<
 export const ORIGIN_KEYS = Object.keys(ORIGIN) as Origin[];
 
 // ---------------------------------------------------------------
-// จุดที่ต้องตรวจ — ติ๊กได้หลายจุด สินค้าตัวเดียวกันตรวจได้หลายรอบในหนึ่งการผลิต
+// ช่วงการตรวจสอบ — เลือกอันเดียว ตรงกับ inspection_type ของ ERPNext ตัวต่อตัว
 //
-// แต่ละจุดมีที่ผูกเทมเพลตกับตัวบังคับของตัวเอง ไม่ใช่ของชุดเดียวกัน
-// เลือกหลายจุด = เทมเพลตอันเดียวไปโผล่หลายที่ ซึ่ง ERPNext รองรับอยู่แล้ว
-// เพราะเทมเพลตเอาไปใช้กี่ใบก็ได้ ไม่มีการจองและไม่มีเช็คซ้ำ
+// เคยทำเป็นติ๊กหลายจุดในช่องเดียว ซึ่งเอาสองเรื่องมาปนกัน — การผลิตรอบเดียว
+// ที่ต้องเดินให้ครบหลายจุด กับการรับของเข้ากับส่งของออกที่เป็นคนละเหตุการณ์
+// ติ๊กรวมกันแล้วอ่านว่า "ใบนี้ต้องรับเข้าแล้วส่งออกถึงจะเสร็จ" ซึ่งไม่ใช่
 //
-// ที่ต้องแยกเป็นจุด ๆ แทนที่จะเป็นช่องเดียวว่า "ผูกไว้ที่ไหน" เพราะก่อนผลิต
-// กับหลังผลิตใช้คนละกลไกกันทั้งที่เป็นการผลิตรอบเดียวกัน บอกแค่ว่าผูกที่ BOM
-// จึงตอบไม่ได้ว่าใบจะเด้งมาตอนไหนบ้าง
+// แยกเป็นเลือกช่วงใหญ่อันเดียวก่อน แล้วช่วงที่มีขั้นย่อยค่อยแตกข้างใน
 // ---------------------------------------------------------------
 
-/**
- * ติ๊กหลายจุดมีสองความหมายที่ต่างกันสิ้นเชิง — ต้องแยกให้ออกตั้งแต่ตอนเลือก
- *
- *   run    จุดในรอบงานเดียวกัน ของชิ้นเดียวต้องผ่านให้ครบตามลำดับถึงจะจบ
- *          ก่อนผลิต → ระหว่างผลิต → หลังผลิต คือล็อตเดียวกันเดินไปสามจุด
- *          คิวจึงเป็นหนึ่งแถวสามชิป และขั้นหลังรอขั้นหน้า
- *
- *   event  เหตุการณ์ที่จบในตัว ไม่เกี่ยวกับเหตุการณ์อื่น
- *          รับของเข้าวันนี้ กับส่งของออกเดือนหน้า เป็นคนละล็อตคนละใบ
- *          แค่ใช้แบบฟอร์มเดียวกัน คิวจึงเป็นคนละแถว ไม่มีอะไรรอใคร
- *
- * ติ๊กข้ามกลุ่มได้ ไม่ใช่ความผิด — ERPNext เองก็ให้ Item มี
- * quality_inspection_template ช่องเดียวใช้ทั้งขารับและขาส่ง แปลว่าเทมเพลต
- * อันเดียวทำหน้าที่หลายเหตุการณ์เป็นเรื่องปกติของมันอยู่แล้ว
- */
-export type StageKind = "run" | "event";
+export type Phase = "incoming" | "production" | "outgoing";
 
-export const STAGE_KIND_LABEL: Record<StageKind, string> = {
-  run: "รอบการผลิต — ต้องผ่านครบตามลำดับ",
-  event: "เหตุการณ์เดี่ยว — จบในตัวครั้งเดียว",
-};
-
-export type Stage =
-  | "receive"
-  | "preProd"
-  | "inProd"
-  | "transfer"
-  | "postProd"
-  | "deliver";
-
-export const STAGE: Record<
-  Stage,
+export const PHASE: Record<Phase, { label: string; erp: string; hint: string }> =
   {
-    /** อยู่ในรอบงานเดียวกัน หรือเป็นเหตุการณ์เดี่ยว */
-    kind: StageKind;
+    incoming: {
+      label: "รับเข้า",
+      erp: "Incoming",
+      hint: "ของเข้าโรงงาน ตรวจครั้งเดียวจบต่อหนึ่งใบรับ",
+    },
+    production: {
+      label: "ระหว่างผลิต",
+      erp: "In Process",
+      hint: "การผลิตรอบเดียวตรวจได้หลายจุด เลือกขั้นข้างในได้",
+    },
+    outgoing: {
+      label: "ส่งออก",
+      erp: "Outgoing",
+      hint: "ของออกจากโรงงาน ตรวจครั้งเดียวจบต่อหนึ่งใบส่ง",
+    },
+  };
+
+export const PHASE_KEYS = Object.keys(PHASE) as Phase[];
+
+// ---------------------------------------------------------------
+// ขั้นย่อยของช่วงการผลิต — เลือกได้หลายขั้น เพราะเป็นล็อตเดียวกันเดินไปหลายจุด
+//
+// ต่างจากช่วงใหญ่ตรงที่สามขั้นนี้ผูกกับการผลิตรอบเดียวกัน ต้องผ่านให้ครบ
+// ตามลำดับถึงจะจบ ลำดับมาจากเวลาจริง ไม่ใช่ลำดับที่เราตั้งเอง
+// ---------------------------------------------------------------
+
+export type ProdStep = "pre" | "during" | "post";
+
+export const PROD_STEP: Record<
+  ProdStep,
+  {
     label: string;
-    /** เอกสารที่เป็นตัวเปิดใบ */
+    erp: string;
+    /** เอกสารที่เป็นตัวเปิดใบของขั้นนี้ */
     doc: string;
     /** เทมเพลตมาจากช่องไหน */
     template: string;
     /** อะไรเป็นตัวบังคับว่าต้องตรวจ */
     enforce: string;
-    /** ต้องเขียนโค้ดเพิ่มไหม — ไม่ใช่ทุกจุดที่คลิกเอาได้ */
+    /**
+     * ป้ายที่ ERPNext แปะให้จริง — ไม่ใช่ In Process ทั้งสามขั้น
+     *
+     * transaction.js quality_inspection_type คืนได้แค่ Incoming กับ Outgoing
+     * ส่วน In Process มาจาก job_card.js ที่เดียว ก่อนผลิตจึงได้ Outgoing
+     * เพราะของออกจากคลังวัตถุดิบ และหลังผลิตได้ Incoming เพราะของเข้าคลังสินค้า
+     */
+    actualType: InspectionType;
     todo: string | null;
   }
 > = {
-  receive: {
-    kind: "event",
-    label: "รับของเข้า",
-    doc: "Purchase Receipt · Purchase Invoice · Subcontracting Receipt",
-    template: "Item · quality_inspection_template",
-    enforce: "Item · inspection_required_before_purchase",
-    todo: null,
-  },
-  preProd: {
-    kind: "run",
-    label: "ก่อนผลิต (โอนวัตถุดิบเข้าไลน์)",
+  pre: {
+    label: "ก่อนผลิต",
+    erp: "Pre-Production",
     doc: "Stock Entry · Material Transfer for Manufacture",
     template: "Item · quality_inspection_template",
     enforce: "Stock Entry · inspection_required (ติ๊กรายใบ ตั้งล่วงหน้าไม่ได้)",
+    actualType: "outgoing",
     todo: null,
   },
-  inProd: {
-    kind: "run",
-    label: "ระหว่างผลิต (ต่อขั้นตอน)",
+  during: {
+    label: "ระหว่างผลิต",
+    erp: "Inprocess",
     doc: "Job Card · หนึ่งใบต่อหนึ่งขั้นตอน",
     template: "Job Card · quality_inspection_template",
     enforce:
       "BOM · inspection_required และ BOM Operation · quality_inspection_required (ต้องติ๊กคู่กัน)",
-    /* job_card.js ส่ง quality_inspection_template ของใบงานไปให้ใบตรวจใหม่ตรง ๆ
-       และไม่ได้ส่ง bom_no ไปด้วย — ใบตรวจจึงไม่มีทางตกไปอ่านเทมเพลตของ BOM
-       ว่างไว้เมื่อไหร่มันจะตกไปอ่าน Item.quality_inspection_template แทน
-       ซึ่งคือแบบฟอร์มตรวจรับเข้า ไม่ใช่แบบตรวจระหว่างผลิต และไม่มีอะไรเตือน */
+    actualType: "inProcess",
     todo: "ต้องเขียน script เติม Job Card.quality_inspection_template ตอนสร้างใบงาน — ช่องมีอยู่แล้วแต่ job_card.py ไม่เคยเขียนค่าลงไป ปล่อยว่างแล้วใบตรวจจะหยิบแบบฟอร์มของ Item มาแทนเงียบ ๆ",
   },
-  transfer: {
-    kind: "event",
-    label: "ตอนเบิก-โอนสต็อก",
-    /* ทุก purpose ใน QI_OUTGOING_PURPOSES ที่ไม่ใช่การเข้าไลน์ผลิต —
-       ของออกจากคลังโดยไม่ได้ไปผลิต ซึ่งรวมการส่งไปจ้างผลิตข้างนอกด้วย
-       แถวที่ถูกตรวจคือแถวที่มี s_warehouse และปลายทางไม่ใช่คลังเดิม */
-    doc: "Stock Entry · Material Issue · Material Transfer · Send to Subcontractor · Disassemble",
-    template: "Item · quality_inspection_template",
-    enforce: "Stock Entry · inspection_required (ติ๊กรายใบ ตั้งล่วงหน้าไม่ได้)",
-    todo: null,
-  },
-  postProd: {
-    kind: "run",
-    label: "หลังผลิตเสร็จ ก่อนเข้าคลัง",
+  post: {
+    label: "หลังผลิต",
+    erp: "Post-Production",
     doc: "Stock Entry · Manufacture (แถวที่เป็นสินค้าสำเร็จรูป)",
     template: "BOM · quality_inspection_template",
     enforce: "BOM · inspection_required + Stock Entry · inspection_required",
-    todo: null,
-  },
-  deliver: {
-    kind: "event",
-    label: "ก่อนส่งของออก",
-    doc: "Delivery Note · Sales Invoice",
-    template: "Item · quality_inspection_template",
-    enforce: "Item · inspection_required_before_delivery",
+    actualType: "incoming",
     todo: null,
   },
 };
 
-export const STAGE_KEYS = Object.keys(STAGE) as Stage[];
+export const PROD_STEP_KEYS = Object.keys(PROD_STEP) as ProdStep[];
 
-/** จุดที่ติ๊กไว้ แยกตามกลุ่ม — ใช้ตัดสินว่าคิวจะวาดเป็นลำดับหรือแถวเดี่ยว */
-export const stagesByKind = (stages: Stage[], kind: StageKind) =>
-  stages.filter((s) => STAGE[s].kind === kind);
-
-/**
- * ติ๊กข้ามกลุ่มไหม — ไม่ใช่ error แต่ต้องบอก เพราะคิวจะออกมาสองแบบ
- *
- * ของกลุ่มรอบการผลิตรวมเป็นแถวเดียวที่ต้องเดินให้ครบ ส่วนของกลุ่มเหตุการณ์เดี่ยว
- * แยกเป็นแถวของตัวเอง ไม่ได้รอกัน คนตั้งค่าที่คิดว่าติ๊กแล้วได้ลำดับยาวขึ้น
- * จะเข้าใจผิดทันทีถ้าไม่เขียนบอก
- */
-export const mixesStageKinds = (stages: Stage[]) =>
-  stagesByKind(stages, "run").length > 0 &&
-  stagesByKind(stages, "event").length > 0;
 
 /** ขั้นตอนการผลิตที่โรงงานมี — Operation ของ ERPNext */
 export const OPERATION_POOL = [
@@ -940,10 +905,12 @@ export type QiTemplate = {
    * ERPNext แนบไฟล์ได้อยู่แล้วทุก doctype แต่บังคับว่า "ต้องแนบเมื่อไม่ผ่าน"
    * ไม่ได้ เพราะเงื่อนไขนั้นขึ้นกับ status ที่เพิ่งคำนวณเสร็จ ต้องเขียน validate เพิ่ม
    */
-  /** จุดที่ต้องตรวจ — ติ๊กได้หลายจุด ว่างคือผู้ตรวจเปิดใบเองล้วน */
-  stages: Stage[];
-  /** เมนูที่เป็นตัวเปิดใบ — ตัวที่กลายเป็น reference_type ของใบตรวจ */
-  triggers: TriggerMenu[];
+  /** ช่วงการตรวจสอบ — เลือกอันเดียว ว่างคือยังไม่ได้ตั้ง */
+  phase: Phase | "";
+  /** ขั้นย่อย — ใช้เมื่อ phase = production เท่านั้น */
+  prodSteps: ProdStep[];
+  /** เอกสารที่เป็นตัวเปิดใบ — ว่างคือไม่มีเอกสาร ผู้ตรวจเปิดใบเอง */
+  refMenu: RefMenu | "";
   /** ขั้นตอนไหนบ้าง — ใช้เมื่อติ๊กระหว่างผลิต หนึ่งขั้นตอน = หนึ่งใบงาน = หนึ่งใบตรวจ */
   operations: string[];
   photo: PhotoMode;
@@ -1195,8 +1162,9 @@ export const QI_TEMPLATES: QiTemplate[] = [
       formula("p-hard", "mean >= 0.4", 5, "ค่าเฉลี่ยความแข็งของเม็ดปุ๋ย ไม่น้อยกว่า 0.4 กก."),
       range("p-moist", 0, 10, 1, "ความชื้นของเม็ดปุ๋ย น้อยกว่า 10%"),
     ],
-    stages: ["receive"],
-    triggers: ["weighing"],
+    phase: "incoming",
+    prodSteps: [],
+    refMenu: "prRaw",
     operations: [],
     photo: "onFail",
     effectiveFrom: "01/09/2026",
@@ -1223,8 +1191,9 @@ export const QI_TEMPLATES: QiTemplate[] = [
       value("p-formula", "ตรง"),
       range("p-temp", 20, 35, 1, "off"),
     ],
-    stages: ["preProd"],
-    triggers: ["stockToLine"],
+    phase: "production",
+    prodSteps: ["pre"],
+    refMenu: "stockEntry",
     operations: [],
     photo: "onFail",
     effectiveFrom: "01/09/2026",
@@ -1252,8 +1221,9 @@ export const QI_TEMPLATES: QiTemplate[] = [
       range("p-moist", 0, 2),
       formula("p-size", "(reading_2 + reading_3) / 2500 * 100 >= 80", 4),
     ],
-    stages: ["postProd"],
-    triggers: ["bulk", "packing"],
+    phase: "production",
+    prodSteps: ["post"],
+    refMenu: "stockEntry",
     operations: [],
     photo: "onFail",
     effectiveFrom: "01/09/2026",
@@ -1299,8 +1269,9 @@ export const QI_TEMPLATES: QiTemplate[] = [
       manual("p-sewing", "ตรวจเช็คกลไกและการทำงานของเครื่องเย็บ"),
       manual("p-printer", "ตรวจสอบความคมชัดและระบบการพิมพ์ให้ถูกต้อง"),
     ],
-    stages: [],
-    triggers: [],
+    phase: "",
+    prodSteps: [],
+    refMenu: "",
     operations: [],
     photo: "onFail",
     effectiveFrom: "01/09/2026",
@@ -1334,8 +1305,9 @@ export const QI_TEMPLATES: QiTemplate[] = [
       manual("p-area-climate", "อุณหภูมิและความชื้นในบริเวณอยู่ในเกณฑ์ที่กำหนด"),
       manual("p-clean-area", "พื้นที่จัดเก็บสะอาด ไม่มีเศษวัสดุตกค้าง"),
     ],
-    stages: [],
-    triggers: [],
+    phase: "",
+    prodSteps: [],
+    refMenu: "",
     operations: [],
     photo: "onFail",
     effectiveFrom: "01/09/2026",
@@ -1371,8 +1343,9 @@ export const QI_TEMPLATES: QiTemplate[] = [
       range("p-weight", null, null, 1, "ชั่งแล้วบันทึกน้ำหนักที่ได้"),
       value("p-sling", "30 / 35 / 40", "ต้องตรงกับที่ระบุในใบสั่งผลิต"),
     ],
-    stages: [],
-    triggers: [],
+    phase: "",
+    prodSteps: [],
+    refMenu: "",
     operations: [],
     photo: "onFail",
     effectiveFrom: "01/09/2026",
@@ -1406,8 +1379,9 @@ export const QI_TEMPLATES: QiTemplate[] = [
     /* สามรอบบนกระดาษคือสามจุดของการผลิตรอบเดียว ไม่ใช่สามครั้งที่รับของ
        ก่อนผลิต = ตอนโอนวัตถุดิบเข้าไลน์ · ระหว่างผลิต = ใบงานของขั้นตอนที่ติ๊กไว้
        หลังผลิตเสร็จ = ตอนรับสินค้าสำเร็จรูปเข้าคลัง */
-    stages: ["preProd", "inProd", "postProd"],
-    triggers: ["stockToLine", "wo", "bulk"],
+    phase: "production",
+    prodSteps: ["pre", "during", "post"],
+    refMenu: "jobCard",
     operations: ["ผสมปุ๋ย", "บรรจุกระสอบ"],
     photo: "onFail",
     effectiveFrom: "01/09/2026",
@@ -1446,8 +1420,9 @@ export const QI_TEMPLATES: QiTemplate[] = [
       manual("p-rm-amsu"),
       manual("p-rm-urea"),
     ],
-    stages: [],
-    triggers: [],
+    phase: "",
+    prodSteps: [],
+    refMenu: "",
     operations: [],
     photo: "onFail",
     effectiveFrom: "01/09/2026",
@@ -1483,8 +1458,9 @@ export const QI_TEMPLATES: QiTemplate[] = [
     /* ตรวจของที่นอนอยู่ในคลังตามรอบ ไม่ได้เกิดจากการเบิกหรือการโอน จึงไม่มี
        เอกสารเป็นตัวเปิดใบ — เคยผูกไว้กับเบิก-โอนสต็อกซึ่งผิด เพราะใบนี้จะเด้ง
        ก็ต่อเมื่อมีคนเบิกของ แต่ความตั้งใจคือตรวจทุกวันไม่ว่าจะมีคนเบิกหรือไม่ */
-    stages: [],
-    triggers: [],
+    phase: "",
+    prodSteps: [],
+    refMenu: "",
     operations: [],
     photo: "onFail",
     effectiveFrom: "01/09/2026",
@@ -1512,8 +1488,9 @@ export const QI_TEMPLATES: QiTemplate[] = [
     updatedAt: "24/09/2026",
     inspectionType: "outgoing",
     rows: [range("p-weight", 49.5, 50.5, 3), value("p-bag", "ปกติ")],
-    stages: ["deliver"],
-    triggers: ["delivery"],
+    phase: "outgoing",
+    prodSteps: [],
+    refMenu: "deliveryNote",
     operations: [],
     photo: "onFail",
     effectiveFrom: "01/09/2026",
@@ -1539,8 +1516,9 @@ export const QI_TEMPLATES: QiTemplate[] = [
     updatedAt: "24/09/2026",
     inspectionType: "outgoing",
     rows: [value("p-complaint", "รับเรื่องแล้ว"), manual("p-trace")],
-    stages: [],
-    triggers: [],
+    phase: "",
+    prodSteps: [],
+    refMenu: "",
     operations: [],
     photo: "onFail",
     effectiveFrom: "01/09/2026",
@@ -1564,8 +1542,9 @@ export const QI_TEMPLATES: QiTemplate[] = [
     updatedAt: "24/09/2026",
     inspectionType: "incoming",
     rows: [value("p-coa-complete", "ครบ"), value("p-coa-match", "ตรง")],
-    stages: [],
-    triggers: [],
+    phase: "",
+    prodSteps: [],
+    refMenu: "",
     operations: [],
     photo: "onFail",
     effectiveFrom: "01/09/2026",
@@ -1593,152 +1572,58 @@ export function setTemplateActive(id: string, on: boolean) {
   if (t) t.active = on;
 }
 
-/**
- * เอกสารอ้างอิงที่ใบของฟอร์มนี้จะไปผูก — อ่านจากจุดที่ติ๊ก ไม่ได้เก็บแยก
- *
- * เคยให้เลือกเองอีกช่อง ซึ่งเป็นการถามเรื่องเดียวกันสองรอบ — ติ๊กก่อนผลิต
- * แล้วไม่เลือกใบเบิก-โอนสต็อกก็ไม่ได้อยู่แล้ว เพราะการโอนวัตถุดิบเข้าไลน์
- * เกิดเป็น Stock Entry เสมอ ไม่มีทางเป็นอย่างอื่น ตั้งขัดกันได้อย่างเดียว
- */
 // ---------------------------------------------------------------
-// เมนูที่เป็นตัวเปิดใบ — พูดเป็นภาษาเมนูของ Parich ไม่ใช่ชื่อ doctype
+// เอกสารอ้างอิง — ชื่อเมนูของ Parich คู่กับชื่อ doctype
 //
-// คนตั้งค่ารู้จัก "ชั่งน้ำหนัก" กับ "สั่งผลิตสินค้า" ไม่ได้รู้จัก Purchase Receipt
-// กับ Job Card และจุดที่ต้องตรวจอย่างเดียวบอกไม่ได้ว่าเมนูไหน เพราะหลายเมนู
-// ไปลง doctype เดียวกัน — รับเข้าผ่านชั่งน้ำหนักกับผ่านสต็อกทั่วไป เป็นคนละ
-// หน้าจอแต่เป็น Purchase Receipt กับ Stock Entry คนละตัว
-//
-// จุดที่ต้องตรวจ = ตรวจตอนไหนของสายงาน (ตัวกรองรายการเมนู)
-// เมนูที่เป็นตัวเปิดใบ = กดจากหน้าไหน (ตัวที่กลายเป็น reference_type)
+// คนตั้งค่ารู้จัก "ใบรับวัตถุดิบ" ไม่ได้รู้จัก Purchase Receipt และสองเมนู
+// อาจลง doctype เดียวกันแต่เป็นคนละหน้าจอ เลือกเองจึงยังจำเป็น
 // ---------------------------------------------------------------
 
-export type TriggerMenu =
-  | "weighing"
-  | "stockIn"
-  | "stockToLine"
-  | "stockTransfer"
-  | "wo"
-  | "packing"
-  | "bulk"
-  | "delivery";
+export type RefMenu =
+  | "prRaw"
+  | "prProduct"
+  | "jobCard"
+  | "stockEntry"
+  | "deliveryNote";
 
-export const TRIGGER: Record<
-  TriggerMenu,
-  {
-    label: string;
-    /** หมวดเมนูใน Parich — ไว้บอกว่าไปหาเมนูนี้ได้ที่ไหน */
-    group: string;
-    refDoc: RefDoc;
-    /** purpose ของเอกสาร ตัวที่ทำให้ ERPNext รู้ว่าต้องตรวจแถวไหน */
-    note: string;
-    /** เมนูนี้ใช้กับจุดไหนได้บ้าง */
-    stages: Stage[];
-  }
+export const REF_MENU: Record<
+  RefMenu,
+  { label: string; erp: string; phases: Phase[] }
 > = {
-  weighing: {
-    label: "ชั่งน้ำหนัก",
-    group: "การสั่งซื้อสินค้า",
-    refDoc: "purchaseReceipt",
-    note: "ของเข้าจากผู้ขาย",
-    stages: ["receive"],
+  prRaw: {
+    label: "ใบรับวัตถุดิบ",
+    erp: "Purchase Receipt",
+    phases: ["incoming"],
   },
-  stockIn: {
-    label: "สต็อกทั่วไป · รับเข้า",
-    group: "การคลังสินค้า",
-    refDoc: "stockEntry",
-    note: "purpose = Material Receipt",
-    stages: ["receive"],
+  prProduct: {
+    label: "ใบรับสินค้า / ทั่วไป",
+    erp: "Purchase Receipt",
+    phases: ["incoming"],
   },
-  stockToLine: {
-    label: "สต็อกทั่วไป · เบิกเข้าไลน์ผลิต",
-    group: "การคลังสินค้า",
-    refDoc: "stockEntry",
-    note: "purpose = Material Transfer for Manufacture",
-    stages: ["preProd"],
+  jobCard: { label: "ใบงานผลิต", erp: "Job Card", phases: ["production"] },
+  stockEntry: {
+    label: "ใบเบิก / จ่ายสต็อก",
+    erp: "Stock Entry",
+    phases: ["incoming", "production", "outgoing"],
   },
-  stockTransfer: {
-    label: "สต็อกทั่วไป · เบิก-โอน",
-    group: "การคลังสินค้า",
-    refDoc: "stockEntry",
-    note: "purpose = Material Issue · Material Transfer",
-    stages: ["transfer"],
-  },
-  wo: {
-    label: "สั่งผลิตสินค้า",
-    group: "การผลิตสินค้า",
-    refDoc: "jobCard",
-    note: "ใบงานผลิตที่แตกจากใบสั่งผลิต หนึ่งใบต่อหนึ่งขั้นตอน",
-    stages: ["inProd"],
-  },
-  packing: {
-    label: "ผลิตแบ่งบรรจุ",
-    group: "การผลิตสินค้า",
-    refDoc: "stockEntry",
-    note: "purpose = Repack",
-    stages: ["postProd"],
-  },
-  bulk: {
-    label: "ผลิตปุ๋ย Bulk Blend",
-    group: "การผลิตสินค้า",
-    refDoc: "stockEntry",
-    note: "purpose = Manufacture · แถวที่ is_finished_item",
-    stages: ["postProd"],
-  },
-  delivery: {
-    label: "ส่งของออก",
-    group: "ยังไม่มีเมนูนี้ใน Parich",
-    refDoc: "deliveryNote",
-    note: "ใบส่งของ",
-    stages: ["deliver"],
+  deliveryNote: {
+    label: "ใบส่งของ",
+    erp: "Delivery Note",
+    phases: ["outgoing"],
   },
 };
 
-export const TRIGGER_KEYS = Object.keys(TRIGGER) as TriggerMenu[];
+export const REF_MENU_KEYS = Object.keys(REF_MENU) as RefMenu[];
 
-/** เมนูที่เลือกได้ — กรองตามจุดที่ติ๊กไว้ ไม่โชว์เมนูที่ไม่มีทางใช้ */
-export const triggersFor = (stages: Stage[]): TriggerMenu[] =>
-  TRIGGER_KEYS.filter((m) =>
-    TRIGGER[m].stages.some((st) => stages.includes(st))
-  );
-
-/**
- * ช่วงการตรวจของแต่ละจุด — อ่านจากจุด ไม่ใช่ช่องให้เลือก
- *
- * ERPNext คำนวณเองจากเอกสารที่เปิดใบ ไม่เคยถามคนตั้งค่า (transaction.js
- * quality_inspection_type) และที่สำคัญคือมันคืนได้แค่ Incoming กับ Outgoing
- * ส่วน In Process มาจากที่เดียวคือ Job Card ที่ส่งค่านี้ไปตรง ๆ
- *
- * ผลที่คนส่วนใหญ่คิดไม่ถึง — ก่อนผลิตเป็น Outgoing เพราะของออกจากคลังวัตถุดิบ
- * และหลังผลิตเป็น Incoming เพราะของเข้าคลังสินค้า ไม่ใช่ In Process ทั้งคู่
- * ให้เลือกเองเมื่อไหร่ก็เลือกผิดเมื่อนั้น แล้ว ERPNext ก็เขียนทับอยู่ดี
- */
-export const STAGE_TYPE: Record<Stage, InspectionType> = {
-  receive: "incoming",
-  // ของออกจากคลังวัตถุดิบ — Material Transfer for Manufacture อยู่ใน
-  // qi_outgoing_purposes ไม่ใช่ขาเข้า
-  preProd: "outgoing",
-  // ทางเดียวที่ได้ In Process คือใบงานผลิต
-  inProd: "inProcess",
-  transfer: "outgoing",
-  // ของเข้าคลังสินค้า — is_incoming_qi_purpose คืนจริงสำหรับ Manufacture
-  postProd: "incoming",
-  deliver: "outgoing",
-};
-
-/** ช่วงการตรวจทั้งหมดที่ฟอร์มนี้จะได้ — หลายจุดอาจได้หลายช่วง */
-export function inspectionTypesOf(t: QiTemplate): InspectionType[] {
-  const out = new Set<InspectionType>();
-  for (const st of t.stages) out.add(STAGE_TYPE[st]);
-  return [...out];
-}
-
-export function refDocsOf(t: QiTemplate): RefDoc[] {
-  return [...new Set(t.triggers.map((m) => TRIGGER[m].refDoc))];
-}
+/** เอกสารที่เลือกได้ในช่วงนั้น — ไม่โชว์ตัวที่ไม่มีทางใช้ */
+export const refMenusFor = (phase: Phase | ""): RefMenu[] =>
+  phase === ""
+    ? []
+    : REF_MENU_KEYS.filter((m) => REF_MENU[m].phases.includes(phase));
 
 
 export const originOf = (t: QiTemplate): Origin =>
-  t.schedule.recurring ? "shift" : t.triggers.length > 0 ? "doc" : "manual";
+  t.schedule.recurring ? "shift" : t.refMenu !== "" ? "doc" : "manual";
 
 // ---------------------------------------------------------------
 // การบังคับใช้ระดับระบบ — Stock Settings
@@ -1919,8 +1804,9 @@ export const blankTemplate = (): QiTemplate => ({
   // เอกสารอ้างอิงปล่อยว่าง ให้คนตั้งค่าเลือกเอง — เดาให้แล้วเขาไม่ได้ดู
   // จะได้ฟอร์มที่ผูกกับเอกสารผิดใบโดยไม่มีใครรู้
   rows: [],
-  stages: [],
-  triggers: [],
+  phase: "",
+  prodSteps: [],
+  refMenu: "",
   operations: [],
   photo: "onFail",
   effectiveFrom: "01/09/2026",
