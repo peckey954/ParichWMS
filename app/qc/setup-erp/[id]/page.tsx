@@ -82,6 +82,8 @@ import {
   MAX_READINGS,
   REF_DOC_VALUE,
   STAGE_TYPE,
+  mixesStageKinds,
+  stagesByKind,
   TRIGGER,
   triggersFor,
   type TriggerMenu,
@@ -481,7 +483,11 @@ function Editor({ seed, isNew }: { seed: QiTemplate; isNew: boolean }) {
                 className="w-full bg-card"
                 placeholder="ไม่ติ๊ก = ผู้ตรวจเปิดใบเองล้วน"
                 options={STAGE_KEYS.map((k) => ({
-                  label: STAGE[k].label,
+                  // ติดกลุ่มไว้ท้ายชื่อ ให้เห็นตั้งแต่ตอนเลือกว่าอันไหนเป็นลำดับ
+                  // อันไหนจบในตัว ไม่ใช่ไปรู้ตอนเห็นคิวออกมาผิดจากที่คิด
+                  label: `${STAGE[k].label} · ${
+                    STAGE[k].kind === "run" ? "รอบการผลิต" : "เหตุการณ์เดี่ยว"
+                  }`,
                   value: k,
                 }))}
                 value={tpl.stages}
@@ -523,11 +529,46 @@ function Editor({ seed, isNew }: { seed: QiTemplate; isNew: boolean }) {
             </div>
           </div>
 
+          {/* ติ๊กข้ามกลุ่มไม่ผิด แต่ได้คิวสองแบบ ต้องเขียนบอก ไม่งั้นคนที่คิดว่า
+              ติ๊กแล้วได้ลำดับยาวขึ้นจะเข้าใจผิดจนกว่าจะไปเห็นคิวจริง */}
+          {mixesStageKinds(tpl.stages) && (
+            <div className="mt-3 rounded-xl border border-border bg-brand px-4 py-3 text-sm">
+              <p className="font-medium">
+                ฟอร์มนี้ติ๊กข้ามสองกลุ่ม — คิวจะออกมาสองแบบ ไม่ได้ต่อกันเป็นลำดับเดียว
+              </p>
+              <p className="mt-1 text-muted-foreground">
+                <span className="font-medium text-foreground">
+                  {stagesByKind(tpl.stages, "run")
+                    .map((k) => STAGE[k].label.replace(/\s*\(.*\)$/, ""))
+                    .join(" → ")}
+                </span>{" "}
+                เป็นล็อตเดียวกันเดินไปตามลำดับ ต้องผ่านครบถึงจะจบ · ส่วน{" "}
+                <span className="font-medium text-foreground">
+                  {stagesByKind(tpl.stages, "event")
+                    .map((k) => STAGE[k].label.replace(/\s*\(.*\)$/, ""))
+                    .join(" · ")}
+                </span>{" "}
+                เป็นคนละเหตุการณ์ จบในตัวครั้งเดียว ไม่ได้รอใคร
+              </p>
+              {/* ที่ไม่ห้าม เพราะ ERPNext เองก็ให้ Item มี
+                  quality_inspection_template ช่องเดียวใช้ทั้งขารับและขาส่ง
+                  เทมเพลตอันเดียวทำหลายเหตุการณ์จึงเป็นเรื่องปกติของมัน */}
+              <p className="mt-1 text-muted-foreground">
+                ไม่ต้องแยกเทมเพลตถ้าหัวข้อตรวจเหมือนกัน — Item มีช่อง
+                quality_inspection_template ช่องเดียวใช้ทั้งขารับและขาส่งอยู่แล้ว
+                แยกไปก็ได้สองอันที่ต้องแก้ให้ตรงกันตลอด
+              </p>
+            </div>
+          )}
+
           {/* ไล่ทีละจุดว่าเดฟต้องไปทำอะไร เพราะแต่ละจุดราคาไม่เท่ากัน
               สี่จุดคลิกเอาในหน้าจอ มีจุดเดียวที่ต้องเขียนโค้ด */}
           {tpl.stages.length > 0 && (
             <div className="mt-3 space-y-2">
-              {tpl.stages.map((k) => (
+              {[
+                ...stagesByKind(tpl.stages, "run"),
+                ...stagesByKind(tpl.stages, "event"),
+              ].map((k) => (
                 <div
                   key={k}
                   className="rounded-xl border border-border bg-card px-4 py-3 text-sm"

@@ -769,6 +769,28 @@ export const ORIGIN_KEYS = Object.keys(ORIGIN) as Origin[];
 // จึงตอบไม่ได้ว่าใบจะเด้งมาตอนไหนบ้าง
 // ---------------------------------------------------------------
 
+/**
+ * ติ๊กหลายจุดมีสองความหมายที่ต่างกันสิ้นเชิง — ต้องแยกให้ออกตั้งแต่ตอนเลือก
+ *
+ *   run    จุดในรอบงานเดียวกัน ของชิ้นเดียวต้องผ่านให้ครบตามลำดับถึงจะจบ
+ *          ก่อนผลิต → ระหว่างผลิต → หลังผลิต คือล็อตเดียวกันเดินไปสามจุด
+ *          คิวจึงเป็นหนึ่งแถวสามชิป และขั้นหลังรอขั้นหน้า
+ *
+ *   event  เหตุการณ์ที่จบในตัว ไม่เกี่ยวกับเหตุการณ์อื่น
+ *          รับของเข้าวันนี้ กับส่งของออกเดือนหน้า เป็นคนละล็อตคนละใบ
+ *          แค่ใช้แบบฟอร์มเดียวกัน คิวจึงเป็นคนละแถว ไม่มีอะไรรอใคร
+ *
+ * ติ๊กข้ามกลุ่มได้ ไม่ใช่ความผิด — ERPNext เองก็ให้ Item มี
+ * quality_inspection_template ช่องเดียวใช้ทั้งขารับและขาส่ง แปลว่าเทมเพลต
+ * อันเดียวทำหน้าที่หลายเหตุการณ์เป็นเรื่องปกติของมันอยู่แล้ว
+ */
+export type StageKind = "run" | "event";
+
+export const STAGE_KIND_LABEL: Record<StageKind, string> = {
+  run: "รอบการผลิต — ต้องผ่านครบตามลำดับ",
+  event: "เหตุการณ์เดี่ยว — จบในตัวครั้งเดียว",
+};
+
 export type Stage =
   | "receive"
   | "preProd"
@@ -780,6 +802,8 @@ export type Stage =
 export const STAGE: Record<
   Stage,
   {
+    /** อยู่ในรอบงานเดียวกัน หรือเป็นเหตุการณ์เดี่ยว */
+    kind: StageKind;
     label: string;
     /** เอกสารที่เป็นตัวเปิดใบ */
     doc: string;
@@ -792,6 +816,7 @@ export const STAGE: Record<
   }
 > = {
   receive: {
+    kind: "event",
     label: "รับของเข้า",
     doc: "Purchase Receipt · Purchase Invoice · Subcontracting Receipt",
     template: "Item · quality_inspection_template",
@@ -799,6 +824,7 @@ export const STAGE: Record<
     todo: null,
   },
   preProd: {
+    kind: "run",
     label: "ก่อนผลิต (โอนวัตถุดิบเข้าไลน์)",
     doc: "Stock Entry · Material Transfer for Manufacture",
     template: "Item · quality_inspection_template",
@@ -806,6 +832,7 @@ export const STAGE: Record<
     todo: null,
   },
   inProd: {
+    kind: "run",
     label: "ระหว่างผลิต (ต่อขั้นตอน)",
     doc: "Job Card · หนึ่งใบต่อหนึ่งขั้นตอน",
     template: "Job Card · quality_inspection_template",
@@ -818,6 +845,7 @@ export const STAGE: Record<
     todo: "ต้องเขียน script เติม Job Card.quality_inspection_template ตอนสร้างใบงาน — ช่องมีอยู่แล้วแต่ job_card.py ไม่เคยเขียนค่าลงไป ปล่อยว่างแล้วใบตรวจจะหยิบแบบฟอร์มของ Item มาแทนเงียบ ๆ",
   },
   transfer: {
+    kind: "event",
     label: "ตอนเบิก-โอนสต็อก",
     /* ทุก purpose ใน QI_OUTGOING_PURPOSES ที่ไม่ใช่การเข้าไลน์ผลิต —
        ของออกจากคลังโดยไม่ได้ไปผลิต ซึ่งรวมการส่งไปจ้างผลิตข้างนอกด้วย
@@ -828,6 +856,7 @@ export const STAGE: Record<
     todo: null,
   },
   postProd: {
+    kind: "run",
     label: "หลังผลิตเสร็จ ก่อนเข้าคลัง",
     doc: "Stock Entry · Manufacture (แถวที่เป็นสินค้าสำเร็จรูป)",
     template: "BOM · quality_inspection_template",
@@ -835,6 +864,7 @@ export const STAGE: Record<
     todo: null,
   },
   deliver: {
+    kind: "event",
     label: "ก่อนส่งของออก",
     doc: "Delivery Note · Sales Invoice",
     template: "Item · quality_inspection_template",
@@ -844,6 +874,21 @@ export const STAGE: Record<
 };
 
 export const STAGE_KEYS = Object.keys(STAGE) as Stage[];
+
+/** จุดที่ติ๊กไว้ แยกตามกลุ่ม — ใช้ตัดสินว่าคิวจะวาดเป็นลำดับหรือแถวเดี่ยว */
+export const stagesByKind = (stages: Stage[], kind: StageKind) =>
+  stages.filter((s) => STAGE[s].kind === kind);
+
+/**
+ * ติ๊กข้ามกลุ่มไหม — ไม่ใช่ error แต่ต้องบอก เพราะคิวจะออกมาสองแบบ
+ *
+ * ของกลุ่มรอบการผลิตรวมเป็นแถวเดียวที่ต้องเดินให้ครบ ส่วนของกลุ่มเหตุการณ์เดี่ยว
+ * แยกเป็นแถวของตัวเอง ไม่ได้รอกัน คนตั้งค่าที่คิดว่าติ๊กแล้วได้ลำดับยาวขึ้น
+ * จะเข้าใจผิดทันทีถ้าไม่เขียนบอก
+ */
+export const mixesStageKinds = (stages: Stage[]) =>
+  stagesByKind(stages, "run").length > 0 &&
+  stagesByKind(stages, "event").length > 0;
 
 /** ขั้นตอนการผลิตที่โรงงานมี — Operation ของ ERPNext */
 export const OPERATION_POOL = [
