@@ -859,11 +859,26 @@ function Editor({ seed, isNew }: { seed: QiTemplate; isNew: boolean }) {
             custom_dispositions ที่เทมเพลต · custom_disposition ที่ใบตรวจ
           </FieldNote>
 
-          {/* สองช่องนี้ของจริงอยู่ที่ Stock Settings ซึ่งเป็น Single doctype
-              มีแถวเดียวทั้งระบบ ย้ายมาไว้ที่เทมเพลตตรง ๆ ไม่ได้ —
-              ทำได้ด้วยการตั้งค่าระบบเป็น Warn ไว้เป็นพื้น แล้ว hook ที่เอกสาร
-              สต็อก throw เองเฉพาะใบที่เทมเพลตบอกว่า stop */}
-          <div className="mt-4 grid gap-4 @2xl:grid-cols-2">
+          {/* แยกเป็นหัวข้อย่อย เพราะคนละเรื่องกับตัวเลือกจัดการของข้างบน —
+              ข้างบนคือผู้ตรวจเลือกว่าจะทำอะไรกับของ ส่วนตรงนี้คือระบบจะปล่อย
+              ให้เอกสารสต็อกเดินต่อไหม และมีผลเฉพาะฟอร์มที่มีเอกสารอ้างอิง */}
+          <div className="mt-5 border-t border-border pt-4">
+            <p className="font-medium">การเดินเอกสารต่อ</p>
+            <p className="mt-0.5 text-sm text-muted-foreground">
+              ใช้เฉพาะฟอร์มที่มีเอกสารอ้างอิง — ฟอร์มที่ไม่มีไปอยู่ doctype
+              ของเราเอง ซึ่ง ERPNext ไม่ได้บล็อกอะไรให้อยู่แล้ว
+            </p>
+          </div>
+
+          {tpl.refMenu === "" ? (
+            /* ไม่ซ่อนทั้งก้อน เขียนบอกว่าทำไมไม่มีให้ตั้ง — ซ่อนเฉย ๆ แล้ว
+               คนที่ตามหาการตั้งค่านี้จะไม่รู้ว่าหายไปไหนหรือไม่เคยมี */
+            <p className="mt-3 rounded-lg border border-dashed border-border px-4 py-3 text-sm text-muted-foreground">
+              ฟอร์มนี้ยังไม่ได้เลือกเอกสารอ้างอิง จึงไม่มีการรับของหรือส่งของ
+              ให้บล็อก — ตั้งตรงนี้ไปก็ไม่มีผล
+            </p>
+          ) : (
+          <div className="mt-3 grid gap-4 @2xl:grid-cols-2">
             <div className="space-y-1.5">
               <Label htmlFor="tpl-rej">ตรวจไม่ผ่านแล้วจะเดินเอกสารต่อ</Label>
               <Select
@@ -919,10 +934,12 @@ function Editor({ seed, isNew }: { seed: QiTemplate; isNew: boolean }) {
               </FieldNote>
             </div>
           </div>
+          )}
 
           {/* เข้มกว่าค่าระบบได้ ผ่อนไม่ได้ — ต้องเขียนบอก ไม่งั้นคนจะตั้ง Warn
               ที่ฟอร์มแล้วนึกว่าผ่อนได้ ทั้งที่ระบบตั้ง Stop ไว้มันโยนไปก่อนแล้ว */}
-          {(tpl.onRejected === "warn" || tpl.onNotSubmitted === "warn") &&
+          {tpl.refMenu !== "" &&
+            (tpl.onRejected === "warn" || tpl.onNotSubmitted === "warn") &&
             (guard.onRejected === "stop" || guard.onNotSubmitted === "stop") && (
               <p className="mt-3 flex items-start gap-2 rounded-lg border border-danger-border bg-danger px-4 py-3 text-sm">
                 <InfoIcon className="mt-0.5 size-4 shrink-0 text-danger-strong" />
