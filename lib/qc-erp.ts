@@ -819,7 +819,10 @@ export const STAGE: Record<
   },
   transfer: {
     label: "ตอนเบิก-โอนสต็อก",
-    doc: "Stock Entry · Material Issue · Material Transfer",
+    /* ทุก purpose ใน QI_OUTGOING_PURPOSES ที่ไม่ใช่การเข้าไลน์ผลิต —
+       ของออกจากคลังโดยไม่ได้ไปผลิต ซึ่งรวมการส่งไปจ้างผลิตข้างนอกด้วย
+       แถวที่ถูกตรวจคือแถวที่มี s_warehouse และปลายทางไม่ใช่คลังเดิม */
+    doc: "Stock Entry · Material Issue · Material Transfer · Send to Subcontractor · Disassemble",
     template: "Item · quality_inspection_template",
     enforce: "Stock Entry · inspection_required (ติ๊กรายใบ ตั้งล่วงหน้าไม่ได้)",
     todo: null,
@@ -1432,8 +1435,11 @@ export const QI_TEMPLATES: QiTemplate[] = [
       range("p-warehouse-temp", 20, 35),
       value("p-bag", "ปกติ"),
     ],
-    stages: ["transfer"],
-    triggers: ["stockTransfer"],
+    /* ตรวจของที่นอนอยู่ในคลังตามรอบ ไม่ได้เกิดจากการเบิกหรือการโอน จึงไม่มี
+       เอกสารเป็นตัวเปิดใบ — เคยผูกไว้กับเบิก-โอนสต็อกซึ่งผิด เพราะใบนี้จะเด้ง
+       ก็ต่อเมื่อมีคนเบิกของ แต่ความตั้งใจคือตรวจทุกวันไม่ว่าจะมีคนเบิกหรือไม่ */
+    stages: [],
+    triggers: [],
     operations: [],
     photo: "onFail",
     effectiveFrom: "01/09/2026",
