@@ -4,6 +4,7 @@ import * as React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { CheckIcon, FlaskConicalIcon, SearchIcon } from "lucide-react";
+import { Badge } from "@peckey954/ui/components/ui/badge";
 import {
   Alert,
   AlertDescription,
@@ -33,12 +34,10 @@ import { cn } from "@peckey954/ui/lib/utils";
 import { ROW_HOVER_NAV } from "@/components/stock/doc-parts";
 import {
   LOTS,
-  checkpointStateOf,
   checkpointsOfQueue,
   currentCheckpoint,
   demoTemplate,
   pendingCount,
-  type Checkpoint,
   type Lot,
 } from "@/lib/qc-production-demo";
 
@@ -59,7 +58,6 @@ export default function ProductionCheckPage() {
   const router = useRouter();
   const [tab, setTab] = React.useState("pending");
   const [query, setQuery] = React.useState("");
-  const [, bump] = React.useReducer((n: number) => n + 1, 0);
 
   const tpl = demoTemplate();
   const points = checkpointsOfQueue();
@@ -146,7 +144,7 @@ export default function ProductionCheckPage() {
               <TableHead className="min-w-20">รอบ</TableHead>
               <TableHead className="min-w-32">วัตถุดิบ</TableHead>
               <TableHead className="min-w-28">รอตรวจสอบ</TableHead>
-              <TableHead className="min-w-80">ขั้นการตรวจ</TableHead>
+              <TableHead className="min-w-44">สถานะ</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -173,10 +171,8 @@ export default function ProductionCheckPage() {
                 <TableCell className="tabular-nums">
                   {lot.ton.toFixed(2)} ตัน
                 </TableCell>
-                {/* ชิปกินคลิกเอง ไม่ให้ไหลขึ้นไปเปิดแถว เพราะกดชิปคือเจาะไปขั้นนั้น
-                    ส่วนกดที่ว่างของแถวคือเปิดดูทั้งใบ เป็นคนละเจตนา */}
-                <TableCell onClick={(e) => e.stopPropagation()}>
-                  <StageChips lot={lot} onChanged={bump} />
+                <TableCell>
+                  <StageStatus lot={lot} />
                 </TableCell>
               </TableRow>
             ))}
@@ -205,78 +201,32 @@ export default function ProductionCheckPage() {
 }
 
 /* ------------------------------------------------------------------
-   สามขั้นในแถวเดียว — สถานะอ่านจากผลที่บันทึกไว้ ไม่ได้เก็บแยก
+   สถานะของใบ — โชว์เฉพาะจุดที่รอทำอยู่ จุดเดียว
+
+   เคยโชว์ทุกจุดเป็นชิปเรียงกัน ซึ่งบอกความคืบหน้าได้ดีแต่ทำให้ตารางอ่านยาก
+   เพราะแต่ละแถวมีของให้กวาดตาสี่ชิ้นทั้งที่ทำได้ทีละชิ้น คิวคือรายการงาน
+   ที่ต้องทำตอนนี้ ไม่ใช่รายงานความคืบหน้า — ความคืบหน้าทั้งใบดูในหน้าใบ
+
+   สถานะอ่านจากผลที่บันทึกไว้ ไม่ได้เก็บแยก
 ------------------------------------------------------------------ */
 
-function StageChips({ lot, onChanged }: { lot: Lot; onChanged: () => void }) {
-  const router = useRouter();
-  void onChanged;
+function StageStatus({ lot }: { lot: Lot }) {
+  const open = currentCheckpoint(lot);
 
+  if (!open)
+    return (
+      <Badge appearance="soft" tone="success">
+        <CheckIcon className="size-3.5" />
+        ตรวจครบแล้ว
+      </Badge>
+    );
+
+  // ชื่อจุดอย่างเดียวพอ ขึ้นต้นว่า "รอตรวจ" ทุกแถวแล้วอ่านซ้ำโดยไม่ได้อะไรเพิ่ม
+  // แต่คอลัมน์ชื่อสถานะ จึงต้องมีคำว่ารออยู่ ไม่งั้นอ่านเป็นชื่อขั้นเฉย ๆ
   return (
-    <div className="flex flex-wrap gap-1.5">
-      {checkpointsOfQueue().map((c) => (
-        <StageChip
-          key={c.key}
-          lot={lot}
-          point={c}
-          onOpen={() =>
-            router.push(
-              `/qc/production-check/${lot.id}?at=${encodeURIComponent(c.key)}`
-            )
-          }
-        />
-      ))}
-    </div>
+    <Badge appearance="soft" tone="warning">
+      รอตรวจ{open.operation ?? open.label}
+    </Badge>
   );
 }
 
-function StageChip({
-  lot,
-  point,
-  onOpen,
-}: {
-  lot: Lot;
-  point: Checkpoint;
-  onOpen: () => void;
-}) {
-  const state = checkpointStateOf(lot, point);
-  const res = lot.done[point.key];
-  // จุดที่แตกมาจากระหว่างผลิตโชว์แค่ชื่อขั้นตอน ไม่ต้องขึ้นต้นว่า "ระหว่างผลิต"
-  // ซ้ำทุกอัน — อยู่ติดกันอยู่แล้วและชื่อขั้นตอนเป็นตัวแยกที่คนอ่านใช้จริง
-  const label = point.operation ?? point.label;
-
-  return (
-    <button
-      type="button"
-      disabled={state === "locked"}
-      onClick={onOpen}
-      title={
-        state === "locked"
-          ? "ยังไม่ถึงคิว — ต้องตรวจขั้นก่อนหน้าให้เสร็จก่อน"
-          : state === "done"
-            ? `${res?.qi} · ${res?.at} · ${res?.by}`
-            : "ถึงคิวแล้ว กดเพื่อตรวจ"
-      }
-      className={cn(
-        "flex min-h-8 items-center gap-1.5 rounded-full border px-3 text-sm whitespace-nowrap transition-colors",
-        state === "done" &&
-          (res?.verdict === "fail"
-            ? "border-danger-border bg-danger text-danger-strong"
-            : "border-success-border bg-success text-success-strong"),
-        state === "current" &&
-          "border-primary bg-brand font-medium text-primary hover:bg-accent-hover",
-        // จางและกดไม่ได้ ไม่ใช่ซ่อน — ต้องเห็นว่ายังเหลืออีกกี่ขั้น
-        state === "locked" && "border-dashed border-border text-muted-foreground"
-      )}
-    >
-      {state === "done" && <CheckIcon className="size-3.5" />}
-      {state === "current" && (
-        <span className="size-1.5 rounded-full bg-primary" />
-      )}
-      {state === "locked" && (
-        <span className="size-1.5 rounded-full border border-current" />
-      )}
-      {label}
-    </button>
-  );
-}

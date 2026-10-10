@@ -23,7 +23,6 @@ import { Label } from "@peckey954/ui/components/ui/label";
 import { Textarea } from "@peckey954/ui/components/ui/textarea";
 import { cn } from "@peckey954/ui/lib/utils";
 import { toast } from "sonner";
-import { CheckChip } from "@/components/check-chip";
 import { rowTitle } from "@/components/qc/check-table";
 import {
   PROD_STEP,
@@ -337,23 +336,40 @@ function StageForm({
                 เกณฑ์: {r.criteria}
               </p>
             )}
+            {/* ชิปเปล่า ไม่มีกล่องติ๊ก — ผ่านกับไม่ผ่านเลือกได้อันเดียว
+                กล่องติ๊กในระบบนี้แปลว่าติ๊กได้หลายอัน ใส่ตรงนี้คือบอกกฎผิด
+                กดอันที่เลือกอยู่ซ้ำ = ยกเลิก กลับไปเป็นยังไม่ได้ตรวจ */}
             <div className="mt-3 flex flex-wrap gap-2">
-              {(["pass", "fail"] as const).map((v) => (
-                <CheckChip
-                  key={v}
-                  id={`${r.id}-${v}`}
-                  label={v === "pass" ? "ผ่าน" : "ไม่ผ่าน"}
-                  checked={marks[r.id] === v}
-                  onChange={(on) =>
-                    setMarks((p) => {
-                      const next = { ...p };
-                      if (on) next[r.id] = v;
-                      else delete next[r.id];
-                      return next;
-                    })
-                  }
-                />
-              ))}
+              {(["pass", "fail"] as const).map((v) => {
+                const on = marks[r.id] === v;
+                return (
+                  <button
+                    key={v}
+                    type="button"
+                    role="radio"
+                    aria-checked={on}
+                    onClick={() =>
+                      setMarks((p) => {
+                        const next = { ...p };
+                        if (on) delete next[r.id];
+                        else next[r.id] = v;
+                        return next;
+                      })
+                    }
+                    className={cn(
+                      "min-h-10 shrink-0 rounded-full border px-5 text-sm whitespace-nowrap transition-colors",
+                      "hover:bg-accent-hover focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none",
+                      on && v === "pass" &&
+                        "border-success-border bg-success font-medium text-success-strong",
+                      on && v === "fail" &&
+                        "border-danger-border bg-danger font-medium text-danger-strong",
+                      !on && "border-border text-foreground"
+                    )}
+                  >
+                    {v === "pass" ? "ผ่าน" : "ไม่ผ่าน"}
+                  </button>
+                );
+              })}
             </div>
           </div>
         ))}
