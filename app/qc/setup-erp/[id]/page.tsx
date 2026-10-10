@@ -82,6 +82,7 @@ import {
   MAX_READINGS,
   REF_DOC_LABEL,
   refDocsOf,
+  inspectionTypesOf,
   usesQualityInspection,
   cloneRow,
   describeCriteria,
@@ -107,7 +108,6 @@ import {
   blankTemplate,
   commitTemplate,
   NEW_TEMPLATE_ID,
-  type InspectionType,
   type QiRow,
   type QiSchedule,
   type QiTemplate,
@@ -204,7 +204,6 @@ function Editor({ seed, isNew }: { seed: QiTemplate; isNew: boolean }) {
       rows: p.rows.map((r) => (r.id === id ? { ...r, ...next } : r)),
     }));
 
-  const changeType = (t: InspectionType) => patch({ inspectionType: t });
 
   const save = () => {
     /* ชื่อรายงานคือ ID ของเอกสารใน ERPNext (autoname: field:quality_inspection_
@@ -426,28 +425,27 @@ function Editor({ seed, isNew }: { seed: QiTemplate; isNew: boolean }) {
               <FieldNote custom>custom_code</FieldNote>
             </div>
 
+            {/* ERPNext คำนวณช่วงการตรวจเองจากเอกสารที่เปิดใบ ไม่เคยถามคนตั้งค่า
+                และคืนได้แค่ Incoming กับ Outgoing ส่วน In Process มาจากใบงานผลิต
+                ที่เดียว ให้เลือกเองเมื่อไหร่ก็เลือกผิดเมื่อนั้น แล้วมันก็เขียนทับอยู่ดี */}
             <div className="space-y-1.5">
-              <Label htmlFor="inspection-type">ช่วงการตรวจสอบ</Label>
-              <Select
-                value={tpl.inspectionType}
-                onValueChange={(v) => changeType(v as InspectionType)}
-              >
-                <SelectTrigger id="inspection-type" className="w-full bg-card">
-                  <SelectValue placeholder="เลือกช่วงการตรวจ" />
-                </SelectTrigger>
-                <SelectContent>
-                  {(Object.keys(INSPECTION_TYPE_LABEL) as InspectionType[]).map(
-                    (t) => (
-                      <SelectItem key={t} value={t}>
-                        {INSPECTION_TYPE_LABEL[t]} — {INSPECTION_TYPE_VALUE[t]}
-                      </SelectItem>
-                    )
-                  )}
-                </SelectContent>
-              </Select>
+              <Label>ช่วงการตรวจสอบ</Label>
+              <div className="flex min-h-10 flex-wrap items-center gap-1.5 rounded-lg border border-border bg-muted px-3 py-2">
+                {inspectionTypesOf(tpl).length === 0 ? (
+                  <span className="text-sm text-muted-foreground">
+                    ยังไม่ได้ติ๊กจุดที่ต้องตรวจ
+                  </span>
+                ) : (
+                  inspectionTypesOf(tpl).map((it) => (
+                    <Badge key={it} appearance="soft" tone="brand">
+                      {INSPECTION_TYPE_LABEL[it]} — {INSPECTION_TYPE_VALUE[it]}
+                    </Badge>
+                  ))
+                )}
+              </div>
               <FieldNote>
-                inspection_type (ใบตรวจ · บังคับกรอก) · เทมเพลตเก็บล่วงหน้าที่
-                custom_inspection_type · สามค่านี้ ERPNext กำหนดมาตายตัว
+                inspection_type · ERPNext ตั้งเองจากเอกสาร
+                (transaction.js quality_inspection_type) ตั้งล่วงหน้าไม่ได้
               </FieldNote>
             </div>
 

@@ -1535,6 +1535,37 @@ export function setTemplateActive(id: string, on: boolean) {
  * แล้วไม่เลือกใบเบิก-โอนสต็อกก็ไม่ได้อยู่แล้ว เพราะการโอนวัตถุดิบเข้าไลน์
  * เกิดเป็น Stock Entry เสมอ ไม่มีทางเป็นอย่างอื่น ตั้งขัดกันได้อย่างเดียว
  */
+/**
+ * ช่วงการตรวจของแต่ละจุด — อ่านจากจุด ไม่ใช่ช่องให้เลือก
+ *
+ * ERPNext คำนวณเองจากเอกสารที่เปิดใบ ไม่เคยถามคนตั้งค่า (transaction.js
+ * quality_inspection_type) และที่สำคัญคือมันคืนได้แค่ Incoming กับ Outgoing
+ * ส่วน In Process มาจากที่เดียวคือ Job Card ที่ส่งค่านี้ไปตรง ๆ
+ *
+ * ผลที่คนส่วนใหญ่คิดไม่ถึง — ก่อนผลิตเป็น Outgoing เพราะของออกจากคลังวัตถุดิบ
+ * และหลังผลิตเป็น Incoming เพราะของเข้าคลังสินค้า ไม่ใช่ In Process ทั้งคู่
+ * ให้เลือกเองเมื่อไหร่ก็เลือกผิดเมื่อนั้น แล้ว ERPNext ก็เขียนทับอยู่ดี
+ */
+export const STAGE_TYPE: Record<Stage, InspectionType> = {
+  receive: "incoming",
+  // ของออกจากคลังวัตถุดิบ — Material Transfer for Manufacture อยู่ใน
+  // qi_outgoing_purposes ไม่ใช่ขาเข้า
+  preProd: "outgoing",
+  // ทางเดียวที่ได้ In Process คือใบงานผลิต
+  inProd: "inProcess",
+  transfer: "outgoing",
+  // ของเข้าคลังสินค้า — is_incoming_qi_purpose คืนจริงสำหรับ Manufacture
+  postProd: "incoming",
+  deliver: "outgoing",
+};
+
+/** ช่วงการตรวจทั้งหมดที่ฟอร์มนี้จะได้ — หลายจุดอาจได้หลายช่วง */
+export function inspectionTypesOf(t: QiTemplate): InspectionType[] {
+  const out = new Set<InspectionType>();
+  for (const st of t.stages) out.add(STAGE_TYPE[st]);
+  return [...out];
+}
+
 export function refDocsOf(t: QiTemplate): RefDoc[] {
   const out = new Set<RefDoc>();
   for (const st of t.stages) {
