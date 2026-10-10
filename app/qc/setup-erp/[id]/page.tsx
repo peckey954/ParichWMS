@@ -82,7 +82,7 @@ import {
   MAX_READINGS,
   REF_DOC_LABEL,
   refDocsOf,
-  inspectionTypesOf,
+  STAGE_TYPE,
   usesQualityInspection,
   cloneRow,
   describeCriteria,
@@ -425,30 +425,6 @@ function Editor({ seed, isNew }: { seed: QiTemplate; isNew: boolean }) {
               <FieldNote custom>custom_code</FieldNote>
             </div>
 
-            {/* ERPNext คำนวณช่วงการตรวจเองจากเอกสารที่เปิดใบ ไม่เคยถามคนตั้งค่า
-                และคืนได้แค่ Incoming กับ Outgoing ส่วน In Process มาจากใบงานผลิต
-                ที่เดียว ให้เลือกเองเมื่อไหร่ก็เลือกผิดเมื่อนั้น แล้วมันก็เขียนทับอยู่ดี */}
-            <div className="space-y-1.5">
-              <Label>ช่วงการตรวจสอบ</Label>
-              <div className="flex min-h-10 flex-wrap items-center gap-1.5 rounded-lg border border-border bg-muted px-3 py-2">
-                {inspectionTypesOf(tpl).length === 0 ? (
-                  <span className="text-sm text-muted-foreground">
-                    ยังไม่ได้ติ๊กจุดที่ต้องตรวจ
-                  </span>
-                ) : (
-                  inspectionTypesOf(tpl).map((it) => (
-                    <Badge key={it} appearance="soft" tone="brand">
-                      {INSPECTION_TYPE_LABEL[it]} — {INSPECTION_TYPE_VALUE[it]}
-                    </Badge>
-                  ))
-                )}
-              </div>
-              <FieldNote>
-                inspection_type · ERPNext ตั้งเองจากเอกสาร
-                (transaction.js quality_inspection_type) ตั้งล่วงหน้าไม่ได้
-              </FieldNote>
-            </div>
-
             {/* อ่านจากจุดที่ติ๊ก ไม่ใช่ช่องให้เลือก — ติ๊กก่อนผลิตแล้วไม่เลือก
                 ใบเบิก-โอนสต็อกก็ไม่ได้อยู่แล้ว เพราะการโอนวัตถุดิบเข้าไลน์เกิดเป็น
                 Stock Entry เสมอ ไม่มีทางเป็นอย่างอื่น ให้เลือกเองได้อย่างเดียว
@@ -542,6 +518,11 @@ function Editor({ seed, isNew }: { seed: QiTemplate; isNew: boolean }) {
                 >
                   <p className="font-medium">{STAGE[k].label}</p>
                   <dl className="mt-1 grid gap-x-3 gap-y-0.5 text-muted-foreground @lg:grid-cols-[7rem_1fr]">
+                    <dt>ช่วงการตรวจ</dt>
+                    <dd className="font-mono text-xs">
+                      {INSPECTION_TYPE_LABEL[STAGE_TYPE[k]]} —{" "}
+                      {INSPECTION_TYPE_VALUE[STAGE_TYPE[k]]}
+                    </dd>
                     <dt>ใบเกิดจาก</dt>
                     <dd className="font-mono text-xs">{STAGE[k].doc}</dd>
                     <dt>เทมเพลตมาจาก</dt>
