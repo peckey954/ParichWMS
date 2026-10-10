@@ -80,9 +80,8 @@ import {
   INSPECTION_TYPE_LABEL,
   INSPECTION_TYPE_VALUE,
   MAX_READINGS,
-  REF_DOCS_OF,
   REF_DOC_LABEL,
-  REF_DOC_VALUE,
+  refDocsOf,
   usesQualityInspection,
   cloneRow,
   describeCriteria,
@@ -112,7 +111,6 @@ import {
   type QiRow,
   type QiSchedule,
   type QiTemplate,
-  type RefDoc,
   type SourceId,
 } from "@/lib/qc-erp";
 
@@ -206,13 +204,7 @@ function Editor({ seed, isNew }: { seed: QiTemplate; isNew: boolean }) {
       rows: p.rows.map((r) => (r.id === id ? { ...r, ...next } : r)),
     }));
 
-  /**
-   * เปลี่ยนประเภทการตรวจแล้วเอกสารอ้างอิงต้องล้างตาม
-   * ใบรับของกับใบส่งของอยู่คนละประเภทกัน ค้างไว้แล้วจะได้เทมเพลตที่บันทึกไม่ผ่าน
-   * ตอนยิงเข้า ERPNext โดยหน้าจอไม่ได้บอกอะไรเลย
-   */
-  const changeType = (t: InspectionType) =>
-    patch({ inspectionType: t, refDocs: [] });
+  const changeType = (t: InspectionType) => patch({ inspectionType: t });
 
   const save = () => {
     /* ชื่อรายงานคือ ID ของเอกสารใน ERPNext (autoname: field:quality_inspection_
@@ -459,39 +451,30 @@ function Editor({ seed, isNew }: { seed: QiTemplate; isNew: boolean }) {
               </FieldNote>
             </div>
 
-            {/* ช่องเดียวที่ตัดสินว่าใบไปเก็บที่ไหน — เว้นว่างคือฟอร์มที่ไม่มี
-                เอกสารเป็นตัวเปิดใบ ซึ่ง Quality Inspection รับไม่ได้ เพราะ
-                reference_type เป็น reqd=1 ที่ไม่มี depends_on ใบแบบนั้นจึงไป
-                อยู่ doctype ของเรา ไม่ต้องมีช่องให้เลือกซ้ำอีกช่อง */}
+            {/* อ่านจากจุดที่ติ๊ก ไม่ใช่ช่องให้เลือก — ติ๊กก่อนผลิตแล้วไม่เลือก
+                ใบเบิก-โอนสต็อกก็ไม่ได้อยู่แล้ว เพราะการโอนวัตถุดิบเข้าไลน์เกิดเป็น
+                Stock Entry เสมอ ไม่มีทางเป็นอย่างอื่น ให้เลือกเองได้อย่างเดียว
+                คือตั้งขัดกับจุดที่ติ๊กไว้ */}
             <div className="space-y-1.5">
-              <Label htmlFor="ref-docs">
-                เอกสารอ้างอิง{" "}
-                <span className="font-normal text-muted-foreground">
-                  (ไม่บังคับ)
-                </span>
-              </Label>
-              <MultiSelectChips
-                id="ref-docs"
-                className="w-full bg-card"
-                placeholder="ไม่เลือก = เปิดใบเองโดยไม่มีเอกสาร"
-                options={REF_DOCS_OF[tpl.inspectionType].map((d) => ({
-                  label: `${REF_DOC_LABEL[d]} — ${REF_DOC_VALUE[d]}`,
-                  value: d,
-                }))}
-                value={tpl.refDocs}
-                onValueChange={(v) => patch({ refDocs: v as RefDoc[] })}
-              />
-              {/* ตัวเลือกเปลี่ยนตามช่วงการตรวจ ไม่ใช่โชว์ทั้งเจ็ดตัวตลอด
-                  เลือกใบส่งของให้การตรวจรับเข้าได้ = ตั้งค่าที่ไม่มีทางถูกใช้
-
-                  ว่างไว้ = ฟอร์มที่ไม่มีเอกสารเป็นตัวเปิดใบ ป้ายที่มาของใบ
-                  ข้างบนจะอ่านออกมาเป็น "เปิดเอง" ให้เอง */}
+              <Label>เอกสารอ้างอิง</Label>
+              <div className="flex min-h-10 flex-wrap items-center gap-1.5 rounded-lg border border-border bg-muted px-3 py-2">
+                {refDocsOf(tpl).length === 0 ? (
+                  <span className="text-sm text-muted-foreground">
+                    ยังไม่ได้ติ๊กจุดที่ต้องตรวจ — ใบนี้ไม่มีเอกสารเป็นตัวเปิด
+                  </span>
+                ) : (
+                  refDocsOf(tpl).map((d) => (
+                    <Badge key={d} appearance="outline" tone="neutral">
+                      {REF_DOC_LABEL[d]}
+                    </Badge>
+                  ))
+                )}
+              </div>
               <FieldNote>
-                reference_type (ใบตรวจ · บังคับกรอก) · เทมเพลตเก็บล่วงหน้าที่
-                custom_reference_types · ตัวเลือกเปลี่ยนตามช่วงการตรวจ
+                reference_type (ใบตรวจ · บังคับกรอก) · อ่านจากจุดที่ต้องตรวจ
+                ข้างล่าง ไม่ได้เก็บแยก
               </FieldNote>
             </div>
-
           </div>
 
           {/* ตัวที่ทำให้ใบตรวจเด้งมาเอง — ไม่ติ๊กจุดไหนเลยเทมเพลตก็ยังใช้ได้

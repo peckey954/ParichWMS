@@ -712,7 +712,7 @@ export function blockersOf(t: QiTemplate): string[] {
      เคยนับประเภทการตรวจกับการผูกสินค้าเป็นเงื่อนไขด้วย ซึ่งเป็นการถามเรื่อง
      เดียวกันสามรอบ — ฟอร์มที่ตรวจเครื่องจักรก็คือฟอร์มที่ไม่มีเอกสารอ้างอิง
      อยู่แล้ว ถามช่องเดียวพอ แล้วตั้งขัดกันเองไม่ได้ด้วย */
-  if (t.refDocs.length === 0) out.push("ไม่ได้เลือกเอกสารอ้างอิง");
+  if (t.stages.length === 0) out.push("ไม่ได้ติ๊กจุดที่ต้องตรวจ");
 
   // หัวข้อที่ดึงคลังหรือเครื่องจักรมา — Quality Inspection ไม่มีช่อง Link ไปหา
   for (const r of t.rows)
@@ -769,7 +769,13 @@ export const ORIGIN_KEYS = Object.keys(ORIGIN) as Origin[];
 // จึงตอบไม่ได้ว่าใบจะเด้งมาตอนไหนบ้าง
 // ---------------------------------------------------------------
 
-export type Stage = "receive" | "preProd" | "inProd" | "postProd" | "deliver";
+export type Stage =
+  | "receive"
+  | "preProd"
+  | "inProd"
+  | "transfer"
+  | "postProd"
+  | "deliver";
 
 export const STAGE: Record<
   Stage,
@@ -810,6 +816,13 @@ export const STAGE: Record<
        ว่างไว้เมื่อไหร่มันจะตกไปอ่าน Item.quality_inspection_template แทน
        ซึ่งคือแบบฟอร์มตรวจรับเข้า ไม่ใช่แบบตรวจระหว่างผลิต และไม่มีอะไรเตือน */
     todo: "ต้องเขียน script เติม Job Card.quality_inspection_template ตอนสร้างใบงาน — ช่องมีอยู่แล้วแต่ job_card.py ไม่เคยเขียนค่าลงไป ปล่อยว่างแล้วใบตรวจจะหยิบแบบฟอร์มของ Item มาแทนเงียบ ๆ",
+  },
+  transfer: {
+    label: "ตอนเบิก-โอนสต็อก",
+    doc: "Stock Entry · Material Issue · Material Transfer",
+    template: "Item · quality_inspection_template",
+    enforce: "Stock Entry · inspection_required (ติ๊กรายใบ ตั้งล่วงหน้าไม่ได้)",
+    todo: null,
   },
   postProd: {
     label: "หลังผลิตเสร็จ ก่อนเข้าคลัง",
@@ -862,7 +875,6 @@ export type QiTemplate = {
   editor?: string;
   updatedAt: string;
   inspectionType: InspectionType;
-  refDocs: RefDoc[];
   schedule: QiSchedule;
   /** ข้อควรระวังเฉพาะฟอร์มนี้ที่อ่านจากโครงไม่ได้ — ว่างคือไม่มีอะไรพิเศษ */
   note?: string;
@@ -1114,7 +1126,6 @@ export const QI_TEMPLATES: QiTemplate[] = [
     owner: "อลิสา พรสุขสิริ",
     updatedAt: "24/09/2026",
     inspectionType: "incoming",
-    refDocs: ["purchaseReceipt"],
     rows: [
       formula(
         "p-size",
@@ -1156,7 +1167,6 @@ export const QI_TEMPLATES: QiTemplate[] = [
     owner: "อลิสา พรสุขสิริ",
     updatedAt: "24/09/2026",
     inspectionType: "inProcess",
-    refDocs: ["jobCard"],
     rows: [
       manual("p-clean"),
       value("p-formula", "ตรง"),
@@ -1185,7 +1195,6 @@ export const QI_TEMPLATES: QiTemplate[] = [
     owner: "อลิสา พรสุขสิริ",
     updatedAt: "24/09/2026",
     inspectionType: "inProcess",
-    refDocs: ["stockEntry"],
     rows: [
       range("p-weight", 49.5, 50.5, 5),
       range("p-moist", 0, 2),
@@ -1215,7 +1224,6 @@ export const QI_TEMPLATES: QiTemplate[] = [
     owner: "อลิสา พรสุขสิริ",
     updatedAt: "24/09/2026",
     inspectionType: "inProcess",
-    refDocs: [],
     // ฟอร์มกระดาษแบ่งเป็น 1.1 / 1.2 / 1.3 แต่ตัดหัวข้อย่อยออกหมด
     // ทุกข้อเป็นหัวข้อหลักเท่ากัน เลขข้อเดินต่อกันรวดเดียว
     rows: [
@@ -1261,7 +1269,6 @@ export const QI_TEMPLATES: QiTemplate[] = [
     owner: "อลิสา พรสุขสิริ",
     updatedAt: "24/09/2026",
     inspectionType: "inProcess",
-    refDocs: [],
     // แปดข้อตรงตามฟอร์มกระดาษ FM-QC-02-04 เรียงลำดับเดิม ไม่แบ่งกลุ่ม
     rows: [
       manual("p-bag-intact", "กระสอบไม่ฉีกขาด ไม่มีรอยรั่ว"),
@@ -1296,7 +1303,6 @@ export const QI_TEMPLATES: QiTemplate[] = [
     owner: "อลิสา พรสุขสิริ",
     updatedAt: "24/09/2026",
     inspectionType: "inProcess",
-    refDocs: [],
     /* สี่คอลัมน์ตรงตามกระดาษ — สูตร เครื่องผลิต น้ำหนัก สลิง
        คอลัมน์ วันที่ / ตรวจสอบ ผ่าน-ไม่ผ่าน / หมายเหตุ ไม่ได้ตั้งเป็นหัวข้อ
        เพราะมากับตัวใบอยู่แล้ว (report_date · status · remarks)
@@ -1334,7 +1340,6 @@ export const QI_TEMPLATES: QiTemplate[] = [
     owner: "อลิสา พรสุขสิริ",
     updatedAt: "24/09/2026",
     inspectionType: "inProcess",
-    refDocs: ["stockEntry", "jobCard"],
     /* ทุกข้อเป็นติ๊กผ่าน/ไม่ผ่านล้วน ไม่มีช่องคีย์ค่า — ตรงกับกระดาษที่มีแต่
        ช่องติ๊กกับคอลัมน์เกณฑ์มาตรฐานให้อ่าน แม้แต่ข้อน้ำหนักกับความชื้นที่มี
        ตัวเลขในเกณฑ์ ผู้ตรวจก็ชั่งแล้วติ๊กเอา ไม่ได้คีย์ตัวเลขลงใบ
@@ -1374,7 +1379,6 @@ export const QI_TEMPLATES: QiTemplate[] = [
     updatedAt: "24/09/2026",
     inspectionType: "inProcess",
     // ใบเกิดจากนาฬิกา ไม่ได้เกิดจากเอกสาร — เว้นว่างไว้ให้ตรงกับความจริง
-    refDocs: [],
     // หนึ่งวัตถุดิบคือหนึ่งข้อ ติ๊กปกติ/ผิดปกติ ไม่มีค่าให้คีย์ ตามใบจริง
     rows: [
       manual("p-rm-4205"),
@@ -1413,13 +1417,12 @@ export const QI_TEMPLATES: QiTemplate[] = [
     owner: "อลิสา พรสุขสิริ",
     updatedAt: "24/09/2026",
     inspectionType: "inProcess",
-    refDocs: ["stockEntry"],
     rows: [
       range("p-moist", 0, 2),
       range("p-warehouse-temp", 20, 35),
       value("p-bag", "ปกติ"),
     ],
-    stages: [],
+    stages: ["transfer"],
     operations: [],
     photo: "onFail",
     effectiveFrom: "01/09/2026",
@@ -1446,7 +1449,6 @@ export const QI_TEMPLATES: QiTemplate[] = [
     owner: "อลิสา พรสุขสิริ",
     updatedAt: "24/09/2026",
     inspectionType: "outgoing",
-    refDocs: ["deliveryNote"],
     rows: [range("p-weight", 49.5, 50.5, 3), value("p-bag", "ปกติ")],
     stages: ["deliver"],
     operations: [],
@@ -1473,7 +1475,6 @@ export const QI_TEMPLATES: QiTemplate[] = [
     owner: "อลิสา พรสุขสิริ",
     updatedAt: "24/09/2026",
     inspectionType: "outgoing",
-    refDocs: [],
     rows: [value("p-complaint", "รับเรื่องแล้ว"), manual("p-trace")],
     stages: [],
     operations: [],
@@ -1498,7 +1499,6 @@ export const QI_TEMPLATES: QiTemplate[] = [
     owner: "อลิสา พรสุขสิริ",
     updatedAt: "24/09/2026",
     inspectionType: "incoming",
-    refDocs: [],
     rows: [value("p-coa-complete", "ครบ"), value("p-coa-match", "ตรง")],
     stages: [],
     operations: [],
@@ -1528,8 +1528,34 @@ export function setTemplateActive(id: string, on: boolean) {
   if (t) t.active = on;
 }
 
+/**
+ * เอกสารอ้างอิงที่ใบของฟอร์มนี้จะไปผูก — อ่านจากจุดที่ติ๊ก ไม่ได้เก็บแยก
+ *
+ * เคยให้เลือกเองอีกช่อง ซึ่งเป็นการถามเรื่องเดียวกันสองรอบ — ติ๊กก่อนผลิต
+ * แล้วไม่เลือกใบเบิก-โอนสต็อกก็ไม่ได้อยู่แล้ว เพราะการโอนวัตถุดิบเข้าไลน์
+ * เกิดเป็น Stock Entry เสมอ ไม่มีทางเป็นอย่างอื่น ตั้งขัดกันได้อย่างเดียว
+ */
+export function refDocsOf(t: QiTemplate): RefDoc[] {
+  const out = new Set<RefDoc>();
+  for (const st of t.stages) {
+    if (st === "receive") {
+      out.add("purchaseReceipt");
+      out.add("purchaseInvoice");
+      out.add("subcontractingReceipt");
+    }
+    if (st === "deliver") {
+      out.add("deliveryNote");
+      out.add("salesInvoice");
+    }
+    if (st === "preProd" || st === "postProd" || st === "transfer")
+      out.add("stockEntry");
+    if (st === "inProd") out.add("jobCard");
+  }
+  return [...out];
+}
+
 export const originOf = (t: QiTemplate): Origin =>
-  t.schedule.recurring ? "shift" : t.refDocs.length > 0 ? "doc" : "manual";
+  t.schedule.recurring ? "shift" : t.stages.length > 0 ? "doc" : "manual";
 
 // ---------------------------------------------------------------
 // การบังคับใช้ระดับระบบ — Stock Settings
@@ -1709,7 +1735,6 @@ export const blankTemplate = (): QiTemplate => ({
   schedule: { ...DEFAULT_SCHEDULE },
   // เอกสารอ้างอิงปล่อยว่าง ให้คนตั้งค่าเลือกเอง — เดาให้แล้วเขาไม่ได้ดู
   // จะได้ฟอร์มที่ผูกกับเอกสารผิดใบโดยไม่มีใครรู้
-  refDocs: [],
   rows: [],
   stages: [],
   operations: [],

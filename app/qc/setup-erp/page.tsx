@@ -71,6 +71,7 @@ import {
   DISPOSITIONS,
   QI_GROUPS,
   REF_DOC_LABEL,
+  refDocsOf,
   addGroup,
   addDisposition,
   NEW_TEMPLATE_ID,
@@ -316,7 +317,7 @@ function TemplateList({
               <Badge appearance="soft" tone="brand">
                 {INSPECTION_TYPE_LABEL[t.inspectionType]}
               </Badge>
-              {t.refDocs.map((d) => (
+              {refDocsOf(t).map((d) => (
                 <Badge key={d} appearance="outline" tone="neutral">
                   {REF_DOC_LABEL[d]}
                 </Badge>
@@ -375,8 +376,8 @@ function TemplateList({
                   </span>
                 </TableCell>
                 <TableCell className="text-sm">
-                  {t.refDocs.length > 0
-                    ? t.refDocs.map((d) => REF_DOC_LABEL[d]).join(", ")
+                  {refDocsOf(t).length > 0
+                    ? refDocsOf(t).map((d) => REF_DOC_LABEL[d]).join(", ")
                     : "-"}
                 </TableCell>
                 <TableCell>
