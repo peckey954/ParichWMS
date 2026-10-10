@@ -28,16 +28,16 @@ import { rowTitle } from "@/components/qc/check-table";
 import {
   PROD_STEP,
   INSPECTION_TYPE_VALUE,
-  type ProdStep,
 } from "@/lib/qc-erp";
 import {
-  currentStage,
+  checkpointStateOf,
+  checkpointsOfQueue,
+  currentCheckpoint,
   demoTemplate,
   lotOf,
   nextQiName,
   saveStage,
-  stageStateOf,
-  stagesOfQueue,
+  type Checkpoint,
   type Lot,
 } from "@/lib/qc-production-demo";
 
@@ -75,11 +75,11 @@ export default function ProductionCheckDetailPage() {
     );
   }
 
-  const stages = stagesOfQueue();
-  const open = currentStage(lot);
-  // กดชิปมาจากรายการ = เจาะมาดูขั้นนั้น ไม่ได้ส่งมา = ดูขั้นที่ถึงคิว
-  const want = search.get("stage") as ProdStep | null;
-  const focus = want && stages.includes(want) ? want : open;
+  const points = checkpointsOfQueue();
+  const open = currentCheckpoint(lot);
+  // กดชิปมาจากรายการ = เจาะมาดูจุดนั้น ไม่ได้ส่งมา = ดูจุดที่ถึงคิว
+  const want = search.get("at");
+  const focus = points.find((c) => c.key === want) ?? open;
 
   return (
     <main className="@container mx-auto w-full max-w-5xl px-4 py-6 sm:px-6">
@@ -112,7 +112,7 @@ export default function ProductionCheckDetailPage() {
           </Badge>
         ) : (
           <Badge appearance="soft" tone="warning">
-            เหลืออีก {stages.filter((s) => !lot.done[s]).length} ขั้น
+            เหลืออีก {points.filter((c) => !lot.done[c.key]).length} จุด
           </Badge>
         )}
       </div>
@@ -120,27 +120,27 @@ export default function ProductionCheckDetailPage() {
       {/* ---------- log ของทุกขั้น ---------- */}
       <h2 className="mt-6 font-semibold">ประวัติการตรวจ</h2>
       <p className="mt-0.5 mb-3 text-sm text-muted-foreground">
-        หนึ่งขั้น = หนึ่งใบตรวจของ ERPNext · ทั้งหมดอ้างใบสั่งผลิต {lot.code}{" "}
+        หนึ่งจุด = หนึ่งใบตรวจของ ERPNext · ทั้งหมดอ้างใบสั่งผลิต {lot.code}{" "}
         ใบเดียวกัน
       </p>
 
       <ol className="space-y-3">
-        {stages.map((s, i) => (
+        {points.map((c, i) => (
           <StageLogItem
-            key={s}
+            key={c.key}
             lot={lot}
-            stage={s}
+            point={c}
             index={i + 1}
-            focused={s === focus}
+            focused={c.key === focus?.key}
           />
         ))}
       </ol>
 
       {/* ---------- ฟอร์มของขั้นที่ถึงคิว ---------- */}
-      {focus && !lot.done[focus] && (
+      {focus && !lot.done[focus.key] && (
         <StageForm
           lot={lot}
-          stage={focus}
+          point={focus}
           onSaved={() => {
             bump();
             router.replace(`/qc/production-check/${lot.id}`);
@@ -157,17 +157,17 @@ export default function ProductionCheckDetailPage() {
 
 function StageLogItem({
   lot,
-  stage,
+  point,
   index,
   focused,
 }: {
   lot: Lot;
-  stage: ProdStep;
+  point: Checkpoint;
   index: number;
   focused: boolean;
 }) {
-  const state = stageStateOf(lot, stage);
-  const res = lot.done[stage];
+  const state = checkpointStateOf(lot, point);
+  const res = lot.done[point.key];
 
   return (
     <li
@@ -193,12 +193,12 @@ function StageLogItem({
           </span>
 
           <div className="min-w-0">
-            <p className="font-medium">{PROD_STEP[stage].label}</p>
+            <p className="font-medium">{point.label}</p>
             {/* ป้ายช่วงการตรวจที่ ERPNext จะแปะให้ — สามขั้นนี้ได้คนละค่ากัน
                 ซึ่งเป็นตัวที่ใช้แยกว่าใบไหนเป็นขั้นไหนโดยไม่ต้องสร้างฟิลด์เพิ่ม */}
             <p className="mt-0.5 font-mono text-xs text-muted-foreground">
-              {PROD_STEP[stage].doc} · inspection_type ={" "}
-              {INSPECTION_TYPE_VALUE[PROD_STEP[stage].actualType]}
+              {PROD_STEP[point.step].doc} · inspection_type ={" "}
+              {INSPECTION_TYPE_VALUE[PROD_STEP[point.step].actualType]}
             </p>
 
             {res && (
@@ -258,11 +258,11 @@ function StageLogItem({
 
 function StageForm({
   lot,
-  stage,
+  point,
   onSaved,
 }: {
   lot: Lot;
-  stage: ProdStep;
+  point: Checkpoint;
   onSaved: () => void;
 }) {
   const tpl = demoTemplate();
@@ -281,7 +281,7 @@ function StageForm({
       toast.error(`ยังตรวจไม่ครบ — เหลืออีก ${rows.length - keyed} ข้อ`);
       return;
     }
-    saveStage(lot.id, stage, {
+    saveStage(lot.id, point.key, {
       qi: nextQiName(),
       at: new Date().toLocaleString("th-TH", {
         dateStyle: "short",
@@ -292,11 +292,11 @@ function StageForm({
       failed: failed.map((r) => rowTitle(r)),
       note: note.trim(),
     });
-    toast.success(`บันทึก${PROD_STEP[stage].label}แล้ว`, {
+    toast.success(`บันทึก${point.label}แล้ว`, {
       description:
         verdict === "pass"
-          ? "ผ่านทุกข้อ — ขั้นถัดไปเปิดให้ตรวจแล้ว"
-          : `ไม่ผ่าน ${failed.length} ข้อ — ขั้นถัดไปยังเปิดให้ตรวจต่อได้`,
+          ? "ผ่านทุกข้อ — จุดถัดไปเปิดให้ตรวจแล้ว"
+          : `ไม่ผ่าน ${failed.length} ข้อ — จุดถัดไปยังเปิดให้ตรวจต่อได้`,
     });
     onSaved();
   };
@@ -305,7 +305,7 @@ function StageForm({
     <section className="mt-6 rounded-2xl border border-border bg-card p-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
-          <h2 className="font-semibold">ตรวจ{PROD_STEP[stage].label}</h2>
+          <h2 className="font-semibold">ตรวจ{point.label}</h2>
           <p className="mt-0.5 text-sm text-muted-foreground">
             {rows.length} หัวข้อ จากเทมเพลต {tpl.name}
           </p>
@@ -378,10 +378,10 @@ function StageForm({
           การบล็อกจะทำให้ล็อตนั้นค้างในคิวตลอดไปทั้งที่หน้างานเดินไปแล้ว */}
       <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
         <p className="text-sm text-muted-foreground">
-          ไม่ผ่านข้อเดียวถือว่าทั้งขั้นไม่ผ่าน ตรงกับ inspect_and_set_status
-          ของ ERPNext — แต่ขั้นถัดไปยังเปิดให้ตรวจต่อ
+          ไม่ผ่านข้อเดียวถือว่าทั้งใบไม่ผ่าน ตรงกับ inspect_and_set_status
+          ของ ERPNext — แต่จุดถัดไปยังเปิดให้ตรวจต่อ
         </p>
-        <Button onClick={save}>บันทึก{PROD_STEP[stage].label}</Button>
+        <Button onClick={save}>บันทึก{point.label}</Button>
       </div>
     </section>
   );

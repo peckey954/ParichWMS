@@ -9,7 +9,13 @@
    วันหนึ่งจะมีคนแก้ที่เดียวแล้วอีกที่ค้าง
 ------------------------------------------------------------------ */
 
-import { PROD_STEP_KEYS, templateOf, type ProdStep } from "@/lib/qc-erp";
+import {
+  OPERATION_POOL,
+  PROD_STEP,
+  PROD_STEP_KEYS,
+  templateOf,
+  type ProdStep,
+} from "@/lib/qc-erp";
 
 /** เทมเพลตที่คิวนี้เดินตาม — ตรวจรับสินค้า (External / Finish Good) */
 export const DEMO_TEMPLATE_ID = "t-inproc";
@@ -17,17 +23,59 @@ export const DEMO_TEMPLATE_ID = "t-inproc";
 export const demoTemplate = () => templateOf(DEMO_TEMPLATE_ID);
 
 /**
- * ขั้นที่ต้องตรวจของคิวนี้ เรียงตามลำดับที่ต้องทำจริง
+ * จุดเช็คหนึ่งจุด = หนึ่งใบตรวจ
  *
- * ลำดับมาจาก PROD_STEP_KEYS ที่ประกาศเรียง ก่อน → ระหว่าง → หลัง ไว้แล้ว
- * ไม่ได้เรียงตามที่คนติ๊กในหน้าตั้งค่า เพราะคนอาจติ๊กหลังผลิตก่อนก่อนผลิต
- * แต่สายการผลิตไม่ได้เดินแบบนั้น
+ * ไม่ใช่หนึ่งขั้นเท่ากับหนึ่งใบ เพราะขั้น "ระหว่างผลิต" แตกตามจำนวนขั้นตอนที่
+ * ติ๊กไว้ — สองขั้นตอนคือสองใบงาน คือสองใบตรวจ ยุบเป็นชิปเดียวแล้วจะมองไม่เห็น
+ * ว่ายังเหลืออีกใบ
  */
-export const stagesOfQueue = (): ProdStep[] => {
+export type Checkpoint = {
+  /** คีย์ที่ใช้เก็บผล — ขั้นเดี่ยวใช้ชื่อขั้น ขั้นที่แตกใช้ชื่อขั้นคู่ชื่อขั้นตอน */
+  key: string;
+  step: ProdStep;
+  /** ชื่อขั้นตอนการผลิต — มีเฉพาะจุดที่แตกมาจากระหว่างผลิต */
+  operation?: string;
+  label: string;
+};
+
+/**
+ * จุดเช็คทั้งหมดของคิวนี้ เรียงตามลำดับที่ต้องทำจริง
+ *
+ * ลำดับระหว่างขั้นมาจาก PROD_STEP_KEYS ที่ประกาศเรียง ก่อน → ระหว่าง → หลัง ไว้
+ * ส่วนลำดับระหว่างขั้นตอนในช่วงระหว่างผลิต เรียงตาม OPERATION_POOL ซึ่งแทน
+ * ลำดับในสูตรการผลิต (BOM Operation.sequence_id) — ไม่ได้เรียงตามที่คนติ๊ก
+ * เพราะคนอาจติ๊กบรรจุกระสอบก่อนผสมปุ๋ย แต่สายการผลิตไม่ได้เดินแบบนั้น
+ */
+export function checkpointsOfQueue(): Checkpoint[] {
   const t = demoTemplate();
   if (!t || t.phase !== "production") return [];
-  return PROD_STEP_KEYS.filter((s) => t.prodSteps.includes(s));
-};
+
+  const out: Checkpoint[] = [];
+  for (const step of PROD_STEP_KEYS) {
+    if (!t.prodSteps.includes(step)) continue;
+
+    if (step !== "during") {
+      out.push({ key: step, step, label: PROD_STEP[step].label });
+      continue;
+    }
+
+    const ops = OPERATION_POOL.filter((o) => t.operations.includes(o));
+    // ไม่ได้ติ๊กขั้นตอนไว้เลย = ยังตั้งไม่เสร็จ แต่ยังโชว์เป็นจุดเดียวไว้ก่อน
+    // ไม่ใช่หายไปเงียบ ๆ จนไม่มีใครรู้ว่าขาด
+    if (ops.length === 0) {
+      out.push({ key: "during", step, label: PROD_STEP.during.label });
+      continue;
+    }
+    for (const o of ops)
+      out.push({
+        key: `during:${o}`,
+        step,
+        operation: o,
+        label: `${PROD_STEP.during.label} · ${o}`,
+      });
+  }
+  return out;
+}
 
 /** ผลของหนึ่งขั้นที่ตรวจไปแล้ว — หนึ่งขั้น = หนึ่งใบ Quality Inspection */
 export type StageResult = {
@@ -56,8 +104,8 @@ export type Lot = {
   company: string;
   ton: number;
   owner: string;
-  /** ผลของขั้นที่ตรวจไปแล้ว — ขั้นที่ยังไม่มีคีย์ในนี้คือยังไม่ได้ตรวจ */
-  done: Partial<Record<ProdStep, StageResult>>;
+  /** ผลของจุดที่ตรวจไปแล้ว — คีย์คือ Checkpoint.key จุดที่ยังไม่มีคือยังไม่ตรวจ */
+  done: Record<string, StageResult>;
 };
 
 export const LOTS: Lot[] = [
@@ -125,7 +173,7 @@ export const LOTS: Lot[] = [
         failed: [],
         note: "",
       },
-      during: {
+      "during:ผสมปุ๋ย": {
         qi: "MAT-QA-2026-00009",
         at: "14/01/2026 13:05",
         by: "ณัฐพล ศรีวิไล",
@@ -140,27 +188,31 @@ export const LOTS: Lot[] = [
 export const lotOf = (id: string) => LOTS.find((l) => l.id === id);
 
 /**
- * ขั้นที่ถึงคิวแล้ว — ขั้นถัดจากขั้นสุดท้ายที่ตรวจไปแล้ว
+ * จุดที่ถึงคิวแล้ว — จุดถัดจากจุดสุดท้ายที่ตรวจไปแล้ว
  *
- * บังคับลำดับเพราะสามขั้นนี้เป็นลำดับของการผลิตจริง ตรวจหลังผลิตทั้งที่ยังไม่ได้
+ * บังคับลำดับเพราะจุดเหล่านี้เป็นลำดับของการผลิตจริง ตรวจหลังผลิตทั้งที่ยังไม่ได้
  * ตรวจก่อนผลิตคือตรวจของที่ยังไม่มี — ไม่ใช่กฎที่เราตั้งเอง แต่เป็นเวลาที่บังคับอยู่
  *
  * ERPNext ไม่มีกฎนี้ให้ มันดูแค่ว่าแต่ละเอกสารมีใบตรวจหรือยัง ไม่ได้ดูข้ามเอกสาร
  * ลำดับจึงเป็นของที่ต้องบังคับเองที่หน้าจอและที่ validate ตอนบันทึก
  */
-export function currentStage(lot: Lot): ProdStep | null {
-  for (const s of stagesOfQueue()) if (!lot.done[s]) return s;
+export function currentCheckpoint(lot: Lot): Checkpoint | null {
+  for (const c of checkpointsOfQueue()) if (!lot.done[c.key]) return c;
   return null;
 }
 
 export type StageState = "done" | "current" | "locked";
 
-export const stageStateOf = (lot: Lot, s: ProdStep): StageState =>
-  lot.done[s] ? "done" : currentStage(lot) === s ? "current" : "locked";
+export const checkpointStateOf = (lot: Lot, c: Checkpoint): StageState =>
+  lot.done[c.key]
+    ? "done"
+    : currentCheckpoint(lot)?.key === c.key
+      ? "current"
+      : "locked";
 
 /** จำนวนงานที่ถึงคิวแล้ว — นับเป็นงาน ไม่ใช่นับเป็นใบ */
 export const pendingCount = () =>
-  LOTS.filter((l) => currentStage(l) !== null).length;
+  LOTS.filter((l) => currentCheckpoint(l) !== null).length;
 
 /* เลขใบตรวจเดินต่อจากที่มีอยู่ — ERPNext ออกเลขจาก naming_series (MAT-QA-.YYYY.-)
    ไม่ได้สุ่ม ตัวอย่างนี้จึงเดินเลขเองให้เหมือน ไม่ใช่สุ่มเลขมั่ว */
@@ -169,7 +221,7 @@ export const nextQiName = () =>
   `MAT-QA-2026-${String(++qiSeq).padStart(5, "0")}`;
 
 /** บันทึกผลหนึ่งขั้น — ไม่มีหลังบ้าน แก้อาเรย์ในหน่วยความจำตรง ๆ */
-export function saveStage(lotId: string, stage: ProdStep, r: StageResult) {
+export function saveStage(lotId: string, key: string, r: StageResult) {
   const lot = lotOf(lotId);
-  if (lot) lot.done[stage] = r;
+  if (lot) lot.done[key] = r;
 }

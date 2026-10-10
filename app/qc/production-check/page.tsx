@@ -31,14 +31,14 @@ import {
 import { Tabs, TabsList, TabsTrigger } from "@peckey954/ui/components/ui/tabs";
 import { cn } from "@peckey954/ui/lib/utils";
 import { ROW_HOVER_NAV } from "@/components/stock/doc-parts";
-import { PROD_STEP, type ProdStep } from "@/lib/qc-erp";
 import {
   LOTS,
-  currentStage,
+  checkpointStateOf,
+  checkpointsOfQueue,
+  currentCheckpoint,
   demoTemplate,
   pendingCount,
-  stageStateOf,
-  stagesOfQueue,
+  type Checkpoint,
   type Lot,
 } from "@/lib/qc-production-demo";
 
@@ -62,11 +62,11 @@ export default function ProductionCheckPage() {
   const [, bump] = React.useReducer((n: number) => n + 1, 0);
 
   const tpl = demoTemplate();
-  const stages = stagesOfQueue();
+  const points = checkpointsOfQueue();
 
   const q = query.trim().toLowerCase();
   const rows = LOTS.filter((l) => {
-    const open = currentStage(l) !== null;
+    const open = currentCheckpoint(l) !== null;
     if (tab === "pending" ? !open : open) return false;
     return (
       q === "" ||
@@ -101,7 +101,7 @@ export default function ProductionCheckPage() {
         >
           {tpl?.name ?? "—"}
         </Link>{" "}
-        · {stages.length} ขั้น · {tpl?.rows.length ?? 0} หัวข้อต่อขั้น
+        · {points.length} จุดตรวจ · {tpl?.rows.length ?? 0} หัวข้อต่อขั้น
       </p>
 
       <Alert className="mt-4">
@@ -214,10 +214,17 @@ function StageChips({ lot, onChanged }: { lot: Lot; onChanged: () => void }) {
 
   return (
     <div className="flex flex-wrap gap-1.5">
-      {stagesOfQueue().map((s) => (
-        <StageChip key={s} lot={lot} stage={s} onOpen={() =>
-          router.push(`/qc/production-check/${lot.id}?stage=${s}`)
-        } />
+      {checkpointsOfQueue().map((c) => (
+        <StageChip
+          key={c.key}
+          lot={lot}
+          point={c}
+          onOpen={() =>
+            router.push(
+              `/qc/production-check/${lot.id}?at=${encodeURIComponent(c.key)}`
+            )
+          }
+        />
       ))}
     </div>
   );
@@ -225,17 +232,18 @@ function StageChips({ lot, onChanged }: { lot: Lot; onChanged: () => void }) {
 
 function StageChip({
   lot,
-  stage,
+  point,
   onOpen,
 }: {
   lot: Lot;
-  stage: ProdStep;
+  point: Checkpoint;
   onOpen: () => void;
 }) {
-  const state = stageStateOf(lot, stage);
-  const res = lot.done[stage];
-  // ชื่อขั้นตัดคำว่าอะไรในวงเล็บออก ชิปในตารางต้องสั้นพอให้สามอันอยู่บรรทัดเดียว
-  const label = PROD_STEP[stage].label;
+  const state = checkpointStateOf(lot, point);
+  const res = lot.done[point.key];
+  // จุดที่แตกมาจากระหว่างผลิตโชว์แค่ชื่อขั้นตอน ไม่ต้องขึ้นต้นว่า "ระหว่างผลิต"
+  // ซ้ำทุกอัน — อยู่ติดกันอยู่แล้วและชื่อขั้นตอนเป็นตัวแยกที่คนอ่านใช้จริง
+  const label = point.operation ?? point.label;
 
   return (
     <button
