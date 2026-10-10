@@ -77,6 +77,11 @@ import {
   DEFAULT_SCHEDULE,
   ORIGIN,
   DISPOSITIONS,
+  DEFAULT_GUARD,
+  GUARD_LABEL,
+  GUARD_PICK,
+  GUARD_PICK_LABEL,
+  type GuardAction,
   INSPECTION_TYPE_VALUE,
   MAX_READINGS,
   PHASE,
@@ -174,6 +179,9 @@ function Editor({ seed, isNew }: { seed: QiTemplate; isNew: boolean }) {
   const tryOf = (id: string) => tries[id] ?? EMPTY_ROUND;
   // เหตุผลที่ลง Quality Inspection ไม่ได้ — อ่านสด ๆ จากที่ตั้งไว้ ไม่ได้เก็บแยก
   const blockers = blockersOf(tpl);
+  /* ค่าระบบ — ของจริงอ่านจาก Stock Settings ตัวเดียวทั้งระบบ ที่นี่ไม่มีหลังบ้าน
+     จึงอ่านค่าตั้งต้นมาโชว์ ให้เห็นว่า "ตามค่าระบบ" ตอนนี้แปลว่าอะไร */
+  const guard = DEFAULT_GUARD;
   // ใบที่ลง Quality Inspection ติดคำว่า Accepted/Rejected ตายตัว ส่วนใบที่ไปอยู่
   // doctype ของเราเลือกคำเองได้ ใบตรวจถังจึงใช้ ปกติ/ผิดปกติ ตามกระดาษ
   const verdict: VerdictWords = usesQualityInspection(tpl)
@@ -850,6 +858,81 @@ function Editor({ seed, isNew }: { seed: QiTemplate; isNew: boolean }) {
           <FieldNote custom>
             custom_dispositions ที่เทมเพลต · custom_disposition ที่ใบตรวจ
           </FieldNote>
+
+          {/* สองช่องนี้ของจริงอยู่ที่ Stock Settings ซึ่งเป็น Single doctype
+              มีแถวเดียวทั้งระบบ ย้ายมาไว้ที่เทมเพลตตรง ๆ ไม่ได้ —
+              ทำได้ด้วยการตั้งค่าระบบเป็น Warn ไว้เป็นพื้น แล้ว hook ที่เอกสาร
+              สต็อก throw เองเฉพาะใบที่เทมเพลตบอกว่า stop */}
+          <div className="mt-4 grid gap-4 @2xl:grid-cols-2">
+            <div className="space-y-1.5">
+              <Label htmlFor="tpl-rej">ตรวจไม่ผ่านแล้วจะเดินเอกสารต่อ</Label>
+              <Select
+                value={tpl.onRejected}
+                onValueChange={(v) =>
+                  patch({ onRejected: v as GuardAction | "system" })
+                }
+              >
+                <SelectTrigger id="tpl-rej" className="w-full bg-card">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {GUARD_PICK.map((k) => (
+                    <SelectItem key={k} value={k}>
+                      {GUARD_PICK_LABEL[k]}
+                      {k === "system" && ` — ตอนนี้คือ ${GUARD_LABEL[guard.onRejected]}`}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <FieldNote custom={tpl.onRejected !== "system"}>
+                {tpl.onRejected === "system"
+                  ? "Stock Settings · action_if_quality_inspection_is_rejected"
+                  : "custom_on_rejected — ต้องเขียน hook ที่เอกสารสต็อก และค่าระบบต้องเป็น Warn"}
+              </FieldNote>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="tpl-sub">ยังไม่ได้ตรวจแล้วจะเดินเอกสารต่อ</Label>
+              <Select
+                value={tpl.onNotSubmitted}
+                onValueChange={(v) =>
+                  patch({ onNotSubmitted: v as GuardAction | "system" })
+                }
+              >
+                <SelectTrigger id="tpl-sub" className="w-full bg-card">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {GUARD_PICK.map((k) => (
+                    <SelectItem key={k} value={k}>
+                      {GUARD_PICK_LABEL[k]}
+                      {k === "system" &&
+                        ` — ตอนนี้คือ ${GUARD_LABEL[guard.onNotSubmitted]}`}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <FieldNote custom={tpl.onNotSubmitted !== "system"}>
+                {tpl.onNotSubmitted === "system"
+                  ? "Stock Settings · action_if_quality_inspection_is_not_submitted"
+                  : "custom_on_not_submitted — ต้องเขียน hook เพิ่มเหมือนกัน"}
+              </FieldNote>
+            </div>
+          </div>
+
+          {/* เข้มกว่าค่าระบบได้ ผ่อนไม่ได้ — ต้องเขียนบอก ไม่งั้นคนจะตั้ง Warn
+              ที่ฟอร์มแล้วนึกว่าผ่อนได้ ทั้งที่ระบบตั้ง Stop ไว้มันโยนไปก่อนแล้ว */}
+          {(tpl.onRejected === "warn" || tpl.onNotSubmitted === "warn") &&
+            (guard.onRejected === "stop" || guard.onNotSubmitted === "stop") && (
+              <p className="mt-3 flex items-start gap-2 rounded-lg border border-danger-border bg-danger px-4 py-3 text-sm">
+                <InfoIcon className="mt-0.5 size-4 shrink-0 text-danger-strong" />
+                <span>
+                  ตั้ง Warn ที่ฟอร์มไม่มีผล เพราะค่าระบบเป็น Stop อยู่ —
+                  ERPNext โยนก่อนที่ hook ของเราจะได้ทำงาน ต้องไปตั้งค่าระบบเป็น
+                  Warn ก่อน แล้วค่อยใช้ฟอร์มที่ต้องการ Stop เป็นตัวเข้มขึ้น
+                </span>
+              </p>
+            )}
 
           {/* ติ๊กเลือกจากรายการกลาง ไม่ใช่พิมพ์เอง — แก้ชื่อหรือเพิ่มตัวเลือก
               ทำที่แท็บตั้งค่าระบบ เพราะแต่ละตัวผูกกับ script ที่เดฟเขียนไว้ */}

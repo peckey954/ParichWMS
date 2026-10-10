@@ -953,6 +953,19 @@ export type QiTemplate = {
   dispositions: string[];
   /** มีข้อไม่ผ่านแล้วต้องเลือกให้ได้ก่อนบันทึก */
   requireDisposition: boolean;
+  /**
+   * ทับค่าระบบเฉพาะฟอร์มนี้ — "system" คือใช้ค่าที่ตั้งไว้ใน Stock Settings
+   *
+   * ERPNext เก็บสองค่านี้ที่ Stock Settings ซึ่งเป็น Single doctype (issingle: 1)
+   * มีแถวเดียวทั้งระบบ ย้ายมาไว้ที่เทมเพลตตรง ๆ ไม่ได้ และ
+   * quality_inspection_service.py อ่านด้วย frappe.get_single_value() เสมอ
+   *
+   * ทำได้ด้วยการตั้งค่าระบบเป็น Warn ไว้เป็นพื้น แล้วเขียน hook ที่เอกสารสต็อก
+   * throw เองเฉพาะใบที่เทมเพลตบอกว่า stop — เพิ่มความเข้มได้ ผ่อนไม่ได้
+   * เพราะถ้าระบบตั้ง Stop ไว้ มันโยนก่อนที่ hook ของเราจะได้ทำงาน
+   */
+  onRejected: GuardAction | "system";
+  onNotSubmitted: GuardAction | "system";
 };
 
 export const ITEM_POOL = [
@@ -1175,6 +1188,8 @@ export const QI_TEMPLATES: QiTemplate[] = [
     requireBefore: true,
     dispositions: ["accept", "repack", "return"],
     requireDisposition: true,
+    onRejected: "system",
+    onNotSubmitted: "system",
     schedule: { ...DEFAULT_SCHEDULE },
   },
   {
@@ -1204,6 +1219,8 @@ export const QI_TEMPLATES: QiTemplate[] = [
     requireBefore: false,
     dispositions: [],
     requireDisposition: false,
+    onRejected: "system",
+    onNotSubmitted: "system",
     schedule: { ...DEFAULT_SCHEDULE },
     note: "ERPNext ไม่มีติ๊กบังคับตรวจก่อนผลิตที่ข้อมูลสินค้า มีแค่ก่อนซื้อกับก่อนส่ง — ถ้าต้องห้ามเดินเครื่องจนกว่าจะตรวจ ต้องเขียน validation เอง",
   },
@@ -1234,6 +1251,8 @@ export const QI_TEMPLATES: QiTemplate[] = [
     requireBefore: false,
     dispositions: ["accept", "repack"],
     requireDisposition: true,
+    onRejected: "system",
+    onNotSubmitted: "system",
     schedule: { ...DEFAULT_SCHEDULE },
   },
 
@@ -1282,6 +1301,8 @@ export const QI_TEMPLATES: QiTemplate[] = [
     requireBefore: false,
     dispositions: [],
     requireDisposition: false,
+    onRejected: "system",
+    onNotSubmitted: "system",
     schedule: { ...DEFAULT_SCHEDULE },
     note: "ตรวจเครื่องจักร ไม่ใช่ตรวจสินค้า จึงไม่มี item_code ให้ใส่ — Asset Maintenance Log ของ ERPNext ก็ใช้ไม่ได้ เพราะหนึ่ง log เก็บได้งานเดียว ไม่มีตารางข้อตรวจ ต้องทำ doctype ของเราเอง",
   },
@@ -1318,6 +1339,8 @@ export const QI_TEMPLATES: QiTemplate[] = [
     requireBefore: false,
     dispositions: [],
     requireDisposition: false,
+    onRejected: "system",
+    onNotSubmitted: "system",
     schedule: { ...DEFAULT_SCHEDULE },
     note: "ตรวจสถานที่ ไม่ใช่ของชิ้นใดชิ้นหนึ่ง — ต้องทำ doctype แยก ซึ่งใช้ตัวเดียวกับตรวจเครื่องจักรได้ และได้คำว่า ปกติ/ผิดปกติ ตามฟอร์มกระดาษกลับมาด้วย",
   },
@@ -1357,6 +1380,8 @@ export const QI_TEMPLATES: QiTemplate[] = [
     requireBefore: false,
     dispositions: [],
     requireDisposition: false,
+    onRejected: "system",
+    onNotSubmitted: "system",
     schedule: { ...DEFAULT_SCHEDULE },
     note: "สุ่มเองตามรอบผลิต ไม่มีเอกสารเป็นตัวเปิดใบ — reference_type เป็น reqd ของ Quality Inspection ใบนี้จึงไปอยู่ doctype QC Check ตัวเดียวกับสุ่มตรวจเครื่องจักรและคลังสินค้า · และสูตรเปลี่ยนไปทุกกระสอบที่สุ่ม ซึ่ง Quality Inspection รับไม่ได้อยู่แล้วเพราะ item_code มีใบละตัวเดียว ส่วนตาราง readings ไม่มีช่องสินค้าเลย",
   },
@@ -1392,6 +1417,8 @@ export const QI_TEMPLATES: QiTemplate[] = [
     requireBefore: true,
     dispositions: ["accept", "repack"],
     requireDisposition: true,
+    onRejected: "system",
+    onNotSubmitted: "system",
     // ใบเกิดจากเอกสารรับของ ไม่ใช่ตามรอบเวลา — คอลัมน์ "ตรวจครั้งที่ 1/2/3"
     // ของกระดาษเป็นการตรวจซ้ำในการรับครั้งเดียวกัน ไม่ใช่สามกะในหนึ่งวัน
     schedule: { ...DEFAULT_SCHEDULE },
@@ -1433,6 +1460,8 @@ export const QI_TEMPLATES: QiTemplate[] = [
     requireBefore: false,
     dispositions: [],
     requireDisposition: false,
+    onRejected: "system",
+    onNotSubmitted: "system",
     // สี่กะต่อวัน เฉพาะวันทำงาน — วันหยุดมาจาก Holiday List ของบริษัท
     schedule: {
       recurring: true,
@@ -1471,6 +1500,8 @@ export const QI_TEMPLATES: QiTemplate[] = [
     requireBefore: false,
     dispositions: [],
     requireDisposition: false,
+    onRejected: "system",
+    onNotSubmitted: "system",
     schedule: {
       recurring: true,
       // ฟอร์มนี้ขอแค่ตรวจสักครั้งในวัน ไม่ได้ผูกกับกะ
@@ -1501,6 +1532,8 @@ export const QI_TEMPLATES: QiTemplate[] = [
     requireBefore: false,
     dispositions: ["accept", "repack"],
     requireDisposition: true,
+    onRejected: "system",
+    onNotSubmitted: "system",
     schedule: { ...DEFAULT_SCHEDULE },
     note: "ถ้าใบเดียวสุ่มหลายสูตรพร้อมกัน ต้องแตกเป็นหลายใบ (ใบละสินค้า) หรือทำหน้าจอที่กดครั้งเดียวแล้วยิงสร้างหลายใบ",
   },
@@ -1529,6 +1562,8 @@ export const QI_TEMPLATES: QiTemplate[] = [
     requireBefore: false,
     dispositions: ["accept", "return"],
     requireDisposition: true,
+    onRejected: "system",
+    onNotSubmitted: "system",
     schedule: { ...DEFAULT_SCHEDULE },
     note: "ไม่ใช่การตรวจของ แต่เป็นการรับเรื่อง — ERPNext มีให้แล้วในโมดูล Quality Management: Quality Feedback รับเรื่อง → Non Conformance บันทึกสิ่งที่ไม่เป็นไปตามเกณฑ์ → Quality Action ตามแก้จนจบ ควรใช้ของมันแทนทำเอง",
   },
@@ -1555,6 +1590,8 @@ export const QI_TEMPLATES: QiTemplate[] = [
     requireBefore: false,
     dispositions: [],
     requireDisposition: false,
+    onRejected: "system",
+    onNotSubmitted: "system",
     schedule: { ...DEFAULT_SCHEDULE },
     note: "เป็นทะเบียนรับเอกสาร วันหนึ่งรับกี่ใบก็ได้ ไม่ใช่การตรวจสินค้า — ต้องทำ doctype แยกที่เพิ่มแถวเองได้",
   },
@@ -1633,6 +1670,15 @@ export const originOf = (t: QiTemplate): Origin =>
 // ---------------------------------------------------------------
 
 export type GuardAction = "stop" | "warn";
+
+/** ตัวเลือกที่ฟอร์มหนึ่งใบเลือกได้ — รวมทางเลือก "ตามค่าระบบ" */
+export const GUARD_PICK = ["system", "stop", "warn"] as const;
+
+export const GUARD_PICK_LABEL: Record<(typeof GUARD_PICK)[number], string> = {
+  system: "ตามค่าระบบ",
+  stop: "ห้ามผ่าน (Stop)",
+  warn: "เตือนแต่ไปต่อได้ (Warn)",
+};
 
 export const GUARD_LABEL: Record<GuardAction, string> = {
   stop: "ห้ามผ่าน (Stop)",
@@ -1818,6 +1864,8 @@ export const blankTemplate = (): QiTemplate => ({
   requireBefore: true,
   dispositions: [],
   requireDisposition: false,
+  onRejected: "system",
+  onNotSubmitted: "system",
 });
 
 /** เอาร่างเข้ารายการจริง — เรียกตอนกดบันทึกครั้งแรกเท่านั้น */
