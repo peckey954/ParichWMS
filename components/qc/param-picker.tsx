@@ -2,7 +2,13 @@
 
 import * as React from "react";
 import dynamic from "next/dynamic";
-import { CheckIcon, ChevronDownIcon, PlusIcon, SearchIcon } from "lucide-react";
+import {
+  CheckIcon,
+  ChevronDownIcon,
+  PlusIcon,
+  SearchIcon,
+  XIcon,
+} from "lucide-react";
 import { Button } from "@peckey954/ui/components/ui/button";
 import {
   Command,
@@ -498,7 +504,8 @@ function GroupCombobox({
 }) {
   const [open, setOpen] = React.useState(false);
   const [search, setSearch] = React.useState("");
-  const [adding, setAdding] = React.useState(false);
+  /** ไม่ใช่ null = กำลังกรอกชื่อกลุ่มใหม่อยู่ในช่องนี้ ไม่ได้เปิดกล่องซ้อน */
+  const [draft, setDraft] = React.useState<string | null>(null);
   const listId = React.useId();
 
   const q = search.trim().toLowerCase();
@@ -510,6 +517,66 @@ function GroupCombobox({
     setOpen(false);
     setSearch("");
   };
+
+  const createDraft = () => {
+    const name = (draft ?? "").trim();
+    if (name === "") {
+      toast.error("กรุณาตั้งชื่อกลุ่ม");
+      return;
+    }
+    const g = addGroup(name);
+    onChange(g);
+    setDraft(null);
+    setSearch("");
+    toast.success(`เพิ่มกลุ่ม “${g}” แล้ว`);
+  };
+
+  /* กรอกในช่องเดิม ไม่เปิดกล่องซ้อนกล่อง — กล่องที่ซ้อนบนกล่องทำให้ของที่
+     กรอกค้างไว้ข้างหลังถูกบัง และปิดผิดใบทีเดียวหายทั้งสองชั้น
+     กลุ่มเก็บแค่ชื่อช่องเดียว ไม่คุ้มที่จะเสียทั้งหน้าจอให้มัน */
+  if (draft !== null)
+    return (
+      <div className="space-y-1.5">
+        <div className="flex items-center gap-2">
+          <Input
+            id={id}
+            autoFocus
+            className="bg-card"
+            placeholder="เช่น จุลชีววิทยา"
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                createDraft();
+              }
+              // กินปุ่ม Esc ไว้เอง ไม่งั้นมันทะลุไปปิดกล่องหัวข้อตรวจข้างหลัง
+              // แล้วของที่กรอกไว้ทั้งใบหายไปด้วยทั้งที่ตั้งใจแค่ยกเลิกกลุ่ม
+              if (e.key === "Escape") {
+                e.preventDefault();
+                e.stopPropagation();
+                setDraft(null);
+              }
+            }}
+          />
+          <Button size="sm" className="shrink-0" onClick={createDraft}>
+            เพิ่มกลุ่ม
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            className="shrink-0"
+            aria-label="ยกเลิกการเพิ่มกลุ่ม"
+            onClick={() => setDraft(null)}
+          >
+            <XIcon />
+          </Button>
+        </div>
+        <p className="font-mono text-xs text-muted-foreground">
+          Quality Inspection Parameter Group · ใช้ร่วมกันทุกฟอร์ม
+        </p>
+      </div>
+    );
 
   return (
     <Popover
@@ -567,7 +634,8 @@ function GroupCombobox({
                   value="__newgroup__"
                   onSelect={() => {
                     setOpen(false);
-                    setAdding(true);
+                    // พาคำที่พิมพ์ค้นหาไว้ไปเป็นชื่อกลุ่มเลย ไม่ต้องพิมพ์ซ้ำ
+                    setDraft(search.trim());
                   }}
                 >
                   <PlusIcon className="size-4" />
@@ -601,79 +669,6 @@ function GroupCombobox({
           </CommandList>
         </Command>
       </PopoverContent>
-
-      {adding && (
-        <GroupQuickAdd
-          defaultName={search.trim()}
-          onClose={() => {
-            setAdding(false);
-            setSearch("");
-          }}
-          onCreated={onChange}
-        />
-      )}
     </Popover>
-  );
-}
-
-/** กล่องเพิ่มกลุ่ม — ช่องเดียว เพราะกลุ่มเก็บแค่ชื่อ */
-function GroupQuickAdd({
-  defaultName,
-  onClose,
-  onCreated,
-}: {
-  defaultName: string;
-  onClose: () => void;
-  onCreated: (group: string) => void;
-}) {
-  const [name, setName] = React.useState(defaultName);
-
-  const create = () => {
-    if (name.trim() === "") {
-      toast.error("กรุณาตั้งชื่อกลุ่ม");
-      return;
-    }
-    const g = addGroup(name);
-    onCreated(g);
-    onClose();
-    toast.success(`เพิ่มกลุ่ม “${g}” แล้ว`);
-  };
-
-  return (
-    <Dialog open onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>เพิ่มกลุ่มใหม่</DialogTitle>
-          <DialogDescription>
-            กลุ่มใช้แบ่งหัวข้อในใบตรวจให้อ่านง่าย ใช้ร่วมกันทุกฟอร์ม
-          </DialogDescription>
-        </DialogHeader>
-
-        <div className="space-y-1.5">
-          <Label htmlFor="gq-name">ชื่อกลุ่ม</Label>
-          <Input
-            id="gq-name"
-            autoFocus
-            className="bg-card"
-            placeholder="เช่น จุลชีววิทยา"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") create();
-            }}
-          />
-          <p className="font-mono text-xs text-muted-foreground">
-            Quality Inspection Parameter Group
-          </p>
-        </div>
-
-        <DialogFooter className="grid grid-cols-2 gap-3">
-          <Button variant="outline-primary" onClick={onClose}>
-            ยกเลิก
-          </Button>
-          <Button onClick={create}>เพิ่มกลุ่ม</Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
   );
 }
