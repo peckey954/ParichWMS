@@ -103,6 +103,7 @@ import {
   shiftOvernight,
   newRow,
   paramOf,
+  passValues,
   readingLabels,
   templateOf,
   OPERATION_POOL,
@@ -1595,7 +1596,10 @@ function computeRound(row: QiRow, st: RoundState) {
           ? keyed.every((n) => n >= (row.min ?? 0) && n <= (row.max ?? 0))
             ? "pass"
             : "fail"
-          : st.text.trim() === row.value.trim()
+          : /* ค่าที่ถือว่าผ่านมีได้หลายค่า — ตรงค่าใดค่าหนึ่งก็ผ่าน
+               ของจริงใน ERPNext เป็น acceptance_formula ที่เขียนว่า
+               reading_value in (...) ไม่ใช่เทียบ value ตรง ๆ */
+            passValues(row.value).includes(st.text.trim())
             ? "pass"
             : "fail";
 
@@ -1838,13 +1842,37 @@ function PreviewRow({
           ) : (
             <div key={l + i} className="space-y-1.5">
               <Label htmlFor={`preview-${row.id}-${i}`}>{l}</Label>
-              <Input
-                id={`preview-${row.id}-${i}`}
-                className="bg-card"
-                placeholder="ระบุค่าที่ตรวจได้"
-                value={state.text}
-                onChange={(e) => onChange({ text: e.target.value })}
-              />
+              {/* ตั้งค่าที่ถือว่าผ่านไว้หลายค่า = ให้เลือก ไม่ใช่ให้พิมพ์
+                  พิมพ์เองแล้วสะกดต่างนิดเดียวก็ไม่ตรงกับที่ตั้งไว้ แล้วจะตก
+                  ทั้งที่ของถูกต้อง */}
+              {passValues(row.value).length > 1 ? (
+                <Select
+                  value={state.text}
+                  onValueChange={(v) => onChange({ text: v })}
+                >
+                  <SelectTrigger
+                    id={`preview-${row.id}-${i}`}
+                    className="w-full bg-card"
+                  >
+                    <SelectValue placeholder="เลือกค่าที่ตรวจได้" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {passValues(row.value).map((o) => (
+                      <SelectItem key={o} value={o}>
+                        {o}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : (
+                <Input
+                  id={`preview-${row.id}-${i}`}
+                  className="bg-card"
+                  placeholder={row.value || "ระบุค่าที่ตรวจได้"}
+                  value={state.text}
+                  onChange={(e) => onChange({ text: e.target.value })}
+                />
+              )}
             </div>
           )
         )}
