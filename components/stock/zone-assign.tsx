@@ -27,6 +27,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@peckey954/ui/components/ui/select";
+import { Spinner } from "@peckey954/ui/components/ui/spinner";
 import { cn } from "@peckey954/ui/lib/utils";
 import { ZONES, formatQty, type InboundPiece } from "@/lib/general-stock";
 
@@ -72,11 +73,19 @@ type ScanResult = {
   piece?: InboundPiece;
 } | null;
 
-/** ขั้นของกล้องที่เปิดอยู่ — aim คือยังส่องหา lock คือจับโค้ดติดแล้ว */
-type ScanPhase = "aim" | "lock";
+/**
+ * ขั้นของกล้องที่เปิดอยู่
+ * boot คือกำลังเปิดกล้อง aim คือยังส่องหา lock คือจับโค้ดติดแล้ว
+ */
+type ScanPhase = "boot" | "aim" | "lock";
 
+/**
+ * ช่วงเปิดกล้อง — กล้องมือถือจริงก็ดำอยู่แวบหนึ่งก่อนภาพจะมา ตัดช่วงนี้ทิ้งแล้ว
+ * ภาพจะเด้งขึ้นมาทันทีที่กดจนดูเหมือนรูปที่เตรียมไว้ ไม่เหมือนกล้องที่เพิ่งเปิด
+ */
+const BOOT_MS = 500;
 /** ช่วงส่องหา ของจริงกล้องก็ใช้เวลาประมาณนี้กว่าจะจับโค้ดติด */
-const AIM_MS = 1300;
+const AIM_MS = 1200;
 /** จับติดแล้วค้างไว้ให้ทันอ่านว่าได้เลขอะไร ก่อนตัดกลับไปที่รายการ */
 const LOCK_MS = 700;
 
@@ -185,14 +194,18 @@ export function useZoneAssign(pieces: InboundPiece[]) {
     }
 
     setResult(null);
-    setScan({ phase: "aim", piece: hit });
+    setScan({ phase: "boot", piece: hit });
 
     timersRef.current = [
-      setTimeout(() => setScan({ phase: "lock", piece: hit }), AIM_MS),
+      setTimeout(() => setScan({ phase: "aim", piece: hit }), BOOT_MS),
+      setTimeout(
+        () => setScan({ phase: "lock", piece: hit }),
+        BOOT_MS + AIM_MS
+      ),
       setTimeout(() => {
         setScan(null);
         take(hit, "สแกนสำเร็จ");
-      }, AIM_MS + LOCK_MS),
+      }, BOOT_MS + AIM_MS + LOCK_MS),
     ];
   };
 
@@ -426,6 +439,7 @@ function ScanCamera({
 }: {
   scan: { phase: ScanPhase; piece: InboundPiece };
 }) {
+  const booting = scan.phase === "boot";
   const locked = scan.phase === "lock";
   const code = scan.piece.receiptCode;
 
@@ -433,8 +447,14 @@ function ScanCamera({
     <div className="flex flex-col items-center gap-3">
       <div className="relative aspect-[4/3] w-full max-w-72 overflow-hidden rounded-xl bg-neutral-900">
         {/* ป้ายบนกระสอบ เอียงนิดหน่อยเพราะถ่ายจากมือ ไม่ใช่วางบนแท่นสแกน
-            พอจับติดแล้วค่อยหมุนเข้าที่และขยับเข้ามา เหมือนกล้องโฟกัสได้ */}
-        <div className="absolute inset-0 flex items-center justify-center">
+            พอจับติดแล้วค่อยหมุนเข้าที่และขยับเข้ามา เหมือนกล้องโฟกัสได้
+            ช่วงเปิดกล้องยังไม่มีภาพ จอจึงดำอยู่กับตัวโหลดอย่างเดียว */}
+        <div
+          className={cn(
+            "absolute inset-0 flex items-center justify-center transition-opacity duration-300",
+            booting && "opacity-0"
+          )}
+        >
           <div
             className={cn(
               "w-4/5 rounded-sm bg-white px-3 py-3 shadow-lg",
@@ -457,8 +477,16 @@ function ScanCamera({
           </div>
         </div>
 
-        {/* เส้นกวาดหายทันทีที่จับติด ถ้ายังวิ่งอยู่จะดูเหมือนยังหาไม่เจอ */}
-        {!locked && (
+        {/* ตัวโหลดของดีไซน์ซิสเต็ม ไม่วาดตัวหมุนเองให้หลุดจากของที่ใช้ทั้งระบบ */}
+        {booting && (
+          <span className="absolute inset-0 flex items-center justify-center">
+            <Spinner className="size-8 text-primary" />
+          </span>
+        )}
+
+        {/* เส้นกวาดมีเฉพาะช่วงส่องหา — ยังไม่เปิดกล้องก็ยังไม่มีอะไรให้กวาด
+            และถ้าจับติดแล้วยังวิ่งอยู่จะดูเหมือนยังหาไม่เจอ */}
+        {scan.phase === "aim" && (
           <span className="animate-scan-sweep absolute inset-x-6 top-0 h-0.5 bg-primary shadow-[0_0_14px_3px] shadow-primary/60" />
         )}
 
@@ -468,7 +496,11 @@ function ScanCamera({
             className={cn(
               "absolute size-7 transition-colors",
               pos,
-              locked ? "border-primary" : "border-white/60"
+              locked
+                ? "border-primary"
+                : booting
+                  ? "border-white/25"
+                  : "border-white/60"
             )}
           />
         ))}
@@ -494,6 +526,11 @@ function ScanCamera({
           <>
             <CircleCheckIcon className="size-4" />
             จับโค้ดได้ {code}
+          </>
+        ) : booting ? (
+          <>
+            <Spinner className="size-4" />
+            กำลังเปิดกล้อง...
           </>
         ) : (
           <>
