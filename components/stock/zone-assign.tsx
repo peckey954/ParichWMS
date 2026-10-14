@@ -56,14 +56,30 @@ import { ZONES, formatQty, type InboundPiece } from "@/lib/general-stock";
    ทั้งสองทางใช้ useZoneAssign + ZoneAssignFields ตัวเดียวกัน ต่างกันแค่กรอบ
    ที่ห่ออยู่ข้างนอกกับที่วางแถบผลสแกน
 
-   ---------- ตอนนี้การสแกนเป็นตัวอย่าง ----------
+   ---------- กล้องเป็นของเครื่อง ไม่ใช่ของเรา ----------
 
-   กดสแกนแล้วขึ้นภาพกล้องจำลองค้างไว้สองวินาที ส่องหาป้ายบนกระสอบ จับโค้ดติด
-   แล้วค่อยตัดเข้ารายการตามเดิม ไม่ได้เปิดกล้องจริง — กล้องต้องขอสิทธิ์และต้อง
-   รันบน https เดโมจะพังบนเครื่องที่เปิดดูผ่าน ip ในออฟฟิศ
+   กดสแกนแล้วส่งต่อให้ระบบของเครื่องเปิดกล้องให้ ด้วยช่องเลือกไฟล์ธรรมดา
+   ไม่ได้เปิดสตรีมกล้องเอง (getUserMedia) ด้วยสองเหตุผล
 
-   แต่จังหวะที่เห็นตรงกับของจริงทุกขั้น — ยกกล้องส่อง จับติด แล้วขึ้นข้อมูลของ
-   เลขที่อ่านได้ให้ยืนยันด้วยตา ตอนต่อกล้องจริงเปลี่ยนแค่ที่มาของเลข
+     1  สตรีมต้องขอสิทธิ์และต้องรันบน https เดโมจะพังบนเครื่องที่เปิดผ่าน ip
+     2  กล้องของเครื่องมีโฟกัส แฟลช ซูม และคนใช้เป็นอยู่แล้ว ทำเองได้ไม่เท่า
+
+   ไม่ใส่ capture ด้วย ตั้งใจ — ใส่แล้วมันกระโดดเข้ากล้องอย่างเดียว ไม่ใส่แล้ว
+   เครื่องจะเด้งเมนูให้เลือกเองว่าถ่ายใหม่หรือหยิบรูปเก่า ซึ่งต้องมีทั้งสองทาง
+   เพราะบางคนถ่ายป้ายเก็บไว้ตอนลงของแล้วมานั่งคีย์ทีหลัง (ตอนลงของมือไม่ว่าง)
+   ปุ่มเดียวได้ครบ ไม่ต้องให้เลือกเองตั้งแต่บนหน้าเราว่าจะถ่ายหรือจะหยิบ
+
+   เลือกได้หลายรูปด้วย ถ่ายป้ายไว้ห้าใบแล้วเลือกรวดเดียว ติ๊กให้ครบทั้งห้า
+
+   ---------- หน้าเราไม่ได้ถือกล้อง หน้าเราแค่รอรับรูป ----------
+
+   ระหว่างอ่าน กรอบสแกนจึงเหลือแค่ตัวโหลด ไม่ได้วาดภาพกล้องปลอมไว้ในกรอบ
+   เพราะกล้องจริงไปอยู่เต็มจอของเครื่องแล้ว วาดซ้ำในกรอบเล็ก ๆ คือโกหกว่า
+   หน้าเว็บเป็นคนส่อง
+
+   เลขที่ได้ยังเป็นของจำลอง ยังไม่ได้ถอดบาร์โค้ดจากรูปจริง ของจริงต้องถอดในเครื่อง
+   ไม่ใช่ส่งรูปสี่เมกขึ้นเซิร์ฟเวอร์ให้รอบนไวไฟโกดัง — เปลี่ยนแค่ที่มาของเลข
+   จังหวะที่เห็นทั้งหมดคงเดิม
 ------------------------------------------------------------------ */
 
 /** ผลของการสแกน/พิมพ์เลขครั้งล่าสุด — piece มีเมื่ออ่านเจอชิ้นจริง */
@@ -73,32 +89,19 @@ type ScanResult = {
   piece?: InboundPiece;
 } | null;
 
-/**
- * ขั้นของกล้องที่เปิดอยู่
- * boot คือกำลังเปิดกล้อง aim คือยังส่องหา lock คือจับโค้ดติดแล้ว
- */
-type ScanPhase = "boot" | "aim" | "lock";
+/** กำลังอ่านรูปอยู่ — done คืออ่านไปแล้วกี่รูปจากทั้งหมด */
+type Reading = { done: number; total: number } | null;
 
-/**
- * ช่วงเปิดกล้อง — กล้องมือถือจริงก็ดำอยู่แวบหนึ่งก่อนภาพจะมา ตัดช่วงนี้ทิ้งแล้ว
- * ภาพจะเด้งขึ้นมาทันทีที่กดจนดูเหมือนรูปที่เตรียมไว้ ไม่เหมือนกล้องที่เพิ่งเปิด
- */
-const BOOT_MS = 500;
-/** ช่วงส่องหา ของจริงกล้องก็ใช้เวลาประมาณนี้กว่าจะจับโค้ดติด */
-const AIM_MS = 1200;
-/** จับติดแล้วค้างไว้ให้ทันอ่านว่าได้เลขอะไร ก่อนตัดกลับไปที่รายการ */
-const LOCK_MS = 700;
+/** เวลาอ่านต่อหนึ่งรูป ถอดบาร์โค้ดจริงในเครื่องก็อยู่ราวนี้ */
+const READ_MS = 900;
 
 export function useZoneAssign(pieces: InboundPiece[]) {
   const [picked, setPicked] = React.useState<Set<string>>(new Set());
   const [zone, setZone] = React.useState<string>();
   const [query, setQuery] = React.useState("");
   const [result, setResult] = React.useState<ScanResult>(null);
-  /** กล้องที่เปิดค้างอยู่ตอนนี้ — null คือยังไม่ได้กดสแกน */
-  const [scan, setScan] = React.useState<{
-    phase: ScanPhase;
-    piece: InboundPiece;
-  } | null>(null);
+  /** รูปที่กำลังอ่านอยู่ตอนนี้ — null คือว่าง กดสแกนได้ */
+  const [reading, setReading] = React.useState<Reading>(null);
 
   // อ่านค่าล่าสุดจากในตัวจับเวลาโดยไม่ต้องผูกมันไว้กับ state ทุกตัว
   const pickedRef = React.useRef(picked);
@@ -172,41 +175,71 @@ export function useZoneAssign(pieces: InboundPiece[]) {
   };
 
   /**
-   * จำลองการสแกน — เปิดกล้องค้างไว้สองวินาที แล้วค่อยหยิบชิ้นนั้นเข้ารายการ
+   * อ่านรูปทีละใบ ติ๊กไปทีละชิ้น ไม่ใช่รอครบแล้วค่อยติ๊กรวดเดียว
    *
-   * เอาชิ้นที่ยังไม่มีโซนขึ้นก่อนเสมอ เพราะนั่นคืองานที่คนเปิดหน้านี้มาทำ
+   * เลือกมาห้ารูปแล้วเงียบไปสี่วินาทีครึ่ง คนจะนึกว่าค้าง เห็นรายการติ๊กไล่ลงมา
+   * ทีละบรรทัดบอกได้ทั้งว่ายังทำงานอยู่และได้ชิ้นไหนไปแล้วบ้าง
+   *
+   * หยิบชิ้นที่ยังไม่มีโซนขึ้นก่อนเสมอ เพราะนั่นคืองานที่คนเปิดหน้านี้มาทำ
    * ของที่มีโซนแล้วจะโผล่ก็ต่อเมื่อไม่เหลืออะไรให้ระบุแล้วจริง ๆ
-   *
-   * เลือกชิ้นตั้งแต่ตอนกด ไม่ใช่ตอนจบ เพราะภาพกล้องต้องส่องเห็นบาร์โค้ดของชิ้นนั้น
-   * ระหว่างรออยู่แล้ว ถ้าไปเลือกตอนจบ เลขบนจอกับเลขที่ได้จะเป็นคนละตัว
    */
-  const simulateScan = () => {
-    if (scan) return;
-    const done = pickedRef.current;
-    const hit =
-      pieces.find((p) => !done.has(p.id) && !p.zone) ??
-      pieces.find((p) => !done.has(p.id));
+  const readNext = (total: number, index: number) => {
+    timersRef.current = [
+      setTimeout(() => {
+        const done = pickedRef.current;
+        const hit =
+          pieces.find((p) => !done.has(p.id) && !p.zone) ??
+          pieces.find((p) => !done.has(p.id));
 
-    // ไม่เหลืออะไรให้สแกนก็ไม่ต้องเปิดกล้องให้รอเก้อสองวินาที
-    if (!hit) {
-      setResult({ ok: false, text: "เลือกครบทุกชิ้นในใบนี้แล้ว" });
+        // รูปยังเหลือแต่ของหมดแล้ว หยุดตรงนี้ ไม่ต้องอ่านรูปที่เหลือให้เสียเวลา
+        if (!hit) {
+          setReading(null);
+          setResult({ ok: false, text: "เลือกครบทุกชิ้นในใบนี้แล้ว" });
+          return;
+        }
+
+        take(
+          hit,
+          total > 1
+            ? `อ่านจากรูปแล้ว ${index + 1} จาก ${total} รูป`
+            : "อ่านเลขจากรูปสำเร็จ"
+        );
+
+        if (index + 1 < total) {
+          setReading({ done: index + 1, total });
+          readNext(total, index + 1);
+        } else {
+          setReading(null);
+        }
+      }, READ_MS),
+    ];
+  };
+
+  const startReading = (total: number) => {
+    setResult(null);
+    setReading({ done: 0, total });
+    readNext(total, 0);
+  };
+
+  /**
+   * ได้รูปมาจากกล้องของเครื่องหรือจากคลังรูป
+   *
+   * กรองเอาเฉพาะรูปก่อน เพราะเมนูของเครื่องมีทาง "เลือกไฟล์" ปนอยู่ด้วย
+   * หยิบ pdf มาแล้วปล่อยให้เดินจังหวะต่อคือหลอกว่าอ่านได้ทั้งที่อ่านไม่ได้
+   */
+  const scanFromPhotos = (files: File[]) => {
+    if (reading) return;
+    const photos = files.filter((f) => f.type.startsWith("image/"));
+
+    if (photos.length === 0) {
+      setResult({
+        ok: false,
+        text: "ไฟล์นี้ไม่ใช่รูป อ่านเลขไม่ได้ ถ่ายใหม่หรือพิมพ์เลขเองด้านล่าง",
+      });
       return;
     }
 
-    setResult(null);
-    setScan({ phase: "boot", piece: hit });
-
-    timersRef.current = [
-      setTimeout(() => setScan({ phase: "aim", piece: hit }), BOOT_MS),
-      setTimeout(
-        () => setScan({ phase: "lock", piece: hit }),
-        BOOT_MS + AIM_MS
-      ),
-      setTimeout(() => {
-        setScan(null);
-        take(hit, "สแกนสำเร็จ");
-      }, BOOT_MS + AIM_MS + LOCK_MS),
-    ];
+    startReading(photos.length);
   };
 
   /**
@@ -235,14 +268,14 @@ export function useZoneAssign(pieces: InboundPiece[]) {
     query,
     setQuery,
     result,
-    scan,
+    reading,
     visible,
     waiting,
     isAllPicked,
     toggle,
     toggleAll,
     clearAll,
-    simulateScan,
+    scanFromPhotos,
     acceptOnlyMatch,
     canSubmit: Boolean(zone) && picked.size > 0,
   };
@@ -284,18 +317,24 @@ export function ZoneAssignFields({
 
       {/* ---------- กรอบสแกน ----------
            เส้นประบอกว่าตรงนี้คือที่ที่ของจริงต้องเอาเลขมาส่อง ไม่ใช่กล่องข้อมูล
-           กดแล้วกรอบเดิมนี่แหละกลายเป็นภาพกล้อง ไม่ได้เปิดกล่องใหม่ซ้อนขึ้นมา
-           สายตาจะได้อยู่ที่เดิมตลอดทั้งจังหวะ */}
-      <div className="rounded-xl border border-dashed border-primary bg-brand px-4 py-6">
-        {state.scan ? (
-          <ScanCamera scan={state.scan} />
+           สูงเท่ากันทั้งตอนว่างและตอนอ่าน กดแล้วหน้าจะได้ไม่กระชาก */}
+      <div className="flex min-h-36 items-center justify-center rounded-xl border border-dashed border-primary bg-brand px-4 py-6">
+        {state.reading ? (
+          <div className="flex flex-col items-center gap-3 text-center">
+            <Spinner className="size-7 text-primary" />
+            <p className="text-sm text-muted-foreground">
+              {state.reading.total > 1
+                ? `กำลังอ่านรูปที่ ${state.reading.done + 1} จาก ${state.reading.total}...`
+                : "กำลังอ่านรหัสจากรูป..."}
+            </p>
+          </div>
         ) : (
-          <div className="flex flex-col items-center justify-center gap-3 py-2 text-center">
+          <div className="flex flex-col items-center gap-3 text-center">
             <ScanBarcodeIcon className="size-8 text-primary" />
             <p className="font-medium">สแกนเลขที่เพื่อเลือกโซนรับสินค้าเข้าคลัง</p>
-            <Button variant="outline-primary" onClick={state.simulateScan}>
+            <PhotoButton onPick={state.scanFromPhotos}>
               สแกนเลขที่รับสินค้า
-            </Button>
+            </PhotoButton>
           </div>
         )}
       </div>
@@ -404,142 +443,42 @@ export function ZoneAssignFields({
 }
 
 /* ------------------------------------------------------------------
-   ภาพกล้องจำลอง
+   ปุ่มสแกน — ที่จริงคือช่องเลือกไฟล์ที่ซ่อนไว้
 
-   ของเดิมกดสแกนแล้วขึ้นวงกลมหมุน ซึ่งบอกได้แค่ว่าระบบกำลังทำอะไรสักอย่าง
-   แต่ไม่ได้บอกว่าคนหน้างานต้องทำอะไร ของจริงคือยกมือถือขึ้นส่องป้ายบนกระสอบ
-   ภาพกล้องเล่าขั้นนั้นตรง ๆ — ส่องหา จับติด แล้วตัดเข้ารายการ คนที่ดูเดโม
-   จะได้เห็นทั้งเส้นทางโดยไม่ต้องให้ใครอธิบายประกอบ
+   ไม่ใส่ capture เพื่อให้เครื่องเด้งเมนูเลือกเองว่าถ่ายใหม่หรือหยิบรูปเก่า
+   ใส่ multiple ไว้ด้วย ถ่ายป้ายเก็บไว้หลายใบแล้วเลือกรวดเดียวได้
 
-   บาร์โค้ดที่เห็นวาดจากเลขที่รับสินค้าของชิ้นนั้นเอง ความกว้างแท่งคิดจากตัวอักษร
-   ในเลข เลขเดิมจึงได้ลายเดิมทุกครั้ง ไม่ได้สุ่ม — ไม่งั้นภาพจะเต้นทุกรอบที่
-   รีเรนเดอร์ และเดโมซ้ำสองรอบจะได้คนละลายทั้งที่เป็นของชิ้นเดียวกัน
+   ล้างค่าในช่องทุกครั้งหลังหยิบ ไม่งั้นเลือก "รูปเดิม" ซ้ำรอบสองจะไม่เกิด change
+   แล้วดูเหมือนกดแล้วไม่มีอะไรเกิดขึ้น ซึ่งเจอแน่ตอนไล่สแกนกระสอบที่ถ่ายไว้ใบเดียว
 ------------------------------------------------------------------ */
 
-/** ความกว้างแท่งบาร์โค้ด สลับแท่งทึบกับช่องว่าง ตำแหน่งคู่คือแท่งทึบ */
-function barWidths(code: string) {
-  const out: number[] = [];
-  for (const ch of code.replace(/[^0-9a-z]/gi, "")) {
-    const c = ch.charCodeAt(0);
-    out.push(1 + (c % 3), 1 + ((c >> 2) % 2), 2 + ((c >> 3) % 3), 1);
-  }
-  return out;
-}
-
-/** มุมกรอบเล็งสี่มุม — คลาสตำแหน่งกับด้านที่ตีเส้นของแต่ละมุม */
-const AIM_CORNERS = [
-  "top-3 left-3 rounded-tl-md border-t-2 border-l-2",
-  "top-3 right-3 rounded-tr-md border-t-2 border-r-2",
-  "bottom-3 left-3 rounded-bl-md border-b-2 border-l-2",
-  "bottom-3 right-3 rounded-br-md border-r-2 border-b-2",
-];
-
-function ScanCamera({
-  scan,
+function PhotoButton({
+  onPick,
+  children,
 }: {
-  scan: { phase: ScanPhase; piece: InboundPiece };
+  onPick: (files: File[]) => void;
+  children: React.ReactNode;
 }) {
-  const booting = scan.phase === "boot";
-  const locked = scan.phase === "lock";
-  const code = scan.piece.receiptCode;
+  const ref = React.useRef<HTMLInputElement>(null);
 
   return (
-    <div className="flex flex-col items-center gap-3">
-      <div className="relative aspect-[4/3] w-full max-w-72 overflow-hidden rounded-xl bg-neutral-900">
-        {/* ป้ายบนกระสอบ เอียงนิดหน่อยเพราะถ่ายจากมือ ไม่ใช่วางบนแท่นสแกน
-            พอจับติดแล้วค่อยหมุนเข้าที่และขยับเข้ามา เหมือนกล้องโฟกัสได้
-            ช่วงเปิดกล้องยังไม่มีภาพ จอจึงดำอยู่กับตัวโหลดอย่างเดียว */}
-        <div
-          className={cn(
-            "absolute inset-0 flex items-center justify-center transition-opacity duration-300",
-            booting && "opacity-0"
-          )}
-        >
-          <div
-            className={cn(
-              "w-4/5 rounded-sm bg-white px-3 py-3 shadow-lg",
-              "transition-transform duration-500",
-              locked ? "scale-105" : "-rotate-2"
-            )}
-          >
-            <div className="flex h-12 items-stretch justify-center gap-px">
-              {barWidths(code).map((w, i) => (
-                <span
-                  key={i}
-                  style={{ width: w * 2 }}
-                  className={i % 2 === 0 ? "bg-neutral-900" : ""}
-                />
-              ))}
-            </div>
-            <p className="mt-1.5 text-center font-mono text-[11px] tracking-wider text-neutral-900">
-              {code}
-            </p>
-          </div>
-        </div>
-
-        {/* ตัวโหลดของดีไซน์ซิสเต็ม ไม่วาดตัวหมุนเองให้หลุดจากของที่ใช้ทั้งระบบ */}
-        {booting && (
-          <span className="absolute inset-0 flex items-center justify-center">
-            <Spinner className="size-8 text-primary" />
-          </span>
-        )}
-
-        {/* เส้นกวาดมีเฉพาะช่วงส่องหา — ยังไม่เปิดกล้องก็ยังไม่มีอะไรให้กวาด
-            และถ้าจับติดแล้วยังวิ่งอยู่จะดูเหมือนยังหาไม่เจอ */}
-        {scan.phase === "aim" && (
-          <span className="animate-scan-sweep absolute inset-x-6 top-0 h-0.5 bg-primary shadow-[0_0_14px_3px] shadow-primary/60" />
-        )}
-
-        {AIM_CORNERS.map((pos) => (
-          <span
-            key={pos}
-            className={cn(
-              "absolute size-7 transition-colors",
-              pos,
-              locked
-                ? "border-primary"
-                : booting
-                  ? "border-white/25"
-                  : "border-white/60"
-            )}
-          />
-        ))}
-
-        {/* แฟลชวาบเดียวตอนจับติด บอกว่า "ถ่ายแล้ว" โดยไม่ต้องมีตัวหนังสือ */}
-        {locked && (
-          <span className="animate-cam-flash pointer-events-none absolute inset-0 bg-white" />
-        )}
-
-        <p className="absolute inset-x-0 bottom-2 text-center text-[11px] text-white/60">
-          ภาพกล้องจำลอง ไม่ได้เปิดกล้องจริง
-        </p>
-      </div>
-
-      {/* บรรทัดสถานะอยู่นอกจอกล้อง จะได้อ่านได้ทั้งตอนมืดและตอนแฟลชขาววาบ */}
-      <p
-        className={cn(
-          "flex items-center gap-1.5 text-sm font-medium",
-          locked ? "text-primary" : "text-muted-foreground"
-        )}
-      >
-        {locked ? (
-          <>
-            <CircleCheckIcon className="size-4" />
-            จับโค้ดได้ {code}
-          </>
-        ) : booting ? (
-          <>
-            <Spinner className="size-4" />
-            กำลังเปิดกล้อง...
-          </>
-        ) : (
-          <>
-            <ScanBarcodeIcon className="size-4" />
-            ส่องกล้องไปที่ป้ายบนสินค้า...
-          </>
-        )}
-      </p>
-    </div>
+    <>
+      <input
+        ref={ref}
+        type="file"
+        accept="image/*"
+        multiple
+        className="hidden"
+        onChange={(e) => {
+          const files = [...(e.target.files ?? [])];
+          e.target.value = "";
+          if (files.length > 0) onPick(files);
+        }}
+      />
+      <Button variant="outline-primary" onClick={() => ref.current?.click()}>
+        {children}
+      </Button>
+    </>
   );
 }
 
