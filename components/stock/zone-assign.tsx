@@ -2,10 +2,8 @@
 
 import * as React from "react";
 import {
-  CameraIcon,
   CircleAlertIcon,
   CircleCheckIcon,
-  ImageIcon,
   RotateCcwIcon,
   ScanBarcodeIcon,
 } from "lucide-react";
@@ -59,16 +57,12 @@ import { ZONES, formatQty, type InboundPiece } from "@/lib/general-stock";
 
    ---------- ตอนนี้การสแกนเป็นตัวอย่าง ----------
 
-   กดถ่ายรูปแล้วเปิดกล้องของเครื่องจริง ๆ หรือหยิบรูปที่ถ่ายเก็บไว้ก็ได้ รูปที่ได้
-   ขึ้นในกรอบค้างไว้สองวินาที กวาดอ่าน จับติด แล้วตัดเข้ารายการตามเดิม
+   กดสแกนแล้วขึ้นภาพกล้องจำลองค้างไว้สองวินาที ส่องหาป้ายบนกระสอบ จับโค้ดติด
+   แล้วค่อยตัดเข้ารายการตามเดิม ไม่ได้เปิดกล้องจริง — กล้องต้องขอสิทธิ์และต้อง
+   รันบน https เดโมจะพังบนเครื่องที่เปิดดูผ่าน ip ในออฟฟิศ
 
-   ใช้ช่องเลือกไฟล์ของเบราว์เซอร์ ไม่ได้เปิดสตรีมกล้องเอง เพราะสตรีมต้องขอสิทธิ์
-   และต้องรันบน https เดโมจะพังบนเครื่องที่เปิดดูผ่าน ip ในออฟฟิศ ส่วนช่องเลือกไฟล์
-   ทำงานได้ทุกที่ และบนมือถือมันเด้งเมนูให้เลือกเองว่าจะถ่ายใหม่หรือหยิบรูปเก่า
-   ซึ่งตรงกับที่คนหน้างานทำจริง — บางคนถ่ายป้ายเก็บไว้ตอนลงของ แล้วมานั่งคีย์ทีหลัง
-
-   เลขที่ได้ยังเป็นของจำลอง ยังไม่ได้ถอดบาร์โค้ดจากรูปจริง มีข้อความกำกับไว้บนจอ
-   ตอนต่อของจริงเปลี่ยนแค่ที่มาของเลข จังหวะที่เห็นทั้งหมดคงเดิม
+   แต่จังหวะที่เห็นตรงกับของจริงทุกขั้น — ยกกล้องส่อง จับติด แล้วขึ้นข้อมูลของ
+   เลขที่อ่านได้ให้ยืนยันด้วยตา ตอนต่อกล้องจริงเปลี่ยนแค่ที่มาของเลข
 ------------------------------------------------------------------ */
 
 /** ผลของการสแกน/พิมพ์เลขครั้งล่าสุด — piece มีเมื่ออ่านเจอชิ้นจริง */
@@ -95,16 +89,12 @@ export function useZoneAssign(pieces: InboundPiece[]) {
   const [scan, setScan] = React.useState<{
     phase: ScanPhase;
     piece: InboundPiece;
-    /** รูปที่ถ่าย/เลือกมา ไม่มีคือกดดูตัวอย่างเฉย ๆ */
-    photo?: string;
   } | null>(null);
 
   // อ่านค่าล่าสุดจากในตัวจับเวลาโดยไม่ต้องผูกมันไว้กับ state ทุกตัว
   const pickedRef = React.useRef(picked);
   // สองจังหวะ (ส่องหา แล้วจับติด) จึงเก็บเป็นชุด ปิดกลางคันต้องตายทั้งคู่
   const timersRef = React.useRef<ReturnType<typeof setTimeout>[]>([]);
-  // รูปที่ถือไว้อยู่ — blob url ต้องคืนเอง ไม่งั้นรูปค้างในหน่วยความจำทุกครั้งที่สแกน
-  const photoRef = React.useRef<string | null>(null);
 
   React.useEffect(() => {
     pickedRef.current = picked;
@@ -115,7 +105,6 @@ export function useZoneAssign(pieces: InboundPiece[]) {
   React.useEffect(() => {
     return () => {
       for (const t of timersRef.current) clearTimeout(t);
-      if (photoRef.current) URL.revokeObjectURL(photoRef.current);
     };
   }, []);
 
@@ -182,52 +171,29 @@ export function useZoneAssign(pieces: InboundPiece[]) {
    * เลือกชิ้นตั้งแต่ตอนกด ไม่ใช่ตอนจบ เพราะภาพกล้องต้องส่องเห็นบาร์โค้ดของชิ้นนั้น
    * ระหว่างรออยู่แล้ว ถ้าไปเลือกตอนจบ เลขบนจอกับเลขที่ได้จะเป็นคนละตัว
    */
-  const dropPhoto = () => {
-    if (photoRef.current) URL.revokeObjectURL(photoRef.current);
-    photoRef.current = null;
-  };
-
-  const beginScan = (photo?: string) => {
+  const simulateScan = () => {
+    if (scan) return;
     const done = pickedRef.current;
     const hit =
       pieces.find((p) => !done.has(p.id) && !p.zone) ??
       pieces.find((p) => !done.has(p.id));
 
-    // ไม่เหลืออะไรให้สแกนก็ไม่ต้องค้างจอให้รอเก้อสองวินาที
+    // ไม่เหลืออะไรให้สแกนก็ไม่ต้องเปิดกล้องให้รอเก้อสองวินาที
     if (!hit) {
-      dropPhoto();
       setResult({ ok: false, text: "เลือกครบทุกชิ้นในใบนี้แล้ว" });
       return;
     }
 
     setResult(null);
-    setScan({ phase: "aim", piece: hit, photo });
+    setScan({ phase: "aim", piece: hit });
 
     timersRef.current = [
-      setTimeout(
-        () => setScan({ phase: "lock", piece: hit, photo }),
-        AIM_MS
-      ),
+      setTimeout(() => setScan({ phase: "lock", piece: hit }), AIM_MS),
       setTimeout(() => {
         setScan(null);
-        dropPhoto();
-        take(hit, photo ? "อ่านเลขจากรูปสำเร็จ" : "สแกนสำเร็จ");
+        take(hit, "สแกนสำเร็จ");
       }, AIM_MS + LOCK_MS),
     ];
-  };
-
-  /** ดูจังหวะทั้งชุดโดยไม่ต้องหารูป — ไว้ให้คนที่เปิดดูเฉย ๆ บนเครื่องคอม */
-  const simulateScan = () => {
-    if (scan) return;
-    beginScan();
-  };
-
-  /** ถ่ายจากกล้องเครื่องนี้ หรือหยิบรูปที่ถ่ายเก็บไว้ก่อนแล้ว */
-  const scanFromPhoto = (file: File) => {
-    if (scan) return;
-    dropPhoto();
-    photoRef.current = URL.createObjectURL(file);
-    beginScan(photoRef.current);
   };
 
   /**
@@ -264,7 +230,6 @@ export function useZoneAssign(pieces: InboundPiece[]) {
     toggleAll,
     clearAll,
     simulateScan,
-    scanFromPhoto,
     acceptOnlyMatch,
     canSubmit: Boolean(zone) && picked.size > 0,
   };
@@ -315,29 +280,8 @@ export function ZoneAssignFields({
           <div className="flex flex-col items-center justify-center gap-3 py-2 text-center">
             <ScanBarcodeIcon className="size-8 text-primary" />
             <p className="font-medium">สแกนเลขที่เพื่อเลือกโซนรับสินค้าเข้าคลัง</p>
-            {/* สองทางเลือกนี้ไม่ใช่ทางเดียวกัน — ถ่ายสดคือยืนอยู่หน้าของ
-                ส่วนหยิบรูปเก่าคือคนที่ถ่ายป้ายเก็บไว้ตอนลงของแล้วมานั่งคีย์ทีหลัง
-                ซึ่งเกิดบ่อยเพราะตอนลงของมือไม่ว่างพอจะมาเลือกโซน */}
-            <p className="text-sm text-muted-foreground">
-              ถ่ายป้ายบนสินค้า หรือหยิบรูปที่ถ่ายเก็บไว้ก็ได้
-            </p>
-            <div className="flex flex-wrap items-center justify-center gap-2">
-              <PhotoButton capture onPick={state.scanFromPhoto}>
-                <CameraIcon />
-                ถ่ายรูปป้าย
-              </PhotoButton>
-              <PhotoButton onPick={state.scanFromPhoto}>
-                <ImageIcon />
-                เลือกจากรูปที่ถ่ายไว้
-              </PhotoButton>
-            </div>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="text-muted-foreground"
-              onClick={state.simulateScan}
-            >
-              ดูตัวอย่างโดยไม่ต้องถ่าย
+            <Button variant="outline-primary" onClick={state.simulateScan}>
+              สแกนเลขที่รับสินค้า
             </Button>
           </div>
         )}
@@ -447,59 +391,16 @@ export function ZoneAssignFields({
 }
 
 /* ------------------------------------------------------------------
-   ปุ่มหยิบรูป
-
-   เป็นช่องเลือกไฟล์ที่ซ่อนไว้แล้วให้ปุ่มกดแทน ไม่ใช่ปุ่มที่เรียกกล้องเอง
-   บนมือถือ capture="environment" บอกให้เครื่องเปิดกล้องหลังให้เลย ส่วนปุ่มที่
-   ไม่ใส่ capture จะเด้งเป็นคลังรูป คนเลยเลือกได้เองว่าจะถ่ายสดหรือใช้รูปเก่า
-
-   ล้างค่าในช่องทุกครั้งหลังหยิบ ไม่งั้นเลือก "รูปเดิม" ซ้ำรอบสองจะไม่เกิด change
-   แล้วดูเหมือนกดแล้วไม่มีอะไรเกิดขึ้น ซึ่งเจอแน่ตอนสแกนกระสอบที่ถ่ายรูปไว้ใบเดียว
------------------------------------------------------------------- */
-
-function PhotoButton({
-  capture,
-  onPick,
-  children,
-}: {
-  /** จริงคือให้เครื่องเปิดกล้องหลังเลย ไม่ต้องผ่านคลังรูป */
-  capture?: boolean;
-  onPick: (file: File) => void;
-  children: React.ReactNode;
-}) {
-  const ref = React.useRef<HTMLInputElement>(null);
-
-  return (
-    <>
-      <input
-        ref={ref}
-        type="file"
-        accept="image/*"
-        capture={capture ? "environment" : undefined}
-        className="hidden"
-        onChange={(e) => {
-          const file = e.target.files?.[0];
-          e.target.value = "";
-          if (file) onPick(file);
-        }}
-      />
-      <Button variant="outline-primary" onClick={() => ref.current?.click()}>
-        {children}
-      </Button>
-    </>
-  );
-}
-
-/* ------------------------------------------------------------------
-   กรอบอ่านรหัส
+   ภาพกล้องจำลอง
 
    ของเดิมกดสแกนแล้วขึ้นวงกลมหมุน ซึ่งบอกได้แค่ว่าระบบกำลังทำอะไรสักอย่าง
    แต่ไม่ได้บอกว่าคนหน้างานต้องทำอะไร ของจริงคือยกมือถือขึ้นส่องป้ายบนกระสอบ
-   กรอบนี้เล่าขั้นนั้นตรง ๆ — กวาดอ่าน จับติด แล้วตัดเข้ารายการ
+   ภาพกล้องเล่าขั้นนั้นตรง ๆ — ส่องหา จับติด แล้วตัดเข้ารายการ คนที่ดูเดโม
+   จะได้เห็นทั้งเส้นทางโดยไม่ต้องให้ใครอธิบายประกอบ
 
-   มีรูปก็เอารูปจริงขึ้นเต็มกรอบ ไม่มีรูป (กดดูตัวอย่าง) ก็วาดป้ายปลอมให้แทน
-   บาร์โค้ดที่วาดคิดความกว้างแท่งจากตัวอักษรในเลขที่รับสินค้า ไม่ได้สุ่ม — ไม่งั้น
-   ภาพจะเต้นทุกรอบที่รีเรนเดอร์ และเดโมซ้ำสองรอบจะได้คนละลายทั้งที่เป็นชิ้นเดียวกัน
+   บาร์โค้ดที่เห็นวาดจากเลขที่รับสินค้าของชิ้นนั้นเอง ความกว้างแท่งคิดจากตัวอักษร
+   ในเลข เลขเดิมจึงได้ลายเดิมทุกครั้ง ไม่ได้สุ่ม — ไม่งั้นภาพจะเต้นทุกรอบที่
+   รีเรนเดอร์ และเดโมซ้ำสองรอบจะได้คนละลายทั้งที่เป็นของชิ้นเดียวกัน
 ------------------------------------------------------------------ */
 
 /** ความกว้างแท่งบาร์โค้ด สลับแท่งทึบกับช่องว่าง ตำแหน่งคู่คือแท่งทึบ */
@@ -523,7 +424,7 @@ const AIM_CORNERS = [
 function ScanCamera({
   scan,
 }: {
-  scan: { phase: ScanPhase; piece: InboundPiece; photo?: string };
+  scan: { phase: ScanPhase; piece: InboundPiece };
 }) {
   const locked = scan.phase === "lock";
   const code = scan.piece.receiptCode;
@@ -531,49 +432,30 @@ function ScanCamera({
   return (
     <div className="flex flex-col items-center gap-3">
       <div className="relative aspect-[4/3] w-full max-w-72 overflow-hidden rounded-xl bg-neutral-900">
-        {scan.photo ? (
-          <>
-            {/* next/image ใช้กับ blob url ของไฟล์ที่เพิ่งถ่ายไม่ได้ มันจะพยายาม
-                ไปแปลงไฟล์ที่เซิร์ฟเวอร์ซึ่งไม่มีทางเห็นรูปในเครื่องคนใช้ */}
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={scan.photo}
-              alt="รูปป้ายบนสินค้าที่เพิ่งถ่าย"
-              className={cn(
-                "absolute inset-0 size-full object-cover transition-transform duration-500",
-                locked && "scale-105"
-              )}
-            />
-            {/* รูปถ่ายในโกดังสว่างจัดบ้างมืดจัดบ้าง คลุมไว้หน่อยให้กรอบเล็ง
-                กับเส้นกวาดเห็นได้เสมอ ไม่ต้องลุ้นว่ารูปที่ถ่ายมาสีอะไร */}
-            <span className="absolute inset-0 bg-black/25" />
-          </>
-        ) : (
-          /* ป้ายบนกระสอบ เอียงนิดหน่อยเพราะถ่ายจากมือ ไม่ใช่วางบนแท่นสแกน
-             พอจับติดแล้วค่อยหมุนเข้าที่และขยับเข้ามา เหมือนกล้องโฟกัสได้ */
-          <div className="absolute inset-0 flex items-center justify-center">
-            <div
-              className={cn(
-                "w-4/5 rounded-sm bg-white px-3 py-3 shadow-lg",
-                "transition-transform duration-500",
-                locked ? "scale-105" : "-rotate-2"
-              )}
-            >
-              <div className="flex h-12 items-stretch justify-center gap-px">
-                {barWidths(code).map((w, i) => (
-                  <span
-                    key={i}
-                    style={{ width: w * 2 }}
-                    className={i % 2 === 0 ? "bg-neutral-900" : ""}
-                  />
-                ))}
-              </div>
-              <p className="mt-1.5 text-center font-mono text-[11px] tracking-wider text-neutral-900">
-                {code}
-              </p>
+        {/* ป้ายบนกระสอบ เอียงนิดหน่อยเพราะถ่ายจากมือ ไม่ใช่วางบนแท่นสแกน
+            พอจับติดแล้วค่อยหมุนเข้าที่และขยับเข้ามา เหมือนกล้องโฟกัสได้ */}
+        <div className="absolute inset-0 flex items-center justify-center">
+          <div
+            className={cn(
+              "w-4/5 rounded-sm bg-white px-3 py-3 shadow-lg",
+              "transition-transform duration-500",
+              locked ? "scale-105" : "-rotate-2"
+            )}
+          >
+            <div className="flex h-12 items-stretch justify-center gap-px">
+              {barWidths(code).map((w, i) => (
+                <span
+                  key={i}
+                  style={{ width: w * 2 }}
+                  className={i % 2 === 0 ? "bg-neutral-900" : ""}
+                />
+              ))}
             </div>
+            <p className="mt-1.5 text-center font-mono text-[11px] tracking-wider text-neutral-900">
+              {code}
+            </p>
           </div>
-        )}
+        </div>
 
         {/* เส้นกวาดหายทันทีที่จับติด ถ้ายังวิ่งอยู่จะดูเหมือนยังหาไม่เจอ */}
         {!locked && (
@@ -596,12 +478,8 @@ function ScanCamera({
           <span className="animate-cam-flash pointer-events-none absolute inset-0 bg-white" />
         )}
 
-        {/* บอกตรง ๆ ว่าเลขยังไม่ได้มาจากรูป ไม่งั้นคนดูเดโมจะเข้าใจว่าถอดบาร์โค้ด
-            ได้แล้ว แล้วไปตกลงกับหน้างานว่าใช้ได้เลย */}
-        <p className="absolute inset-x-0 bottom-2 text-center text-[11px] text-white/70">
-          {scan.photo
-            ? "ตัวอย่าง ยังไม่ได้ถอดบาร์โค้ดจากรูปจริง"
-            : "ภาพจำลอง ยังไม่ได้ใช้รูปจริง"}
+        <p className="absolute inset-x-0 bottom-2 text-center text-[11px] text-white/60">
+          ภาพกล้องจำลอง ไม่ได้เปิดกล้องจริง
         </p>
       </div>
 
@@ -620,7 +498,7 @@ function ScanCamera({
         ) : (
           <>
             <ScanBarcodeIcon className="size-4" />
-            {scan.photo ? "กำลังอ่านรหัสจากรูป..." : "ส่องกล้องไปที่ป้ายบนสินค้า..."}
+            ส่องกล้องไปที่ป้ายบนสินค้า...
           </>
         )}
       </p>
