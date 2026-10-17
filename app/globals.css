@@ -72,6 +72,8 @@
   --cat-purple-foreground: hsl(271 91% 65%);
   --cat-sky: hsl(204 100% 97%);
   --cat-sky-foreground: hsl(199 89% 48%);
+  --cat-pink: hsl(327 73% 97%);
+  --cat-pink-foreground: hsl(330 81% 60%);
 }
 
 [data-brand="parich"].dark {
@@ -79,6 +81,7 @@
   --cat-blue: hsl(217 45% 17%);
   --cat-purple: hsl(271 40% 18%);
   --cat-sky: hsl(199 45% 15%);
+  --cat-pink: hsl(330 40% 17%);
 }
 
 /* --- ชุดที่ 2: สีสภาพล็อตในหน้าสต็อก ---
@@ -296,6 +299,8 @@
   --color-cat-purple-foreground: var(--cat-purple-foreground);
   --color-cat-sky: var(--cat-sky);
   --color-cat-sky-foreground: var(--cat-sky-foreground);
+  --color-cat-pink: var(--cat-pink);
+  --color-cat-pink-foreground: var(--cat-pink-foreground);
 
   --color-chip-lime: var(--chip-lime);
   --color-chip-lime-foreground: var(--chip-lime-foreground);

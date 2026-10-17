@@ -10,6 +10,7 @@ import { QI_TEMPLATES, REPORT_TYPES, templateOf } from "@/lib/qc-erp";
 
 export type ModuleGroupId =
   | "purchase"
+  | "receiving"
   | "warehouse"
   | "production"
   | "qc"
@@ -17,7 +18,7 @@ export type ModuleGroupId =
   | "settings";
 
 /** สีประจำหมวด อ้าง token ล้วน ไม่มีค่าสีจริงในนี้ */
-export type GroupTone = "yellow" | "blue" | "orange" | "purple" | "sky";
+export type GroupTone = "yellow" | "blue" | "orange" | "purple" | "sky" | "pink";
 
 export type ModuleGroup = {
   id: ModuleGroupId;
@@ -43,10 +44,11 @@ export type ModuleGroup = {
 
 export const MODULE_GROUPS: ModuleGroup[] = [
   { id: "purchase", label: "การสั่งซื้อสินค้า", tone: "yellow" },
+  { id: "receiving", label: "การรับเข้าสินค้า", tone: "sky" },
   { id: "warehouse", label: "การคลังสินค้า", tone: "blue" },
   { id: "production", label: "การผลิตสินค้า", tone: "orange" },
   { id: "qc", label: "การตรวจคุณภาพสินค้า", icon: "clipboardCheck" },
-  { id: "accounting", label: "บัญชี", tone: "sky" },
+  { id: "accounting", label: "บัญชี", tone: "pink" },
   { id: "settings", label: "ตั้งค่าระบบ", tone: "purple" },
 ];
 
@@ -116,6 +118,20 @@ export const MODULES: ModuleItem[] = [
     icon: "scale",
     href: "/weighing",
     pending: 3,
+  },
+
+  // ---------- การรับเข้าสินค้า ----------
+  // ยังไม่มีหน้าของตัวเอง การ์ดจึงกดไม่ได้และขึ้นป้ายบอกไว้
+  { id: "rcv-raw", group: "receiving", label: "รับเข้าวัตถุดิบ", code: "FM-ST-01-05", icon: "rcvRaw" },
+  { id: "rcv-production", group: "receiving", label: "รับเข้าผลิต", code: "FM-PD-01-03", icon: "rcvProduction" },
+  { id: "rcv-product", group: "receiving", label: "รับเข้าสินค้า", code: "FM-ST-01-05", icon: "rcvProduct" },
+  {
+    id: "rcv-general",
+    group: "receiving",
+    label: "รับเข้าสินค้าทั่วไป",
+    shortLabel: "รับเข้าทั่วไป",
+    code: "FM-ST-01-05",
+    icon: "rcvGeneral",
   },
 
   // ---------- การคลังสินค้า ----------
@@ -293,7 +309,7 @@ export const reportTypeOfModule = (m: ModuleItem): string | undefined => {
 
 /**
  * แบ่งการ์ดของหมวดหนึ่งเป็นหมวดย่อยตามประเภทรายงาน เรียงตามทะเบียนประเภท
- * การ์ดที่ไม่มีประเภทไปรวมท้ายสุด — หมวดที่ไม่มีการ์ดไหนมีประเภทเลยคืนก้อนเดียว
+ * การ์ดที่ไม่มีประเภทไม่ถูกวาด — หมวดที่ไม่มีการ์ดไหนมีประเภทเลยคืนก้อนเดียว
  * ไม่มีหัวข้อย่อย หน้าหลักจะได้วาดแบบเดิม
  */
 export function subgroupsOf(
@@ -307,12 +323,9 @@ export function subgroupsOf(
     label: t.label as string | null,
     items: items.filter((m) => reportTypeOfModule(m) === t.id),
   }));
-  const rest = items.filter(
-    (m) => !REPORT_TYPES.some((t) => t.id === reportTypeOfModule(m))
-  );
-  return [...known, { id: "other", label: "อื่น ๆ", items: rest }].filter(
-    (g) => g.items.length > 0
-  );
+  // การ์ดที่ยังไม่มีประเภทไม่ขึ้นในหน้าหลัก — ตั้งประเภทในหน้าตั้งค่ารายงานก่อน
+  // ยังหาได้จากเมนูข้างและช่องค้นหา
+  return known.filter((g) => g.items.length > 0);
 }
 
 /** เมนูทั้งหมด = ที่เขียนไว้ตายตัว + ที่งอกจากเทมเพลต */

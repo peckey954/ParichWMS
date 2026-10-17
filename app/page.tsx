@@ -24,7 +24,10 @@ export default function AllModulesPage() {
 
   const groups = MODULE_GROUPS.map((g) => ({
     ...g,
-    items: matched.filter((m) => m.group === g.id),
+    // หมวดที่แตกหมวดย่อยนับเฉพาะการ์ดที่ได้วาดจริง — ตัวเลขต้องตรงกับที่เห็น
+    items: subgroupsOf(matched.filter((m) => m.group === g.id)).flatMap(
+      (sg) => sg.items
+    ),
   })).filter((g) => g.items.length > 0);
 
   return (

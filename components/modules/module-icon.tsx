@@ -1,7 +1,10 @@
 "use client";
 
 import {
+  ArchiveRestoreIcon,
   BoxesIcon,
+  FactoryIcon,
+  PackagePlusIcon,
   ChartNoAxesColumnIcon,
   ClipboardCheckIcon,
   CircleCheckBigIcon,
@@ -55,6 +58,10 @@ const ICONS: Record<string, LucideIcon> = {
   settings: SettingsIcon,
   palette: PaletteIcon,
   grid: LayoutGridIcon,
+  rcvRaw: ArchiveRestoreIcon,
+  rcvProduction: FactoryIcon,
+  rcvProduct: PackagePlusIcon,
+  rcvGeneral: BoxesIcon,
 };
 
 /** เส้นไอคอนบางกว่าค่าเริ่มต้นของ lucide (2) ให้ตรงกับไฟล์ Figma */
@@ -78,6 +85,7 @@ export const TONE_BOX: Record<GroupTone, string> = {
   orange: "bg-cat-orange text-cat-orange-foreground",
   purple: "bg-cat-purple text-cat-purple-foreground",
   sky: "bg-cat-sky text-cat-sky-foreground",
+  pink: "bg-cat-pink text-cat-pink-foreground",
 };
 
 /** จุดกลมหน้าชื่อหมวด ใช้สีเข้มของหมวดนั้น */
@@ -87,6 +95,7 @@ export const TONE_DOT: Record<GroupTone, string> = {
   orange: "bg-cat-orange-foreground",
   purple: "bg-cat-purple-foreground",
   sky: "bg-cat-sky-foreground",
+  pink: "bg-cat-pink-foreground",
 };
 
 export function IconBox({
