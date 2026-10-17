@@ -5,10 +5,10 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   ChevronRightIcon,
-  PencilIcon,
+  ListFilterIcon,
   PlusIcon,
   SearchIcon,
-  Trash2Icon,
+  SettingsIcon,
 } from "lucide-react";
 import { Badge } from "@peckey954/ui/components/ui/badge";
 import {
@@ -21,17 +21,12 @@ import {
 } from "@peckey954/ui/components/ui/breadcrumb";
 import { Button } from "@peckey954/ui/components/ui/button";
 import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@peckey954/ui/components/ui/collapsible";
-import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
+  DialogTrigger,
 } from "@peckey954/ui/components/ui/dialog";
 import { Input } from "@peckey954/ui/components/ui/input";
 import {
@@ -56,249 +51,280 @@ import {
   TableHeader,
   TableRow,
 } from "@peckey954/ui/components/ui/table";
-import { Tabs, TabsList, TabsTrigger } from "@peckey954/ui/components/ui/tabs";
 import { cn } from "@peckey954/ui/lib/utils";
-import { toast } from "sonner";
-import { ParamRegistryTable } from "@/components/qc/param-registry";
-import { ROW_HOVER_NAV } from "@/components/stock/doc-parts";
+import { ChipGroup } from "@/components/chip-group";
+import { DateSelect, formatDateSlash } from "@/components/date-select";
+import { MultiSelectChips } from "@/components/multi-select-chips";
+import { EmptyBox } from "@/components/qc/system-settings";
 import {
-  DEFAULT_GUARD,
-  GUARD_LABEL,
-  INSPECTION_TYPE_LABEL,
-  INSPECTION_TYPE_VALUE,
-  QI_PARAMETERS,
-  QI_TEMPLATES,
-  DISPOSITIONS,
-  QI_GROUPS,
-  PHASE,
-  REF_MENU,
-  addGroup,
-  addDisposition,
+  ROW_HOVER_NAV,
+  TablePager,
+  paginate,
+} from "@/components/stock/doc-parts";
+import {
   NEW_TEMPLATE_ID,
-  dispositionUsedBy,
-  groupUsedBy,
-  removeDisposition,
-  removeGroup,
-  renameGroup,
+  QI_TEMPLATES,
+  REF_MENU,
+  REPORT_TYPES,
+  STAGE,
   hrefOf,
+  reportTypeOf,
   setTemplateActive,
-  updateDisposition,
-  type Disposition,
-  type GuardAction,
-  type StockGuard,
+  stageOf,
+  type QiTemplate,
 } from "@/lib/qc-erp";
 
 /* ------------------------------------------------------------------
-   Setup QC — หน้าตั้งค่าที่ปรับให้ลง ERPNext ได้ตรง ๆ
+   ตั้งค่ารายงานตรวจสอบ QC — รายการรายงานทั้งหมด
 
-   คนละหน้ากับ "ตั้งค่ารายงาน QC" (/qc/setup) ที่ยังอยู่เหมือนเดิม
-   เก็บของเดิมไว้เพราะมันคือฟอร์มที่โรงงานใช้จริงตอนนี้ ส่วนหน้านี้คือภาพว่า
-   ถ้าย้ายไป ERPNext แล้วหน้าตั้งค่าจะเหลือหน้าตาแบบไหน
+   ตารางเดียว กดแถวเข้าไปแก้โครงสร้างทีละรายงาน สวิตช์ท้ายแถวเปิด/ปิดได้เลย
+   โดยไม่ต้องเข้าไปข้างใน
 
-   สองแท็บ
-     เทมเพลต      Quality Inspection Template — ฟอร์มหนึ่งใบ
-     ตั้งค่าระบบ  Stock Settings + ทะเบียนหัวข้อตรวจ
-
-   ทะเบียนหัวข้อตรวจ (Quality Inspection Parameter) ไม่ได้เป็นแท็บของตัวเอง
-   เพราะ ERPNext เองก็ไม่ได้ให้เดินออกจากฟอร์มไปจัดทะเบียนก่อน — Link field
-   ของ Frappe มีทั้งรายการที่มีอยู่ "Create a new …" และ "Advanced Search"
-   อยู่ในดรอปดาวน์เดียวกัน เราจึงยกทั้งสามอย่างไปไว้ในช่องเลือกหัวข้อของหน้าเทมเพลต
-
-   ตารางทะเบียนยังอยู่ท้ายแท็บตั้งค่าระบบ สำหรับงานดูแลข้อมูลที่นาน ๆ ทำที
-   คือหาตัวซ้ำ ดูว่าอันไหนไม่มีใครใช้ และจัดกลุ่มย้อนหลัง
+   ตั้งค่าระบบ (Stock Settings + ทะเบียนกลาง) เคยเป็นแท็บคู่กับรายการ ย้ายไป
+   อยู่หลังปุ่มที่หัวหน้า เพราะเป็นงานนาน ๆ ทำที ไม่ควรแย่งที่ตารางที่ใช้ทุกวัน
 ------------------------------------------------------------------ */
 
-type TabId = "templates" | "system";
+type ActiveFilter = "all" | "on" | "off";
+
+type Filter = { types: string[]; active: ActiveFilter };
+
+const NO_FILTER: Filter = { types: [], active: "all" };
+
+const PAGE_SIZES = [10, 20, 50];
 
 export default function SetupQcPage() {
   const router = useRouter();
-  const [tab, setTab] = React.useState<TabId>("templates");
   const [query, setQuery] = React.useState("");
-  const [guard, setGuard] = React.useState<StockGuard>(DEFAULT_GUARD);
+  const [date, setDate] = React.useState<Date | undefined>();
+  const [filter, setFilter] = React.useState<Filter>(NO_FILTER);
+  const [page, setPage] = React.useState(1);
+  const [size, setSize] = React.useState(10);
   // ของที่สร้างใหม่ต่อท้ายอาเรย์ในโมดูล ไม่ได้อยู่ใน state — ต้องสั่งวาดใหม่เอง
   const [, bump] = React.useReducer((n: number) => n + 1, 0);
 
   const q = query.trim().toLowerCase();
+  const day = date ? formatDateSlash(date) : "";
   const templates = QI_TEMPLATES.filter(
     (t) =>
-      !q ||
-      t.name.toLowerCase().includes(q) ||
-      t.code.toLowerCase().includes(q)
+      (!q ||
+        t.name.toLowerCase().includes(q) ||
+        t.code.toLowerCase().includes(q)) &&
+      (!day || t.updatedAt === day) &&
+      (filter.types.length === 0 || filter.types.includes(t.reportType)) &&
+      (filter.active === "all" || t.active === (filter.active === "on"))
   );
+  const filterActive =
+    filter.types.length > 0 || filter.active !== NO_FILTER.active;
+  const { pages, safe, slice } = paginate(templates, page, size);
+
+  // เปลี่ยนเงื่อนไขค้นแล้วกลับหน้าแรก — ค้างหน้า 3 ไว้ทั้งที่ผลเหลือหน้าเดียวคือจอว่าง
+  const reset =
+    <T,>(set: (v: T) => void) =>
+    (v: T) => {
+      set(v);
+      setPage(1);
+    };
+
   return (
-    <main className="@container mx-auto w-full max-w-6xl px-4 py-6 sm:px-6">
+    <main className="@container mx-auto w-full max-w-7xl px-4 py-6 sm:px-6">
       <Breadcrumb>
         <BreadcrumbList>
           <BreadcrumbItem>
-            <BreadcrumbLink href="/">ระบบ</BreadcrumbLink>
+            <BreadcrumbLink href="/">หน้าหลัก</BreadcrumbLink>
           </BreadcrumbItem>
           <BreadcrumbSeparator />
           <BreadcrumbItem>
-            <BreadcrumbPage className="text-primary">Setup QC</BreadcrumbPage>
+            <BreadcrumbPage className="text-primary">ตั้งค่ารายงาน</BreadcrumbPage>
           </BreadcrumbItem>
         </BreadcrumbList>
       </Breadcrumb>
 
-      <div className="mt-4">
-        <h1 className="text-2xl font-semibold tracking-tight">Setup QC</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          ตั้งค่าการตรวจคุณภาพตามโครงของ ERPNext — ทุกช่องในหน้านี้มีที่อยู่จริงใน
-          doctype ไม่ต้องดัดตอนขึ้นระบบ
-        </p>
-      </div>
-
-      <WhatChanged />
-
-      <Tabs
-        value={tab}
-        onValueChange={(v) => setTab(v as TabId)}
-        className="mt-5"
-      >
-        <TabsList className="w-full">
-          <TabsTrigger value="templates" className="flex-1">
-            เทมเพลต ({QI_TEMPLATES.length})
-          </TabsTrigger>
-          <TabsTrigger value="system" className="flex-1">
-            ตั้งค่าระบบ
-          </TabsTrigger>
-        </TabsList>
-      </Tabs>
-
-      {tab === "templates" && (
-        <div className="mt-4 flex flex-wrap items-center justify-between gap-2">
-          <InputGroup className="w-full max-w-sm bg-card">
-            <InputGroupAddon align="inline-start">
-              <SearchIcon />
-            </InputGroupAddon>
-            <InputGroupInput
-              placeholder="ค้นหาชื่อฟอร์มหรือรหัส..."
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-            />
-          </InputGroup>
-          {/* ไปหน้าตั้งค่าเลย ไม่ถามชื่อในกล่องก่อน — กล่องที่ถามสามช่องแล้วค่อย
-              เปิดหน้าที่มีอีกยี่สิบช่อง คือด่านที่ไม่ได้กันอะไร ได้แค่ให้กรอก
-              สองรอบ และสามช่องนั้นก็เป็นช่องเดียวกับที่อยู่ในหัวข้อ 1 อยู่แล้ว */}
-          <Button
-            variant="outline-primary"
-            onClick={() => router.push(`/qc/setup-erp/${NEW_TEMPLATE_ID}`)}
-          >
+      <div className="mt-4 flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h1 className="text-2xl font-semibold tracking-tight">
+            ตั้งค่ารายงานตรวจสอบ QC
+          </h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            รายงานตรวจคุณภาพทั้งหมด กดเข้าไปแก้โครงสร้าง หรือเปิด-ปิดการใช้งานได้จากตาราง
+          </p>
+        </div>
+        {/* ตั้งค่าระบบเป็นงานนาน ๆ ทำที ปุ่มรองจึงเป็น outline และอยู่ก่อนปุ่มหลัก
+            จอแคบเหลือไอคอนอย่างเดียว ไม่งั้นสองปุ่มเบียดจนปุ่มหลักตกบรรทัด */}
+        <div className="flex shrink-0 items-center gap-2">
+          <Button asChild variant="outline-primary" size="icon" className="@3xl:hidden">
+            <Link href="/qc/setup-erp/system" aria-label="ตั้งค่าระบบ">
+              <SettingsIcon />
+            </Link>
+          </Button>
+          <Button asChild variant="outline-primary" className="hidden @3xl:inline-flex">
+            <Link href="/qc/setup-erp/system">
+              <SettingsIcon />
+              ตั้งค่าระบบ
+            </Link>
+          </Button>
+          {/* ไปหน้าตั้งค่าเลย ไม่ถามชื่อในกล่องก่อน — ช่องที่จะถามก็คือช่องแรก
+              ของหัวข้อ 1 อยู่แล้ว ถามก่อนคือได้กรอกสองรอบ */}
+          <Button onClick={() => router.push(`/qc/setup-erp/${NEW_TEMPLATE_ID}`)}>
             <PlusIcon />
             เพิ่มรายงาน
           </Button>
         </div>
-      )}
+      </div>
 
-      {tab === "templates" && (
-        <TemplateList templates={templates} onToggled={bump} />
-      )}
-      {tab === "system" && (
-        <SystemSettings guard={guard} onChange={setGuard} onParamsChanged={bump} />
+      <div className="mt-5 flex flex-wrap items-center gap-2 @3xl:flex-nowrap">
+        <InputGroup className="w-full min-w-0 bg-card @3xl:flex-1">
+          <InputGroupAddon align="inline-start">
+            <SearchIcon />
+          </InputGroupAddon>
+          <InputGroupInput
+            placeholder="ค้นหา..."
+            value={query}
+            onChange={(e) => reset(setQuery)(e.target.value)}
+          />
+        </InputGroup>
+        <div className="flex w-full items-center gap-2 @3xl:w-auto">
+          <DateSelect
+            className="min-w-0 flex-1 @3xl:w-72 @3xl:flex-none"
+            placeholder="วันที่"
+            value={date}
+            onValueChange={reset(setDate)}
+          />
+          <FilterButton
+            value={filter}
+            active={filterActive}
+            onApply={reset(setFilter)}
+          />
+        </div>
+      </div>
+
+      {templates.length === 0 ? (
+        <EmptyBox text="ไม่พบรายงานที่ค้นหา" />
+      ) : (
+        <>
+          <TemplateCards templates={slice} />
+          <TemplateTable templates={slice} onToggled={bump} />
+          <Pager
+            page={safe}
+            pages={pages}
+            size={size}
+            onPage={setPage}
+            onSize={(n) => {
+              setSize(n);
+              setPage(1);
+            }}
+          />
+        </>
       )}
     </main>
   );
 }
 
-/* ---------- ต่างจากของเดิมยังไง ----------
-     หุบไว้ ไม่ใช่กางค้าง — คนที่เข้ามาตั้งค่าจริงอ่านรอบเดียวก็พอ
-     แต่ต้องหาเจอตอนสงสัยว่าทำไมช่องที่เคยมีหายไป */
-function WhatChanged() {
+/* ---------- ตัวกรอง ----------
+     กล่องกลางจอ ชุดเดียวกับหน้าขอซื้อ — แก้ในกล่องก่อน กดตกลงถึงมีผล
+     จุดบนปุ่มบอกว่ามีอะไรถูกเปลี่ยนไว้ ไม่บอกว่ากี่อย่าง */
+function FilterButton({
+  value,
+  active,
+  onApply,
+}: {
+  value: Filter;
+  active: boolean;
+  onApply: (next: Filter) => void;
+}) {
+  const [open, setOpen] = React.useState(false);
+  const [draft, setDraft] = React.useState(value);
+
   return (
-    <Collapsible className="mt-4 rounded-xl border border-border bg-card">
-      <CollapsibleTrigger asChild>
-        <button
-          type="button"
-          className="group flex w-full items-center justify-between gap-3 px-4 py-3 text-left"
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        setOpen(next);
+        if (next) setDraft(value);
+      }}
+    >
+      <DialogTrigger asChild>
+        <Button
+          variant="outline-primary"
+          size="icon"
+          aria-label="ตัวกรอง"
+          className="relative shrink-0"
         >
-          <span className="min-w-0">
-            <span className="block font-medium">
-              ต่างจาก “ตั้งค่ารายงาน QC” เดิมยังไง
-            </span>
-            <span className="block text-sm text-muted-foreground">
-              ปรับ 5 · เพิ่ม 4 · ย้ายออก 3
-            </span>
-          </span>
-          <ChevronRightIcon className="size-5 shrink-0 text-muted-foreground transition-transform group-data-[state=open]:rotate-90" />
-        </button>
-      </CollapsibleTrigger>
-      <CollapsibleContent className="grid gap-4 border-t border-border px-4 py-4 @2xl:grid-cols-3">
-        <ChangeGroup
-          title="ปรับ"
-          tone="brand"
-          items={[
-            "ชื่อหัวข้อตรวจมาจากทะเบียนกลาง พิมพ์สร้างใหม่ได้ แต่ไม่ใช่ข้อความลอยในฟอร์ม",
-            "หนึ่งหัวข้อมีเกณฑ์เดียว — หลายช่องที่คำนวณรวมกันใช้สูตรแทน",
-            "หัวข้อย่อยซ้อนชั้นเปลี่ยนเป็นกลุ่มชั้นเดียว",
-            "ผ่าน/ไม่ผ่านอย่างเดียว ไม่มีให้ตั้งคำว่าปกติ/ผิดปกติรายฟอร์ม",
-            "ตรวจซ้ำในข้อเดียวได้ไม่เกิน 10 ครั้ง ตามเพดานของ ERPNext",
-          ]}
-        />
-        <ChangeGroup
-          title="เพิ่ม"
-          tone="success"
-          items={[
-            "ประเภทการตรวจ — รับเข้า / ส่งออก / ระหว่างผลิต (ERPNext บังคับ)",
-            "เอกสารที่ใบตรวจอ้างอิง เช่น ใบรับของ ใบส่งของ ใบงานผลิต",
-            "ผูกฟอร์มกับสินค้า + ติ๊กว่าต้องตรวจก่อนรับ",
-            "ไม่ผ่านแล้วให้ระบบห้ามผ่านหรือแค่เตือน",
-          ]}
-        />
-        <ChangeGroup
-          title="ย้ายออก"
-          tone="neutral"
-          items={[
-            "รอบเวลา/กะ และปฏิทิน — ไปเป็นตารางการตรวจแยก",
-            "ตารางที่ผู้ตรวจเพิ่มแถวเอง เช่นทะเบียน COA",
-            "ช่องหัวเอกสารที่ตั้งเองได้ — หัวใบของ ERPNext ตายตัว",
-          ]}
-        />
-      </CollapsibleContent>
-    </Collapsible>
+          <ListFilterIcon />
+          {active && (
+            <span className="absolute top-1 right-1 size-2 rounded-full bg-primary" />
+          )}
+        </Button>
+      </DialogTrigger>
+      <DialogContent aria-describedby={undefined} className="sm:max-w-md">
+        <DialogHeader className="text-left">
+          <DialogTitle>ตัวกรอง</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4">
+          <div className="space-y-1.5">
+            <Label htmlFor="flt-type">ประเภทรายงาน</Label>
+            <MultiSelectChips
+              id="flt-type"
+              className="w-full bg-card"
+              placeholder="ทุกประเภท"
+              options={REPORT_TYPES.map((t) => ({ label: t.label, value: t.id }))}
+              value={draft.types}
+              onValueChange={(types) => setDraft((d) => ({ ...d, types }))}
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label>การใช้งาน</Label>
+            <ChipGroup
+              label="การใช้งาน"
+              value={draft.active}
+              onChange={(active) => setDraft((d) => ({ ...d, active }))}
+              options={[
+                { id: "all" as const, label: "ทั้งหมด" },
+                { id: "on" as const, label: "เปิดใช้งาน" },
+                { id: "off" as const, label: "ปิดใช้งาน" },
+              ]}
+            />
+          </div>
+        </div>
+        <DialogFooter className="flex-row justify-between gap-2 sm:justify-between">
+          <Button variant="ghost" onClick={() => setDraft(NO_FILTER)}>
+            ล้างตัวกรอง
+          </Button>
+          <Button
+            onClick={() => {
+              onApply(draft);
+              setOpen(false);
+            }}
+          >
+            ตกลง
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 
-function ChangeGroup({
-  title,
-  tone,
-  items,
-}: {
-  title: string;
-  tone: "brand" | "success" | "neutral";
-  items: string[];
-}) {
-  return (
-    <div>
-      <Badge tone={tone} appearance="soft">
-        {title} ({items.length})
-      </Badge>
-      <ul className="mt-2 space-y-1.5 text-sm">
-        {items.map((t) => (
-          <li key={t} className="flex gap-2">
-            <span className="mt-2 size-1 shrink-0 rounded-full bg-muted-foreground" />
-            <span className="text-muted-foreground">{t}</span>
-          </li>
-        ))}
-      </ul>
-    </div>
-  );
-}
-
-/* ---------- แท็บเทมเพลต ---------- */
-function TemplateList({
-  templates,
-  onToggled,
-}: {
-  templates: typeof QI_TEMPLATES;
-  onToggled: () => void;
-}) {
-  const router = useRouter();
-  if (templates.length === 0) return <EmptyBox text="ไม่พบเทมเพลตที่ค้นหา" />;
-
+/** ช่วงการตรวจสอบสองบรรทัด ไทยบน อังกฤษล่าง — ไม่มีคือรายงานที่ไม่ผูกเอกสาร */
+function StageCell({ t }: { t: QiTemplate }) {
+  const s = stageOf(t);
+  if (s === "") return <span className="text-muted-foreground">-</span>;
   return (
     <>
-      {/* จอแคบเป็นการ์ด — ตารางหกคอลัมน์บีบจนอ่านไม่ออกบนมือถือ */}
-      <div className="mt-4 grid gap-3 @3xl:hidden">
-        {templates.map((t) => (
+      <span>{STAGE[s].label}</span>
+      <span className="block text-sm text-muted-foreground">{STAGE[s].erp}</span>
+    </>
+  );
+}
+
+/* ---------- จอแคบ ----------
+     การ์ดทีละใบ — ตารางหกคอลัมน์บีบจนอ่านไม่ออกบนมือถือ
+     สถานะเป็นป้ายอ่านอย่างเดียว ทั้งการ์ดเป็นลิงก์ มีสวิตช์ซ้อนข้างในจะกดโดนกันเอง */
+function TemplateCards({ templates }: { templates: QiTemplate[] }) {
+  return (
+    <div className="mt-4 grid gap-3 @3xl:hidden">
+      {templates.map((t) => {
+        const s = stageOf(t);
+        const type = reportTypeOf(t.reportType);
+        return (
           <Link
             key={t.id}
             href={hrefOf(t)}
@@ -307,16 +333,19 @@ function TemplateList({
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <p className="font-medium">{t.name}</p>
-                <p className="mt-0.5 text-sm text-muted-foreground">
-                  {t.code}
-                </p>
+                <p className="mt-0.5 text-sm text-muted-foreground">{t.code}</p>
               </div>
               <ChevronRightIcon className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
             </div>
             <div className="mt-3 flex flex-wrap gap-1.5">
-              {t.phase !== "" && (
+              {type && (
                 <Badge appearance="soft" tone="brand">
-                  {PHASE[t.phase].label}
+                  {type.label}
+                </Badge>
+              )}
+              {s !== "" && (
+                <Badge appearance="outline" tone="neutral">
+                  {STAGE[s].label}
                 </Badge>
               )}
               {t.refMenu !== "" && (
@@ -325,569 +354,162 @@ function TemplateList({
                 </Badge>
               )}
             </div>
-            <p className="mt-2 text-sm text-muted-foreground">
-              {t.editor ?? t.owner} · {t.updatedAt}
-            </p>
-            {/* สถานะเปิด/ปิดบนการ์ดเป็นป้ายอ่านอย่างเดียว ไม่ใช่สวิตช์ —
-                ทั้งการ์ดเป็นลิงก์อยู่แล้ว มีสวิตช์ซ้อนข้างในจะกดโดนกันเอง */}
-            <Badge
-              appearance="soft"
-              tone={t.active ? "success" : "neutral"}
-              className="mt-2"
-            >
-              {t.active ? "เปิดใช้งาน" : "ปิดใช้งาน"}
-            </Badge>
+            <div className="mt-3 flex items-center justify-between gap-3 border-t border-border pt-2 text-sm text-muted-foreground">
+              <span className="truncate">
+                {t.editor ?? t.owner} · {t.updatedAt}
+              </span>
+              <Badge appearance="soft" tone={t.active ? "success" : "neutral"}>
+                {t.active ? "เปิดใช้งาน" : "ปิดใช้งาน"}
+              </Badge>
+            </div>
           </Link>
-        ))}
-      </div>
-
-      {/* จอกว้างเป็นตาราง — คอลัมน์ "ผูกกับสินค้า" ต้องเทียบข้ามแถวได้
-          เพราะฟอร์มที่ยังไม่ผูกสินค้าคือฟอร์มที่จะไม่มีวันถูกเรียกใช้ */}
-      <div className="mt-4 hidden overflow-hidden rounded-xl border border-border bg-card @3xl:block">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead className="min-w-56">ชื่อฟอร์ม</TableHead>
-              <TableHead className="min-w-28">ประเภทการตรวจ</TableHead>
-              <TableHead className="min-w-32">เอกสารอ้างอิง</TableHead>
-              <TableHead className="min-w-40">ผู้ทำรายการ</TableHead>
-              <TableHead className="min-w-32">วันที่อัปเดตล่าสุด</TableHead>
-              <TableHead className="min-w-32">การใช้งาน</TableHead>
-
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {templates.map((t) => (
-              // ทั้งแถวเป็นเป้ากด ไม่ใช่เฉพาะชื่อฟอร์ม — คนกวาดตาอ่านคอลัมน์ขวา
-              // อยู่แล้วกดตรงนั้นเลย ต้องเลื่อนกลับมากดชื่อคือเป้าที่มองไม่เห็น
-              <TableRow
-                key={t.id}
-                onClick={() => router.push(hrefOf(t))}
-                className={cn("cursor-pointer", ROW_HOVER_NAV)}
-              >
-                <TableCell>
-                  <span className="font-medium">{t.name}</span>
-                  <span className="block text-sm text-muted-foreground">
-                    {t.code}
-                  </span>
-                </TableCell>
-                <TableCell>
-                  <span>{INSPECTION_TYPE_LABEL[t.inspectionType]}</span>
-                  <span className="block text-xs text-muted-foreground">
-                    {INSPECTION_TYPE_VALUE[t.inspectionType]}
-                  </span>
-                </TableCell>
-                <TableCell className="text-sm">
-                  {t.refMenu === "" ? "-" : REF_MENU[t.refMenu].label}
-                </TableCell>
-                <TableCell>
-                  <span className="font-medium">{t.owner}</span>
-                  {/* คนแก้ล่าสุดอยู่ใต้คนสร้าง ไม่ใช่คอลัมน์แยก — สองชื่อนี้
-                      ส่วนใหญ่เป็นคนเดียวกัน แยกคอลัมน์ไปก็ว่างครึ่งตาราง */}
-                  {t.editor && (
-                    <span className="block text-sm text-muted-foreground">
-                      แก้ไขล่าสุด: {t.editor}
-                    </span>
-                  )}
-                </TableCell>
-                <TableCell className="text-sm tabular-nums">
-                  {t.updatedAt}
-                </TableCell>
-                {/* กดสวิตช์แล้วต้องไม่เปิดหน้ารายละเอียดตามไปด้วย
-                    ทั้งแถวเป็นเป้ากด สวิตช์จึงต้องกันคลิกไม่ให้ไหลขึ้นไป */}
-                <TableCell onClick={(e) => e.stopPropagation()}>
-                  <label className="flex items-center gap-2 text-sm">
-                    <Switch
-                      checked={t.active}
-                      onCheckedChange={(v) => {
-                        setTemplateActive(t.id, v);
-                        onToggled();
-                      }}
-                    />
-                    {t.active ? "เปิดใช้งาน" : "ปิดใช้งาน"}
-                  </label>
-                </TableCell>
-
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </div>
-    </>
-  );
-}
-
-/* ---------- แท็บตั้งค่าระบบ ---------- */
-function SystemSettings({
-  guard,
-  onChange,
-  onParamsChanged,
-}: {
-  guard: StockGuard;
-  onChange: (next: StockGuard) => void;
-  onParamsChanged: () => void;
-}) {
-  return (
-    <div className="mt-4 space-y-4">
-      <section className="rounded-xl border border-border bg-card p-4 sm:p-5">
-        <h2 className="font-semibold">การบังคับใช้กับการรับ–จ่ายของ</h2>
-        <p className="mt-1 text-sm text-muted-foreground">
-          เป็นค่าของทั้งระบบ ไม่ใช่รายฟอร์มหรือรายวัตถุดิบ — อยากให้บางตัวห้ามผ่าน
-          บางตัวแค่เตือน ต้องเขียน script เพิ่ม
-        </p>
-        {/* ค่านี้ตัวเดียวครอบทุกเอกสารที่มีการตรวจ รวมระหว่างผลิต — เขียนไว้
-            ไม่งั้นจะอ่านว่าครอบแค่ขาซื้อขาขาย แล้วไปตั้งความคาดหวังผิด */}
-        <p className="mt-2 rounded-lg bg-surface px-3 py-2 text-sm text-muted-foreground">
-          ใช้กับ <span className="font-medium text-foreground">ทุกเอกสาร</span> ที่มีการตรวจ
-          — ใบรับของ · ใบแจ้งหนี้ซื้อ · ใบรับงานจ้างผลิต · ใบส่งของ · ใบแจ้งหนี้ขาย ·
-          ใบเบิก-โอนสต็อก (ระหว่างผลิต)
-        </p>
-
-        <div className="mt-4 grid gap-4 @2xl:grid-cols-2">
-          <GuardField
-            id="on-rejected"
-            label="ตรวจไม่ผ่านแล้วจะเดินเอกสารต่อ"
-            hint="action_if_quality_inspection_is_rejected"
-            value={guard.onRejected}
-            onValueChange={(v) => onChange({ ...guard, onRejected: v })}
-          />
-          <GuardField
-            id="on-not-submitted"
-            label="ยังไม่ได้ตรวจแล้วจะเดินเอกสารต่อ"
-            hint="action_if_quality_inspection_is_not_submitted"
-            value={guard.onNotSubmitted}
-            onValueChange={(v) => onChange({ ...guard, onNotSubmitted: v })}
-          />
-        </div>
-
-        <label className="mt-4 flex items-start justify-between gap-4 rounded-lg bg-brand px-4 py-3">
-          <span className="min-w-0">
-            <span className="block text-sm font-medium">
-              ให้ตรวจย้อนหลังได้หลังรับของไปแล้ว
-            </span>
-            <span className="block text-sm text-muted-foreground">
-              ปิดไว้ = ต้องตรวจให้เสร็จก่อนถึงจะรับของได้ ·
-              allow_to_make_quality_inspection_after_purchase_or_delivery ·
-              ชื่อฟิลด์บอกขอบเขตแค่ซื้อ-ขาย ยังไม่ได้ยืนยันว่าครอบใบเบิก-โอนสต็อกด้วยไหม
-            </span>
-          </span>
-          <Switch
-            checked={guard.allowAfter}
-            onCheckedChange={(v) => onChange({ ...guard, allowAfter: v })}
-          />
-        </label>
-      </section>
-
-      <DispositionRegistry />
-
-      {/* ---------- ทะเบียนหัวข้อตรวจ ----------
-           งานที่ทำตรงนี้คือดูทั้งทะเบียนทีเดียว — หาตัวซ้ำ ดูว่าอันไหนไม่มีใครใช้
-           และจัดกลุ่มย้อนหลัง ส่วนการเลือก/สร้างหัวข้อตอนกำลังตั้งฟอร์ม
-           ทำได้ในช่องของหน้าเทมเพลตโดยไม่ต้องเดินมาที่นี่ */}
-      <section className="rounded-xl border border-border bg-card p-4 sm:p-5">
-        <h2 className="font-semibold">
-          ทะเบียนหัวข้อตรวจ ({QI_PARAMETERS.length})
-        </h2>
-        <p className="mt-1 mb-3 text-sm text-muted-foreground">
-          เก็บแค่ชื่อกับกลุ่ม ไม่ได้เก็บเกณฑ์ — ความชื้นในฟอร์มรับวัตถุดิบกับใน
-          ฟอร์มก่อนผลิตต้องเป็นตัวเดียวกัน รายงานย้อนหลังถึงรวมกันได้
-        </p>
-        <ParamRegistryTable onChanged={onParamsChanged} />
-      </section>
-
-      <GroupRegistry onChanged={onParamsChanged} />
-
+        );
+      })}
     </div>
   );
 }
 
-/* ---------- กลุ่มหัวข้อตรวจ ----------
-     ERPNext เก็บกลุ่มเป็น doctype ของตัวเอง (Quality Inspection Parameter Group)
-     ไม่ใช่ข้อความในชื่อหัวข้อ ที่นี่จึงต้องมีที่จัดการของมันเอง
-
-     เปลี่ยนชื่อกลุ่มแล้วหัวข้อที่อยู่ในกลุ่มนั้นย้ายตามให้เอง และถ้าเปลี่ยนเป็น
-     ชื่อที่มีอยู่แล้วคือยุบสองกลุ่มรวมกัน ซึ่งเป็นวิธีเก็บกวาดกลุ่มที่ตั้งซ้ำ */
-function GroupRegistry({ onChanged }: { onChanged: () => void }) {
-  const [adding, setAdding] = React.useState(false);
-  const [draft, setDraft] = React.useState("");
-  const [editing, setEditing] = React.useState<string | null>(null);
-  const [, bump] = React.useReducer((n: number) => n + 1, 0);
-
-  const refresh = () => {
-    bump();
-    onChanged();
-  };
-
-  const commitAdd = () => {
-    if (draft.trim() === "") {
-      setAdding(false);
-      return;
-    }
-    const name = addGroup(draft);
-    setDraft("");
-    setAdding(false);
-    refresh();
-    toast.success(`เพิ่มกลุ่ม “${name}” แล้ว`);
-  };
-
+/* ---------- จอกว้าง ---------- */
+function TemplateTable({
+  templates,
+  onToggled,
+}: {
+  templates: QiTemplate[];
+  onToggled: () => void;
+}) {
+  const router = useRouter();
   return (
-    <section className="rounded-xl border border-border bg-card p-4 sm:p-5">
-      <div className="flex flex-wrap items-start justify-between gap-2">
-        <div className="min-w-0">
-          <h2 className="font-semibold">กลุ่มหัวข้อตรวจ ({QI_GROUPS.length})</h2>
-          <p className="mt-1 text-sm text-muted-foreground">
-            ใช้แบ่งหัวข้อในใบตรวจให้อ่านง่าย — ไม่บังคับ หัวข้อที่ไม่จัดกลุ่มก็ใช้ได้ปกติ
-          </p>
-        </div>
-        <Button variant="ghost" size="sm" onClick={() => setAdding(true)}>
-          <PlusIcon />
-          เพิ่มกลุ่ม
-        </Button>
-      </div>
-
-      <div className="mt-3 overflow-hidden rounded-lg border border-border">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead className="min-w-48">ชื่อกลุ่ม</TableHead>
-              <TableHead className="min-w-32 text-right">หัวข้อในกลุ่ม</TableHead>
-              <TableHead className="w-24" />
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {QI_GROUPS.map((g) => {
-              const used = groupUsedBy(g);
-              return (
-                <TableRow key={g}>
-                  <TableCell>
-                    {/* แก้ชื่อในแถวเลย ไม่ต้องเปิดกล่อง — กลุ่มมีช่องเดียว
-                        เปิดกล่องเพื่อแก้ข้อความบรรทัดเดียวคือขั้นตอนเกินจำเป็น */}
-                    {editing === g ? (
-                      <Input
-                        autoFocus
-                        defaultValue={g}
-                        className="bg-card"
-                        onBlur={(e) => {
-                          renameGroup(g, e.target.value);
-                          setEditing(null);
-                          refresh();
-                        }}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter") e.currentTarget.blur();
-                          if (e.key === "Escape") setEditing(null);
-                        }}
-                      />
-                    ) : (
-                      <span className="font-medium">{g}</span>
-                    )}
-                  </TableCell>
-                  <TableCell className="text-right tabular-nums">
-                    {used > 0 ? (
-                      `${used} หัวข้อ`
-                    ) : (
-                      <span className="text-muted-foreground">ว่าง</span>
-                    )}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <Button
-                      variant="ghost"
-                      size="icon-sm"
-                      aria-label={`แก้ชื่อกลุ่ม ${g}`}
-                      onClick={() => setEditing(g)}
-                    >
-                      <PencilIcon />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon-sm"
-                      disabled={used > 0}
-                      title={used > 0 ? `ลบไม่ได้ มี ${used} หัวข้ออยู่ในกลุ่มนี้` : undefined}
-                      aria-label={`ลบกลุ่ม ${g}`}
-                      onClick={() => {
-                        removeGroup(g);
-                        refresh();
-                        toast.success(`ลบกลุ่ม “${g}” แล้ว`);
-                      }}
-                    >
-                      <Trash2Icon />
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              );
-            })}
-
-            {adding && (
-              <TableRow>
-                <TableCell colSpan={3}>
-                  <Input
-                    autoFocus
-                    className="bg-card"
-                    placeholder="ชื่อกลุ่มใหม่ เช่น จุลชีววิทยา"
-                    value={draft}
-                    onChange={(e) => setDraft(e.target.value)}
-                    onBlur={commitAdd}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") e.currentTarget.blur();
-                      if (e.key === "Escape") {
-                        setDraft("");
-                        setAdding(false);
-                      }
+    <div className="mt-4 hidden overflow-hidden rounded-t-xl border border-b-0 border-border bg-card @3xl:block">
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead className="min-w-56 pl-4">ชื่อรายงาน</TableHead>
+            <TableHead className="min-w-28">ประเภทการตรวจสอบ</TableHead>
+            <TableHead className="min-w-32">เอกสารอ้างอิง</TableHead>
+            <TableHead className="min-w-40">ผู้ทำรายการ</TableHead>
+            <TableHead className="min-w-32">วันที่อัปเดตล่าสุด</TableHead>
+            <TableHead className="min-w-32 pr-4">การใช้งาน</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {templates.map((t) => (
+            // ทั้งแถวเป็นเป้ากด — คนกวาดตาอ่านคอลัมน์ขวาอยู่แล้วกดตรงนั้นเลย
+            <TableRow
+              key={t.id}
+              onClick={() => router.push(hrefOf(t))}
+              className={cn("cursor-pointer", ROW_HOVER_NAV)}
+            >
+              <TableCell className="pl-4">
+                <span className="font-medium">{t.name}</span>
+                <span className="block text-sm text-muted-foreground">{t.code}</span>
+              </TableCell>
+              <TableCell>
+                <StageCell t={t} />
+              </TableCell>
+              <TableCell>
+                {t.refMenu === "" ? (
+                  <span className="text-muted-foreground">-</span>
+                ) : (
+                  REF_MENU[t.refMenu].label
+                )}
+              </TableCell>
+              <TableCell>
+                <span className="font-medium">{t.owner}</span>
+                {/* คนแก้ล่าสุดอยู่ใต้คนสร้าง ไม่ใช่คอลัมน์แยก — ส่วนใหญ่เป็นคน
+                    เดียวกัน แยกคอลัมน์ไปก็ว่างครึ่งตาราง */}
+                {t.editor && (
+                  <span className="block text-sm text-muted-foreground">
+                    แก้ไขล่าสุด: {t.editor}
+                  </span>
+                )}
+              </TableCell>
+              <TableCell className="tabular-nums">{t.updatedAt}</TableCell>
+              {/* กดสวิตช์แล้วต้องไม่เปิดหน้ารายละเอียดตามไปด้วย */}
+              <TableCell className="pr-4" onClick={(e) => e.stopPropagation()}>
+                <label className="flex items-center gap-2 text-sm">
+                  <Switch
+                    checked={t.active}
+                    onCheckedChange={(v) => {
+                      setTemplateActive(t.id, v);
+                      onToggled();
                     }}
                   />
-                </TableCell>
-              </TableRow>
-            )}
-          </TableBody>
-        </Table>
-      </div>
-
-      <p className="mt-2 font-mono text-xs text-muted-foreground">
-        Quality Inspection Parameter Group · เปลี่ยนชื่อเป็นกลุ่มที่มีอยู่แล้ว = ยุบรวมกัน
-      </p>
-    </section>
-  );
-}
-
-/* ---------- ผลตรวจที่ไม่ผ่าน ----------
-     รายการกลาง ไม่ให้พิมพ์อิสระในแต่ละฟอร์ม เพราะแต่ละตัวผูกกับ server script
-     ที่เดฟเขียน พิมพ์ชื่อเพี้ยนไปตัวเดียว script ก็ไม่รู้จัก ผู้ตรวจเลือกได้
-     บันทึกผ่าน แต่ยอดสต็อกไม่ขยับ และไม่มีอะไรเตือน
-
-     คอลัมน์ "ผลกับสต็อก" เป็นสเปคให้เดฟ ไม่ใช่ของที่ระบบทำให้เอง — เขียนไว้
-     ตรงนี้เพื่อให้คนตั้งค่ากับคนเขียนโค้ดอ่านของเดียวกัน */
-function DispositionRegistry() {
-  const [adding, setAdding] = React.useState(false);
-  const [editing, setEditing] = React.useState<Disposition | null>(null);
-  const [, bump] = React.useReducer((n: number) => n + 1, 0);
-
-  return (
-    <section className="rounded-xl border border-border bg-card p-4 sm:p-5">
-      <div className="flex flex-wrap items-start justify-between gap-2">
-        <div className="min-w-0">
-          <h2 className="font-semibold">
-            ผลตรวจที่ไม่ผ่าน ({DISPOSITIONS.length})
-          </h2>
-          <p className="mt-1 text-sm text-muted-foreground">
-            ตัวเลือกที่ผู้ตรวจเลือกได้เมื่อของไม่ผ่าน — แต่ละฟอร์มเปิดใช้เฉพาะที่
-            เกี่ยวข้องได้ ส่วนผลกับสต็อกต้องให้เดฟเขียน server script
-          </p>
-        </div>
-        <Button variant="outline-primary" size="sm" onClick={() => setAdding(true)}>
-          <PlusIcon />
-          เพิ่มตัวเลือก
-        </Button>
-      </div>
-
-      <div className="mt-3 overflow-hidden rounded-lg border border-border">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead className="min-w-32">ตัวเลือก</TableHead>
-              <TableHead className="min-w-56">ผลกับสต็อก</TableHead>
-              <TableHead className="min-w-52">ต้องไปเขียนที่</TableHead>
-              <TableHead className="min-w-24 text-right">ใช้ในฟอร์ม</TableHead>
-              <TableHead className="w-24" />
+                  {t.active ? "เปิดใช้งาน" : "ปิดใช้งาน"}
+                </label>
+              </TableCell>
             </TableRow>
-          </TableHeader>
-          <TableBody>
-            {DISPOSITIONS.map((d) => {
-              const used = dispositionUsedBy(d.id);
-              return (
-                <TableRow key={d.id}>
-                  <TableCell className="font-medium">{d.label}</TableCell>
-                  <TableCell className="text-sm">{d.effect}</TableCell>
-                  <TableCell className="font-mono text-xs text-muted-foreground">
-                    {d.field}
-                  </TableCell>
-                  <TableCell className="text-right tabular-nums">
-                    {used > 0 ? (
-                      `${used} ฟอร์ม`
-                    ) : (
-                      <span className="text-muted-foreground">ยังไม่มีใครใช้</span>
-                    )}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <Button
-                      variant="ghost"
-                      size="icon-sm"
-                      aria-label={`แก้ไข ${d.label}`}
-                      onClick={() => setEditing(d)}
-                    >
-                      <PencilIcon />
-                    </Button>
-                    {/* ลบตัวที่ฟอร์มยังเปิดใช้อยู่ไม่ได้ — ใบตรวจเก่าจะอ้างค่าที่หายไป */}
-                    <Button
-                      variant="ghost"
-                      size="icon-sm"
-                      disabled={used > 0}
-                      title={used > 0 ? `ลบไม่ได้ มี ${used} ฟอร์มใช้อยู่` : undefined}
-                      aria-label={`ลบ ${d.label}`}
-                      onClick={() => {
-                        removeDisposition(d.id);
-                        bump();
-                        toast.success(`ลบ “${d.label}” แล้ว`);
-                      }}
-                    >
-                      <Trash2Icon />
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              );
-            })}
-          </TableBody>
-        </Table>
-      </div>
-
-      {(adding || editing) && (
-        <DispositionDialog
-          editing={editing}
-          onClose={() => {
-            setAdding(false);
-            setEditing(null);
-          }}
-          onSaved={bump}
-        />
-      )}
-    </section>
-  );
-}
-
-function DispositionDialog({
-  editing,
-  onClose,
-  onSaved,
-}: {
-  editing: Disposition | null;
-  onClose: () => void;
-  onSaved: () => void;
-}) {
-  const [label, setLabel] = React.useState(editing?.label ?? "");
-  const [effect, setEffect] = React.useState(editing?.effect ?? "");
-  const [field, setField] = React.useState(editing?.field ?? "");
-
-  const save = () => {
-    if (label.trim() === "") {
-      toast.error("กรุณาตั้งชื่อตัวเลือก");
-      return;
-    }
-    const payload = {
-      label: label.trim(),
-      effect: effect.trim(),
-      field: field.trim(),
-    };
-    if (editing) updateDisposition(editing.id, payload);
-    else addDisposition(payload);
-    onSaved();
-    onClose();
-    toast.success(editing ? `แก้ “${payload.label}” แล้ว` : `เพิ่ม “${payload.label}” แล้ว`, {
-      description: "อย่าลืมบอกเดฟให้เขียน script รองรับตัวเลือกนี้ด้วย",
-    });
-  };
-
-  return (
-    <Dialog open onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className="sm:max-w-lg">
-        <DialogHeader>
-          <DialogTitle>
-            {editing ? "แก้ไขตัวเลือก" : "เพิ่มตัวเลือกใหม่"}
-          </DialogTitle>
-          <DialogDescription>
-            ตั้งที่นี่แล้วทุกฟอร์มหยิบไปใช้ร่วมกัน — ชื่อที่ตั้งคือค่าที่ server
-            script จะอ่าน เปลี่ยนชื่อแล้วต้องแก้ script ตาม
-          </DialogDescription>
-        </DialogHeader>
-
-        <div className="space-y-4">
-          <div className="space-y-1.5">
-            <Label htmlFor="disp-label">ชื่อตัวเลือก</Label>
-            <Input
-              id="disp-label"
-              autoFocus
-              className="bg-card"
-              placeholder="เช่น ส่งคืน"
-              value={label}
-              onChange={(e) => setLabel(e.target.value)}
-            />
-          </div>
-
-          <div className="space-y-1.5">
-            <Label htmlFor="disp-effect">ผลกับสต็อก</Label>
-            <Input
-              id="disp-effect"
-              className="bg-card"
-              placeholder="เช่น ตัดออกจากยอดรับ แล้วออกใบคืนของผู้ขาย"
-              value={effect}
-              onChange={(e) => setEffect(e.target.value)}
-            />
-            <p className="text-sm text-muted-foreground">
-              เขียนให้คนอ่าน ระบบไม่ได้ทำตามนี้เอง ต้องมีคนเขียน script
-            </p>
-          </div>
-
-          <div className="space-y-1.5">
-            <Label htmlFor="disp-field">ต้องไปเขียนที่</Label>
-            <Input
-              id="disp-field"
-              className="bg-card font-mono text-sm"
-              placeholder="เช่น rejected_qty + Purchase Return"
-              value={field}
-              onChange={(e) => setField(e.target.value)}
-            />
-            <p className="font-mono text-xs text-muted-foreground">
-              สเปคให้เดฟ · ฟิลด์ในใบรับของที่ต้องถูกเซ็ต
-            </p>
-          </div>
-        </div>
-
-        <DialogFooter className="grid grid-cols-2 gap-3">
-          <Button variant="outline-primary" onClick={onClose}>
-            ยกเลิก
-          </Button>
-          <Button onClick={save}>{editing ? "บันทึก" : "เพิ่ม"}</Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-function GuardField({
-  id,
-  label,
-  hint,
-  value,
-  onValueChange,
-}: {
-  id: string;
-  label: string;
-  hint: string;
-  value: GuardAction;
-  onValueChange: (v: GuardAction) => void;
-}) {
-  return (
-    <div className="space-y-1.5">
-      <Label htmlFor={id}>{label}</Label>
-      <Select value={value} onValueChange={(v) => onValueChange(v as GuardAction)}>
-        <SelectTrigger id={id} className="w-full bg-card">
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          {(["stop", "warn"] as GuardAction[]).map((a) => (
-            <SelectItem key={a} value={a}>
-              {GUARD_LABEL[a]}
-            </SelectItem>
           ))}
-        </SelectContent>
-      </Select>
-      <p className="font-mono text-xs text-muted-foreground">{hint}</p>
+        </TableBody>
+      </Table>
     </div>
   );
 }
 
-function EmptyBox({ text }: { text: string }) {
+/* ---------- แบ่งหน้า ----------
+     ติดใต้ตารางในกรอบเดียวกันบนจอกว้าง จอแคบเป็นแถวแยกใต้การ์ด
+     ไปที่หน้าพิมพ์เลขแล้วกด Enter — กดปุ่มทีละหน้าไปหน้า 40 ไม่ไหว */
+function Pager({
+  page,
+  pages,
+  size,
+  onPage,
+  onSize,
+}: {
+  page: number;
+  pages: number;
+  size: number;
+  onPage: (p: number) => void;
+  onSize: (n: number) => void;
+}) {
+  const [jump, setJump] = React.useState("");
+
   return (
-    <div className={cn("mt-4 rounded-xl border border-dashed border-border", "px-6 py-14 text-center")}>
-      <p className="font-medium">{text}</p>
-      <p className="mt-1 text-sm text-muted-foreground">ลองใช้คำค้นสั้นลง</p>
+    <div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-card px-4 py-3 @3xl:mt-0 @3xl:rounded-t-none">
+      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+        <span>แถวต่อหน้า</span>
+        <Select value={String(size)} onValueChange={(v) => onSize(Number(v))}>
+          <SelectTrigger className="w-20 bg-card" aria-label="แถวต่อหน้า">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {PAGE_SIZES.map((n) => (
+              <SelectItem key={n} value={String(n)}>
+                {n}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-3">
+        {/* TablePager ซ่อนตัวเองเมื่อมีหน้าเดียว — ช่องไปที่หน้าก็ไม่มีความหมาย */}
+        <div className="[&>nav]:border-0 [&>nav]:p-0">
+          <TablePager page={page} pages={pages} onChange={onPage} />
+        </div>
+        {pages > 1 && (
+          <form
+            className="flex items-center gap-2 text-sm text-muted-foreground"
+            onSubmit={(e) => {
+              e.preventDefault();
+              const n = Number(jump);
+              if (Number.isInteger(n) && n >= 1 && n <= pages) onPage(n);
+              setJump("");
+            }}
+          >
+            <Label htmlFor="pager-jump" className="font-normal">
+              ไปที่หน้า
+            </Label>
+            <Input
+              id="pager-jump"
+              inputMode="numeric"
+              className="w-16 bg-card"
+              placeholder={String(page)}
+              value={jump}
+              onChange={(e) => setJump(e.target.value.replace(/\D/g, ""))}
+            />
+          </form>
+        )}
+      </div>
     </div>
   );
 }

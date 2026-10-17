@@ -323,7 +323,8 @@ export type SourceId =
   | "batch"
   | "user"
   | "warehouse"
-  | "machine";
+  | "machine"
+  | "tank";
 
 export const SOURCE: Record<
   SourceId,
@@ -389,6 +390,12 @@ export const SOURCE: Record<
     custom: true,
     pool: ["L1", "L2", "L3"],
   },
+  tank: {
+    label: "ถังวัตถุดิบ",
+    store: "QC Check · Link → Warehouse (ถังเป็นคลังย่อย)",
+    custom: true,
+    pool: ["ถัง T1", "ถัง T2", "ถัง T3", "ถัง T4"],
+  },
 };
 
 export const SOURCE_IDS = Object.keys(SOURCE) as SourceId[];
@@ -401,6 +408,9 @@ export const sourcePool = (id: SourceId): string[] =>
    เอกสารกับผู้ตรวจไม่อยู่ในนี้ เพราะเป็นของหัวใบ ไม่ใช่หัวข้อที่ตัดสินผ่าน */
 export const CHECK_SOURCES: SourceId[] = ["item", "warehouse", "machine"];
 
+/** ส่วนหัวเอกสารดึงได้สี่อย่าง — ของที่ใบหนึ่งใบผูกอยู่ ไม่ใช่ของที่ถูกตัดสิน */
+export const HEADER_SOURCES: SourceId[] = ["item", "machine", "warehouse", "tank"];
+
 // ---------------------------------------------------------------
 // ช่องในส่วนหัวเอกสาร — ผู้ตรวจกรอกครั้งเดียวต่อใบ
 //
@@ -410,6 +420,9 @@ export const CHECK_SOURCES: SourceId[] = ["item", "warehouse", "machine"];
 
 export type DocField = {
   id: string;
+  /** ดึงจากระบบ = เลือกจากรายการของระบบ · ข้อความ = ผู้ตรวจพิมพ์เอง */
+  kind: RowKind;
+  /** ชื่อช่อง — ใช้เมื่อ kind = text ส่วน system ใช้ชื่อแหล่งข้อมูลเป็นชื่อไปในตัว */
   label: string;
   source: SourceId | "";
   required: boolean;
@@ -864,16 +877,123 @@ export const OPERATION_POOL = [
   "บรรจุกระสอบ",
 ];
 
-/** รูปถ่ายประกอบ — บังคับเมื่อไม่ผ่านคือแบบที่ฟอร์มกระดาษใช้จริง */
-export type PhotoMode = "off" | "optional" | "onFail";
+/** รูปถ่ายประกอบ — บังคับเมื่อไม่ผ่านคือแบบที่ฟอร์มกระดาษใช้จริง
+ *
+ *  หมายเหตุท้ายใบใช้ชุดเดียวกัน เพราะคำถามเดียวกันว่า "ผู้ตรวจต้องใส่ไหม" */
+export type PhotoMode = "onFail" | "required" | "optional" | "off";
 
 export const PHOTO_LABEL: Record<PhotoMode, string> = {
-  off: "ไม่ต้องแนบ",
-  optional: "แนบได้ ไม่บังคับ",
   onFail: "บังคับเมื่อไม่ผ่าน",
+  required: "บังคับ",
+  optional: "ไม่บังคับ",
+  off: "ไม่มี",
 };
 
 export const PHOTO_KEYS = Object.keys(PHOTO_LABEL) as PhotoMode[];
+
+// ---------------------------------------------------------------
+// ตัวเลือกการตัดสิน — ปุ่มที่ผู้ตรวจกดได้ต่อหนึ่งหัวข้อ
+//
+// "ไม่มี" คือข้อที่ไม่เกี่ยวกับของล็อตนั้น เช่นไม่มีสติกเกอร์ให้ตรวจ
+// ไม่นับเป็นผ่านหรือไม่ผ่าน ผลรวมทั้งใบข้ามข้อนั้นไป
+// ---------------------------------------------------------------
+
+export type VerdictOption = "pass" | "fail" | "na";
+
+export const VERDICT_OPTION_LABEL: Record<VerdictOption, string> = {
+  pass: "ผ่าน",
+  fail: "ไม่ผ่าน",
+  na: "ไม่มี",
+};
+
+export const VERDICT_OPTION_KEYS = Object.keys(
+  VERDICT_OPTION_LABEL
+) as VerdictOption[];
+
+// ---------------------------------------------------------------
+// ประเภทรายงาน — หมวดย่อยของการ์ดในหน้าหลัก
+//
+// ช่วงการตรวจสอบตอบว่า "ของไหลไปทางไหน" ซึ่งเป็นภาษาของระบบสต็อก ส่วนหน้าหลัก
+// ต้องจัดตามที่คนหน้างานหาของ — ตรวจรับเข้า / ระหว่างผลิต / สุ่มตรวจ / จ่ายออก
+// สุ่มตรวจไม่ใช่ช่วงไหนเลย จึงเก็บแยก ไม่ได้อ่านจากช่วงการตรวจ
+//
+// เพิ่มได้จากช่องเลือกในหน้าตั้งค่ารายงาน หมวดใหม่ขึ้นในหน้าหลักทันทีที่มีรายงานใช้
+// ---------------------------------------------------------------
+
+export type ReportType = { id: string; label: string };
+
+export const REPORT_TYPES: ReportType[] = [
+  { id: "rt-incoming", label: "ตรวจรับเข้า" },
+  { id: "rt-production", label: "ตรวจระหว่างผลิต" },
+  { id: "rt-random", label: "สุ่มตรวจ" },
+  { id: "rt-outgoing", label: "ตรวจจ่ายออก" },
+];
+
+export const reportTypeOf = (id: string | undefined) =>
+  REPORT_TYPES.find((t) => t.id === id);
+
+/** เพิ่มประเภทใหม่ — ชื่อซ้ำคืนตัวเดิม ไม่สร้างหมวดซ้อนกันสองอันในหน้าหลัก */
+export function addReportType(label: string): ReportType {
+  const name = label.trim();
+  const dup = REPORT_TYPES.find(
+    (t) => t.label.toLowerCase() === name.toLowerCase()
+  );
+  if (dup) return dup;
+  const t = { id: uid("rt"), label: name };
+  REPORT_TYPES.push(t);
+  return t;
+}
+
+/** ประเภทสินค้าที่รายงานนี้ใช้ — ชุดเดียวกับหมวดสินค้าของคลัง */
+export const PRODUCT_TYPES = [
+  "ปุ๋ยจัมโบ้",
+  "ปุ๋ยกระสอบ",
+  "กระสอบ",
+  "สินค้า OEM",
+  "สติกเกอร์",
+  "ของแจกของแถม",
+  "ของใช้ไลน์ผลิต",
+];
+
+// ---------------------------------------------------------------
+// ช่วงการตรวจสอบแบบที่หน้าตั้งค่าโชว์ — ช่องเดียว ห้าค่า
+//
+// ข้างในยังเก็บเป็น phase + prodSteps เหมือนเดิม เพราะคิวตรวจและเมนูที่งอก
+// จากเทมเพลตอ่านสองช่องนั้นอยู่ ช่องนี้แค่ยุบให้เลือกทีเดียวจบ
+//
+// "ทั้งรอบการผลิต" มีไว้ให้ฟอร์มที่ล็อตเดียวต้องเดินครบสามจุด — ไม่มีตัวนี้
+// ฟอร์มแบบนั้นจะตั้งจากหน้านี้ไม่ได้เลย
+// ---------------------------------------------------------------
+
+export type Stage = "incoming" | "pre" | "during" | "post" | "round" | "outgoing";
+
+export const STAGE: Record<Stage, { label: string; erp: string }> = {
+  incoming: { label: "รับเข้า", erp: "Incoming" },
+  pre: { label: "ก่อนผลิต", erp: "Pre-Production" },
+  during: { label: "ระหว่างผลิต", erp: "Inprocess" },
+  post: { label: "หลังผลิต", erp: "Post-Production" },
+  round: { label: "ทั้งรอบการผลิต", erp: "ก่อน · ระหว่าง · หลังผลิต" },
+  outgoing: { label: "ส่งออก", erp: "Outgoing" },
+};
+
+export const STAGE_KEYS = Object.keys(STAGE) as Stage[];
+
+export function stageOf(t: Pick<QiTemplate, "phase" | "prodSteps">): Stage | "" {
+  if (t.phase === "incoming" || t.phase === "outgoing") return t.phase;
+  if (t.phase !== "production") return "";
+  if (t.prodSteps.length === 1) return t.prodSteps[0];
+  return "round";
+}
+
+export function stagePatch(
+  stage: Stage
+): Pick<QiTemplate, "phase" | "prodSteps"> {
+  if (stage === "incoming" || stage === "outgoing")
+    return { phase: stage, prodSteps: [] };
+  if (stage === "round")
+    return { phase: "production", prodSteps: ["pre", "during", "post"] };
+  return { phase: "production", prodSteps: [stage] };
+}
 
 export type QiTemplate = {
   id: string;
@@ -965,8 +1085,58 @@ export type QiTemplate = {
    * เพราะถ้าระบบตั้ง Stop ไว้ มันโยนก่อนที่ hook ของเราจะได้ทำงาน
    */
   onRejected: GuardAction | "system";
-  onNotSubmitted: GuardAction | "system";
+  /** "off" = ไม่บังคับตรวจ — เอกสารเดินต่อได้แม้ยังไม่มีใบตรวจ */
+  onNotSubmitted: GuardAction | "system" | "off";
+  /** หมวดย่อยในหน้าหลัก — id ใน REPORT_TYPES ว่างคือไปอยู่กลุ่มอื่น ๆ */
+  reportType: string;
+  /** ประเภทสินค้าที่ใช้รายงานนี้ — ว่างคือยังไม่ได้ระบุ */
+  productTypes: string[];
+  /**
+   * เชื่อมโยงกับเอกสารในระบบ — ปิดคือรายงานที่ผู้ตรวจเปิดเอง
+   * ไม่มีช่วงการตรวจ เอกสารอ้างอิง หรือการบล็อกเอกสารให้ตั้ง
+   */
+  linkDocs: boolean;
+  /** มีส่วนหัวเอกสารไหม — ปิดแล้วช่องที่ตั้งไว้ยังเก็บไว้ เปิดใหม่ไม่ต้องตั้งซ้ำ */
+  headerOn: boolean;
+  header: DocField[];
+  /** หมายเหตุท้ายใบ — ผู้ตรวจต้องใส่ไหม */
+  remark: PhotoMode;
+  /** ปุ่มที่ผู้ตรวจกดได้ต่อหนึ่งหัวข้อ */
+  verdicts: VerdictOption[];
 };
+
+/** ช่องที่หน้าตั้งค่ารายงานแบบใหม่เพิ่มเข้ามา — ฟอร์มตั้งต้นไม่ต้องเขียนครบ */
+type DesignKeys =
+  | "reportType"
+  | "productTypes"
+  | "linkDocs"
+  | "headerOn"
+  | "header"
+  | "remark"
+  | "verdicts";
+
+type SeedTemplate = Omit<QiTemplate, DesignKeys> &
+  Partial<Pick<QiTemplate, DesignKeys>>;
+
+/** ประเภทรายงานของฟอร์มตั้งต้น — อ่านจากช่วงการตรวจ ยกเว้นสุ่มตรวจที่อ่านจากชื่อ */
+function defaultReportType(t: SeedTemplate): string {
+  if (t.name.startsWith("สุ่มตรวจ")) return "rt-random";
+  if (t.phase === "incoming") return "rt-incoming";
+  if (t.phase === "production") return "rt-production";
+  if (t.phase === "outgoing") return "rt-outgoing";
+  return "";
+}
+
+const withDesignDefaults = (t: SeedTemplate): QiTemplate => ({
+  reportType: defaultReportType(t),
+  productTypes: [],
+  linkDocs: t.phase !== "" || t.refMenu !== "",
+  headerOn: false,
+  header: [],
+  remark: "onFail",
+  verdicts: ["pass", "fail"],
+  ...t,
+});
 
 export const ITEM_POOL = [
   "21-0-0 ฟูเจียน ผง",
@@ -1168,7 +1338,7 @@ const manual = (
    ระหว่างผลิตมีเอกสารอ้างอิง เลยนับเป็น "ตามเอกสาร" ทั้งที่ชื่อขึ้นต้นว่าสุ่ม
 --------------------------------------------------------------- */
 
-export const QI_TEMPLATES: QiTemplate[] = [
+const SEED_TEMPLATES: SeedTemplate[] = [
   // ---------- 1 อ้างอิงเอกสาร ----------
   {
     id: "t-rm",
@@ -1620,6 +1790,20 @@ export const QI_TEMPLATES: QiTemplate[] = [
   },
 ];
 
+/* หมวดที่อ่านจากช่วงการตรวจไม่ได้ — ฟอร์มตรวจในคลังไม่ได้ขึ้นต้นว่าสุ่ม
+   แต่หน้างานเรียกรวมกับสุ่มตรวจ ส่วน COA คือของที่มากับการรับเข้า */
+const SEED_REPORT_TYPE: Record<string, string> = {
+  "t-tank-rm": "rt-random",
+  "t-tank-fg": "rt-random",
+  "t-coa": "rt-incoming",
+};
+
+export const QI_TEMPLATES: QiTemplate[] = SEED_TEMPLATES.map((t) =>
+  withDesignDefaults(
+    SEED_REPORT_TYPE[t.id] ? { ...t, reportType: SEED_REPORT_TYPE[t.id] } : t
+  )
+);
+
 /** ที่อยู่ของฟอร์มหนึ่งใบ — ฟอร์มตัวอย่างมีหน้าของตัวเอง ที่เหลือใช้หน้ามาตรฐาน */
 export const hrefOf = (t: QiTemplate) => t.href ?? `/qc/setup-erp/${t.id}`;
 
@@ -1722,6 +1906,96 @@ export const DEFAULT_GUARD: StockGuard = {
   onNotSubmitted: "stop",
   allowAfter: false,
 };
+
+// ---------------------------------------------------------------
+// การบังคับใช้ระดับสินค้า — Item
+//
+// สองติ๊กนี้อยู่ที่ Item ไม่ได้อยู่ที่เทมเพลต ตอนแรกเราให้ตั้งจากหน้าเทมเพลต
+// เพราะคนตั้งคิดจากฝั่งฟอร์ม แต่พอฟอร์มหลายใบผูกสินค้าตัวเดียวกัน
+// มันกลายเป็นหลายที่เขียนช่องเดียว ใครบันทึกทีหลังทับคนก่อนโดยไม่มีใครเห็น
+//
+// ตอนนี้จึงมีผู้เขียนที่เดียวต่อหนึ่งช่อง
+//   beforePurchase / beforeDelivery  เขียนที่ /qc/setup-erp/items เท่านั้น
+//   targets (สินค้าที่ฟอร์มนี้ครอบ)   เขียนที่หน้าเทมเพลตเท่านั้น
+// หน้าไหนไม่ใช่เจ้าของช่องให้โชว์อ่านอย่างเดียวแล้วลิงก์ไปหาเจ้าของ
+// ---------------------------------------------------------------
+
+/** ทิศทางที่ ERPNext มีช่องบังคับตรวจให้ — ระหว่างผลิตไม่มี */
+export type QcDirection = "purchase" | "delivery";
+
+export type ItemQc = {
+  /** inspection_required_before_purchase */
+  beforePurchase: boolean;
+  /** inspection_required_before_delivery */
+  beforeDelivery: boolean;
+};
+
+export const QC_DIRECTION_FIELD: Record<QcDirection, string> = {
+  purchase: "inspection_required_before_purchase",
+  delivery: "inspection_required_before_delivery",
+};
+
+export const QC_DIRECTION_LABEL: Record<QcDirection, string> = {
+  purchase: "ตรวจก่อนรับเข้า",
+  delivery: "ตรวจก่อนส่งออก",
+};
+
+/** ช่วงการตรวจของฟอร์ม → ช่องที่ Item ที่คู่กัน · ระหว่างผลิตไม่มีช่องให้บังคับ */
+export const directionOf = (t: InspectionType): QcDirection | null =>
+  t === "incoming" ? "purchase" : t === "outgoing" ? "delivery" : null;
+
+const EMPTY_ITEM_QC: ItemQc = { beforePurchase: false, beforeDelivery: false };
+
+/** ค่าตั้งต้นให้ดูเหมือนระบบที่ใช้มาสักพัก ไม่ใช่ตารางว่างทั้งคอลัมน์ */
+const ITEM_QC: Record<string, ItemQc> = {
+  "21-0-0 ฟูเจียน ผง": { beforePurchase: true, beforeDelivery: false },
+  "46-0-0 ยูเรีย": { beforePurchase: true, beforeDelivery: false },
+  "18-46-0 DAP": { beforePurchase: false, beforeDelivery: false },
+  "ปุ๋ยสูตร 15-15-15 กระสอบ 50 กก.": { beforePurchase: false, beforeDelivery: true },
+  "ปุ๋ยสูตร 16-20-0 กระสอบ 50 กก.": { beforePurchase: false, beforeDelivery: false },
+  "ปุ๋ยจัมโบ้ Bulk": { beforePurchase: false, beforeDelivery: false },
+};
+
+export const itemQcOf = (item: string): ItemQc =>
+  ITEM_QC[item] ?? EMPTY_ITEM_QC;
+
+export const itemRequires = (item: string, dir: QcDirection) =>
+  dir === "purchase"
+    ? itemQcOf(item).beforePurchase
+    : itemQcOf(item).beforeDelivery;
+
+export function setItemQc(item: string, dir: QcDirection, on: boolean) {
+  const cur = ITEM_QC[item] ?? { ...EMPTY_ITEM_QC };
+  ITEM_QC[item] = {
+    ...cur,
+    ...(dir === "purchase" ? { beforePurchase: on } : { beforeDelivery: on }),
+  };
+}
+
+/** ฟอร์มตรวจสินค้าทุกใบที่ผูกสินค้าตัวนี้ไว้
+ *
+ *  คืนเป็นอาเรย์ ไม่ใช่ตัวเดียว เพราะของจริงมีได้หลายใบ — แต่
+ *  Item.quality_inspection_template เป็น Link เดี่ยว เก็บได้ใบเดียว
+ *  ตัวที่เกินคือของที่จะหายตอนขึ้นระบบ ต้องเห็นได้ ไม่ใช่ซ่อนไว้ */
+export const templatesOfItem = (item: string) =>
+  QI_TEMPLATES.filter(
+    (t) => usesQualityInspection(t) && t.targets.includes(item)
+  );
+
+/** สินค้าที่มีฟอร์มแย่งช่อง quality_inspection_template กันเกินหนึ่งใบ */
+export const isContested = (item: string) => templatesOfItem(item).length > 1;
+
+/** นับว่าในสินค้าที่ฟอร์มนี้ผูกไว้ ติ๊กบังคับตรวจไปแล้วกี่ตัว */
+export function enforcedCount(t: QiTemplate): {
+  dir: QcDirection | null;
+  on: number;
+  total: number;
+} {
+  const dir = directionOf(t.inspectionType);
+  const total = t.targets.length;
+  if (!dir) return { dir, on: 0, total };
+  return { dir, on: t.targets.filter((i) => itemRequires(i, dir)).length, total };
+}
 
 // ---------------------------------------------------------------
 // ตัวช่วยอ่านค่า
@@ -1920,8 +2194,26 @@ export const blankTemplate = (): QiTemplate => ({
   requireBefore: true,
   dispositions: [],
   requireDisposition: false,
-  onRejected: "system",
-  onNotSubmitted: "system",
+  // รายงานใหม่ตั้งแบบที่โรงงานใช้บ่อยสุด — ยังไม่ตรวจห้ามเดินต่อ ตรวจแล้วไม่ผ่าน
+  // แค่เตือน เพราะคนที่ตัดสินว่าจะรับสภาพหรือส่งคืนคือคนหน้างาน ไม่ใช่ระบบ
+  onRejected: "warn",
+  onNotSubmitted: "stop",
+  reportType: "",
+  productTypes: [],
+  linkDocs: true,
+  headerOn: false,
+  header: [],
+  remark: "onFail",
+  verdicts: ["pass", "fail"],
+});
+
+/** ช่องหัวเอกสารใหม่ — เริ่มที่ดึงจากระบบ เพราะหัวใบส่วนใหญ่คือของที่ระบบมีอยู่แล้ว */
+export const newDocField = (): DocField => ({
+  id: uid("hd"),
+  kind: "system",
+  label: "",
+  source: "",
+  required: true,
 });
 
 /** เอาร่างเข้ารายการจริง — เรียกตอนกดบันทึกครั้งแรกเท่านั้น */

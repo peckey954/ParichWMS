@@ -6,7 +6,7 @@
 // จะได้ไม่หลอกให้กดแล้วเจอ 404
 // ============================================================
 
-import { QI_TEMPLATES } from "@/lib/qc-erp";
+import { QI_TEMPLATES, REPORT_TYPES, templateOf } from "@/lib/qc-erp";
 
 export type ModuleGroupId =
   | "purchase"
@@ -75,6 +75,17 @@ export type ModuleItem = {
    * ถ้าทุกเมนูมีป้ายเหมือนกันหมด ป้ายจะกลายเป็นของประดับ ไม่มีใครมอง
    */
   pending?: number;
+  /**
+   * หมวดย่อยในหน้าหลัก — id ใน REPORT_TYPES ใช้กับหมวดตรวจคุณภาพเท่านั้น
+   * ไม่ใส่คือไปอยู่กลุ่ม "อื่น ๆ" ท้ายหมวด
+   */
+  reportType?: string;
+  /**
+   * เทมเพลตที่การ์ดนี้เป็นหน้าทำงานให้ — ใส่แล้วหมวดย่อยอ่านจากเทมเพลต
+   * แก้ประเภทรายงานในหน้าตั้งค่าแล้วการ์ดย้ายหมวดตาม ไม่ต้องมาแก้ไฟล์นี้
+   * และเทมเพลตที่มีการ์ดแล้วจะไม่งอกการ์ดซ้ำอีกใบ
+   */
+  templateIds?: string[];
 };
 
 export const MODULES: ModuleItem[] = [
@@ -151,6 +162,7 @@ export const MODULES: ModuleItem[] = [
     href: "/qc/raw-receiving",
     // เท่ากับจำนวนใบในแท็บรอตรวจวัตถุดิบ — ตัวเลขบนการ์ดกับในหน้าต้องตรงกัน
     pending: 11,
+    templateIds: ["t-rm"],
   },
   {
     id: "qc-fg-in",
@@ -159,6 +171,7 @@ export const MODULES: ModuleItem[] = [
     code: "FM-QC-02-03",
     icon: "packageSearch",
     href: "/qc/goods-receiving",
+    reportType: "rt-incoming",
   },
   {
     id: "qc-pre",
@@ -167,6 +180,7 @@ export const MODULES: ModuleItem[] = [
     shortLabel: "ตรวจก่อนผลิต",
     code: "FM-PD-01-03",
     icon: "listTodo",
+    templateIds: ["t-pre"],
   },
   {
     id: "qc-check",
@@ -176,12 +190,14 @@ export const MODULES: ModuleItem[] = [
     icon: "clipboardCheck",
     href: "/qc/checks",
     pending: 3,
+    // หน้านี้คือใบตรวจในคลังที่ทำซ้ำตามรอบ ทั้งวัตถุดิบและสินค้า
+    templateIds: ["t-tank-rm", "t-tank-fg"],
   },
-  { id: "qc-machine", group: "qc", label: "ตรวจเครื่องจักร", code: "FM-PD-01-03", icon: "scanSearch" },
-  { id: "qc-inline", group: "qc", label: "ตรวจระหว่างผลิต", code: "FM-ST-01-02", icon: "searchCheck" },
-  { id: "qc-post", group: "qc", label: "ตรวจหลังผลิต", code: "FM-QC-02-04", icon: "packageCheck" },
-  { id: "qc-warehouse", group: "qc", label: "ตรวจคลังสินค้า", code: "FM-ST-01-02", icon: "search" },
-  { id: "qc-complaint", group: "qc", label: "ร้องเรียนลูกค้า", code: "FM-PD-01-03", icon: "complaint", pending: 2 },
+  { id: "qc-machine", group: "qc", label: "ตรวจเครื่องจักร", code: "FM-PD-01-03", icon: "scanSearch", templateIds: ["t-machine"] },
+  { id: "qc-inline", group: "qc", label: "ตรวจระหว่างผลิต", code: "FM-ST-01-02", icon: "searchCheck", reportType: "rt-production" },
+  { id: "qc-post", group: "qc", label: "ตรวจหลังผลิต", code: "FM-QC-02-04", icon: "packageCheck", templateIds: ["t-post"] },
+  { id: "qc-warehouse", group: "qc", label: "ตรวจคลังสินค้า", code: "FM-ST-01-02", icon: "search", templateIds: ["t-warehouse"] },
+  { id: "qc-complaint", group: "qc", label: "ร้องเรียนลูกค้า", code: "FM-PD-01-03", icon: "complaint", pending: 2, templateIds: ["t-complaint"] },
 
   // ---------- บัญชี ----------
   {
@@ -197,20 +213,11 @@ export const MODULES: ModuleItem[] = [
   // ไม่ใช่งานประจำวัน แต่อยู่ท้ายเมนูหลักเพื่อให้หาเจอโดยไม่ต้องรู้มาก่อน
   // ว่าต้องไปที่เมนูข้าง — ของที่ตั้งครั้งเดียวแล้วใช้ยาวมักถูกลืมว่าตั้งที่ไหน
   {
-    id: "qc-template",
-    group: "settings",
-    label: "ตั้งค่ารายงาน QC",
-    description: "สร้างและแก้ไขโครงฟอร์มตรวจคุณภาพ กำหนดช่วงเวลาที่ใช้และกลุ่มผู้ใช้",
-    code: "FM-QC-02-03",
-    icon: "clipboardCheck",
-    href: "/qc/setup",
-  },
-  {
     id: "qc-setup-erp",
     group: "settings",
-    label: "Setup QC",
+    label: "ตั้งค่ารายงาน QC",
     description:
-      "ตั้งค่าการตรวจคุณภาพตามโครง ERPNext — เทมเพลต ทะเบียนหัวข้อตรวจ และการบังคับใช้กับการรับของ",
+      "สร้างและแก้ไขรายงานตรวจคุณภาพ ประเภทรายงาน หัวข้อตรวจ และการบังคับใช้กับการรับ–จ่ายของ",
     code: "FM-QC-02-04",
     icon: "clipboardCheck",
     href: "/qc/setup-erp",
@@ -256,20 +263,57 @@ export const SETTINGS_ITEMS: ModuleItem[] = MODULES.filter(
  * เคยต้องมาเพิ่มเมนูมือทุกครั้งที่มีฟอร์มใหม่ ซึ่งแปลว่าวันหนึ่งจะลืม แล้ว
  * เทมเพลตที่ตั้งไว้จะไม่มีใครเจอ — เกิดขึ้นแล้วกับฟอร์มตรวจสินค้าสำเร็จรูป
  *
- * ตอนนี้งอกเฉพาะฟอร์มที่มีขั้นย่อยของการผลิต เพราะหน้าคิวทำได้แค่รูปแบบนั้น
- * ฟอร์มรับเข้ากับส่งออกมีหน้าของตัวเองอยู่แล้ว
+ * งอกทุกเทมเพลตที่เปิดใช้และยังไม่มีการ์ดของตัวเอง ไปอยู่หมวดย่อยตามประเภท
+ * รายงานที่ตั้งไว้ ตั้งประเภทใหม่แล้วหมวดใหม่ขึ้นในหน้าหลักเลย
+ *
+ * หน้าคิวทำได้แค่ฟอร์มที่มีขั้นย่อยของการผลิต — ที่เหลือขึ้นเป็นการ์ดที่ยังกด
+ * ไม่ได้ ดีกว่าไม่ขึ้นเลยจนคนนึกว่าตั้งไม่ติด
  */
-export const templateModules = (): ModuleItem[] =>
-  QI_TEMPLATES.filter(
-    (t) => t.active && t.phase === "production" && t.prodSteps.length > 0
-  ).map((t) => ({
-    id: `qc-queue-${t.id}`,
+export const templateModules = (): ModuleItem[] => {
+  const claimed = new Set(MODULES.flatMap((m) => m.templateIds ?? []));
+  return QI_TEMPLATES.filter((t) => t.active && !claimed.has(t.id)).map((t) => ({
+    id: `qc-tpl-${t.id}`,
     group: "qc" as const,
     label: t.name,
     code: t.code,
     icon: "packageCheck",
-    href: `/qc/queue/${t.id}`,
+    href:
+      t.phase === "production" && t.prodSteps.length > 0
+        ? `/qc/queue/${t.id}`
+        : undefined,
+    reportType: t.reportType || undefined,
   }));
+};
+
+/** หมวดย่อยของการ์ด — การ์ดที่ผูกเทมเพลตอ่านจากเทมเพลต ไม่ใช่ค่าที่เขียนค้างไว้ */
+export const reportTypeOfModule = (m: ModuleItem): string | undefined => {
+  const tpl = m.templateIds?.map(templateOf).find(Boolean);
+  return tpl ? tpl.reportType || undefined : m.reportType;
+};
+
+/**
+ * แบ่งการ์ดของหมวดหนึ่งเป็นหมวดย่อยตามประเภทรายงาน เรียงตามทะเบียนประเภท
+ * การ์ดที่ไม่มีประเภทไปรวมท้ายสุด — หมวดที่ไม่มีการ์ดไหนมีประเภทเลยคืนก้อนเดียว
+ * ไม่มีหัวข้อย่อย หน้าหลักจะได้วาดแบบเดิม
+ */
+export function subgroupsOf(
+  items: ModuleItem[]
+): { id: string; label: string | null; items: ModuleItem[] }[] {
+  if (!items.some((m) => reportTypeOfModule(m))) {
+    return [{ id: "all", label: null, items }];
+  }
+  const known = REPORT_TYPES.map((t) => ({
+    id: t.id,
+    label: t.label as string | null,
+    items: items.filter((m) => reportTypeOfModule(m) === t.id),
+  }));
+  const rest = items.filter(
+    (m) => !REPORT_TYPES.some((t) => t.id === reportTypeOfModule(m))
+  );
+  return [...known, { id: "other", label: "อื่น ๆ", items: rest }].filter(
+    (g) => g.items.length > 0
+  );
+}
 
 /** เมนูทั้งหมด = ที่เขียนไว้ตายตัว + ที่งอกจากเทมเพลต */
 export const allModules = (): ModuleItem[] => [...MODULES, ...templateModules()];

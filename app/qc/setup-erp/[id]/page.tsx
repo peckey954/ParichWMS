@@ -4,15 +4,9 @@ import * as React from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import {
-  CalendarDaysIcon,
-  ChevronDownIcon,
-  ChevronUpIcon,
   CircleCheckIcon,
   CircleXIcon,
-  CopyIcon,
   EyeIcon,
-  InfoIcon,
-  ListChecksIcon,
   MinusIcon,
   PlusIcon,
   Trash2Icon,
@@ -64,10 +58,11 @@ import { cn } from "@peckey954/ui/lib/utils";
 import { toast } from "sonner";
 import { CheckChip } from "@/components/check-chip";
 import { ChoiceGroup } from "@/components/choice-group";
-import { ChipGroup } from "@/components/chip-group";
 import { SchedulePreviewCalendar } from "@/components/qc/schedule-calendar";
 import { TimeField } from "@/components/time-field";
 import { MultiSelectChips } from "@/components/multi-select-chips";
+import { DRAG_ITEM_ATTR, DragHandle } from "@/components/drag-handle";
+import { SearchSelect } from "@/components/qc/search-select";
 import {
   CheckTable,
   criteriaProblems,
@@ -75,29 +70,15 @@ import {
 } from "@/components/qc/check-table";
 import {
   DEFAULT_SCHEDULE,
-  ORIGIN,
-  DISPOSITIONS,
   DEFAULT_GUARD,
-  GUARD_LABEL,
-  GUARD_PICK,
-  GUARD_PICK_LABEL,
   type GuardAction,
-  INSPECTION_TYPE_VALUE,
   MAX_READINGS,
-  PHASE,
-  PHASE_KEYS,
-  PROD_STEP,
-  PROD_STEP_KEYS,
   REF_MENU,
   refMenusFor,
-  type Phase,
-  type ProdStep,
   type RefMenu,
   usesQualityInspection,
-  cloneRow,
   describeCriteria,
   dispositionOf,
-  originOf,
   docsPerDay,
   newShift,
   shiftOvernight,
@@ -110,7 +91,6 @@ import {
   PHOTO_KEYS,
   PHOTO_LABEL,
   type PhotoMode,
-  blockersOf,
   sourcePool,
   SOURCE,
   blankTemplate,
@@ -120,6 +100,19 @@ import {
   type QiSchedule,
   type QiTemplate,
   type SourceId,
+  type DocField,
+  type Stage,
+  HEADER_SOURCES,
+  PRODUCT_TYPES,
+  REPORT_TYPES,
+  STAGE,
+  STAGE_KEYS,
+  VERDICT_OPTION_KEYS,
+  VERDICT_OPTION_LABEL,
+  addReportType,
+  newDocField,
+  stageOf,
+  stagePatch,
 } from "@/lib/qc-erp";
 
 /* ------------------------------------------------------------------
@@ -157,7 +150,7 @@ export default function SetupQcTemplatePage() {
         <div className="mt-10 rounded-xl border border-dashed border-border px-6 py-14 text-center">
           <p className="font-medium">ไม่พบเทมเพลตนี้</p>
           <Button asChild variant="outline-primary" className="mt-4">
-            <Link href="/qc/setup-erp">กลับไปหน้า Setup QC</Link>
+            <Link href="/qc/setup-erp">กลับไปหน้าตั้งค่ารายงาน QC</Link>
           </Button>
         </div>
       </main>
@@ -178,8 +171,6 @@ function Editor({ seed, isNew }: { seed: QiTemplate; isNew: boolean }) {
      จากทุกแถวพร้อมกัน — ERPNext เองก็ตัดสินทั้งใบจาก readings ทั้งตาราง */
   const [tries, setTries] = React.useState<Record<string, RoundState>>({});
   const tryOf = (id: string) => tries[id] ?? EMPTY_ROUND;
-  // เหตุผลที่ลง Quality Inspection ไม่ได้ — อ่านสด ๆ จากที่ตั้งไว้ ไม่ได้เก็บแยก
-  const blockers = blockersOf(tpl);
   /* ค่าระบบ — ของจริงอ่านจาก Stock Settings ตัวเดียวทั้งระบบ ที่นี่ไม่มีหลังบ้าน
      จึงอ่านค่าตั้งต้นมาโชว์ ให้เห็นว่า "ตามค่าระบบ" ตอนนี้แปลว่าอะไร */
   const guard = DEFAULT_GUARD;
@@ -195,19 +186,9 @@ function Editor({ seed, isNew }: { seed: QiTemplate; isNew: boolean }) {
   const patch = (next: Partial<QiTemplate>) => setTpl((p) => ({ ...p, ...next }));
   const patchSchedule = (next: Partial<QiSchedule>) =>
     setTpl((p) => ({ ...p, schedule: { ...p.schedule, ...next } }));
-  // ที่มาของใบอ่านจากโครงสด ๆ — เปิดรอบการตรวจหรือเอาเอกสารอ้างอิงออก
-  // ป้ายเปลี่ยนทันที ไม่มีที่ให้ป้ายค้างไว้จนโกหก
-  const origin = originOf(tpl);
-
-  /**
-   * คัดลอกทั้งชุดต่อท้าย — ฟอร์มกระดาษที่มีคอลัมน์ "ตรวจครั้งที่ 1/2/3"
-   *
-   * ERPNext คัดลอกแถวเทมเพลตลงใบแบบหนึ่งต่อหนึ่ง ไม่ได้คูณให้ตามจำนวนรอบ
-   * เทมเพลตจึงต้องมีแถวครบทุกรอบเอง — แปดข้อสามรอบคือยี่สิบสี่แถวจริง ๆ
-   * กดปุ่มนี้สองครั้งแทนการกดคัดลอกทีละข้อสิบหกครั้ง
-   */
-  const duplicateAll = () =>
-    setTpl((p) => ({ ...p, rows: [...p.rows, ...p.rows.map(cloneRow)] }));
+  const stage = stageOf(tpl);
+  // ตัวเลือกที่ยังไม่ได้ตั้งชื่อไม่ขึ้นในใบ — ช่องว่างให้กดไม่ได้บอกอะไรผู้ตรวจ
+  const dispositions = tpl.dispositions.filter((d) => d.trim() !== "");
 
   const patchRow = (id: string, next: Partial<QiRow>) =>
     setTpl((p) => ({
@@ -284,7 +265,7 @@ function Editor({ seed, isNew }: { seed: QiTemplate; isNew: boolean }) {
 
   return (
     <>
-      <main className="@container mx-auto w-full max-w-5xl px-4 pt-6 pb-24 sm:px-6">
+      <main className="@container mx-auto w-full max-w-7xl px-4 pt-6 pb-24 sm:px-6">
         <Breadcrumb>
           <BreadcrumbList>
             <BreadcrumbItem>
@@ -292,13 +273,11 @@ function Editor({ seed, isNew }: { seed: QiTemplate; isNew: boolean }) {
             </BreadcrumbItem>
             <BreadcrumbSeparator />
             <BreadcrumbItem>
-              <BreadcrumbLink href="/qc/setup-erp">
-                ตั้งค่ารายงานตรวจสอบ QC
-              </BreadcrumbLink>
+              <BreadcrumbLink href="/qc/setup-erp">ตั้งค่ารายงาน</BreadcrumbLink>
             </BreadcrumbItem>
             <BreadcrumbSeparator />
             <BreadcrumbItem>
-              <BreadcrumbPage className="text-primary">ตั้งค่ารายงาน</BreadcrumbPage>
+              <BreadcrumbPage className="text-primary">รายงาน</BreadcrumbPage>
             </BreadcrumbItem>
           </BreadcrumbList>
         </Breadcrumb>
@@ -306,738 +285,462 @@ function Editor({ seed, isNew }: { seed: QiTemplate; isNew: boolean }) {
         <div className="mt-4 flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0">
             <h1 className="text-2xl font-semibold tracking-tight">
-              ตั้งค่ารายงานตรวจสอบ QC
+              รายงานตรวจสอบ QC
             </h1>
             <p className="mt-1 text-sm text-muted-foreground">
-              สร้างแบบรายงานตรวจคุณภาพได้ตามต้องการ เพิ่ม ลบ และแก้ไขหัวข้อการตรวจได้ตามกำหนด
+              สร้างแบบรายงานตรวจคุณภาพ เพิ่ม ลบ และแก้ไขหัวข้อการตรวจได้ตามกำหนด
             </p>
           </div>
           {/* เปิด/ปิดได้จากตรงนี้เลย ไม่ต้องกลับไปหน้ารายการ — ปิดแล้วฟอร์มยังอยู่
               แค่ไม่ถูกหยิบไปใช้กับใบตรวจใหม่ ใบเก่าที่ออกไปแล้วไม่กระทบ */}
-          <div className="shrink-0 text-right">
-            <label className="flex items-center gap-2 text-sm">
-              <Switch
-                checked={tpl.active}
-                onCheckedChange={(v) => patch({ active: v })}
-              />
-              เปิดใช้งานรายงานนี้
-            </label>
-            <FieldNote custom>custom_disabled</FieldNote>
-          </div>
-        </div>
-
-        {/* ฟอร์มที่ลง ERPNext ตรง ๆ ไม่ได้ ต้องบอกตั้งแต่บรรทัดแรกของหน้า
-             ไม่ใช่ปล่อยให้ตั้งค่าจนจบแล้วค่อยมีคนมาบอกว่าของแบบนี้ระบบไม่รับ */}
-        {/* ฟอร์มที่ไม่ได้เกิดจากเอกสาร ต้องบอกตั้งแต่บรรทัดแรกของหน้า
-             ไม่ใช่ปล่อยให้ตั้งค่าจนจบแล้วค่อยมีคนมาบอกว่าของแบบนี้ระบบไม่รับ */}
-        {origin !== "doc" && (
-          <Alert variant="warning" className="mt-4">
-            <InfoIcon />
-            <AlertTitle>ที่มาของใบ: {ORIGIN[origin].label}</AlertTitle>
-            <AlertDescription>{ORIGIN[origin].hint}</AlertDescription>
-          </Alert>
-        )}
-
-        {/* ข้อควรระวังเฉพาะใบนี้ที่อ่านจากโครงไม่ได้ */}
-        {tpl.note && (
-          <Alert variant="brand" className="mt-3">
-            <InfoIcon />
-            <AlertDescription>{tpl.note}</AlertDescription>
-          </Alert>
-        )}
-
-        {/* ปลายทางเป็นผลลัพธ์ ไม่ใช่ช่องให้เลือก — อ่านจากที่ตั้งไว้ทั้งหมด
-            และต้องบอกเหตุผลเป็นรายข้อ ไม่ใช่บอกแค่ว่าเป็น custom แล้วปล่อยให้
-            เดาเอง ซึ่งเป็นสิ่งที่ทำให้คนตั้งค่าไม่กล้าแก้อะไรเลย */}
-        <div
-          className={cn(
-            "mt-5 rounded-xl border px-4 py-3",
-            blockers.length === 0
-              ? "border-success-border bg-success"
-              : "border-border bg-brand"
-          )}
-        >
-          <div className="flex flex-wrap items-center gap-2">
-            <p className="font-medium">
-              {blockers.length === 0
-                ? "ใบของฟอร์มนี้ลง Quality Inspection ของ ERPNext ได้"
-                : "ใบของฟอร์มนี้ต้องไปลง QC Check"}
-            </p>
-            {blockers.length > 0 && (
-              <Badge
-                appearance="soft"
-                tone="warning"
-                className="font-mono text-[10px] uppercase"
-              >
-                custom
-              </Badge>
-            )}
-          </div>
-          <p className="mt-1 text-sm text-muted-foreground">
-            {blockers.length === 0
-              ? "ทุกช่องมีที่เก็บใน doctype มาตรฐาน — บล็อกการรับของได้ อยู่ใต้ Stock Settings และเข้ารายงานมาตรฐาน"
-              : `เพราะ ${blockers.join(" · ")} — ไม่ได้ให้เลือกเอง อ่านจากที่ตั้งไว้ทั้งหมด`}
-          </p>
+          <SwitchLabel
+            checked={tpl.active}
+            onCheckedChange={(v) => patch({ active: v })}
+          >
+            เปิดใช้งาน
+          </SwitchLabel>
         </div>
 
         <Tabs defaultValue="build" className="mt-5">
           <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="build">
-              <ListChecksIcon />
-              โครงสร้างรายงาน
-            </TabsTrigger>
-            <TabsTrigger value="preview">
-              <EyeIcon />
-              ตัวอย่างรายงาน
-            </TabsTrigger>
+            <TabsTrigger value="build">โครงสร้างรายงาน</TabsTrigger>
+            <TabsTrigger value="preview">ตัวอย่างรายงาน</TabsTrigger>
           </TabsList>
 
           <TabsContent value="build">
-        {/* ---------- 1 ข้อมูลรายงาน ----------
-             รวมสามเรื่องที่เคยแยกกันอยู่คนละก้อน — ชื่อ/ช่วงการตรวจ/ของที่ผูก
-             เพราะทั้งสามอย่างตอบคำถามเดียวกันว่า "ใบนี้คือใบอะไร ของใคร"
-             คนตั้งค่าตอบรวดเดียวจบ ไม่ต้องเลื่อนลงไปผูกสินค้าท้ายหน้าอีกรอบ */}
-        <Section
-          index={1}
-          title="ข้อมูลรายงาน"
-          note="ชื่อรายงาน ช่วงที่ใช้ เอกสารที่อ้างอิง และของที่ฟอร์มนี้ผูกอยู่"
-        >
-          <div className="grid gap-4 @2xl:grid-cols-2">
-            <div className="space-y-1.5">
-              <Label htmlFor="tpl-name">ชื่อรายงาน</Label>
-              <Input
-                id="tpl-name"
-                className="bg-card"
-                placeholder="ระบุชื่อรายงาน"
-                value={tpl.name}
-                onChange={(e) => patch({ name: e.target.value })}
-              />
-              {/* ชื่อคือ ID ของเอกสาร การเปลี่ยนชื่อจึงเป็น rename ที่ Frappe
-                  ต้องตามไปแก้ลิงก์ในใบตรวจเก่าให้ ไม่ใช่แค่แก้ข้อความ */}
-              <FieldNote>
-                quality_inspection_template_name · ชื่อนี้คือ ID ของเอกสาร
-              </FieldNote>
-            </div>
-
-            <div className="space-y-1.5">
-              <Label htmlFor="tpl-code">
-                รหัสรายงาน{" "}
-                <span className="font-normal text-muted-foreground">
-                  (ไม่บังคับ)
-                </span>
-              </Label>
-              <Input
-                id="tpl-code"
-                className="bg-card"
-                placeholder="ระบุรหัสรายงาน"
-                value={tpl.code}
-                onChange={(e) => patch({ code: e.target.value })}
-              />
-              <FieldNote custom>custom_code</FieldNote>
-            </div>
-
-            {/* ช่วงใหญ่เลือกอันเดียว ตรงกับ inspection_type ของ ERPNext ที่มี
-                สามค่าตายตัว เคยให้ติ๊กหลายจุดรวมกันซึ่งเอาคนละเรื่องมาปน */}
-            <div className="space-y-1.5">
-              <Label htmlFor="tpl-phase">ช่วงการตรวจสอบ</Label>
-              <Select
-                value={tpl.phase}
-                onValueChange={(v) =>
-                  // ออกจากช่วงการผลิตแล้วขั้นย่อยกับขั้นตอนไม่มีความหมายอีก
-                  // และเอกสารที่เลือกไว้อาจใช้กับช่วงใหม่ไม่ได้ ล้างทั้งหมด
-                  patch({
-                    phase: v as Phase,
-                    prodSteps: v === "production" ? tpl.prodSteps : [],
-                    operations: v === "production" ? tpl.operations : [],
-                    refMenu: "",
-                  })
-                }
-              >
-                <SelectTrigger id="tpl-phase" className="w-full bg-card">
-                  <SelectValue placeholder="เลือกช่วงการตรวจ" />
-                </SelectTrigger>
-                <SelectContent>
-                  {PHASE_KEYS.map((k) => (
-                    <SelectItem key={k} value={k}>
-                      {PHASE[k].label} — {PHASE[k].erp}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <FieldNote>inspection_type · สามค่านี้ ERPNext กำหนดมาตายตัว</FieldNote>
-            </div>
-
-            {/* โชว์เสมอ ปิดไว้เมื่อไม่ใช่ช่วงการผลิต — ซ่อนแล้วช่องข้าง ๆ
-                จะเลื่อนมาแทนที่ทุกครั้งที่สลับ ซึ่งกวนตากว่าเห็นช่องที่กดไม่ได้ */}
-            <div className="space-y-1.5">
-              <Label htmlFor="tpl-steps">ช่วงการผลิต</Label>
-              <MultiSelectChips
-                id="tpl-steps"
-                className="w-full bg-card"
-                disabled={tpl.phase !== "production"}
-                placeholder={
-                  tpl.phase === "production"
-                    ? "เลือกขั้น — ล็อตเดียวกันเดินไปตามลำดับ"
-                    : "ใช้เมื่อเลือกช่วงระหว่างผลิตเท่านั้น"
-                }
-                options={PROD_STEP_KEYS.map((k) => ({
-                  label: `${PROD_STEP[k].label} — ${PROD_STEP[k].erp}`,
-                  value: k,
-                }))}
-                value={tpl.prodSteps}
-                onValueChange={(v) =>
-                  patch({
-                    prodSteps: v as ProdStep[],
-                    ...(v.includes("during") ? {} : { operations: [] }),
-                  })
-                }
-              />
-              <FieldNote custom>
-                custom_prod_steps ที่เทมเพลต — ERPNext ไม่มีแนวคิดขั้นย่อย
-                ตัวจริงกระจายอยู่ที่ Stock Entry, Job Card และ BOM
-              </FieldNote>
-            </div>
-
-            {/* เลือกเป็นชื่อเมนูของเรา ไม่ใช่ชื่อ doctype — คนตั้งค่ารู้จัก
-                "ใบรับวัตถุดิบ" ไม่ได้รู้จัก Purchase Receipt และสองเมนูอาจลง
-                doctype เดียวกันแต่เป็นคนละหน้าจอ เลือกเองจึงยังจำเป็น */}
-            <div className="space-y-1.5">
-              <Label htmlFor="tpl-ref">เอกสารอ้างอิง</Label>
-              <Select
-                value={tpl.refMenu}
-                disabled={tpl.phase === ""}
-                onValueChange={(v) => patch({ refMenu: v as RefMenu })}
-              >
-                <SelectTrigger id="tpl-ref" className="w-full bg-card">
-                  <SelectValue
-                    placeholder={
-                      tpl.phase === ""
-                        ? "เลือกช่วงการตรวจก่อน"
-                        : "เลือกเอกสาร"
-                    }
-                  />
-                </SelectTrigger>
-                <SelectContent>
-                  {refMenusFor(tpl.phase).map((m) => (
-                    <SelectItem key={m} value={m}>
-                      {REF_MENU[m].label} — {REF_MENU[m].erp}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <FieldNote>
-                reference_type (ใบตรวจ · บังคับกรอก)
-                {tpl.refMenu !== "" && ` = ${REF_MENU[tpl.refMenu].erp}`}
-              </FieldNote>
-            </div>
-
-            {/* โชว์เสมอ ปิดไว้เมื่อไม่ได้ติ๊กระหว่างผลิต */}
-            <div className="space-y-1.5">
-              <Label htmlFor="tpl-ops">ขั้นตอนการผลิตที่ต้องตรวจ</Label>
-              <MultiSelectChips
-                id="tpl-ops"
-                className="w-full bg-card"
-                disabled={!tpl.prodSteps.includes("during")}
-                placeholder={
-                  tpl.prodSteps.includes("during")
-                    ? "เลือกขั้นตอน — หนึ่งขั้นตอน = หนึ่งใบตรวจ"
-                    : "ใช้เมื่อเลือกช่วงระหว่างผลิตเท่านั้น"
-                }
-                options={OPERATION_POOL.map((o) => ({ label: o, value: o }))}
-                value={tpl.operations}
-                onValueChange={(v) => patch({ operations: v })}
-              />
-              <FieldNote>
-                BOM Operation · quality_inspection_required · เรียงตาม
-                sequence_id ของสูตรการผลิต ไม่ได้เรียงตามที่เลือกตรงนี้
-              </FieldNote>
-            </div>
-          </div>
-
-          {/* ไล่ทีละขั้นว่าเดฟต้องไปทำอะไร เพราะสามขั้นราคาไม่เท่ากัน
-              สองขั้นคลิกเอาในหน้าจอ มีขั้นเดียวที่ต้องเขียนโค้ด */}
-          {tpl.phase === "production" && tpl.prodSteps.length > 0 && (
-            <div className="mt-3 space-y-2">
-              {PROD_STEP_KEYS.filter((k) => tpl.prodSteps.includes(k)).map(
-                (k) => (
-                  <div
-                    key={k}
-                    className="rounded-xl border border-border bg-card px-4 py-3 text-sm"
-                  >
-                    <p className="font-medium">
-                      {PROD_STEP[k].label} — {PROD_STEP[k].erp}
-                    </p>
-                    <dl className="mt-1 grid gap-x-3 gap-y-0.5 text-muted-foreground @lg:grid-cols-[8rem_1fr]">
-                      <dt>ใบเกิดจาก</dt>
-                      <dd className="font-mono text-xs">{PROD_STEP[k].doc}</dd>
-                      <dt>เทมเพลตมาจาก</dt>
-                      <dd className="font-mono text-xs">
-                        {PROD_STEP[k].template}
-                      </dd>
-                      <dt>บังคับด้วย</dt>
-                      <dd className="font-mono text-xs">
-                        {PROD_STEP[k].enforce}
-                      </dd>
-                      {/* ป้ายที่ ERPNext แปะจริง ไม่ใช่ In Process ทั้งสามขั้น
-                          ต้องเขียนไว้ ไม่งั้นจะงงตอนไปเปิดดูใบจริงแล้วป้ายไม่ตรง
-                          กับช่วงที่เลือกไว้ในหน้านี้ */}
-                      <dt>ป้ายที่ได้จริง</dt>
-                      <dd className="font-mono text-xs">
-                        inspection_type ={" "}
-                        {INSPECTION_TYPE_VALUE[PROD_STEP[k].actualType]}
-                      </dd>
-                    </dl>
-                    {PROD_STEP[k].todo ? (
-                      <p className="mt-2 text-sm text-danger-strong">
-                        ต้องเขียนเพิ่ม — {PROD_STEP[k].todo}
-                      </p>
-                    ) : (
-                      <p className="mt-2 text-sm text-success-strong">
-                        ไม่ต้องเขียนโค้ดเพิ่ม คลิกเอาในหน้าจอของ ERPNext ได้เลย
-                      </p>
-                    )}
-                  </div>
-                )
-              )}
-
-              {/* สามขั้นได้ป้ายคนละค่ากัน ซึ่งขัดกับช่วงใหญ่ที่เลือกว่า In Process
-                  ไม่ใช่บั๊ก แต่เป็นวิธีที่ ERPNext คิดป้ายจากเอกสาร ต้องบอกไว้ */}
-              {tpl.prodSteps.length > 1 && (
-                <p className="px-1 text-sm text-muted-foreground">
-                  สามขั้นนี้ใช้เทมเพลตอันนี้อันเดียว ไม่ต้องสร้างแยก —
-                  แต่ ERPNext จะแปะ inspection_type ให้คนละค่ากันตามเอกสารที่
-                  เปิดใบ ไม่ได้เป็น In Process ทั้งสามขั้นอย่างที่ชื่อช่วงบอก
-                </p>
-              )}
-            </div>
-          )}
-
-          {/* สามช่องนี้เป็นของเทมเพลต ไม่ใช่ของใบตรวจ          {/* สามช่องนี้เป็นของเทมเพลต ไม่ใช่ของใบตรวจ — ตอบว่าฟอร์มนี้ใช้ช่วงไหน
-              และผู้ตรวจต้องแนบรูปไหม ทั้งสามอย่างไม่มีใน Quality Inspection
-              Template ที่มีแค่ชื่อกับตารางหัวข้อ ต้องสร้างฟิลด์เพิ่มทั้งหมด */}
-          <div className="mt-4 grid gap-4 @2xl:grid-cols-3">
-            <div className="space-y-1.5">
-              <Label htmlFor="tpl-photo">แนบรูปภาพ</Label>
-              <Select
-                value={tpl.photo}
-                onValueChange={(v) => patch({ photo: v as PhotoMode })}
-              >
-                <SelectTrigger id="tpl-photo" className="w-full bg-card">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {PHOTO_KEYS.map((k) => (
-                    <SelectItem key={k} value={k}>
-                      {PHOTO_LABEL[k]}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {/* ERPNext แนบไฟล์ได้ทุก doctype อยู่แล้ว แต่บังคับตามผลตรวจไม่ได้
-                  เพราะเงื่อนไขขึ้นกับ status ที่เพิ่งคำนวณเสร็จ ต้องเขียน validate เพิ่ม */}
-              <FieldNote custom={tpl.photo === "onFail"}>
-                {tpl.photo === "onFail"
-                  ? "custom_require_photo — ต้องเขียน validate เพิ่ม บังคับตามผลตรวจเองไม่ได้"
-                  : "แนบไฟล์เป็นของที่ ERPNext มีให้ทุก doctype อยู่แล้ว"}
-              </FieldNote>
-            </div>
-
-            <div className="space-y-1.5">
-              <Label htmlFor="tpl-from">วันที่เริ่มใช้</Label>
-              <Input
-                id="tpl-from"
-                className="bg-card"
-                placeholder="วว/ดด/ปปปป"
-                value={tpl.effectiveFrom}
-                onChange={(e) => patch({ effectiveFrom: e.target.value })}
-              />
-              <FieldNote custom>custom_effective_from</FieldNote>
-            </div>
-
-            <div className="space-y-1.5">
-              <Label htmlFor="tpl-to">
-                วันที่เลิกใช้{" "}
-                <span className="font-normal text-muted-foreground">
-                  (ไม่บังคับ)
-                </span>
-              </Label>
-              <Input
-                id="tpl-to"
-                className="bg-card"
-                placeholder="เลือกวันที่"
-                value={tpl.effectiveTo}
-                onChange={(e) => patch({ effectiveTo: e.target.value })}
-              />
-              {/* ปิดใช้งานกับเลิกใช้ตามวันที่เป็นคนละเรื่อง — ปิดคือหยุดทันที
-                  ส่วนวันที่เลิกใช้คือตั้งไว้ล่วงหน้าแล้วไม่ต้องมาจำว่าต้องมาปิด */}
-              <FieldNote custom>
-                custom_effective_to · ว่างคือใช้ไปเรื่อย ๆ จนกว่าจะปิดใช้งานเอง
-              </FieldNote>
-            </div>
-          </div>
-
-          {/* เตือนเฉพาะฟอร์มตรวจสินค้า เพราะมีแต่ฟอร์มพวกนี้ที่ระบบเป็นคนเรียกใช้
-              ฟอร์มตรวจเครื่องจักรหรือคลังคนเปิดใบเอง ไม่ผูกไว้ก็ยังใช้ได้ */}
-          {usesQualityInspection(tpl) && tpl.targets.length === 0 && (
-            <p className="mt-4 flex items-start gap-2 rounded-lg border border-danger-border bg-danger px-4 py-3 text-sm">
-              <InfoIcon className="mt-0.5 size-4 shrink-0 text-danger-strong" />
-              ยังไม่ได้ผูกกับสินค้าตัวไหน ฟอร์มนี้จะไม่ถูกเรียกใช้ตอนรับของ
-            </p>
-          )}
-
-          {/* ติ๊กบังคับตรวจอยู่ที่ Item เฉพาะขาซื้อกับขาขาย — ระหว่างผลิตไม่มี
-              ที่ Item เลย ของ ERPNext ใช้ติ๊ก inspection_required บนตัวใบ
-              เบิก-โอนสต็อกรายใบแทน ตั้งล่วงหน้าจากฟอร์มไม่ได้ จึงบอกไว้
-              ไม่ใช่โชว์สวิตช์ที่กดแล้วไม่มีผล */}
-          {usesQualityInspection(tpl) &&
-            (tpl.inspectionType === "inProcess" ? (
-              <div className="mt-4 rounded-lg bg-brand px-4 py-3 text-sm">
-                <p className="font-medium">
-                  ฟอร์มระหว่างผลิตตั้งบังคับตรวจล่วงหน้าไม่ได้
-                </p>
-                <p className="mt-1 text-muted-foreground">
-                  ข้อมูลสินค้ามีติ๊กบังคับตรวจแค่ก่อนซื้อกับก่อนส่ง — ใบเบิก-โอนสต็อก
-                  ต้องติ๊ก{" "}
-                  <span className="font-mono text-xs">inspection_required</span>{" "}
-                  บนตัวใบเองรายใบ ส่วนใบงานผลิต (Job Card) ERPNext ไม่บล็อกให้เลย
-                  ต้องเขียน validation เพิ่ม
-                </p>
-              </div>
-            ) : (
-              <div className="mt-4">
-                {/* สวิตช์อยู่หน้าข้อความบรรทัดเดียว ไม่ใช่กล่องเต็มความกว้าง —
-                    มันเป็นเงื่อนไขต่อท้ายของช่องสินค้าข้างบน ไม่ใช่หัวข้อของตัวเอง */}
-                <label className="flex items-center gap-3">
-                  <Switch
-                    checked={tpl.requireBefore}
-                    disabled={tpl.targets.length === 0}
-                    onCheckedChange={(v) => patch({ requireBefore: v })}
-                  />
-                  <span className="text-sm font-medium">
-                    {tpl.inspectionType === "outgoing"
-                      ? "ต้องตรวจก่อนส่งของ"
-                      : "ต้องตรวจก่อนรับของเข้าคลัง"}
-                  </span>
-                </label>
-                {/* ติ๊กนี้ไม่ได้เก็บที่ฟอร์ม — ERPNext เก็บที่ข้อมูลสินค้ารายตัว
-                    บอกไว้ว่าจะไปเขียนที่ไหนกี่ตัว ไม่งั้นกดแล้วไม่รู้ว่ากระทบอะไร */}
-                <p className="mt-1 text-sm text-muted-foreground">
-                  {tpl.targets.length === 0
-                    ? "ผูกสินค้าก่อน — ติ๊กนี้ไปอยู่ที่ข้อมูลสินค้า ไม่ได้อยู่ที่ฟอร์ม"
-                    : `จะไปติ๊กที่ข้อมูลสินค้า ${tpl.targets.length} ตัวที่ผูกไว้`}
-                </p>
-                {/* ERPNext มีบิตเดียวต่อทิศทาง เลือกอ้างอิงแค่ใบเดียวก็บังคับ
-                    ทั้งกลุ่ม — ต้องเขียนไว้ ไม่งั้นจะงงว่าทำไมใบที่ไม่ได้เลือกก็โดนบล็อก */}
-                <p className="text-sm text-muted-foreground">
-                  {tpl.inspectionType === "outgoing"
-                    ? "ครอบใบส่งของและใบแจ้งหนี้ขายพร้อมกัน แยกรายเอกสารไม่ได้"
-                    : "ครอบใบรับของ ใบแจ้งหนี้ซื้อ และใบรับงานจ้างผลิตพร้อมกัน แยกรายเอกสารไม่ได้"}
-                </p>
-                <FieldNote>
-                  Item ·{" "}
-                  {tpl.inspectionType === "outgoing"
-                    ? "inspection_required_before_delivery"
-                    : "inspection_required_before_purchase"}
-                </FieldNote>
-              </div>
-            ))}
-        </Section>
-
-        {/* ---------- 2 หัวข้อตรวจ ---------- */}
-        {/* เพิ่มหัวข้อที่นี่ = หยิบชื่อจากทะเบียนมาใส่ฟอร์มนี้ แล้วตั้งเกณฑ์ของมัน
-             ชื่อที่ยังไม่มีในทะเบียนก็พิมพ์สร้างได้จากในช่องเลย ทะเบียนเต็ม ๆ
-             (ไว้แก้ชื่อ/ดูตัวที่ไม่มีใครใช้) อยู่ท้ายแท็บตั้งค่าระบบของหน้า Setup QC */}
-        <Section
-          index={2}
-          title={`หัวข้อตรวจ (${tpl.rows.length})`}
-          note="หนึ่งหัวข้อ = หนึ่งแถวใน readings · กดดินสอเพื่อตั้งเกณฑ์ จำนวนค่า และหมายเหตุ"
-          action={
-            <div className="flex flex-wrap items-center gap-4">
-              {/* คนละตัวกับติ๊กรายข้อในตาราง — ตัวนี้คือ manual_inspection
-                  ที่หัวใบ ทำให้ inspect_and_set_status ไม่เขียนทับผลรวมทั้งใบ
-                  ส่วนผลรายข้อยังคำนวณให้ตามปกติ */}
-              <label className="flex items-center gap-2 text-sm">
-                <Checkbox
-                  checked={tpl.manualWholeDoc}
-                  onCheckedChange={(v) => patch({ manualWholeDoc: v === true })}
-                />
-                ผู้ตรวจตัดสินเองทั้งใบ
-              </label>
-              <label className="flex items-center gap-2 text-sm">
-                <Switch
-                  checked={tpl.multiSample}
-                  onCheckedChange={(v) => patch({ multiSample: v })}
-                />
-                สุ่มหลายตัวอย่างต่อครั้ง
-              </label>
-            </div>
-          }
-        >
-          {/* สวิตช์นี้เปลี่ยนว่า "กี่ใบ" ไม่ได้เปลี่ยนว่า "doctype ไหน"
-              จึงไม่ไปยุ่งกับแถบปลายทางด้านบน ต้องเขียนให้ชัดตรงนี้
-              ไม่งั้นจะเข้าใจว่าเปิดแล้วหลุดจาก ERPNext */}
-          <div className="mb-3 rounded-xl border border-border bg-card px-4 py-3 text-sm">
-            {tpl.multiSample ? (
-              <>
-                <p className="font-medium">
-                  หนึ่งตัวอย่าง = หนึ่งใบตรวจ สุ่มกี่ตัวอย่างก็ได้
-                  แต่ละตัวอย่างมีผลผ่าน/ไม่ผ่านของตัวเอง
-                </p>
-                <p className="mt-1 text-muted-foreground">
-                  ตารางเป็นแค่หน้าจอ กดบันทึกทีเดียวแล้วระบบแตกเป็นหลายใบให้ —
-                  ที่เก็บยังเป็นของมาตรฐานทุกใบ
-                </p>
-                <FieldNote>
-                  make_quality_inspections(company, doctype, docname, items,
-                  inspection_type) — ของ ERPNext เอง ไม่ต้องเขียนเพิ่ม
-                </FieldNote>
-              </>
-            ) : (
-              <>
-                <p className="font-medium">
-                  หนึ่งใบต่อครั้ง วัดซ้ำได้สูงสุด {MAX_READINGS} ครั้งต่อหัวข้อ
-                </p>
-                <p className="mt-1 text-muted-foreground">
-                  ใช้กับการวัดของชิ้นเดียวซ้ำหลายจุดแล้วเอามาเฉลี่ย
-                  ซึ่งเป็นสิ่งที่ reading_1…reading_10 ถูกทำมาเพื่อรองรับ
-                  ผลผ่าน/ไม่ผ่านจึงมีอันเดียวต่อหัวข้อ
-                </p>
-              </>
-            )}
-          </div>
-
-          <CheckTable
-            rows={tpl.rows}
-            onChange={(rows) => patch({ rows })}
-            onPatch={patchRow}
-          />
-
-          <div className="mt-3 flex flex-wrap justify-center gap-2">
-            <Button
-              variant="outline-primary"
-              size="sm"
-              onClick={() =>
-                setTpl((p) => ({ ...p, rows: [...p.rows, newRow()] }))
+            {/* ---------- 1 ข้อมูลและเงื่อนไข ----------
+                 สวิตช์เชื่อมโยงเอกสารอยู่หัวก้อน เพราะมันตัดสินว่าแถวที่สองมีไหม
+                 รายงานที่ผู้ตรวจเปิดเอง (ตรวจเครื่องจักร ตรวจคลัง) ไม่มีช่วงการตรวจ
+                 ไม่มีเอกสาร และไม่มีเอกสารให้บล็อก — ซ่อนทั้งแถว ไม่ใช่ปล่อยให้เห็น
+                 สี่ช่องที่กรอกแล้วไม่มีผล */}
+            <Section
+              index={1}
+              title="ข้อมูลและเงื่อนไขการตรวจสอบ"
+              note="กำหนดข้อมูลรายงาน ช่วงการตรวจสอบ เอกสารอ้างอิง และเงื่อนไขการดำเนินงาน"
+              action={
+                <SwitchLabel
+                  checked={tpl.linkDocs}
+                  onCheckedChange={(on) =>
+                    patch(
+                      on
+                        ? { linkDocs: true }
+                        : {
+                            linkDocs: false,
+                            phase: "",
+                            prodSteps: [],
+                            operations: [],
+                            refMenu: "",
+                          }
+                    )
+                  }
+                >
+                  {tpl.linkDocs
+                    ? "เชื่อมโยงกับเอกสารในระบบ"
+                    : "ไม่มีเชื่อมโยงกับเอกสารในระบบ"}
+                </SwitchLabel>
               }
             >
-              <PlusIcon />
-              เพิ่มหัวข้อตรวจ
-            </Button>
-            {tpl.rows.length > 0 && (
-              <Button variant="ghost" size="sm" onClick={duplicateAll}>
-                <CopyIcon />
-                คัดลอกทั้งชุดต่อท้าย ({tpl.rows.length} ข้อ)
-              </Button>
-            )}
-          </div>
-        </Section>
+              <div className="grid gap-4 @xl:grid-cols-2 @5xl:grid-cols-4">
+                <Field id="tpl-name" label="ชื่อรายงาน">
+                  <Input
+                    id="tpl-name"
+                    className="bg-card"
+                    placeholder="ระบุชื่อรายงาน"
+                    value={tpl.name}
+                    onChange={(e) => patch({ name: e.target.value })}
+                  />
+                </Field>
 
-        {/* ---------- 3 ผลตรวจที่ไม่ผ่าน ---------- */}
-        {/* repack / รับสภาพ / ส่งคืน เป็นการตัดสินใจกับ "ของ" ตรวจเครื่องจักร
-            กับตรวจคลังไม่มีของให้ตัดสิน ซ่อนทั้งก้อนไปเลย */}
-        <Section
-          index={3}
-          title="ผลตรวจที่ไม่ผ่าน"
-          note="ผู้ตรวจต้องเลือกว่าจะจัดการสินค้าที่ไม่ผ่านอย่างไร"
-          action={
-            /* บังคับเลือกไหม เป็นของฟอร์ม ไม่ใช่ของรายการกลาง — บางฟอร์ม
-               ไม่ผ่านแล้วต้องตัดสินทันที บางฟอร์มรอให้หัวหน้ามาดูก่อนได้
-               ปิดไว้ตอนยังไม่ได้เลือกตัวเลือกเลย เพราะไม่มีอะไรให้บังคับ */
-            <div className="shrink-0 text-right">
-              <label className="flex items-center gap-2 text-sm">
-                <Switch
-                  checked={tpl.requireDisposition}
-                  disabled={tpl.dispositions.length === 0}
-                  onCheckedChange={(v) => patch({ requireDisposition: v })}
+                <Field id="tpl-code" label="รหัสรายงาน" optional>
+                  <Input
+                    id="tpl-code"
+                    className="bg-card"
+                    placeholder="ระบุรหัสรายงาน"
+                    value={tpl.code}
+                    onChange={(e) => patch({ code: e.target.value })}
+                  />
+                </Field>
+
+                {/* หมวดย่อยของการ์ดในหน้าหลัก — เพิ่มประเภทใหม่ได้จากในช่องเลย
+                    หมวดใหม่ขึ้นในหน้าหลักทันทีที่มีรายงานเปิดใช้อยู่ในหมวดนั้น */}
+                <Field id="tpl-type" label="ประเภทรายงาน">
+                  <SearchSelect
+                    id="tpl-type"
+                    value={tpl.reportType}
+                    placeholder="เลือกประเภท"
+                    options={REPORT_TYPES.map((t) => ({
+                      value: t.id,
+                      label: t.label,
+                    }))}
+                    createLabel="เพิ่มประเภทใหม่"
+                    onCreate={(label) => addReportType(label).id}
+                    onChange={(v) => patch({ reportType: v })}
+                  />
+                </Field>
+
+                <Field id="tpl-product" label="ประเภทสินค้า">
+                  <MultiSelectChips
+                    id="tpl-product"
+                    className="h-9 w-full bg-card"
+                    placeholder="เลือกประเภทสินค้า"
+                    searchPlaceholder="ค้นหา"
+                    selectAllLabel="ทั้งหมด"
+                    options={PRODUCT_TYPES.map((p) => ({ label: p, value: p }))}
+                    value={tpl.productTypes}
+                    onValueChange={(v) => patch({ productTypes: v })}
+                  />
+                </Field>
+
+                {tpl.linkDocs && (
+                  <>
+                    <Field id="tpl-stage" label="ช่วงการตรวจสอบ">
+                      <Select
+                        value={stage}
+                        onValueChange={(v) => {
+                          const next = stagePatch(v as Stage);
+                          // ออกจากช่วงที่มีระหว่างผลิตแล้วขั้นตอนไม่มีความหมายอีก
+                          // เอกสารที่เลือกไว้ใช้กับช่วงใหม่ไม่ได้ก็ล้างทิ้ง
+                          patch({
+                            ...next,
+                            operations: next.prodSteps.includes("during")
+                              ? tpl.operations
+                              : [],
+                            refMenu: refMenusFor(next.phase).includes(
+                              tpl.refMenu as RefMenu
+                            )
+                              ? tpl.refMenu
+                              : "",
+                          });
+                        }}
+                      >
+                        <SelectTrigger id="tpl-stage" className="w-full bg-card">
+                          <SelectValue placeholder="เลือกช่วงการตรวจ" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {STAGE_KEYS.map((k) => (
+                            <SelectItem key={k} value={k}>
+                              {STAGE[k].label} - {STAGE[k].erp}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </Field>
+
+                    <Field id="tpl-ref" label="เอกสารอ้างอิง">
+                      <SearchSelect
+                        id="tpl-ref"
+                        value={tpl.refMenu}
+                        disabled={tpl.phase === ""}
+                        placeholder={
+                          tpl.phase === "" ? "เลือกช่วงการตรวจก่อน" : "เลือกเอกสาร"
+                        }
+                        options={refMenusFor(tpl.phase).map((m) => ({
+                          value: m,
+                          label: `${REF_MENU[m].label} - ${REF_MENU[m].erp}`,
+                        }))}
+                        onChange={(v) => patch({ refMenu: v as RefMenu })}
+                      />
+                    </Field>
+
+                    {/* "ตามค่าระบบ" ไม่ได้เป็นตัวเลือกแล้ว — โชว์ค่าที่ระบบใช้อยู่จริง
+                        แทนคำว่าตามค่าระบบ ที่ต้องไปเปิดอีกหน้าถึงจะรู้ว่าแปลว่าอะไร */}
+                    <Field id="tpl-sub" label="ยังไม่ได้ตรวจแล้วจะเดินเอกสารต่อ">
+                      <Select
+                        value={
+                          tpl.onNotSubmitted === "system"
+                            ? guard.onNotSubmitted
+                            : tpl.onNotSubmitted
+                        }
+                        onValueChange={(v) =>
+                          patch({ onNotSubmitted: v as GuardAction | "off" })
+                        }
+                      >
+                        <SelectTrigger id="tpl-sub" className="w-full bg-card">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {(["warn", "stop", "off"] as const).map((k) => (
+                            <SelectItem key={k} value={k}>
+                              {FLOW_LABEL[k]}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </Field>
+
+                    <Field id="tpl-rej" label="ตรวจไม่ผ่านแล้วจะเดินเอกสารต่อ">
+                      <Select
+                        value={
+                          tpl.onRejected === "system"
+                            ? guard.onRejected
+                            : tpl.onRejected
+                        }
+                        onValueChange={(v) =>
+                          patch({ onRejected: v as GuardAction })
+                        }
+                      >
+                        <SelectTrigger id="tpl-rej" className="w-full bg-card">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {(["warn", "stop"] as const).map((k) => (
+                            <SelectItem key={k} value={k}>
+                              {FLOW_LABEL[k]}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </Field>
+
+                    {/* ระหว่างผลิตหนึ่งขั้นตอน = หนึ่งใบงาน = หนึ่งใบตรวจ ต้องรู้ว่า
+                        ขั้นตอนไหนบ้าง ไม่งั้นใบงานผลิตทุกใบจะเปิดใบตรวจให้หมด */}
+                    {tpl.prodSteps.includes("during") && (
+                      <div className="@xl:col-span-2">
+                        <Field id="tpl-ops" label="ขั้นตอนการผลิตที่ต้องตรวจ">
+                          <MultiSelectChips
+                            id="tpl-ops"
+                            className="h-9 w-full bg-card"
+                            placeholder="เลือกขั้นตอน — หนึ่งขั้นตอน = หนึ่งใบตรวจ"
+                            options={OPERATION_POOL.map((o) => ({
+                              label: o,
+                              value: o,
+                            }))}
+                            value={tpl.operations}
+                            onValueChange={(v) => patch({ operations: v })}
+                          />
+                        </Field>
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+            </Section>
+
+            {/* ---------- 2 ส่วนหัวเอกสาร ----------
+                 ปิดแล้วช่องที่ตั้งไว้ยังเก็บอยู่ เปิดกลับมาไม่ต้องตั้งใหม่ */}
+            <Section
+              index={2}
+              title="ส่วนหัวเอกสาร"
+              note="ช่องที่ผู้ตรวจต้องระบุก่อนเริ่มตรวจ เช่น สินค้า, เครื่องจักร"
+              action={
+                <SwitchLabel
+                  checked={tpl.headerOn}
+                  onCheckedChange={(on) =>
+                    patch({
+                      headerOn: on,
+                      header:
+                        on && tpl.header.length === 0
+                          ? [newDocField()]
+                          : tpl.header,
+                    })
+                  }
+                >
+                  เพิ่มหัวเอกสาร
+                </SwitchLabel>
+              }
+            >
+              {tpl.headerOn && (
+                <HeaderFieldsTable
+                  fields={tpl.header}
+                  onChange={(header) => patch({ header })}
                 />
-                บังคับเลือกเมื่อมีข้อไม่ผ่าน
-              </label>
-              <FieldNote custom>custom_require_disposition</FieldNote>
-            </div>
-          }
-        >
-          <FieldNote custom>
-            custom_dispositions ที่เทมเพลต · custom_disposition ที่ใบตรวจ
-          </FieldNote>
+              )}
+            </Section>
 
-          {/* แยกเป็นหัวข้อย่อย เพราะคนละเรื่องกับตัวเลือกจัดการของข้างบน —
-              ข้างบนคือผู้ตรวจเลือกว่าจะทำอะไรกับของ ส่วนตรงนี้คือระบบจะปล่อย
-              ให้เอกสารสต็อกเดินต่อไหม และมีผลเฉพาะฟอร์มที่มีเอกสารอ้างอิง */}
-          <div className="mt-5 border-t border-border pt-4">
-            <p className="font-medium">การเดินเอกสารต่อ</p>
-            <p className="mt-0.5 text-sm text-muted-foreground">
-              ใช้เฉพาะฟอร์มที่มีเอกสารอ้างอิง — ฟอร์มที่ไม่มีไปอยู่ doctype
-              ของเราเอง ซึ่ง ERPNext ไม่ได้บล็อกอะไรให้อยู่แล้ว
-            </p>
-          </div>
-
-          {tpl.refMenu === "" ? (
-            /* ไม่ซ่อนทั้งก้อน เขียนบอกว่าทำไมไม่มีให้ตั้ง — ซ่อนเฉย ๆ แล้ว
-               คนที่ตามหาการตั้งค่านี้จะไม่รู้ว่าหายไปไหนหรือไม่เคยมี */
-            <p className="mt-3 rounded-lg border border-dashed border-border px-4 py-3 text-sm text-muted-foreground">
-              ฟอร์มนี้ยังไม่ได้เลือกเอกสารอ้างอิง จึงไม่มีการรับของหรือส่งของ
-              ให้บล็อก — ตั้งตรงนี้ไปก็ไม่มีผล
-            </p>
-          ) : (
-          <div className="mt-3 grid gap-4 @2xl:grid-cols-2">
-            <div className="space-y-1.5">
-              <Label htmlFor="tpl-rej">ตรวจไม่ผ่านแล้วจะเดินเอกสารต่อ</Label>
-              <Select
-                value={tpl.onRejected}
-                onValueChange={(v) =>
-                  patch({ onRejected: v as GuardAction | "system" })
-                }
-              >
-                <SelectTrigger id="tpl-rej" className="w-full bg-card">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {GUARD_PICK.map((k) => (
-                    <SelectItem key={k} value={k}>
-                      {GUARD_PICK_LABEL[k]}
-                      {k === "system" && ` — ตอนนี้คือ ${GUARD_LABEL[guard.onRejected]}`}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <FieldNote custom={tpl.onRejected !== "system"}>
-                {tpl.onRejected === "system"
-                  ? "Stock Settings · action_if_quality_inspection_is_rejected"
-                  : "custom_on_rejected — ต้องเขียน hook ที่เอกสารสต็อก และค่าระบบต้องเป็น Warn"}
-              </FieldNote>
-            </div>
-
-            <div className="space-y-1.5">
-              <Label htmlFor="tpl-sub">ยังไม่ได้ตรวจแล้วจะเดินเอกสารต่อ</Label>
-              <Select
-                value={tpl.onNotSubmitted}
-                onValueChange={(v) =>
-                  patch({ onNotSubmitted: v as GuardAction | "system" })
-                }
-              >
-                <SelectTrigger id="tpl-sub" className="w-full bg-card">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {GUARD_PICK.map((k) => (
-                    <SelectItem key={k} value={k}>
-                      {GUARD_PICK_LABEL[k]}
-                      {k === "system" &&
-                        ` — ตอนนี้คือ ${GUARD_LABEL[guard.onNotSubmitted]}`}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <FieldNote custom={tpl.onNotSubmitted !== "system"}>
-                {tpl.onNotSubmitted === "system"
-                  ? "Stock Settings · action_if_quality_inspection_is_not_submitted"
-                  : "custom_on_not_submitted — ต้องเขียน hook เพิ่มเหมือนกัน"}
-              </FieldNote>
-            </div>
-          </div>
-          )}
-
-          {/* เข้มกว่าค่าระบบได้ ผ่อนไม่ได้ — ต้องเขียนบอก ไม่งั้นคนจะตั้ง Warn
-              ที่ฟอร์มแล้วนึกว่าผ่อนได้ ทั้งที่ระบบตั้ง Stop ไว้มันโยนไปก่อนแล้ว */}
-          {tpl.refMenu !== "" &&
-            (tpl.onRejected === "warn" || tpl.onNotSubmitted === "warn") &&
-            (guard.onRejected === "stop" || guard.onNotSubmitted === "stop") && (
-              <p className="mt-3 flex items-start gap-2 rounded-lg border border-danger-border bg-danger px-4 py-3 text-sm">
-                <InfoIcon className="mt-0.5 size-4 shrink-0 text-danger-strong" />
-                <span>
-                  ตั้ง Warn ที่ฟอร์มไม่มีผล เพราะค่าระบบเป็น Stop อยู่ —
-                  ERPNext โยนก่อนที่ hook ของเราจะได้ทำงาน ต้องไปตั้งค่าระบบเป็น
-                  Warn ก่อน แล้วค่อยใช้ฟอร์มที่ต้องการ Stop เป็นตัวเข้มขึ้น
-                </span>
-              </p>
-            )}
-
-          {/* ติ๊กเลือกจากรายการกลาง ไม่ใช่พิมพ์เอง — แก้ชื่อหรือเพิ่มตัวเลือก
-              ทำที่แท็บตั้งค่าระบบ เพราะแต่ละตัวผูกกับ script ที่เดฟเขียนไว้ */}
-          <div className="mt-2 flex flex-wrap gap-2">
-            {DISPOSITIONS.map((d) => (
-              <CheckChip
-                key={d.id}
-                id={`disp-${d.id}`}
-                label={d.label}
-                checked={tpl.dispositions.includes(d.id)}
-                onChange={(on) =>
-                  patch({
-                    dispositions: on
-                      ? [...tpl.dispositions, d.id]
-                      : tpl.dispositions.filter((x) => x !== d.id),
-                  })
-                }
+            {/* ---------- 3 หัวข้อตรวจ ---------- */}
+            <Section
+              index={3}
+              title="หัวข้อตรวจ"
+              note="กำหนดหัวข้อ เกณฑ์ และการตัดสิน"
+              action={
+                /* คนละตัวกับติ๊กรายข้อในตาราง — ตัวนี้คือ manual_inspection
+                   ที่หัวใบ ทำให้ระบบไม่เขียนทับผลรวมทั้งใบ ผลรายข้อยังคำนวณให้ */
+                <label className="flex items-center gap-2 text-sm">
+                  <Checkbox
+                    checked={tpl.manualWholeDoc}
+                    onCheckedChange={(v) => patch({ manualWholeDoc: v === true })}
+                  />
+                  ผู้ตรวจตัดสินเองทั้งใบ
+                </label>
+              }
+            >
+              <CheckTable
+                rows={tpl.rows}
+                onChange={(rows) => patch({ rows })}
+                onPatch={patchRow}
               />
-            ))}
-          </div>
+              <AddButton
+                onClick={() =>
+                  setTpl((p) => ({ ...p, rows: [...p.rows, newRow()] }))
+                }
+              >
+                เพิ่มหัวข้อตรวจ
+              </AddButton>
+            </Section>
 
-          {tpl.dispositions.length > 0 && (
-            <>
-              <ul className="mt-4 space-y-2">
-                {tpl.dispositions.map((id) => {
-                  const d = dispositionOf(id);
-                  if (!d) return null;
-                  return (
-                    <li
-                      key={id}
-                      className="flex flex-wrap items-baseline gap-x-2 gap-y-1 rounded-lg bg-surface px-3 py-2 text-sm"
-                    >
-                      <span className="font-medium">{d.label}</span>
-                      <span className="text-muted-foreground">{d.effect}</span>
-                      <span className="font-mono text-xs text-muted-foreground">
-                        {d.field}
-                      </span>
-                    </li>
-                  );
-                })}
-              </ul>
+            {/* ---------- 4 ข้อมูลเพิ่มเติม ---------- */}
+            <Section
+              index={4}
+              title="ข้อมูลเพิ่มเติม"
+              note="กำหนดการระบุหมายเหตุและแนบรูปภาพเอกสาร"
+            >
+              <div className="grid gap-4 @xl:grid-cols-2">
+                <Field id="tpl-remark" label="หมายเหตุ">
+                  <AttachSelect
+                    id="tpl-remark"
+                    value={tpl.remark}
+                    onChange={(v) => patch({ remark: v })}
+                  />
+                </Field>
+                <Field id="tpl-photo" label="แนบรูปภาพ/เอกสาร">
+                  <AttachSelect
+                    id="tpl-photo"
+                    value={tpl.photo}
+                    onChange={(v) => patch({ photo: v })}
+                  />
+                </Field>
+              </div>
+            </Section>
 
-            </>
-          )}
-        </Section>
+            {/* ---------- 5 ตัวเลือกการตัดสิน ----------
+                 ต้องเหลืออย่างน้อยหนึ่งปุ่ม ไม่งั้นผู้ตรวจไม่มีอะไรให้กด */}
+            <Section
+              index={5}
+              title="ตัวเลือกการตัดสิน"
+              note="กำหนดตัวเลือกการตัดสิน"
+            >
+              <div className="flex flex-wrap gap-2">
+                {VERDICT_OPTION_KEYS.map((k) => (
+                  <CheckChip
+                    key={k}
+                    id={`verdict-${k}`}
+                    label={VERDICT_OPTION_LABEL[k]}
+                    checked={tpl.verdicts.includes(k)}
+                    onChange={(on) => {
+                      if (!on && tpl.verdicts.length === 1) return;
+                      patch({
+                        verdicts: on
+                          ? VERDICT_OPTION_KEYS.filter(
+                              (x) => x === k || tpl.verdicts.includes(x)
+                            )
+                          : tpl.verdicts.filter((x) => x !== k),
+                      });
+                    }}
+                  />
+                ))}
+              </div>
+            </Section>
 
-        {/* ---------- 4 รอบเวลาทำงาน ----------
-             ของใหม่ทั้งก้อน และเป็นก้อนเดียวในหน้านี้ที่ ERPNext ไม่มีที่เก็บให้เลย
-             เขียนกำกับไว้ว่าต้องสร้างอะไรเพิ่ม ไม่ใช่ทำให้ดูเหมือนตั้งแล้วใช้ได้ทันที
+            {/* ---------- 6 ผลตรวจที่ไม่ผ่าน ----------
+                 สวิตช์คือ "มีขั้นนี้ไหม" — ปิดคือไม่ผ่านแล้วจบที่ผลตรวจ ไม่ต้องเลือก
+                 ว่าจะจัดการของยังไง ตัวเลือกเป็นของฟอร์มนี้ พิมพ์ตั้งชื่อเองได้ */}
+            <Section
+              index={6}
+              title="ผลตรวจที่ไม่ผ่าน"
+              note={
+                tpl.requireDisposition
+                  ? "ผู้ตรวจต้องเลือกว่าจะจัดการสินค้าที่ไม่ผ่านอย่างไร"
+                  : "กำหนดตัวเลือกการจัดการสินค้าที่ไม่ผ่าน"
+              }
+              action={
+                <SwitchLabel
+                  checked={tpl.requireDisposition}
+                  onCheckedChange={(on) =>
+                    patch({
+                      requireDisposition: on,
+                      dispositions:
+                        on && tpl.dispositions.length === 0
+                          ? ["repack", "accept", "return"]
+                          : tpl.dispositions,
+                    })
+                  }
+                >
+                  บังคับเลือกเมื่อมีข้อไม่ผ่าน
+                </SwitchLabel>
+              }
+            >
+              {tpl.requireDisposition && (
+                <>
+                  <ul className="space-y-3">
+                    {tpl.dispositions.map((d, i) => (
+                      <RowCard
+                        key={`${i}-${d}`}
+                        label={`ตัวเลือกที่ ${i + 1}`}
+                        total={tpl.dispositions.length}
+                        onMove={(dir) =>
+                          patch({ dispositions: move(tpl.dispositions, i, dir) })
+                        }
+                        onRemove={() =>
+                          patch({
+                            dispositions: tpl.dispositions.filter(
+                              (_, j) => j !== i
+                            ),
+                          })
+                        }
+                      >
+                        <Input
+                          aria-label={`ตัวเลือกที่ ${i + 1}`}
+                          className="w-full bg-card @xl:w-80"
+                          placeholder="ระบุตัวเลือก เช่น ส่งคืน"
+                          defaultValue={dispositionOf(d)?.label ?? d}
+                          onBlur={(e) => {
+                            const v = e.target.value.trim();
+                            if (v === (dispositionOf(d)?.label ?? d)) return;
+                            patch({
+                              dispositions: tpl.dispositions.map((x, j) =>
+                                j === i ? v : x
+                              ),
+                            });
+                          }}
+                        />
+                      </RowCard>
+                    ))}
+                  </ul>
+                  <AddButton
+                    onClick={() =>
+                      patch({ dispositions: [...tpl.dispositions, ""] })
+                    }
+                  >
+                    เพิ่มตัวเลือก
+                  </AddButton>
+                </>
+              )}
+            </Section>
 
-             อยู่ท้ายสุดเพราะเป็นก้อนที่ฟอร์มส่วนใหญ่ไม่ได้เปิด — ฟอร์มที่เกิดจาก
-             ใบรับของไม่มีรอบเวลา เปิดมาเจอกะสี่ช่องก่อนจะงงว่าต้องกรอกไหม */}
-        <Section
-          index={4}
-          title="เปิดใบตามรอบเวลาทำงาน"
-          note="ระบบจะขึ้นข้อมูลให้ทำเอกสารตามช่วงเวลาการทำงานที่ตั้งไว้ ไม่รวมวันหยุดทำงานและวันหยุดนักขัตฤกษ์ วันไหนไม่มีข้อมูล ระบบจะขึ้นว่ายังไม่มีใครทำ จึงดูเป็นปฏิทินทั้งเดือนได้"
-          action={
-            <div className="shrink-0 text-right">
-              <label className="flex items-center gap-2 text-sm">
-                <Switch
+            {/* ---------- 7 รอบเวลาทำงาน ----------
+                 อยู่ท้ายสุดเพราะฟอร์มส่วนใหญ่ไม่ได้เปิด — ฟอร์มที่เกิดจากใบรับของ
+                 ไม่มีรอบเวลา เปิดมาเจอกะสี่ช่องก่อนจะงงว่าต้องกรอกไหม */}
+            <Section
+              index={7}
+              title="เปิดใบตามรอบเวลาทำงาน"
+              note="ระบบจะขึ้นข้อมูลให้ทำเอกสารตามช่วงเวลาการทำงานที่ตั้งไว้ ไม่รวมวันหยุดทำงานและวันหยุดนักขัตฤกษ์ วันไหนไม่มีข้อมูล ระบบจะขึ้นว่ายังไม่มีใครทำ จึงดูเป็นปฏิทินทั้งเดือนได้"
+              action={
+                <SwitchLabel
                   checked={tpl.schedule.recurring}
                   onCheckedChange={(on) =>
                     patch({
                       schedule: on
                         ? {
-                            ...tpl.schedule,
                             recurring: true,
-                            // เปิดครั้งแรกให้เป็นวันละครั้งไว้ก่อน — เป็นแบบที่เข้าใจ
-                            // ง่ายที่สุด ใครต้องการกะค่อยสลับเอง
-                            allDay:
-                              tpl.schedule.slots.length === 0 ||
-                              tpl.schedule.allDay,
+                            allDay: false,
+                            slots:
+                              tpl.schedule.slots.length > 0
+                                ? tpl.schedule.slots
+                                : [newShift("08:30", "12:00")],
                           }
-                        : // ปิดแล้วเก็บกะที่ตั้งไว้ไว้ก่อน เปิดใหม่จะได้ไม่ต้องตั้งซ้ำ
+                        : // ปิดแล้วเก็บช่วงที่ตั้งไว้ เปิดใหม่จะได้ไม่ต้องตั้งซ้ำ
                           { ...DEFAULT_SCHEDULE, slots: tpl.schedule.slots },
                     })
                   }
-                />
-                ดูเป็นปฏิทินทั้งเดือนได้
-              </label>
-              <FieldNote custom>doctype QC Schedule</FieldNote>
-            </div>
-          }
-        >
-          <ScheduleEditor schedule={tpl.schedule} onChange={patchSchedule} />
-        </Section>
-
+                >
+                  ดูเป็นปฏิทินทั้งเดือนได้
+                </SwitchLabel>
+              }
+            >
+              {tpl.schedule.recurring && (
+                <ScheduleEditor schedule={tpl.schedule} onChange={patchSchedule} />
+              )}
+            </Section>
           </TabsContent>
 
           {/* ---------- ตัวอย่างใบตรวจที่ได้ ----------
@@ -1197,7 +900,7 @@ function Editor({ seed, isNew }: { seed: QiTemplate; isNew: boolean }) {
               )}
             </div>
 
-            {tpl.dispositions.length > 0 && !plain && (
+            {tpl.requireDisposition && dispositions.length > 0 && !plain && (
               <div className="mt-4">
                 <p className="text-sm font-medium">
                   ประเภทการรับสินค้า กรณีไม่ผ่านข้อใดข้อหนึ่ง{" "}
@@ -1208,7 +911,7 @@ function Editor({ seed, isNew }: { seed: QiTemplate; isNew: boolean }) {
                   )}
                 </p>
                 <RadioGroup className="mt-2 grid gap-2 @lg:grid-cols-3">
-                  {tpl.dispositions.map((id) => (
+                  {dispositions.map((id) => (
                     <Label
                       key={id}
                       htmlFor={`preview-disp-${id}`}
@@ -1243,7 +946,7 @@ function Editor({ seed, isNew }: { seed: QiTemplate; isNew: boolean }) {
       </main>
 
       <div className="sticky bottom-0 z-30 border-t border-border bg-surface">
-        <div className="mx-auto flex w-full max-w-5xl items-center justify-between gap-3 px-4 py-3 sm:px-6">
+        <div className="mx-auto flex w-full max-w-7xl items-center justify-between gap-3 px-4 py-3 sm:px-6">
           <Button variant="outline-primary" onClick={() => router.back()}>
             ย้อนกลับ
           </Button>
@@ -1255,11 +958,11 @@ function Editor({ seed, isNew }: { seed: QiTemplate; isNew: boolean }) {
 }
 
 /* ---------- รอบการตรวจ ----------
-     สวิตช์เดียว ไม่ใช่สองตัวเลือก — ปิด (ค่าเริ่มต้น) คือเปิดใบตามเอกสารแบบปกติ
-     ของ ERPNext เปิดคือทำตามกะ ซึ่งต้องเขียนของเพิ่มเอง จึงต้องบอกให้ชัดตอนเปิด
+     หนึ่งช่วงเวลา = หนึ่งใบต่อวัน ลากจัดลำดับได้ ลบได้ทีละช่วง
+     ช่วงที่เวลาจบน้อยกว่าเวลาเริ่มคือข้ามเที่ยงคืน อ่านจากเวลาเอง ไม่ให้ติ๊กบอก
 
-     ที่มาของใบไม่มีช่องให้เลือกแยก — อ่านจากสวิตช์นี้กับช่องเอกสารอ้างอิงเอา
-     ตัวตั้งค่ามีที่เดียวเสมอ ป้ายจึงตรงกับของจริงโดยไม่ต้องมีใครมาคอยดูแล */
+     ช่องเลือกวันไม่มี เพราะวันทำงานไม่ใช่เรื่องของฟอร์ม — อ่านจาก Holiday List
+     ของบริษัท ตั้งซ้ำรายฟอร์มมีแต่จะตอบไม่ตรงกัน */
 function ScheduleEditor({
   schedule,
   onChange,
@@ -1267,201 +970,322 @@ function ScheduleEditor({
   schedule: QiSchedule;
   onChange: (next: Partial<QiSchedule>) => void;
 }) {
+  const slots = schedule.slots;
   const patchSlot = (id: string, p: Partial<{ from: string; to: string }>) =>
-    onChange({
-      slots: schedule.slots.map((s) => (s.id === id ? { ...s, ...p } : s)),
-    });
-
-  const moveSlot = (id: string, delta: number) => {
-    const i = schedule.slots.findIndex((s) => s.id === id);
-    const j = i + delta;
-    if (i < 0 || j < 0 || j >= schedule.slots.length) return;
-    const slots = [...schedule.slots];
-    [slots[i], slots[j]] = [slots[j], slots[i]];
-    onChange({ slots });
-  };
+    onChange({ slots: slots.map((s) => (s.id === id ? { ...s, ...p } : s)) });
 
   return (
-    <div className="space-y-4">
-      {!schedule.recurring ? (
-        <p className="rounded-lg border border-dashed border-border px-4 py-6 text-center text-sm text-muted-foreground">
-          ปิดไว้ = ใบเกิดจากเอกสารสต็อกตามปกติ ไม่มีปฏิทินและไม่มีใบรอไว้ล่วงหน้า
-        </p>
-      ) : (
-        <>
-      {/* ไม่ได้ขู่ให้กลัว แต่ถ้าไม่เขียนไว้ตรงนี้ จะมีคนตั้งกะเสร็จแล้วรอใบที่ไม่มีวันมา */}
-          <Alert variant="warning">
-            <CalendarDaysIcon />
-            <AlertTitle>ส่วนนี้ ERPNext ไม่มีมาให้ ต้องเขียนเพิ่ม 3 อย่าง</AlertTitle>
-            <AlertDescription>
-              <ul className="mt-1 list-disc space-y-1 pl-4">
-                <li>
-                  doctype <span className="font-mono text-xs">QC Schedule</span>{" "}
-                  เก็บช่วงเวลาที่ตั้งไว้ข้างล่างนี้
-                </li>
-                <li>
-                  scheduled job สร้าง Quality Inspection เป็นร่างล่วงหน้าทุกกะ โดย
-                  ข้ามวันที่อยู่ใน Holiday List ของบริษัท
-                </li>
-                {!schedule.allDay && (
-                  <li>
-                    custom field{" "}
-                    <span className="font-mono text-xs">custom_shift</span> ที่ Quality
-                    Inspection เพื่อบอกว่าใบนี้ของกะไหน
-                  </li>
-                )}
-              </ul>
-            </AlertDescription>
-          </Alert>
-
-          {/* วันละครั้ง กับ ตามรอบกะ ต่างกันที่เวลามีความหมายไหม — ฟอร์มที่ขอแค่
-              "ตรวจสักครั้งในวันนั้น" ไม่ควรต้องกรอกเวลาเริ่ม-จบที่ไม่มีใครใช้ */}
-          <div className="space-y-2">
-            <Label>ความถี่</Label>
-            <ChipGroup
-              label="ตรวจบ่อยแค่ไหนในหนึ่งวัน"
-              value={schedule.allDay ? "day" : "shift"}
-              onChange={(v) =>
-                onChange({
-                  allDay: v === "day",
-                  slots:
-                    v === "shift" && schedule.slots.length === 0
-                      ? [newShift()]
-                      : schedule.slots,
-                })
-              }
-              options={[
-                {
-                  id: "day" as const,
-                  label: "วันละครั้ง",
-                  hint: "วันละใบเดียว ตรวจตอนไหนของวันก็ได้",
-                },
-                {
-                  id: "shift" as const,
-                  label: "ตามรอบกะ",
-                  hint: "หนึ่งกะหนึ่งใบ ใบบอกได้ว่าเป็นของกะไหน",
-                },
-              ]}
-            />
-          </div>
-
-          {!schedule.allDay && (
-          <div className="space-y-3">
-            <div className="min-w-0">
-              <Label>ช่วงเวลาที่ต้องตรวจในหนึ่งวัน</Label>
-              <p className="text-sm text-muted-foreground">
-                หนึ่งช่วงเวลาคือหนึ่งใบต่อวัน — ตั้งไว้ {schedule.slots.length} ใบต่อวัน
-              </p>
+    <>
+      <ul className="space-y-3">
+        {slots.map((sl, i) => (
+          <RowCard
+            key={sl.id}
+            label={`ช่วงที่ ${i + 1}`}
+            total={slots.length}
+            onMove={(dir) => onChange({ slots: move(slots, i, dir) })}
+            onRemove={() => onChange({ slots: slots.filter((x) => x.id !== sl.id) })}
+          >
+            <div className="flex flex-wrap items-center gap-3">
+              <TimeField
+                aria-label={`เวลาเริ่มช่วงที่ ${i + 1}`}
+                className="w-36"
+                value={sl.from}
+                onValueChange={(v) => patchSlot(sl.id, { from: v })}
+              />
+              <span className="text-sm">ถึง</span>
+              <TimeField
+                aria-label={`เวลาสิ้นสุดช่วงที่ ${i + 1}`}
+                className="w-36"
+                value={sl.to}
+                onValueChange={(v) => patchSlot(sl.id, { to: v })}
+              />
+              {shiftOvernight(sl) && (
+                <Badge appearance="soft" tone="neutral">
+                  ข้ามเที่ยงคืน
+                </Badge>
+              )}
             </div>
+          </RowCard>
+        ))}
+      </ul>
+      <AddButton
+        onClick={() => onChange({ allDay: false, slots: [...slots, newShift()] })}
+      >
+        เพิ่มช่วงเวลา
+      </AddButton>
+    </>
+  );
+}
 
-            {schedule.slots.length === 0 ? (
-              <p className="rounded-lg border border-dashed border-border px-4 py-6 text-center text-sm text-muted-foreground">
-                ยังไม่ได้ตั้งช่วงเวลา — ต้องมีอย่างน้อยหนึ่งช่วง ปฏิทินจึงจะรู้ว่าวันหนึ่งควรมีกี่ใบ
-              </p>
-            ) : (
-              <div className="space-y-2">
-                {schedule.slots.map((s, i) => (
-                  <div
-                    key={s.id}
-                    className="flex flex-wrap items-center gap-2 rounded-lg border border-dashed border-border p-3"
-                  >
-                    <span className="w-14 shrink-0 text-sm text-muted-foreground">
-                      ช่วงที่ {i + 1}
-                    </span>
-                    <TimeField
-                      aria-label={`เวลาเริ่มของช่วงที่ ${i + 1}`}
-                      className="w-32"
-                      value={s.from}
-                      onValueChange={(from) => patchSlot(s.id, { from })}
-                    />
-                    <span className="text-muted-foreground">ถึง</span>
-                    <TimeField
-                      aria-label={`เวลาสิ้นสุดของช่วงที่ ${i + 1}`}
-                      className="w-32"
-                      value={s.to}
-                      onValueChange={(to) => patchSlot(s.id, { to })}
-                    />
-                    {shiftOvernight(s) && (
-                      <span className="text-sm text-muted-foreground">
-                        ข้ามคืน — ใบเป็นของวันที่กะเริ่ม
-                      </span>
-                    )}
-                    {/* เรียงกะตามเวลาจริงที่เดินงาน ไม่ใช่ตามลำดับที่กดเพิ่ม
-                        กะดึกที่เพิ่มทีหลังต้องย้ายขึ้นไปอยู่ตำแหน่งที่ถูกได้ */}
-                    <div className="ml-auto flex shrink-0 items-center">
-                      <Button
-                        variant="ghost"
-                        size="icon-sm"
-                        disabled={i === 0}
-                        aria-label={`ย้ายช่วงที่ ${i + 1} ขึ้น`}
-                        onClick={() => moveSlot(s.id, -1)}
-                      >
-                        <ChevronUpIcon />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon-sm"
-                        disabled={i === schedule.slots.length - 1}
-                        aria-label={`ย้ายช่วงที่ ${i + 1} ลง`}
-                        onClick={() => moveSlot(s.id, 1)}
-                      >
-                        <ChevronDownIcon />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon-sm"
-                        aria-label={`ลบช่วงที่ ${i + 1}`}
-                        onClick={() =>
-                          onChange({
-                            slots: schedule.slots.filter((x) => x.id !== s.id),
-                          })
-                        }
-                      >
-                        <Trash2Icon />
-                      </Button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
+/* ---------- ส่วนหัวเอกสาร ----------
+     ตารางเดียวกับหัวข้อตรวจ แต่ตั้งแค่สามอย่าง — เอามาจากไหน อะไร บังคับไหม
+     ดึงจากระบบเลือกได้จากรายการ ส่วนข้อความพิมพ์ชื่อช่องเอง
 
-            <div className="flex justify-center">
-              <Button
-                variant="outline-primary"
-                size="sm"
-                onClick={() =>
-                  onChange({ slots: [...schedule.slots, newShift()] })
-                }
-              >
-                <PlusIcon />
-                เพิ่มช่วงเวลา
-              </Button>
-            </div>
-          </div>
+     จอแคบเรียงเป็นการ์ดทีละช่อง หัวตารางซ่อน ป้ายย้ายไปอยู่ในช่องแทน */
+function HeaderFieldsTable({
+  fields,
+  onChange,
+}: {
+  fields: DocField[];
+  onChange: (next: DocField[]) => void;
+}) {
+  const patchField = (id: string, p: Partial<DocField>) =>
+    onChange(fields.map((f) => (f.id === id ? { ...f, ...p } : f)));
+  const grid =
+    "@3xl:grid @3xl:grid-cols-[12rem_minmax(0,1fr)_6rem_5.5rem] @3xl:items-center @3xl:gap-4";
+
+  return (
+    <>
+      <div className="overflow-hidden rounded-xl border border-border bg-card">
+        <div
+          className={cn(
+            "hidden border-b border-border px-4 py-3 text-sm text-muted-foreground",
+            grid
           )}
+        >
+          <span>ประเภทข้อมูล</span>
+          <span>ข้อมูล</span>
+          <span className="text-center">บังคับกรอก</span>
+          <span />
+        </div>
+        <ul>
+          {fields.map((f, i) => (
+            <li
+              key={f.id}
+              {...{ [DRAG_ITEM_ATTR]: "" }}
+              className={cn(
+                "flex flex-col gap-3 bg-card px-4 py-3",
+                i > 0 && "border-t border-border",
+                grid
+              )}
+            >
+              <div className="space-y-1.5">
+                <Label htmlFor={`hd-kind-${f.id}`} className="@3xl:sr-only">
+                  ประเภทข้อมูล
+                </Label>
+                <Select
+                  value={f.kind}
+                  onValueChange={(v) =>
+                    patchField(f.id, { kind: v as DocField["kind"], source: "", label: "" })
+                  }
+                >
+                  <SelectTrigger id={`hd-kind-${f.id}`} className="w-full bg-card">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="system">ดึงจากระบบ</SelectItem>
+                    <SelectItem value="text">ข้อความ</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
 
-          {/* ติ๊กวันเองทั้งเจ็ด ไม่ใช่เลือกจากสองแบบที่เดาไว้ให้ — โรงงานเดิน
-              จ–ส บ้าง เจ็ดวันบ้าง หรือตรวจเฉพาะ จ/พ/ศ ก็มี และวันที่ไม่ติ๊กคือ
-              ตัวที่ทำให้ช่องว่างในปฏิทินแปลความได้ว่า "ไม่ต้องทำ" ไม่ใช่ "ขาด" */}
-          {/* ไม่มีช่องติ๊กวันและไม่มีช่องเลือกปฏิทินวันหยุด — วันทำงานไม่ใช่
-              เรื่องที่ตั้งรายฟอร์ม Holiday List ของบริษัทตอบไว้แล้วทั้งสองชั้น
-              (weekly_off = วันหยุดประจำสัปดาห์, holidays = วันหยุดนักขัตฤกษ์)
-              ให้ตั้งซ้ำตรงนี้ = เปิดทางให้สองที่ตอบไม่ตรงกัน แล้วไม่มีใครรู้ว่าอันไหนจริง */}
-          <div className="rounded-lg bg-surface px-4 py-3">
-            <p className="text-sm font-medium">
-              เปิดใบเฉพาะวันทำงาน เว้นวันหยุดให้อัตโนมัติ
-            </p>
-            <p className="mt-1 text-sm text-muted-foreground">
-              อ่านจากปฏิทินวันหยุดของบริษัท ทั้งวันหยุดประจำสัปดาห์และวันหยุดนักขัตฤกษ์
-              — เปลี่ยนวันหยุดที่เดียว ทุกฟอร์มตามให้เอง
-            </p>
-            <FieldNote>
-              Company · default_holiday_list → Holiday List (weekly_off + holidays)
-            </FieldNote>
-          </div>
-        </>
-      )}
+              <div className="space-y-1.5">
+                <Label htmlFor={`hd-data-${f.id}`} className="@3xl:sr-only">
+                  ข้อมูล
+                </Label>
+                {f.kind === "system" ? (
+                  <Select
+                    value={f.source}
+                    onValueChange={(v) => patchField(f.id, { source: v as SourceId })}
+                  >
+                    <SelectTrigger id={`hd-data-${f.id}`} className="w-full bg-card">
+                      <SelectValue placeholder="เลือกข้อมูล" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {HEADER_SOURCES.map((s) => (
+                        <SelectItem key={s} value={s}>
+                          {SOURCE[s].label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <Input
+                    id={`hd-data-${f.id}`}
+                    className="bg-card"
+                    placeholder="ระบุชื่อช่อง เช่น เลขที่ล็อต"
+                    value={f.label}
+                    onChange={(e) => patchField(f.id, { label: e.target.value })}
+                  />
+                )}
+              </div>
+
+              <div className="flex items-center justify-between gap-3 @3xl:contents">
+                <label className="flex items-center gap-2 text-sm @3xl:justify-center">
+                  <Checkbox
+                    checked={f.required}
+                    aria-label="บังคับกรอก"
+                    onCheckedChange={(v) => patchField(f.id, { required: v === true })}
+                  />
+                  <span className="@3xl:sr-only">บังคับกรอก</span>
+                </label>
+                <div className="flex items-center justify-end gap-1">
+                  <DragHandle
+                    label={`หัวเอกสารช่องที่ ${i + 1}`}
+                    disabled={fields.length < 2}
+                    onMove={(dir) => onChange(move(fields, i, dir))}
+                  />
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    aria-label={`ลบหัวเอกสารช่องที่ ${i + 1}`}
+                    onClick={() => onChange(fields.filter((x) => x.id !== f.id))}
+                  >
+                    <Trash2Icon />
+                  </Button>
+                </div>
+              </div>
+            </li>
+          ))}
+          {fields.length === 0 && (
+            <li className="px-4 py-10 text-center">
+              <p className="font-medium">ไม่มีข้อมูล</p>
+              <p className="mt-1 text-sm text-muted-foreground">กรุณาเพิ่มหัวเอกสาร</p>
+            </li>
+          )}
+        </ul>
+      </div>
+      <AddButton onClick={() => onChange([...fields, newDocField()])}>
+        เพิ่มหัวเอกสาร
+      </AddButton>
+    </>
+  );
+}
+
+/** สลับของในรายการขึ้น/ลงหนึ่งช่อง — ชนขอบแล้วคืนของเดิม */
+function move<T>(list: T[], i: number, dir: -1 | 1): T[] {
+  const j = i + dir;
+  if (j < 0 || j >= list.length) return list;
+  const next = [...list];
+  [next[i], next[j]] = [next[j], next[i]];
+  return next;
+}
+
+/** ป้ายของการเดินเอกสารต่อ — ใช้คำเดียวกับ Stock Settings มีชื่อภาษาอังกฤษต่อท้าย
+ *  เพราะคนที่ตั้งค่านี้ต้องไปตั้งคู่กันใน ERPNext ด้วย */
+const FLOW_LABEL: Record<GuardAction | "off", string> = {
+  warn: "เตือนแต่ไปต่อได้ - Warn",
+  stop: "ห้ามผ่าน - Stop",
+  off: "ไม่บังคับตรวจ",
+};
+
+/* ---------- การ์ดหนึ่งแถว ----------
+     ใช้ร่วมกันระหว่างตัวเลือกของที่ไม่ผ่านกับช่วงเวลา — ป้ายซ้าย ช่องกลาง
+     ปุ่มลากกับลบชิดขวา จอแคบป้ายกับปุ่มอยู่บรรทัดบน ช่องลงบรรทัดล่าง */
+function RowCard({
+  label,
+  total,
+  onMove,
+  onRemove,
+  children,
+}: {
+  label: string;
+  total: number;
+  onMove: (dir: -1 | 1) => void;
+  onRemove: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <li
+      {...{ [DRAG_ITEM_ATTR]: "" }}
+      className="flex flex-wrap items-center gap-x-4 gap-y-3 rounded-xl border border-border bg-card px-4 py-3 @xl:px-5"
+    >
+      <span className="order-1 shrink-0 text-sm font-medium">{label}</span>
+      <div className="order-3 w-full min-w-0 @xl:order-2 @xl:w-auto @xl:flex-1">
+        {children}
+      </div>
+      <div className="order-2 ml-auto flex shrink-0 items-center gap-1 @xl:order-3">
+        <DragHandle label={label} disabled={total < 2} onMove={onMove} />
+        <Button variant="ghost" size="icon-sm" aria-label={`ลบ${label}`} onClick={onRemove}>
+          <Trash2Icon />
+        </Button>
+      </div>
+    </li>
+  );
+}
+
+function AddButton({
+  onClick,
+  children,
+}: {
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="mt-3 flex justify-center">
+      <Button variant="outline-primary" size="sm" onClick={onClick}>
+        <PlusIcon />
+        {children}
+      </Button>
     </div>
+  );
+}
+
+/** หมายเหตุกับแนบรูปใช้ตัวเลือกชุดเดียวกัน — ผู้ตรวจต้องใส่ไหม */
+function AttachSelect({
+  id,
+  value,
+  onChange,
+}: {
+  id: string;
+  value: PhotoMode;
+  onChange: (v: PhotoMode) => void;
+}) {
+  return (
+    <Select value={value} onValueChange={(v) => onChange(v as PhotoMode)}>
+      <SelectTrigger id={id} className="w-full bg-card">
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent>
+        {PHOTO_KEYS.map((k) => (
+          <SelectItem key={k} value={k}>
+            {PHOTO_LABEL[k]}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  );
+}
+
+function Field({
+  id,
+  label,
+  optional,
+  children,
+}: {
+  id: string;
+  label: string;
+  optional?: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="min-w-0 space-y-1.5">
+      <Label htmlFor={id}>
+        {label}
+        {optional && " "}
+        {optional && (
+          <span className="font-normal text-muted-foreground">(ไม่บังคับ)</span>
+        )}
+      </Label>
+      {children}
+    </div>
+  );
+}
+
+function SwitchLabel({
+  checked,
+  onCheckedChange,
+  children,
+}: {
+  checked: boolean;
+  onCheckedChange: (v: boolean) => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <label className="flex shrink-0 items-center gap-2 text-sm">
+      <Switch checked={checked} onCheckedChange={onCheckedChange} />
+      {children}
+    </label>
   );
 }
 
@@ -1968,9 +1792,7 @@ function Section({
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
           <h2 className="font-semibold">
-            {index !== undefined && (
-              <span className="text-muted-foreground">{index}. </span>
-            )}
+            {index !== undefined && `${index}. `}
             {title}
           </h2>
           {note && <p className="mt-0.5 text-sm text-muted-foreground">{note}</p>}

@@ -14,6 +14,7 @@ import { PendingBadge } from "@/components/modules/pending-badge";
 import {
   MODULE_GROUPS,
   searchModules,
+  subgroupsOf,
   type ModuleItem,
 } from "@/lib/modules";
 
@@ -73,16 +74,31 @@ export default function AllModulesPage() {
                 น้อยจนโดนตัดท้ายเกือบทุกใบ ทั้งที่ชื่อคือข้อมูลชิ้นเดียวที่ใช้เลือก
                 — และการ์ดเตี้ยอยู่แล้ว เรียงใบละแถวจึงไม่ได้ทำให้หน้ายาวขึ้นมาก
                 ส่วนการ์ดที่มีไอคอนสูงกว่าเท่าตัว ถ้าเรียงใบละแถวจะต้องเลื่อนนาน */}
-            <div
-              className={cn(
-                "mt-3 grid gap-3 @2xl:grid-cols-3 @4xl:grid-cols-4",
-                g.tone ? "grid-cols-2" : "grid-cols-1"
-              )}
-            >
-              {g.items.map((m) => (
-                <ModuleCard key={m.id} module={m} tone={g.tone} />
-              ))}
-            </div>
+            {/* หมวดตรวจคุณภาพแตกเป็นหมวดย่อยตามประเภทรายงานที่ตั้งไว้ในหน้า
+                ตั้งค่ารายงาน — ตรวจมีหลายช่วง เรียงการ์ดรวมกันก้อนเดียวแล้วหาไม่เจอ
+                หมวดอื่นไม่มีประเภท ได้ก้อนเดียวไม่มีหัวข้อย่อยเหมือนเดิม */}
+            {subgroupsOf(g.items).map((sg) => (
+              <div key={sg.id} className={cn(sg.label && "mt-5")}>
+                {sg.label && (
+                  <div className="flex items-center gap-2">
+                    <h3 className="font-semibold">{sg.label}</h3>
+                    <span className="text-sm text-muted-foreground">
+                      {sg.items.length} ระบบ
+                    </span>
+                  </div>
+                )}
+                <div
+                  className={cn(
+                    "mt-3 grid gap-3 @2xl:grid-cols-3 @4xl:grid-cols-4",
+                    g.tone ? "grid-cols-2" : "grid-cols-1"
+                  )}
+                >
+                  {sg.items.map((m) => (
+                    <ModuleCard key={m.id} module={m} tone={g.tone} />
+                  ))}
+                </div>
+              </div>
+            ))}
           </section>
         ))}
 
