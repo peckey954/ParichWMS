@@ -21,6 +21,7 @@ import {
 import { Label } from "@peckey954/ui/components/ui/label";
 import { Textarea } from "@peckey954/ui/components/ui/textarea";
 import { cn } from "@peckey954/ui/lib/utils";
+import { FailAttachments } from "@/components/qc/fail-attachments";
 import { toast } from "sonner";
 import { RawItemCard } from "@/components/qc/raw-item-card";
 import {
@@ -271,6 +272,14 @@ function RawSheet({ doc }: { doc: RawDoc }) {
             />
           ))}
         </div>
+
+        {/* ไม่ผ่านแล้วต้องมีหลักฐาน — รูปของเสียหรือเอกสารประกอบ ขึ้นเฉพาะตอนมีข้อตก
+            ใบที่ตรวจแล้วอ่านอย่างเดียว ไม่มีช่องแนบให้กด */}
+        {hasFail && !readOnly && (
+          <div className="mt-6">
+            <FailAttachments />
+          </div>
+        )}
 
         {/* ---------- ไม่ผ่านแล้วทำยังไงกับของ ----------
             ขึ้นเฉพาะตอนมีข้อที่ไม่ผ่านจริง ผ่านหมดแล้วไม่มีอะไรให้ตัดสิน

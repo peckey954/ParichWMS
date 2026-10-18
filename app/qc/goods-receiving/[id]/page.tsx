@@ -21,6 +21,7 @@ import {
 import { Label } from "@peckey954/ui/components/ui/label";
 import { Textarea } from "@peckey954/ui/components/ui/textarea";
 import { cn } from "@peckey954/ui/lib/utils";
+import { FailAttachments } from "@/components/qc/fail-attachments";
 import { toast } from "sonner";
 import { RoundCard } from "@/components/qc/round-card";
 import {
@@ -306,6 +307,13 @@ function ReceivingSheet({ doc }: { doc: NonNullable<ReturnType<typeof findDoc>> 
             <PlusIcon />
             เพิ่มครั้งที่ตรวจ
           </Button>
+        </div>
+      )}
+
+      {/* ไม่ผ่านแล้วต้องมีหลักฐาน — รูปของเสียหรือเอกสารประกอบ ขึ้นเฉพาะตอนมีข้อตก */}
+      {hasFail && (
+        <div className="mt-6">
+          <FailAttachments />
         </div>
       )}
 

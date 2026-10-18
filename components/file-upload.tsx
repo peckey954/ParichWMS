@@ -1,9 +1,10 @@
 "use client";
 
 import * as React from "react";
-import { FileTextIcon, RotateCwIcon, UploadIcon, XIcon } from "lucide-react";
+import { FileTextIcon, ImageIcon, RotateCwIcon, UploadIcon, XIcon } from "lucide-react";
 import { Button } from "@peckey954/ui/components/ui/button";
 import { cn } from "@peckey954/ui/lib/utils";
+import type { ViewerFile } from "@/components/file-viewer";
 
 /* ------------------------------------------------------------------
    ช่องแนบเอกสาร
@@ -41,7 +42,33 @@ export type DocFile = {
   size: number;
   status: "uploading" | "done" | "tooLarge" | "failed";
   progress: number;
+  /** blob URL — มีเฉพาะรูปที่เลือกจากเครื่อง ใช้วาดรูปย่อบนการ์ดและในหน้าดูเอกสาร */
+  url?: string;
 };
+
+/** รูปหรือเอกสาร — อ่านจากนามสกุล ช่องนี้รับแค่ PDF / PNG / JPG */
+export const isImageFile = (name: string) => /\.(png|jpe?g)$/i.test(name);
+
+/**
+ * แปลงไฟล์ที่ขึ้นครบแล้วเป็นชุดให้หน้าดูเอกสาร — ไฟล์ที่ยังอัปอยู่หรือพังไม่มี
+ * อะไรให้ดู จึงไม่ใส่เข้าไป ลำดับตามที่แนบ กดถัดไปแล้วไล่ตามที่เห็นบนจอ
+ */
+export function toViewerFiles(files: DocFile[], group: string): ViewerFile[] {
+  return files
+    .filter((f) => f.status === "done")
+    .map((f) => {
+      const image = isImageFile(f.name);
+      return {
+        id: f.id,
+        name: f.name,
+        group,
+        kind: image ? ("image" as const) : ("pdf" as const),
+        url: f.url,
+        // ไม่มีตัวอ่าน PDF จริง เดาจำนวนหน้าจากขนาดไฟล์พอให้รางหน้ามีอะไรให้ดู
+        pages: image ? 1 : Math.max(1, Math.min(12, Math.round(f.size / 2_000_000))),
+      };
+    });
+}
 
 export const formatFileSize = (bytes: number) =>
   bytes >= 1024 * 1024
@@ -173,6 +200,10 @@ function DocCard({
   onOpen?: () => void;
 }) {
   const bad = f.status === "tooLarge" || f.status === "failed";
+  const image = isImageFile(f.name);
+  // รูปที่มีไฟล์จริงโชว์เป็นรูปเต็มการ์ด ไม่ใช่ไอคอนกับชื่อไฟล์ — รูปของเสีย
+  // ชื่อไฟล์จากกล้องเป็นเลขสุ่ม บอกอะไรไม่ได้ ตัวรูปเองคือสิ่งที่ใช้แยกว่าใบไหน
+  const thumb = image && f.url && !bad ? f.url : null;
   // กดเปิดได้เฉพาะไฟล์ที่ขึ้นครบแล้ว ที่ยังโหลดอยู่หรือพังไม่มีอะไรให้ดู
   const openable = f.status === "done" && onOpen;
 
@@ -212,6 +243,17 @@ function DocCard({
                 : "อัปโหลดไม่สำเร็จ"}
             </span>
           </button>
+        ) : thumb ? (
+          <button
+            type="button"
+            onClick={openable ? onOpen : undefined}
+            disabled={!openable}
+            aria-label={`ดูรูป ${f.name}`}
+            className="absolute inset-0 overflow-hidden rounded-lg focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none"
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={thumb} alt={f.name} className="size-full object-cover" />
+          </button>
         ) : openable ? (
           <button
             type="button"
@@ -219,7 +261,7 @@ function DocCard({
             aria-label={`ดูเอกสาร ${f.name}`}
             className="flex size-full flex-col items-center justify-center gap-1 rounded-md focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none"
           >
-            <FileTextIcon className="size-6 text-primary" strokeWidth={1.5} />
+            <FileKindIcon name={f.name} />
             <span className="line-clamp-2 text-[11px] leading-tight font-medium">
               {f.name}
             </span>
@@ -229,7 +271,7 @@ function DocCard({
           </button>
         ) : (
           <>
-            <FileTextIcon className="size-6 text-primary" strokeWidth={1.5} />
+            <FileKindIcon name={f.name} />
             <span className="line-clamp-2 text-[11px] leading-tight font-medium">
               {f.name}
             </span>
@@ -267,6 +309,11 @@ function DocCard({
       </button>
     </div>
   );
+}
+
+function FileKindIcon({ name }: { name: string }) {
+  const Icon = isImageFile(name) ? ImageIcon : FileTextIcon;
+  return <Icon className="size-6 text-primary" strokeWidth={1.5} />;
 }
 
 /**
@@ -319,6 +366,7 @@ export function useDocUpload(seed: DocFile[] = []) {
         size: file.size,
         status: tooLarge ? "tooLarge" : "uploading",
         progress: 0,
+        url: !tooLarge && isImageFile(file.name) ? URL.createObjectURL(file) : undefined,
       };
     });
 

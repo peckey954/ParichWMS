@@ -42,7 +42,12 @@ import {
 } from "@peckey954/ui/components/ui/table";
 import { cn } from "@peckey954/ui/lib/utils";
 import { toast } from "sonner";
-import { FileUpload, useDocUpload, type DocFile } from "@/components/file-upload";
+import {
+  FileUpload,
+  toViewerFiles,
+  useDocUpload,
+  type DocFile,
+} from "@/components/file-upload";
 import { type ViewerFile } from "@/components/file-viewer";
 import { useFileViewer } from "@/components/file-viewer-provider";
 import { useNumberField } from "@/components/number-field";
@@ -110,21 +115,6 @@ function seedDocs(prefix: string, names: string[]): DocFile[] {
   }));
 }
 
-function toViewer(files: DocFile[], group: string): ViewerFile[] {
-  return files
-    .filter((f) => f.status === "done")
-    .map((f) => {
-      const image = /\.(png|jpe?g)$/i.test(f.name);
-      return {
-        id: f.id,
-        name: f.name,
-        group,
-        kind: image ? ("image" as const) : ("pdf" as const),
-        pages: image ? 1 : Math.max(1, Math.min(12, Math.round(f.size / 2_000_000))),
-      };
-    });
-}
-
 const round = MULTI_PRODUCT_DEMO_ROUND;
 
 export default function MultiProductWeighingDemoPage() {
@@ -153,9 +143,9 @@ export default function MultiProductWeighingDemoPage() {
   const idCardDocs = useDocUpload(seedDocs("wi", ["สำเนาบัตร-คนขับ.pdf"]));
   const { openViewer } = useFileViewer();
   const viewerFiles: ViewerFile[] = [
-    ...toViewer(parichDocs.files, "เอกสารของพาริช"),
-    ...toViewer(supplierDocs.files, "เอกสารของผู้ขาย"),
-    ...toViewer(idCardDocs.files, "สำเนาบัตรประชาชนคนขับ"),
+    ...toViewerFiles(parichDocs.files, "เอกสารของพาริช"),
+    ...toViewerFiles(supplierDocs.files, "เอกสารของผู้ขาย"),
+    ...toViewerFiles(idCardDocs.files, "สำเนาบัตรประชาชนคนขับ"),
   ];
 
   function startWeighing() {
