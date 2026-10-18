@@ -46,7 +46,7 @@ import {
    ว่าไม่บังคับ พอมีข้อตกเปลี่ยนเป็นบังคับทันที คนกรอกรู้ก่อนกดบันทึก
 ------------------------------------------------------------------ */
 
-type RowState = {
+export type RowState = {
   verdict: VerdictOption | "";
   nums: string[];
   text: string;
@@ -107,25 +107,42 @@ function Hint({ mode, failed }: { mode: PhotoMode; failed: boolean }) {
   );
 }
 
+/** สิ่งที่ผู้ตรวจกรอกทั้งใบ — ส่งเข้ามาเปิดใบเดิมขึ้นมาแก้ และส่งออกตอนบันทึก */
+export type FormValues = {
+  header: Record<string, string>;
+  rows: Record<string, RowState>;
+  disposition: string;
+  note: string;
+};
+
+export type FormResult = {
+  values: FormValues;
+  /** ผลรายข้อ คีย์คือ id ของแถว */
+  verdicts: Record<string, VerdictOption | "">;
+  failed: boolean;
+};
+
 export function TemplateForm({
   tpl,
   title,
+  initial,
   onSubmit,
   onBack,
   before,
 }: {
   tpl: QiTemplate;
   title: string;
+  initial?: FormValues;
   /** ส่งมา = ใบจริง มีแถบบันทึกท้ายหน้าและเช็คความครบก่อนบันทึก */
-  onSubmit?: () => void;
+  onSubmit?: (r: FormResult) => void;
   onBack?: () => void;
   /** ของที่อยู่ระหว่างชื่อใบกับหัวเอกสาร เช่น รอบเวลา */
   before?: React.ReactNode;
 }) {
-  const [rows, setRows] = React.useState<Record<string, RowState>>({});
-  const [header, setHeader] = React.useState<Record<string, string>>({});
-  const [disposition, setDisposition] = React.useState("");
-  const [note, setNote] = React.useState("");
+  const [rows, setRows] = React.useState<Record<string, RowState>>(initial?.rows ?? {});
+  const [header, setHeader] = React.useState<Record<string, string>>(initial?.header ?? {});
+  const [disposition, setDisposition] = React.useState(initial?.disposition ?? "");
+  const [note, setNote] = React.useState(initial?.note ?? "");
   const [files, setFiles] = React.useState(0);
 
   const stOf = (id: string) => rows[id] ?? EMPTY;
@@ -162,7 +179,11 @@ export function TemplateForm({
       });
       return;
     }
-    onSubmit?.();
+    onSubmit?.({
+      values: { header, rows, disposition: picked, note },
+      verdicts: Object.fromEntries(tpl.rows.map((r, i) => [r.id, verdicts[i]])),
+      failed,
+    });
   };
 
   return (
