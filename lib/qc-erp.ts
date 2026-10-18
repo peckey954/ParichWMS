@@ -1612,6 +1612,13 @@ const SEED_TEMPLATES: SeedTemplate[] = [
     requireDisposition: true,
     onRejected: "system",
     onNotSubmitted: "system",
+    // หัวใบที่ผู้ตรวจเลือกก่อนเริ่ม — สองช่องนี้กลายเป็นตัวกรองในหน้าคิวเองด้วย
+    headerOn: true,
+    header: [
+      { id: "hd-inproc-item", kind: "system", label: "", source: "item", required: true },
+      { id: "hd-inproc-mc", kind: "system", label: "", source: "machine", required: true },
+      { id: "hd-inproc-wh", kind: "system", label: "", source: "warehouse", required: false },
+    ],
     // ใบเกิดจากเอกสารรับของ ไม่ใช่ตามรอบเวลา — คอลัมน์ "ตรวจครั้งที่ 1/2/3"
     // ของกระดาษเป็นการตรวจซ้ำในการรับครั้งเดียวกัน ไม่ใช่สามกะในหนึ่งวัน
     schedule: { ...DEFAULT_SCHEDULE },

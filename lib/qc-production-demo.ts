@@ -13,8 +13,10 @@ import {
   OPERATION_POOL,
   PROD_STEP,
   PROD_STEP_KEYS,
+  SOURCE,
   templateOf,
   type ProdStep,
+  type SourceId,
 } from "@/lib/qc-erp";
 
 /**
@@ -107,6 +109,8 @@ export type Lot = {
   company: string;
   ton: number;
   owner: string;
+  /** คลังที่ของล็อตนี้เข้าไปเก็บ — ใช้กับหัวเอกสารที่ดึงคลังสินค้า */
+  warehouse: string;
   /** ผลของจุดที่ตรวจไปแล้ว — คีย์คือ Checkpoint.key จุดที่ยังไม่มีคือยังไม่ตรวจ */
   done: Record<string, StageResult>;
 };
@@ -126,6 +130,7 @@ export const LOTS: Lot[] = [
     company: "เอชซี อินเตอร์เนชั่นแนล",
     ton: 800,
     owner: "อลิสา พรสุขสิริ",
+    warehouse: "สต็อกสินค้า",
     done: {},
   },
   {
@@ -142,6 +147,7 @@ export const LOTS: Lot[] = [
     company: "เอชซี อินเตอร์เนชั่นแนล",
     ton: 640,
     owner: "อลิสา พรสุขสิริ",
+    warehouse: "สต็อกสินค้า",
     done: {
       "t-inproc:pre": {
         qi: "MAT-QA-2026-00011",
@@ -167,6 +173,7 @@ export const LOTS: Lot[] = [
     company: "ปาริช",
     ton: 420,
     owner: "ณัฐพล ศรีวิไล",
+    warehouse: "สต็อก WIP",
     done: {
       "t-inproc:pre": {
         qi: "MAT-QA-2026-00008",
@@ -186,7 +193,105 @@ export const LOTS: Lot[] = [
       },
     },
   },
+  {
+    id: "lot-4",
+    code: "PO260113/01",
+    createdAt: "13/01/2026 09:02:11",
+    line: "ไลน์ 1",
+    round: "ปกติ",
+    material: "46-0-0",
+    materialNote: "ยูเรีย",
+    product: "ปุ๋ยสูตร 15-15-15 กระสอบ 50 กก.",
+    category: "Bag",
+    pack: "50 กก.",
+    company: "ปาริช",
+    ton: 380,
+    owner: "อลิสา พรสุขสิริ",
+    warehouse: "สต็อกสินค้า",
+    done: {
+      "t-inproc:pre": done("00004", "13/01/2026 09:30", "อลิสา พรสุขสิริ"),
+      "t-inproc:during:ผสมปุ๋ย": done("00005", "13/01/2026 11:10", "อลิสา พรสุขสิริ"),
+      "t-inproc:during:บรรจุกระสอบ": done("00006", "13/01/2026 14:45", "ณัฐพล ศรีวิไล"),
+      "t-inproc:post": done("00007", "13/01/2026 16:20", "ณัฐพล ศรีวิไล"),
+    },
+  },
+  {
+    id: "lot-5",
+    code: "PO260112/02",
+    createdAt: "12/01/2026 13:40:05",
+    line: "ไลน์ 2",
+    round: "แทรก",
+    material: "18-46-0",
+    materialNote: "DAP",
+    product: "ปุ๋ยสูตร 16-20-0 กระสอบ 50 กก.",
+    category: "Bag",
+    pack: "50 กก.",
+    company: "เอชซี อินเตอร์เนชั่นแนล",
+    ton: 260,
+    owner: "ณัฐพล ศรีวิไล",
+    warehouse: "สต็อกสินค้า",
+    done: {
+      "t-inproc:pre": done("00001", "12/01/2026 14:00", "ณัฐพล ศรีวิไล"),
+      "t-inproc:during:ผสมปุ๋ย": {
+        ...done("00002", "12/01/2026 15:35", "ณัฐพล ศรีวิไล"),
+        verdict: "fail",
+        failed: ["ความชื้น"],
+        note: "ความชื้น 11.2% อบซ้ำแล้วผ่าน",
+      },
+      "t-inproc:during:บรรจุกระสอบ": done("00003", "12/01/2026 17:05", "อลิสา พรสุขสิริ"),
+    },
+  },
+  {
+    id: "lot-6",
+    code: "PO260116/01",
+    createdAt: "16/01/2026 07:55:40",
+    line: "ไลน์กลาง",
+    round: "ปกติ",
+    material: "21-0-0",
+    materialNote: "ฟูเจียน ผง",
+    product: "ปุ๋ยจัมโบ้ Bulk",
+    category: "Bulk",
+    pack: "1 ตัน",
+    company: "ปาริช",
+    ton: 900,
+    owner: "อลิสา พรสุขสิริ",
+    warehouse: "สต็อก WIP",
+    done: {},
+  },
 ];
+
+/** ผลที่ผ่านทุกข้อ — ไว้เขียนล็อตตัวอย่างให้สั้น */
+function done(no: string, at: string, by: string): StageResult {
+  return { qi: `MAT-QA-2026-${no}`, at, by, verdict: "pass", failed: [], note: "" };
+}
+
+/**
+ * ค่าของหัวเอกสารช่องหนึ่งในล็อตนี้ — อ่านจากข้อมูลของล็อตเอง ไม่ได้เก็บซ้ำ
+ *
+ * เครื่องจักรของงานผลิตคือไลน์ที่เดิน ส่วนแหล่งที่ล็อตไม่มีคำตอบให้ (ถังวัตถุดิบ
+ * เอกสาร ผู้ตรวจ) คืนว่าง หน้าคิวจะไม่ทำตัวกรองให้ช่องที่ไม่มีค่าเลยสักแถว
+ */
+export function headerValueOf(lot: Lot, source: SourceId): string {
+  switch (source) {
+    case "item":
+      return lot.product;
+    case "machine":
+      return lot.line;
+    case "warehouse":
+      return lot.warehouse;
+    default:
+      return "";
+  }
+}
+
+/** ชื่อของหัวเอกสารช่องหนึ่ง — ดึงจากระบบใช้ชื่อแหล่ง ข้อความใช้ชื่อที่ตั้งไว้ */
+export const headerLabelOf = (source: SourceId) => SOURCE[source].label;
+
+/** ผลตรวจทั้งหมดของล็อตนี้ในเทมเพลตนี้ — ไม่รวมของฟอร์มอื่น */
+export const resultsOf = (lot: Lot, tplId: string): StageResult[] =>
+  Object.entries(lot.done)
+    .filter(([k]) => k.startsWith(`${tplId}:`))
+    .map(([, r]) => r);
 
 export const lotOf = (id: string) => LOTS.find((l) => l.id === id);
 
