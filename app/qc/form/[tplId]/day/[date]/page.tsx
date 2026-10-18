@@ -16,14 +16,16 @@ import {
 import { Button } from "@peckey954/ui/components/ui/button";
 import { cn } from "@peckey954/ui/lib/utils";
 import { Ring, STATE_LABEL } from "@/components/qc/record-calendar";
-import { shiftLabel, templateOf } from "@/lib/qc-erp";
+import {
+  templateOf,
+} from "@/lib/qc-erp";
 import { docNo, recordAt, slotState, thaiDate } from "@/lib/qc-records";
 
 /* ------------------------------------------------------------------
    รอบของวันหนึ่ง — มาจากการกดวันในปฏิทิน
 
-   หนึ่งการ์ดต่อหนึ่งรอบ รอบล่าสุดอยู่บน เพราะคนเปิดหน้านี้มักมาดูรอบที่เพิ่ง
-   ผ่านไป รอบที่ตรวจแล้วกดเข้าไปดูใบ รอบที่ไม่มีใบบอกว่าไม่ได้ตรวจ และรอบ
+   หนึ่งการ์ดต่อหนึ่งรอบ จอกว้างเรียงรอบแรกก่อน จอแคบรอบล่าสุดอยู่บน
+   รอบที่ตรวจแล้วกดเข้าไปดูใบ รอบที่ไม่มีใบบอกว่าไม่ได้ตรวจ และรอบ
    ที่กำลังเดินของวันนี้กดไปตรวจได้เลย
 ------------------------------------------------------------------ */
 
@@ -46,7 +48,7 @@ export default function DayPage() {
   const [y, m, d] = date.split("-").map(Number);
   const day = new Date(y, m - 1, d);
   const slots = tpl.schedule.slots;
-  const order = slots.map((s, i) => ({ s, i })).reverse();
+  const order = slots.map((s, i) => ({ s, i }));
   const isToday = isSameDay(day, new Date());
 
   return (
@@ -73,7 +75,9 @@ export default function DayPage() {
         </h1>
         <p className="mt-1 text-sm text-muted-foreground">{thaiDate(date)}</p>
 
-        <ul className="mt-5 grid gap-3 @3xl:grid-cols-2">
+        {/* จอกว้างเรียงรอบแรกก่อนตามเวลา จอแคบกลับด้านให้รอบล่าสุดอยู่บน
+            คนเปิดจากมือถือมักมาดูรอบที่เพิ่งผ่านไป ไม่ต้องเลื่อนลงไปหา */}
+        <ul className="mt-5 flex flex-col-reverse gap-3 @3xl:grid @3xl:grid-cols-2">
           {order.map(({ s, i }) => {
             const rec = recordAt(tpl.id, date, s.id);
             const st = slotState(tpl, day, s);
@@ -81,12 +85,7 @@ export default function DayPage() {
             const card = (
               <>
                 <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="font-semibold">{rec?.no ?? docNo(date, i)}</p>
-                    <p className="text-sm text-muted-foreground">
-                      ช่วงที่ {i + 1} · {shiftLabel(s)}
-                    </p>
-                  </div>
+                  <p className="min-w-0 font-semibold">{rec?.no ?? docNo(date, i)}</p>
                   <span className="text-sm text-muted-foreground tabular-nums">
                     {rec?.time ?? "-"}
                   </span>
