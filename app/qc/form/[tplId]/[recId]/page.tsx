@@ -67,17 +67,19 @@ export default function RecordPage() {
   const done = isNew && tpl && slot ? recordAt(tpl.id, today, slot.id) : undefined;
   const rec = isNew ? undefined : recordOf(recId);
 
+  const slotText = slot ? `ช่วงที่ ${slots.indexOf(slot) + 1} · ${shiftLabel(slot)}` : "";
+
   // รอบนี้ตรวจแล้ว — ไปใบเดิม
   React.useEffect(() => {
     if (!done || !tpl) return;
     toast.info(
-      `ช่วงที่ ${slots.indexOf(slot!) + 1} · ${shiftLabel(slot!)} ตรวจไปแล้ว — เปิดใบเดิม`,
+      `${slotText} ตรวจไปแล้ว — เปิดใบเดิม`,
       {
         description: `${done.no} · ${done.time} · ${done.by}`,
       }
     );
     router.replace(`/qc/form/${tpl.id}/${done.id}`);
-  }, [done, tpl, slot, slots, router]);
+  }, [done, tpl, slotText, router]);
 
   if (!tpl || (!isNew && !rec)) {
     return (
