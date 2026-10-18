@@ -38,7 +38,7 @@ import { Tabs, TabsList, TabsTrigger } from "@peckey954/ui/components/ui/tabs";
 import { cn } from "@peckey954/ui/lib/utils";
 import { ChipGroup } from "@/components/chip-group";
 import { DateSelect, formatDateSlash } from "@/components/date-select";
-import { RecordCalendar } from "@/components/qc/record-calendar";
+import { RecordCalendar, Ring } from "@/components/qc/record-calendar";
 import { ROW_HOVER_NAV, TablePager, paginate } from "@/components/stock/doc-parts";
 import {
   SOURCE,
@@ -80,10 +80,9 @@ function Mark({ v }: { v: VerdictOption | "" | undefined }) {
     return <CircleXIcon aria-label="ไม่ผ่าน" className="size-5 text-danger-strong" strokeWidth={1.5} />;
   // ไม่มี / ยังไม่ได้ตรวจข้อนี้ — วงกลมเส้นประ
   return (
-    <span
-      aria-label={v === "na" ? "ไม่มี" : "ไม่ได้ตรวจ"}
-      className="inline-block size-5 rounded-full border-[1.5px] border-dashed border-muted-foreground"
-    />
+    <span aria-label={v === "na" ? "ไม่มี" : "ไม่ได้ตรวจ"} className="inline-flex">
+      <Ring state="missed" className="size-5" />
+    </span>
   );
 }
 

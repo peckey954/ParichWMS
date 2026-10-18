@@ -41,11 +41,14 @@ const MONTHS = [
 const DAYS = ["อา", "จ", "อ", "พ", "พฤ", "ศ", "ส"];
 const DAY_FULL = ["อาทิตย์", "จันทร์", "อังคาร", "พุธ", "พฤหัสบดี", "ศุกร์", "เสาร์"];
 
-const RING: Record<Exclude<SlotState, "off">, string> = {
-  pass: "border-success-strong",
-  fail: "border-danger-strong",
-  missed: "border-dashed border-muted-foreground",
-  future: "border-border",
+/* วงกลมวาดเป็น SVG ไม่ใช่ border — เส้นประของ border บนวงกลมสิบพิกเซลได้แค่
+   สี่ห้าขีดหยาบ ๆ ดูเหมือนวงกลมแตก ไม่ใช่ "ยังไม่ได้ทำ" SVG ตั้งระยะขีดเองได้
+   พื้นของผ่าน/ไม่ผ่านเป็นสีอ่อนชุดเดียวกับป้ายผ่าน/ไม่ผ่าน อ่านเป็นคู่กันทันที */
+const RING: Record<Exclude<SlotState, "off">, { stroke: string; fill: string; dash?: string }> = {
+  pass: { stroke: "stroke-success-strong", fill: "fill-success" },
+  fail: { stroke: "stroke-danger-strong", fill: "fill-danger" },
+  missed: { stroke: "stroke-muted-foreground", fill: "fill-transparent", dash: "1.6 1.4" },
+  future: { stroke: "stroke-border", fill: "fill-transparent" },
 };
 
 const STATE_LABEL: Record<SlotState, string> = {
@@ -58,11 +61,18 @@ const STATE_LABEL: Record<SlotState, string> = {
 
 export function Ring({ state, className }: { state: SlotState; className?: string }) {
   if (state === "off") return null;
+  const r = RING[state];
   return (
-    <span
-      aria-hidden
-      className={cn("inline-block size-2.5 shrink-0 rounded-full border-[1.5px]", RING[state], className)}
-    />
+    <svg aria-hidden viewBox="0 0 12 12" className={cn("size-3 shrink-0", className)}>
+      <circle
+        cx="6"
+        cy="6"
+        r="5.1"
+        strokeWidth="1.2"
+        strokeDasharray={r.dash}
+        className={cn(r.stroke, r.fill)}
+      />
+    </svg>
   );
 }
 
@@ -221,7 +231,7 @@ function DayDialog({
             const body = (
               <>
                 <div className="flex min-w-0 items-center gap-3">
-                  <Ring state={st} className="size-3" />
+                  <Ring state={st} className="size-3.5" />
                   <div className="min-w-0">
                     <p className="text-sm font-medium">
                       ช่วงที่ {i + 1} · {shiftLabel(s)}
