@@ -22,6 +22,7 @@ import { Label } from "@peckey954/ui/components/ui/label";
 import { Textarea } from "@peckey954/ui/components/ui/textarea";
 import { cn } from "@peckey954/ui/lib/utils";
 import { FailAttachments } from "@/components/qc/fail-attachments";
+import { formDisposition } from "@/lib/qc-erp";
 import { toast } from "sonner";
 import { RoundCard } from "@/components/qc/round-card";
 import {
@@ -112,10 +113,18 @@ function ReceivingSheet({ doc }: { doc: NonNullable<ReturnType<typeof findDoc>> 
 
   const digests = rounds.map((r, i) => roundDigest(items, r, i));
   const hasFail = digests.some((d) => d.pass === false);
+  /* บังคับเลือกไหม และเลือกอะไรได้บ้าง มาจากเทมเพลต — ผูกเอกสารแล้วตั้ง
+     บังคับเลือกผลตรวจคือต้องเลือก ไม่ผูกเอกสารเลือกหรือไม่ก็ได้ ตั้ง Warn/Stop
+     คือไม่มีขั้นนี้ ตัวเลือกเดียวเลือกไว้ให้เลย */
+  const rule = formDisposition(undefined);
+  const choices = DISPOSITIONS.filter((d) => rule.ids.includes(d.id));
+  const askDisposition = hasFail && rule.rule !== "none";
+  const picked: Disposition | null =
+    disposition ?? (choices.length === 1 ? choices[0].id : null);
   // ยังไม่มีใครตรวจอะไรเลย ก็ยังบอกไม่ได้ว่าของจะเข้าคลังเท่าไหร่
   const started = digests.some((d) => d.done > 0);
   const ton = started
-    ? tonnage(doc.ton, hasFail, disposition)
+    ? tonnage(doc.ton, hasFail, picked)
     : { fail: null as number | null, warehouse: null as number | null };
 
   const patchAnswer = (roundId: string, itemId: string, p: Partial<Answer>) =>
@@ -164,7 +173,7 @@ function ReceivingSheet({ doc }: { doc: NonNullable<ReturnType<typeof findDoc>> 
       setOpenRound(rounds[missing[0].ri].id);
       return;
     }
-    if (hasFail && disposition === null) {
+    if (askDisposition && rule.rule === "required" && picked === null) {
       toast.error("ยังไม่ได้เลือกประเภทการรับสินค้า", {
         description: "มีข้อที่ไม่ผ่าน ต้องระบุว่าจะทำยังไงกับของ",
       });
@@ -243,8 +252,8 @@ function ReceivingSheet({ doc }: { doc: NonNullable<ReturnType<typeof findDoc>> 
                 label="ไม่ผ่าน (ตัน)"
                 value={ton.fail === null ? "-" : fmtTon(ton.fail)}
                 note={
-                  ton.fail !== null && disposition
-                    ? DISPOSITIONS.find((d) => d.id === disposition)?.label
+                  ton.fail !== null && picked
+                    ? DISPOSITIONS.find((d) => d.id === picked)?.label
                     : undefined
                 }
                 danger={ton.fail !== null}
@@ -320,20 +329,25 @@ function ReceivingSheet({ doc }: { doc: NonNullable<ReturnType<typeof findDoc>> 
       {/* ---------- ไม่ผ่านแล้วทำยังไงกับของ ----------
            ขึ้นเฉพาะตอนมีข้อที่ไม่ผ่านจริง ผ่านหมดแล้วไม่มีอะไรให้ตัดสิน
            การเลือกตรงนี้เปลี่ยนยอดเข้าคลังในกล่องข้างบนทันที */}
-      {hasFail && (
+      {askDisposition && (
         <div className="mt-6">
-          <Label>ประเภทการรับสินค้า กรณีไม่ผ่านข้อใดข้อหนึ่ง</Label>
+          <Label>
+            ประเภทการรับสินค้า กรณีไม่ผ่านข้อใดข้อหนึ่ง
+            {rule.rule === "optional" && (
+              <span className="font-normal text-muted-foreground">(ไม่บังคับ)</span>
+            )}
+          </Label>
           <div className="mt-2 grid gap-3 @2xl:grid-cols-3">
-            {DISPOSITIONS.map((d) => (
+            {choices.map((d) => (
               <button
                 key={d.id}
                 type="button"
                 role="radio"
-                aria-checked={disposition === d.id}
+                aria-checked={picked === d.id}
                 onClick={() => setDisposition(d.id)}
                 className={cn(
                   "flex min-h-11 items-center gap-3 rounded-lg border px-4 text-sm transition-colors",
-                  disposition === d.id
+                  picked === d.id
                     ? "border-primary bg-brand font-medium text-primary"
                     : "border-border bg-card hover:bg-accent-hover"
                 )}
@@ -341,10 +355,10 @@ function ReceivingSheet({ doc }: { doc: NonNullable<ReturnType<typeof findDoc>> 
                 <span
                   className={cn(
                     "flex size-4 shrink-0 items-center justify-center rounded-full border",
-                    disposition === d.id ? "border-current" : "border-border"
+                    picked === d.id ? "border-current" : "border-border"
                   )}
                 >
-                  {disposition === d.id && (
+                  {picked === d.id && (
                     <span className="size-2 rounded-full bg-current" />
                   )}
                 </span>

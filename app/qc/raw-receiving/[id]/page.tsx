@@ -22,6 +22,7 @@ import { Label } from "@peckey954/ui/components/ui/label";
 import { Textarea } from "@peckey954/ui/components/ui/textarea";
 import { cn } from "@peckey954/ui/lib/utils";
 import { FailAttachments } from "@/components/qc/fail-attachments";
+import { formDisposition } from "@/lib/qc-erp";
 import { toast } from "sonner";
 import { RawItemCard } from "@/components/qc/raw-item-card";
 import {
@@ -89,10 +90,18 @@ function RawSheet({ doc }: { doc: RawDoc }) {
   const [openInfo, setOpenInfo] = React.useState(true);
 
   const hasFail = anyFail(values);
+  /* บังคับเลือกไหม และเลือกอะไรได้บ้าง มาจากเทมเพลต — ผูกเอกสารแล้วตั้ง
+     บังคับเลือกผลตรวจคือต้องเลือก ไม่ผูกเอกสารเลือกหรือไม่ก็ได้ ตั้ง Warn/Stop
+     คือไม่มีขั้นนี้ ตัวเลือกเดียวเลือกไว้ให้เลย */
+  const rule = formDisposition("t-rm");
+  const choices = DISPOSITIONS.filter((d) => rule.ids.includes(d.id));
+  const askDisposition = hasFail && rule.rule !== "none";
+  const picked: Disposition | null =
+    disposition ?? (choices.length === 1 ? choices[0].id : null);
   // ยังไม่มีใครคีย์อะไรเลย ก็ยังบอกไม่ได้ว่าของจะเข้าคลังเท่าไหร่
   const started = RAW_ITEMS.some((i) => itemResult(i, values).pass !== null);
   const ton = started
-    ? tonnage(doc.ton, hasFail, disposition)
+    ? tonnage(doc.ton, hasFail, picked)
     : { fail: null as number | null, warehouse: null as number | null };
   const pieces = doc.bagKg > 0 ? (doc.ton * 1000) / doc.bagKg : 0;
   const outcome = outcomeOf(doc);
@@ -105,7 +114,7 @@ function RawSheet({ doc }: { doc: RawDoc }) {
       });
       return;
     }
-    if (hasFail && disposition === null) {
+    if (askDisposition && rule.rule === "required" && picked === null) {
       toast.error("ยังไม่ได้เลือกประเภทการรับสินค้า", {
         description: "มีข้อที่ไม่ผ่าน ต้องระบุว่าจะทำยังไงกับของ",
       });
@@ -207,8 +216,8 @@ function RawSheet({ doc }: { doc: RawDoc }) {
                 label="ไม่ผ่าน (ตัน)"
                 value={ton.fail === null ? "-" : fmtTon(ton.fail)}
                 note={
-                  ton.fail !== null && disposition
-                    ? DISPOSITION_LABEL[disposition]
+                  ton.fail !== null && picked
+                    ? DISPOSITION_LABEL[picked]
                     : undefined
                 }
                 danger={ton.fail !== null}
@@ -284,26 +293,31 @@ function RawSheet({ doc }: { doc: RawDoc }) {
         {/* ---------- ไม่ผ่านแล้วทำยังไงกับของ ----------
             ขึ้นเฉพาะตอนมีข้อที่ไม่ผ่านจริง ผ่านหมดแล้วไม่มีอะไรให้ตัดสิน
             การเลือกตรงนี้เปลี่ยนยอดเข้าคลังในกล่องข้างบนทันที */}
-        {hasFail && (
+        {askDisposition && (
           <div className="mt-6 grid gap-4 @2xl:grid-cols-2">
             <div>
-              <Label>ประเภทการรับสินค้า กรณีไม่ผ่านข้อใดข้อหนึ่ง</Label>
+              <Label>
+                ประเภทการรับสินค้า กรณีไม่ผ่านข้อใดข้อหนึ่ง
+                {rule.rule === "optional" && (
+                  <span className="font-normal text-muted-foreground">(ไม่บังคับ)</span>
+                )}
+              </Label>
               {readOnly ? (
                 <p className="mt-2 font-semibold">
-                  {disposition ? DISPOSITION_LABEL[disposition] : "-"}
+                  {picked ? DISPOSITION_LABEL[picked] : "-"}
                 </p>
               ) : (
                 <div className="mt-2 grid gap-3 @4xl:grid-cols-3">
-                  {DISPOSITIONS.map((d) => (
+                  {choices.map((d) => (
                     <button
                       key={d.id}
                       type="button"
                       role="radio"
-                      aria-checked={disposition === d.id}
+                      aria-checked={picked === d.id}
                       onClick={() => setDisposition(d.id)}
                       className={cn(
                         "flex min-h-11 items-center gap-3 rounded-lg border px-4 text-sm transition-colors",
-                        disposition === d.id
+                        picked === d.id
                           ? "border-primary bg-brand font-medium text-primary"
                           : "border-border bg-card hover:bg-accent-hover"
                       )}
@@ -311,10 +325,10 @@ function RawSheet({ doc }: { doc: RawDoc }) {
                       <span
                         className={cn(
                           "flex size-4 shrink-0 items-center justify-center rounded-full border",
-                          disposition === d.id ? "border-current" : "border-border"
+                          picked === d.id ? "border-current" : "border-border"
                         )}
                       >
-                        {disposition === d.id && (
+                        {picked === d.id && (
                           <span className="size-2 rounded-full bg-current" />
                         )}
                       </span>
@@ -335,7 +349,7 @@ function RawSheet({ doc }: { doc: RawDoc }) {
         )}
 
         {/* ผ่านหมดก็ยังมีช่องหมายเหตุของทั้งใบ แค่ไม่ต้องมีคอลัมน์คู่กับตัวเลือก */}
-        {!hasFail && (
+        {!askDisposition && (
           <DocNote
             readOnly={readOnly}
             value={note}

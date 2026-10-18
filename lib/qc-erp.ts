@@ -516,18 +516,19 @@ export type Disposition = {
   field: string;
 };
 
+// เรียง Repack ก่อน ตรงกับปุ่มในใบตรวจหน้างาน (lib/qc-receiving)
 export const DISPOSITIONS: Disposition[] = [
-  {
-    id: "accept",
-    label: "รับสภาพ",
-    effect: "ยอดทั้งหมดเข้าคลังปกติ",
-    field: "qty (Accepted Quantity)",
-  },
   {
     id: "repack",
     label: "Repack",
     effect: "เข้าคลัง repack แยก รอแบ่งบรรจุใหม่",
     field: "rejected_warehouse = คลัง repack",
+  },
+  {
+    id: "accept",
+    label: "รับสภาพ",
+    effect: "ยอดทั้งหมดเข้าคลังปกติ",
+    field: "qty (Accepted Quantity)",
   },
   {
     id: "return",
@@ -539,6 +540,48 @@ export const DISPOSITIONS: Disposition[] = [
 
 export const dispositionOf = (id: string) =>
   DISPOSITIONS.find((d) => d.id === id);
+
+/**
+ * ผู้ตรวจต้องเลือกผลตรวจที่ไม่ผ่านไหม
+ *
+ *   required  เชื่อมโยงเอกสาร และตั้งตรวจไม่ผ่านเป็น "บังคับเลือกผลตรวจ"
+ *             ยอดเข้าคลังขึ้นกับที่เลือก ไม่เลือกบันทึกไม่ได้
+ *   optional  ไม่เชื่อมโยงเอกสาร — ไม่มียอดให้เปลี่ยน เลือกไว้เป็นข้อมูลได้
+ *   none      เชื่อมโยงเอกสารแต่ตั้ง Warn / Stop / ไม่บังคับตรวจ — เอกสารจัดการ
+ *             เองตามที่ตั้ง ไม่มีขั้นเลือกผลตรวจ
+ *
+ * ไม่มีตัวเลือกให้เลือกเลยนับเป็น none เสมอ ช่องว่างให้กดไม่ได้บังคับใครได้
+ */
+export function dispositionRule(
+  t: Pick<QiTemplate, "linkDocs" | "onRejected" | "dispositions">
+): "required" | "optional" | "none" {
+  if (dispositionChoices(t).length === 0) return "none";
+  if (!t.linkDocs) return "optional";
+  return t.onRejected === "dispose" ? "required" : "none";
+}
+
+/** ตัวเลือกที่ฟอร์มนี้เปิดไว้ เรียงตามรายการกลาง ไม่ใช่ตามลำดับที่ติ๊ก */
+export const dispositionChoices = (t: Pick<QiTemplate, "dispositions">) =>
+  DISPOSITIONS.filter((d) => t.dispositions.includes(d.id));
+
+/**
+ * กฎของใบตรวจหน้างาน — อ่านจากเทมเพลตที่ใบนั้นเดินตาม
+ *
+ * ใบที่ยังไม่มีเทมเพลตของตัวเอง (ไม่ส่ง id มา) ถือเป็นใบรับของผูกเอกสาร
+ * ที่บังคับเลือกครบสามตัว ตรงกับที่หน้างานทำอยู่ตอนนี้
+ */
+export function formDisposition(tplId?: string): {
+  rule: "required" | "optional" | "none";
+  ids: string[];
+} {
+  const t = tplId ? templateOf(tplId) : undefined;
+  if (!t) return { rule: "required", ids: DISPOSITIONS.map((d) => d.id) };
+  return { rule: dispositionRule(t), ids: dispositionChoices(t).map((d) => d.id) };
+}
+
+/** หัวข้อผลตรวจที่ไม่ผ่านโผล่ในหน้าตั้งค่าไหม — ตัวเลือกยังไม่ติ๊กก็ต้องเห็นให้ติ๊ก */
+export const showsDispositions = (t: Pick<QiTemplate, "linkDocs" | "onRejected">) =>
+  !t.linkDocs || t.onRejected === "dispose";
 
 /** กี่ฟอร์มที่เปิดตัวเลือกนี้อยู่ — ใช้กันลบตัวที่ยังมีคนใช้ */
 export const dispositionUsedBy = (id: string) =>
@@ -1084,9 +1127,14 @@ export type QiTemplate = {
    * throw เองเฉพาะใบที่เทมเพลตบอกว่า stop — เพิ่มความเข้มได้ ผ่อนไม่ได้
    * เพราะถ้าระบบตั้ง Stop ไว้ มันโยนก่อนที่ hook ของเราจะได้ทำงาน
    */
-  onRejected: GuardAction | "system";
-  /** "off" = ไม่บังคับตรวจ — เอกสารเดินต่อได้แม้ยังไม่มีใบตรวจ */
-  onNotSubmitted: GuardAction | "system" | "off";
+  /**
+   * ตรวจไม่ผ่านแล้วเอกสารเดินต่อยังไง — ใช้เมื่อเชื่อมโยงเอกสาร
+   *   off      ไม่บังคับตรวจ ไม่ผ่านก็เดินต่อได้ ไม่เตือน
+   *   dispose  ผู้ตรวจต้องเลือกผลตรวจ (Repack / รับสภาพ / ส่งคืน) ก่อนบันทึก
+   *            ยอดเข้าคลังเปลี่ยนตามที่เลือก เอกสารจึงเดินต่อได้เมื่อเลือกแล้ว
+   */
+  onRejected: GuardAction | "system" | "off" | "dispose";
+  onNotSubmitted: GuardAction | "system";
   /** หมวดย่อยในหน้าหลัก — id ใน REPORT_TYPES ว่างคือไปอยู่กลุ่มอื่น ๆ */
   reportType: string;
   /** ประเภทสินค้าที่ใช้รายงานนี้ — ว่างคือยังไม่ได้ระบุ */
@@ -1127,16 +1175,25 @@ function defaultReportType(t: SeedTemplate): string {
   return "";
 }
 
-const withDesignDefaults = (t: SeedTemplate): QiTemplate => ({
-  reportType: defaultReportType(t),
-  productTypes: [],
-  linkDocs: t.phase !== "" || t.refMenu !== "",
-  headerOn: false,
-  header: [],
-  remark: "onFail",
-  verdicts: ["pass", "fail"],
-  ...t,
-});
+const withDesignDefaults = (t: SeedTemplate): QiTemplate => {
+  const linkDocs = t.linkDocs ?? (t.phase !== "" || t.refMenu !== "");
+  return {
+    reportType: defaultReportType(t),
+    productTypes: [],
+    headerOn: false,
+    header: [],
+    remark: "onFail",
+    verdicts: ["pass", "fail"],
+    ...t,
+    linkDocs,
+    // ฟอร์มตั้งต้นที่เคยติ๊ก "บังคับเลือก" ไว้ ย้ายมาเป็นตัวเลือกของการเดินเอกสาร
+    // ตัวเดียวกัน — ฟอร์มที่ไม่ผูกเอกสารไม่มีเอกสารให้เดิน เก็บตามเดิม
+    onRejected:
+      linkDocs && t.requireDisposition && t.onRejected === "system"
+        ? "dispose"
+        : t.onRejected,
+  };
+};
 
 export const ITEM_POOL = [
   "21-0-0 ฟูเจียน ผง",
@@ -2201,13 +2258,14 @@ export const blankTemplate = (): QiTemplate => ({
   requireBefore: true,
   dispositions: [],
   requireDisposition: false,
-  // รายงานใหม่ตั้งแบบที่โรงงานใช้บ่อยสุด — ยังไม่ตรวจห้ามเดินต่อ ตรวจแล้วไม่ผ่าน
+  // ค่าที่จะได้ตอนเปิดเชื่อมโยงเอกสาร — ยังไม่ตรวจห้ามเดินต่อ ตรวจแล้วไม่ผ่าน
   // แค่เตือน เพราะคนที่ตัดสินว่าจะรับสภาพหรือส่งคืนคือคนหน้างาน ไม่ใช่ระบบ
   onRejected: "warn",
   onNotSubmitted: "stop",
   reportType: "",
   productTypes: [],
-  linkDocs: true,
+  // รายงานใหม่เริ่มที่ไม่ผูกเอกสาร — ไม่เลือกอะไรให้ก่อน คนตั้งค่าเปิดเองเมื่อใช่
+  linkDocs: false,
   headerOn: false,
   header: [],
   remark: "onFail",

@@ -57,6 +57,7 @@ import { Textarea } from "@peckey954/ui/components/ui/textarea";
 import { cn } from "@peckey954/ui/lib/utils";
 import { toast } from "sonner";
 import { CheckChip } from "@/components/check-chip";
+import { ChipGroup } from "@/components/chip-group";
 import { ChoiceGroup } from "@/components/choice-group";
 import { SchedulePreviewCalendar } from "@/components/qc/schedule-calendar";
 import { TimeField } from "@/components/time-field";
@@ -78,7 +79,6 @@ import {
   type RefMenu,
   usesQualityInspection,
   describeCriteria,
-  dispositionOf,
   docsPerDay,
   newShift,
   shiftOvernight,
@@ -107,9 +107,11 @@ import {
   REPORT_TYPES,
   STAGE,
   STAGE_KEYS,
-  VERDICT_OPTION_KEYS,
-  VERDICT_OPTION_LABEL,
   addReportType,
+  DISPOSITIONS,
+  dispositionChoices,
+  dispositionRule,
+  showsDispositions,
   newDocField,
   stageOf,
   stagePatch,
@@ -187,8 +189,20 @@ function Editor({ seed, isNew }: { seed: QiTemplate; isNew: boolean }) {
   const patchSchedule = (next: Partial<QiSchedule>) =>
     setTpl((p) => ({ ...p, schedule: { ...p.schedule, ...next } }));
   const stage = stageOf(tpl);
-  // ตัวเลือกที่ยังไม่ได้ตั้งชื่อไม่ขึ้นในใบ — ช่องว่างให้กดไม่ได้บอกอะไรผู้ตรวจ
-  const dispositions = tpl.dispositions.filter((d) => d.trim() !== "");
+  const rule = dispositionRule(tpl);
+  const choices = dispositionChoices(tpl);
+  // เลขหัวข้อเดินตามที่โชว์จริง — ผลตรวจที่ไม่ผ่านซ่อนได้ เลขที่เหลือต้องไม่ข้าม
+  const order = [
+    "info",
+    "header",
+    "checks",
+    "link",
+    ...(showsDispositions(tpl) ? ["dispose"] : []),
+    "verdict",
+    "extra",
+    "schedule",
+  ];
+  const no = (key: string) => order.indexOf(key) + 1;
 
   const patchRow = (id: string, next: Partial<QiRow>) =>
     setTpl((p) => ({
@@ -203,6 +217,13 @@ function Editor({ seed, isNew }: { seed: QiTemplate; isNew: boolean }) {
        ที่เหลือปล่อยให้บันทึกร่างไว้ก่อนได้ ฟอร์มกระดาษกว่าจะตั้งครบใช้หลายรอบ */
     if (tpl.name.trim() === "") {
       toast.error("กรุณาตั้งชื่อรายงาน");
+      return;
+    }
+    // บังคับเลือกผลตรวจแต่ไม่มีตัวเลือก — ผู้ตรวจจะติดบันทึกใบที่ไม่ผ่านไม่ได้เลย
+    if (tpl.linkDocs && tpl.onRejected === "dispose" && choices.length === 0) {
+      toast.error("ยังไม่ได้เลือกตัวเลือกผลตรวจที่ไม่ผ่าน", {
+        description: "ตั้งให้บังคับเลือกผลตรวจไว้ ต้องเปิดอย่างน้อยหนึ่งตัวเลือก",
+      });
       return;
     }
 
@@ -308,37 +329,11 @@ function Editor({ seed, isNew }: { seed: QiTemplate; isNew: boolean }) {
           </TabsList>
 
           <TabsContent value="build">
-            {/* ---------- 1 ข้อมูลและเงื่อนไข ----------
-                 สวิตช์เชื่อมโยงเอกสารอยู่หัวก้อน เพราะมันตัดสินว่าแถวที่สองมีไหม
-                 รายงานที่ผู้ตรวจเปิดเอง (ตรวจเครื่องจักร ตรวจคลัง) ไม่มีช่วงการตรวจ
-                 ไม่มีเอกสาร และไม่มีเอกสารให้บล็อก — ซ่อนทั้งแถว ไม่ใช่ปล่อยให้เห็น
-                 สี่ช่องที่กรอกแล้วไม่มีผล */}
+            {/* ---------- ข้อมูลรายงาน ---------- */}
             <Section
-              index={1}
-              title="ข้อมูลและเงื่อนไขการตรวจสอบ"
-              note="กำหนดข้อมูลรายงาน ช่วงการตรวจสอบ เอกสารอ้างอิง และเงื่อนไขการดำเนินงาน"
-              action={
-                <SwitchLabel
-                  checked={tpl.linkDocs}
-                  onCheckedChange={(on) =>
-                    patch(
-                      on
-                        ? { linkDocs: true }
-                        : {
-                            linkDocs: false,
-                            phase: "",
-                            prodSteps: [],
-                            operations: [],
-                            refMenu: "",
-                          }
-                    )
-                  }
-                >
-                  {tpl.linkDocs
-                    ? "เชื่อมโยงกับเอกสารในระบบ"
-                    : "ไม่มีเชื่อมโยงกับเอกสารในระบบ"}
-                </SwitchLabel>
-              }
+              index={no("info")}
+              title="ข้อมูลรายงาน"
+              note="กำหนดข้อมูลรายงาน"
             >
               <div className="grid gap-4 @xl:grid-cols-2 @5xl:grid-cols-4">
                 <Field id="tpl-name" label="ชื่อรายงาน">
@@ -391,8 +386,104 @@ function Editor({ seed, isNew }: { seed: QiTemplate; isNew: boolean }) {
                   />
                 </Field>
 
-                {tpl.linkDocs && (
-                  <>
+              </div>
+            </Section>
+
+            {/* ---------- 2 ส่วนหัวเอกสาร ----------
+                 ปิดแล้วช่องที่ตั้งไว้ยังเก็บอยู่ เปิดกลับมาไม่ต้องตั้งใหม่ */}
+            <Section
+              index={no("header")}
+              title="ส่วนหัวเอกสาร"
+              note="ช่องที่ผู้ตรวจต้องระบุก่อนเริ่มตรวจ เช่น สินค้า, เครื่องจักร"
+              action={
+                <SwitchLabel
+                  checked={tpl.headerOn}
+                  onCheckedChange={(on) =>
+                    patch({
+                      headerOn: on,
+                      header:
+                        on && tpl.header.length === 0
+                          ? [newDocField()]
+                          : tpl.header,
+                    })
+                  }
+                >
+                  เพิ่มหัวเอกสาร
+                </SwitchLabel>
+              }
+            >
+              {tpl.headerOn && (
+                <HeaderFieldsTable
+                  fields={tpl.header}
+                  onChange={(header) => patch({ header })}
+                />
+              )}
+            </Section>
+
+            {/* ---------- 3 หัวข้อตรวจ ---------- */}
+            <Section
+              index={no("checks")}
+              title="หัวข้อตรวจ"
+              note="กำหนดหัวข้อ เกณฑ์ และการตัดสิน"
+              action={
+                /* คนละตัวกับติ๊กรายข้อในตาราง — ตัวนี้คือ manual_inspection
+                   ที่หัวใบ ทำให้ระบบไม่เขียนทับผลรวมทั้งใบ ผลรายข้อยังคำนวณให้ */
+                <label className="flex items-center gap-2 text-sm">
+                  <Checkbox
+                    checked={tpl.manualWholeDoc}
+                    onCheckedChange={(v) => patch({ manualWholeDoc: v === true })}
+                  />
+                  ผู้ตรวจตัดสินเองทั้งใบ
+                </label>
+              }
+            >
+              <CheckTable
+                rows={tpl.rows}
+                onChange={(rows) => patch({ rows })}
+                onPatch={patchRow}
+              />
+              <AddButton
+                onClick={() =>
+                  setTpl((p) => ({ ...p, rows: [...p.rows, newRow()] }))
+                }
+              >
+                เพิ่มหัวข้อตรวจ
+              </AddButton>
+            </Section>
+
+            {/* ---------- เชื่อมโยงเอกสาร ----------
+                 อยู่หลังหัวข้อตรวจ เพราะเป็นเรื่องว่าใบนี้ผูกกับการรับ–จ่ายของไหม
+                 ไม่ใช่เรื่องว่าตรวจอะไร รายงานใหม่เริ่มที่ปิด เปิดเองเมื่อใช่
+                 ปิดแล้วซ่อนทั้งแถว ไม่ใช่ปล่อยให้เห็นสี่ช่องที่กรอกแล้วไม่มีผล */}
+            <Section
+              index={no("link")}
+              title="เชื่อมโยงเอกสาร"
+              note="กำหนดช่วงการเชื่อมโยงกับเอกสารในระบบ"
+              action={
+                <SwitchLabel
+                  checked={tpl.linkDocs}
+                  onCheckedChange={(on) =>
+                    patch(
+                      on
+                        ? { linkDocs: true }
+                        : {
+                            linkDocs: false,
+                            phase: "",
+                            prodSteps: [],
+                            operations: [],
+                            refMenu: "",
+                          }
+                    )
+                  }
+                >
+                  {tpl.linkDocs
+                    ? "เชื่อมโยงกับเอกสารในระบบ"
+                    : "ไม่มีการเชื่อมโยงกับเอกสารในระบบ"}
+                </SwitchLabel>
+              }
+            >
+              {tpl.linkDocs && (
+                <div className="grid gap-4 @xl:grid-cols-2 @5xl:grid-cols-4">
                     <Field id="tpl-stage" label="ช่วงการตรวจสอบ">
                       <Select
                         value={stage}
@@ -452,14 +543,14 @@ function Editor({ seed, isNew }: { seed: QiTemplate; isNew: boolean }) {
                             : tpl.onNotSubmitted
                         }
                         onValueChange={(v) =>
-                          patch({ onNotSubmitted: v as GuardAction | "off" })
+                          patch({ onNotSubmitted: v as GuardAction })
                         }
                       >
                         <SelectTrigger id="tpl-sub" className="w-full bg-card">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          {(["warn", "stop", "off"] as const).map((k) => (
+                          {(["warn", "stop"] as const).map((k) => (
                             <SelectItem key={k} value={k}>
                               {FLOW_LABEL[k]}
                             </SelectItem>
@@ -476,14 +567,14 @@ function Editor({ seed, isNew }: { seed: QiTemplate; isNew: boolean }) {
                             : tpl.onRejected
                         }
                         onValueChange={(v) =>
-                          patch({ onRejected: v as GuardAction })
+                          patch({ onRejected: v as RejectFlow })
                         }
                       >
                         <SelectTrigger id="tpl-rej" className="w-full bg-card">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          {(["warn", "stop"] as const).map((k) => (
+                          {(["warn", "stop", "off", "dispose"] as const).map((k) => (
                             <SelectItem key={k} value={k}>
                               {FLOW_LABEL[k]}
                             </SelectItem>
@@ -511,76 +602,75 @@ function Editor({ seed, isNew }: { seed: QiTemplate; isNew: boolean }) {
                         </Field>
                       </div>
                     )}
-                  </>
-                )}
-              </div>
-            </Section>
-
-            {/* ---------- 2 ส่วนหัวเอกสาร ----------
-                 ปิดแล้วช่องที่ตั้งไว้ยังเก็บอยู่ เปิดกลับมาไม่ต้องตั้งใหม่ */}
-            <Section
-              index={2}
-              title="ส่วนหัวเอกสาร"
-              note="ช่องที่ผู้ตรวจต้องระบุก่อนเริ่มตรวจ เช่น สินค้า, เครื่องจักร"
-              action={
-                <SwitchLabel
-                  checked={tpl.headerOn}
-                  onCheckedChange={(on) =>
-                    patch({
-                      headerOn: on,
-                      header:
-                        on && tpl.header.length === 0
-                          ? [newDocField()]
-                          : tpl.header,
-                    })
-                  }
-                >
-                  เพิ่มหัวเอกสาร
-                </SwitchLabel>
-              }
-            >
-              {tpl.headerOn && (
-                <HeaderFieldsTable
-                  fields={tpl.header}
-                  onChange={(header) => patch({ header })}
-                />
+                                  </div>
               )}
             </Section>
 
-            {/* ---------- 3 หัวข้อตรวจ ---------- */}
-            <Section
-              index={3}
-              title="หัวข้อตรวจ"
-              note="กำหนดหัวข้อ เกณฑ์ และการตัดสิน"
-              action={
-                /* คนละตัวกับติ๊กรายข้อในตาราง — ตัวนี้คือ manual_inspection
-                   ที่หัวใบ ทำให้ระบบไม่เขียนทับผลรวมทั้งใบ ผลรายข้อยังคำนวณให้ */
-                <label className="flex items-center gap-2 text-sm">
-                  <Checkbox
-                    checked={tpl.manualWholeDoc}
-                    onCheckedChange={(v) => patch({ manualWholeDoc: v === true })}
-                  />
-                  ผู้ตรวจตัดสินเองทั้งใบ
-                </label>
-              }
-            >
-              <CheckTable
-                rows={tpl.rows}
-                onChange={(rows) => patch({ rows })}
-                onPatch={patchRow}
-              />
-              <AddButton
-                onClick={() =>
-                  setTpl((p) => ({ ...p, rows: [...p.rows, newRow()] }))
-                }
+            {/* ---------- ผลตรวจที่ไม่ผ่าน ----------
+                 ขึ้นสองกรณี — ผูกเอกสารแล้วตั้งให้บังคับเลือกผลตรวจ (ยอดเข้าคลัง
+                 ขึ้นกับที่เลือก) กับไม่ผูกเอกสาร (เลือกไว้เป็นข้อมูล ไม่บังคับ)
+                 ผูกเอกสารแล้วตั้ง Warn / Stop / ไม่บังคับตรวจ เอกสารจัดการเอง
+                 ไม่มีขั้นนี้ จึงซ่อนทั้งก้อน */}
+            {showsDispositions(tpl) && (
+              <Section
+                index={no("dispose")}
+                title="ผลตรวจที่ไม่ผ่าน"
+                note={`กำหนดตัวเลือกการจัดการสินค้าที่ไม่ผ่าน ถ้าเลือกตัวเลือกเดียว เมื่อไม่ผ่านข้อมูลจะเลือกให้อัตโนมัติ${
+                  tpl.linkDocs ? "" : " (ไม่บังคับ)"
+                }`}
               >
-                เพิ่มหัวข้อตรวจ
-              </AddButton>
+                <div className="flex flex-wrap gap-2">
+                  {DISPOSITIONS.map((d) => (
+                    <CheckChip
+                      key={d.id}
+                      id={`disp-${d.id}`}
+                      label={d.label}
+                      checked={tpl.dispositions.includes(d.id)}
+                      onChange={(on) =>
+                        patch({
+                          dispositions: on
+                            ? [...tpl.dispositions, d.id]
+                            : tpl.dispositions.filter((x) => x !== d.id),
+                        })
+                      }
+                    />
+                  ))}
+                </div>
+                {/* บังคับเลือกแต่ไม่ได้เปิดตัวเลือกไว้สักตัว ผู้ตรวจจะติดบันทึกไม่ได้ */}
+                {tpl.linkDocs && dispositionChoices(tpl).length === 0 && (
+                  <p className="mt-2 text-sm text-danger-strong">
+                    เลือกอย่างน้อยหนึ่งตัวเลือก — ตั้งให้บังคับเลือกผลตรวจไว้ที่การเชื่อมโยงเอกสาร
+                  </p>
+                )}
+              </Section>
+            )}
+
+            {/* ---------- ตัวเลือกการตัดสิน ----------
+                 เลือกชุดเดียว ไม่ใช่ติ๊กทีละปุ่ม — ผ่านกับไม่ผ่านต้องมีเสมอ
+                 ต่างกันแค่มี "ไม่มี" ให้ข้อที่ไม่เกี่ยวกับของล็อตนั้นไหม */}
+            <Section
+              index={no("verdict")}
+              title="ตัวเลือกการตัดสิน"
+              note="กำหนดตัวเลือกการตัดสิน"
+            >
+              <ChipGroup
+                label="ตัวเลือกการตัดสิน"
+                value={tpl.verdicts.includes("na") ? "withNa" : "passFail"}
+                onChange={(v) =>
+                  patch({
+                    verdicts: v === "withNa" ? ["pass", "fail", "na"] : ["pass", "fail"],
+                  })
+                }
+                options={[
+                  { id: "passFail" as const, label: "ผ่าน/ไม่ผ่าน" },
+                  { id: "withNa" as const, label: "ผ่าน/ไม่ผ่าน/ไม่มี" },
+                ]}
+              />
             </Section>
 
             {/* ---------- 4 ข้อมูลเพิ่มเติม ---------- */}
             <Section
-              index={4}
+              index={no("extra")}
               title="ข้อมูลเพิ่มเติม"
               note="กำหนดการระบุหมายเหตุและแนบรูปภาพเอกสาร"
             >
@@ -602,116 +692,11 @@ function Editor({ seed, isNew }: { seed: QiTemplate; isNew: boolean }) {
               </div>
             </Section>
 
-            {/* ---------- 5 ตัวเลือกการตัดสิน ----------
-                 ต้องเหลืออย่างน้อยหนึ่งปุ่ม ไม่งั้นผู้ตรวจไม่มีอะไรให้กด */}
-            <Section
-              index={5}
-              title="ตัวเลือกการตัดสิน"
-              note="กำหนดตัวเลือกการตัดสิน"
-            >
-              <div className="flex flex-wrap gap-2">
-                {VERDICT_OPTION_KEYS.map((k) => (
-                  <CheckChip
-                    key={k}
-                    id={`verdict-${k}`}
-                    label={VERDICT_OPTION_LABEL[k]}
-                    checked={tpl.verdicts.includes(k)}
-                    onChange={(on) => {
-                      if (!on && tpl.verdicts.length === 1) return;
-                      patch({
-                        verdicts: on
-                          ? VERDICT_OPTION_KEYS.filter(
-                              (x) => x === k || tpl.verdicts.includes(x)
-                            )
-                          : tpl.verdicts.filter((x) => x !== k),
-                      });
-                    }}
-                  />
-                ))}
-              </div>
-            </Section>
-
-            {/* ---------- 6 ผลตรวจที่ไม่ผ่าน ----------
-                 สวิตช์คือ "มีขั้นนี้ไหม" — ปิดคือไม่ผ่านแล้วจบที่ผลตรวจ ไม่ต้องเลือก
-                 ว่าจะจัดการของยังไง ตัวเลือกเป็นของฟอร์มนี้ พิมพ์ตั้งชื่อเองได้ */}
-            <Section
-              index={6}
-              title="ผลตรวจที่ไม่ผ่าน"
-              note={
-                tpl.requireDisposition
-                  ? "ผู้ตรวจต้องเลือกว่าจะจัดการสินค้าที่ไม่ผ่านอย่างไร"
-                  : "กำหนดตัวเลือกการจัดการสินค้าที่ไม่ผ่าน"
-              }
-              action={
-                <SwitchLabel
-                  checked={tpl.requireDisposition}
-                  onCheckedChange={(on) =>
-                    patch({
-                      requireDisposition: on,
-                      dispositions:
-                        on && tpl.dispositions.length === 0
-                          ? ["repack", "accept", "return"]
-                          : tpl.dispositions,
-                    })
-                  }
-                >
-                  บังคับเลือกเมื่อมีข้อไม่ผ่าน
-                </SwitchLabel>
-              }
-            >
-              {tpl.requireDisposition && (
-                <>
-                  <ul className="space-y-3">
-                    {tpl.dispositions.map((d, i) => (
-                      <RowCard
-                        key={`${i}-${d}`}
-                        label={`ตัวเลือกที่ ${i + 1}`}
-                        total={tpl.dispositions.length}
-                        onMove={(dir) =>
-                          patch({ dispositions: move(tpl.dispositions, i, dir) })
-                        }
-                        onRemove={() =>
-                          patch({
-                            dispositions: tpl.dispositions.filter(
-                              (_, j) => j !== i
-                            ),
-                          })
-                        }
-                      >
-                        <Input
-                          aria-label={`ตัวเลือกที่ ${i + 1}`}
-                          className="w-full bg-card @xl:w-80"
-                          placeholder="ระบุตัวเลือก เช่น ส่งคืน"
-                          defaultValue={dispositionOf(d)?.label ?? d}
-                          onBlur={(e) => {
-                            const v = e.target.value.trim();
-                            if (v === (dispositionOf(d)?.label ?? d)) return;
-                            patch({
-                              dispositions: tpl.dispositions.map((x, j) =>
-                                j === i ? v : x
-                              ),
-                            });
-                          }}
-                        />
-                      </RowCard>
-                    ))}
-                  </ul>
-                  <AddButton
-                    onClick={() =>
-                      patch({ dispositions: [...tpl.dispositions, ""] })
-                    }
-                  >
-                    เพิ่มตัวเลือก
-                  </AddButton>
-                </>
-              )}
-            </Section>
-
             {/* ---------- 7 รอบเวลาทำงาน ----------
                  อยู่ท้ายสุดเพราะฟอร์มส่วนใหญ่ไม่ได้เปิด — ฟอร์มที่เกิดจากใบรับของ
                  ไม่มีรอบเวลา เปิดมาเจอกะสี่ช่องก่อนจะงงว่าต้องกรอกไหม */}
             <Section
-              index={7}
+              index={no("schedule")}
               title="เปิดใบตามรอบเวลาทำงาน"
               note="ระบบจะขึ้นข้อมูลให้ทำเอกสารตามช่วงเวลาการทำงานที่ตั้งไว้ ไม่รวมวันหยุดทำงานและวันหยุดนักขัตฤกษ์ วันไหนไม่มีข้อมูล ระบบจะขึ้นว่ายังไม่มีใครทำ จึงดูเป็นปฏิทินทั้งเดือนได้"
               action={
@@ -900,25 +885,33 @@ function Editor({ seed, isNew }: { seed: QiTemplate; isNew: boolean }) {
               )}
             </div>
 
-            {tpl.requireDisposition && dispositions.length > 0 && !plain && (
+            {/* ตัวเลือกเดียวเลือกไว้ให้เลย — ไม่มีอะไรให้ตัดสินใจ กดซ้ำเสียเวลาเปล่า */}
+            {rule !== "none" && !plain && (
               <div className="mt-4">
                 <p className="text-sm font-medium">
                   ประเภทการรับสินค้า กรณีไม่ผ่านข้อใดข้อหนึ่ง{" "}
-                  {tpl.requireDisposition && (
-                    <span className="font-normal text-danger-strong">
-                      (บังคับเลือก)
-                    </span>
-                  )}
+                  <span
+                    className={cn(
+                      "font-normal",
+                      rule === "required" ? "text-danger-strong" : "text-muted-foreground"
+                    )}
+                  >
+                    {rule === "required" ? "(บังคับเลือก)" : "(ไม่บังคับ)"}
+                  </span>
                 </p>
-                <RadioGroup className="mt-2 grid gap-2 @lg:grid-cols-3">
-                  {dispositions.map((id) => (
+                <RadioGroup
+                  key={choices.map((d) => d.id).join()}
+                  className="mt-2 grid gap-2 @lg:grid-cols-3"
+                  defaultValue={choices.length === 1 ? choices[0].id : undefined}
+                >
+                  {choices.map((d) => (
                     <Label
-                      key={id}
-                      htmlFor={`preview-disp-${id}`}
+                      key={d.id}
+                      htmlFor={`preview-disp-${d.id}`}
                       className="flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-2.5 font-normal"
                     >
-                      <RadioGroupItem id={`preview-disp-${id}`} value={id} />
-                      {dispositionOf(id)?.label ?? id}
+                      <RadioGroupItem id={`preview-disp-${d.id}`} value={d.id} />
+                      {d.label}
                     </Label>
                   ))}
                 </RadioGroup>
@@ -1163,10 +1156,13 @@ function move<T>(list: T[], i: number, dir: -1 | 1): T[] {
 
 /** ป้ายของการเดินเอกสารต่อ — ใช้คำเดียวกับ Stock Settings มีชื่อภาษาอังกฤษต่อท้าย
  *  เพราะคนที่ตั้งค่านี้ต้องไปตั้งคู่กันใน ERPNext ด้วย */
-const FLOW_LABEL: Record<GuardAction | "off", string> = {
+type RejectFlow = Exclude<QiTemplate["onRejected"], "system">;
+
+const FLOW_LABEL: Record<RejectFlow, string> = {
   warn: "เตือนแต่ไปต่อได้ - Warn",
   stop: "ห้ามผ่าน - Stop",
   off: "ไม่บังคับตรวจ",
+  dispose: `บังคับเลือกผลตรวจ ${DISPOSITIONS.map((d) => d.label).join(", ")}`,
 };
 
 /* ---------- การ์ดหนึ่งแถว ----------
