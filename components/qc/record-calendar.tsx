@@ -1,23 +1,16 @@
 "use client";
 
 import * as React from "react";
-import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { ChevronLeftIcon, ChevronRightIcon } from "lucide-react";
-import { Badge } from "@peckey954/ui/components/ui/badge";
 import { Button } from "@peckey954/ui/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@peckey954/ui/components/ui/dialog";
 import { cn } from "@peckey954/ui/lib/utils";
-import { shiftLabel, type QiTemplate } from "@/lib/qc-erp";
+import {
+  type QiTemplate,
+} from "@/lib/qc-erp";
 import {
   isWorkday,
   isoDate,
-  recordAt,
   slotState,
   type SlotState,
 } from "@/lib/qc-records";
@@ -31,15 +24,17 @@ import {
      จาง      ยังไม่ถึงรอบ
 
    วันหยุด (อาทิตย์) เป็นช่องเทาไม่มีวงกลม — ไม่ใช่ขาดตรวจ ไม่มีใครต้องมาทำ
-   กดวันไหนก็ได้รายการทีละรอบของวันนั้น แล้วกดเข้าไปดูใบของรอบนั้นต่อ
+   กดวันไหนก็ไปหน้าของวันนั้น (/qc/form/[tplId]/day/[date]) เห็นทีละรอบ
+   แล้วกดเข้าไปดูใบของรอบนั้นต่อ — เป็นหน้า ไม่ใช่กล่องซ้อน ปุ่มย้อนกลับของ
+   เบราว์เซอร์จะได้พากลับมาที่ปฏิทินตามที่คนคาด
 ------------------------------------------------------------------ */
 
-const MONTHS = [
+export const MONTHS = [
   "มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน",
   "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม",
 ];
 const DAYS = ["อา", "จ", "อ", "พ", "พฤ", "ศ", "ส"];
-const DAY_FULL = ["อาทิตย์", "จันทร์", "อังคาร", "พุธ", "พฤหัสบดี", "ศุกร์", "เสาร์"];
+export const DAY_FULL = ["อาทิตย์", "จันทร์", "อังคาร", "พุธ", "พฤหัสบดี", "ศุกร์", "เสาร์"];
 
 /* วงกลมวาดเป็น SVG ไม่ใช่ border — เส้นประของ border บนวงกลมสิบพิกเซลได้แค่
    สี่ห้าขีดหยาบ ๆ ดูเหมือนวงกลมแตก ไม่ใช่ "ยังไม่ได้ทำ" SVG ตั้งระยะขีดเองได้
@@ -51,7 +46,7 @@ const RING: Record<Exclude<SlotState, "off">, { stroke: string; fill: string; da
   future: { stroke: "stroke-border", fill: "fill-transparent" },
 };
 
-const STATE_LABEL: Record<SlotState, string> = {
+export const STATE_LABEL: Record<SlotState, string> = {
   pass: "ผ่าน",
   fail: "ไม่ผ่าน",
   missed: "ไม่ได้ตรวจ",
@@ -92,7 +87,7 @@ function weeksOf(year: number, month: number): Date[][] {
 export function RecordCalendar({ tpl }: { tpl: QiTemplate }) {
   const now = new Date();
   const [ym, setYm] = React.useState({ y: now.getFullYear(), m: now.getMonth() });
-  const [day, setDay] = React.useState<Date | null>(null);
+  const router = useRouter();
   const slots = tpl.schedule.slots;
   const today = isoDate(now);
 
@@ -166,7 +161,7 @@ export function RecordCalendar({ tpl }: { tpl: QiTemplate }) {
                     key={iso}
                     type="button"
                     disabled={!work}
-                    onClick={() => setDay(d)}
+                    onClick={() => router.push(`/qc/form/${tpl.id}/day/${iso}`)}
                     aria-label={`${d.getDate()} ${MONTHS[d.getMonth()]}`}
                     className={cn(
                       "flex min-h-14 flex-col items-start gap-1.5 rounded-lg border p-1.5 text-left text-xs transition-colors @3xl:min-h-20 @3xl:p-2.5",
@@ -195,81 +190,6 @@ export function RecordCalendar({ tpl }: { tpl: QiTemplate }) {
         </div>
       </div>
 
-      {day && <DayDialog tpl={tpl} day={day} onClose={() => setDay(null)} />}
     </div>
-  );
-}
-
-/* ---------- รอบของวันที่กด ----------
-     ทีละรอบ เรียงตามเวลา — รอบที่ทำแล้วกดเข้าไปดูใบ รอบที่กำลังเดินอยู่ของวันนี้
-     กดไปตรวจได้เลย รอบที่ผ่านไปแล้วไม่มีใบบอกว่าไม่ได้ตรวจ */
-function DayDialog({
-  tpl,
-  day,
-  onClose,
-}: {
-  tpl: QiTemplate;
-  day: Date;
-  onClose: () => void;
-}) {
-  const iso = isoDate(day);
-  const isToday = iso === isoDate(new Date());
-
-  return (
-    <Dialog open onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className="sm:max-w-lg">
-        <DialogHeader className="text-left">
-          <DialogTitle>
-            วัน{DAY_FULL[day.getDay()]}ที่ {day.getDate()} {MONTHS[day.getMonth()]} {day.getFullYear()}
-          </DialogTitle>
-          <DialogDescription>{tpl.name}</DialogDescription>
-        </DialogHeader>
-        <ul className="space-y-2">
-          {tpl.schedule.slots.map((s, i) => {
-            const rec = recordAt(tpl.id, iso, s.id);
-            const st = slotState(tpl, day, s);
-            const body = (
-              <>
-                <div className="flex min-w-0 items-center gap-3">
-                  <Ring state={st} className="size-3.5" />
-                  <div className="min-w-0">
-                    <p className="text-sm font-medium">
-                      ช่วงที่ {i + 1} · {shiftLabel(s)}
-                    </p>
-                    <p className="truncate text-sm text-muted-foreground">
-                      {rec ? `${rec.no} · ${rec.time} · ${rec.by}` : STATE_LABEL[st]}
-                    </p>
-                  </div>
-                </div>
-                {rec ? (
-                  <Badge appearance="soft" tone={rec.status === "pass" ? "success" : "danger"}>
-                    {STATE_LABEL[rec.status]}
-                  </Badge>
-                ) : isToday && st === "future" ? (
-                  <span className="text-sm font-medium text-primary">ตรวจสอบ</span>
-                ) : null}
-              </>
-            );
-            const cls =
-              "flex items-center justify-between gap-3 rounded-lg border border-border bg-card px-3 py-2.5";
-            return (
-              <li key={s.id}>
-                {rec ? (
-                  <Link href={`/qc/form/${tpl.id}/${rec.id}`} className={cn(cls, "hover:border-primary hover:bg-brand")}>
-                    {body}
-                  </Link>
-                ) : isToday && st === "future" ? (
-                  <Link href={`/qc/form/${tpl.id}/new`} className={cn(cls, "hover:border-primary hover:bg-brand")}>
-                    {body}
-                  </Link>
-                ) : (
-                  <div className={cls}>{body}</div>
-                )}
-              </li>
-            );
-          })}
-        </ul>
-      </DialogContent>
-    </Dialog>
   );
 }

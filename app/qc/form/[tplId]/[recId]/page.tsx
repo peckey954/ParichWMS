@@ -2,8 +2,8 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { useParams, useRouter } from "next/navigation";
-import { ClockIcon } from "lucide-react";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
+import { ClockIcon, PencilIcon, Trash2Icon } from "lucide-react";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -14,9 +14,11 @@ import {
 } from "@peckey954/ui/components/ui/breadcrumb";
 import { Button } from "@peckey954/ui/components/ui/button";
 import { toast } from "sonner";
+import { RecordView } from "@/components/qc/record-view";
 import { TemplateForm, type FormValues } from "@/components/qc/template-form";
 import { shiftLabel, templateOf } from "@/lib/qc-erp";
 import {
+  cancelRecord,
   docNo,
   isoDate,
   nowTime,
@@ -66,6 +68,9 @@ export default function RecordPage() {
   const slot = slotAt(slots, nowTime(opened));
   const done = isNew && tpl && slot ? recordAt(tpl.id, today, slot.id) : undefined;
   const rec = isNew ? undefined : recordOf(recId);
+  const search = useSearchParams();
+  const [editing, setEditing] = React.useState(search.get("edit") === "1");
+  const [, bump] = React.useReducer((n: number) => n + 1, 0);
 
   const slotText = slot ? `ช่วงที่ ${slots.indexOf(slot) + 1} · ${shiftLabel(slot)}` : "";
 
@@ -78,7 +83,8 @@ export default function RecordPage() {
         description: `${done.no} · ${done.time} · ${done.by}`,
       }
     );
-    router.replace(`/qc/form/${tpl.id}/${done.id}`);
+    // ทำซ้ำในรอบเดิม = ตั้งใจแก้ใบเดิม เปิดเป็นฟอร์มเลย ไม่ต้องกดแก้ไขอีกที
+    router.replace(`/qc/form/${tpl.id}/${done.id}?edit=1`);
   }, [done, tpl, slotText, router]);
 
   if (!tpl || (!isNew && !rec)) {
@@ -97,6 +103,75 @@ export default function RecordPage() {
   const no = rec?.no ?? docNo(today, Math.max(0, slotIndex));
   const shownSlot = rec ? slots.find((s) => s.id === rec.slotId) : slot;
   const shownIndex = shownSlot ? slots.indexOf(shownSlot) : -1;
+  const back = () =>
+    router.push(rec?.slotId ? `/qc/form/${tpl.id}/day/${rec.date}` : `/qc/form/${tpl.id}`);
+
+  /* ใบที่ทำแล้วเปิดมาเป็นข้อความก่อน — แก้ไขต้องกดปุ่ม ยกเลิกใบไม่ได้ลบทิ้ง
+     ใบยังอยู่ในแท็บยกเลิก และรอบนั้นกลับไปว่างให้ตรวจใหม่ได้ */
+  if (rec && !editing) {
+    return (
+      <>
+        <main className="@container mx-auto w-full max-w-6xl px-4 pt-6 pb-24 sm:px-6">
+          <div className="flex items-start justify-between gap-3">
+            <Breadcrumb>
+              <BreadcrumbList>
+                <BreadcrumbItem>
+                  <BreadcrumbLink href="/">หน้าหลัก</BreadcrumbLink>
+                </BreadcrumbItem>
+                <BreadcrumbSeparator />
+                <BreadcrumbItem>
+                  <BreadcrumbLink href={`/qc/form/${tpl.id}`}>{tpl.name}</BreadcrumbLink>
+                </BreadcrumbItem>
+                <BreadcrumbSeparator />
+                <BreadcrumbItem>
+                  <BreadcrumbPage className="text-primary">ใบ{tpl.name}</BreadcrumbPage>
+                </BreadcrumbItem>
+              </BreadcrumbList>
+            </Breadcrumb>
+            {!rec.cancelled && (
+              <Button
+                variant="outline"
+                size="icon"
+                aria-label="ยกเลิกใบตรวจนี้"
+                title="ยกเลิกใบตรวจนี้"
+                className="shrink-0 bg-card"
+                onClick={() => {
+                  cancelRecord(rec.id);
+                  toast.success(`ยกเลิก ${rec.no} แล้ว`, {
+                    description: "ดูได้ในแท็บรายการ › ยกเลิก รอบนี้ตรวจใหม่ได้",
+                  });
+                  bump();
+                }}
+              >
+                <Trash2Icon />
+              </Button>
+            )}
+          </div>
+          {rec.cancelled && (
+            <p className="mt-3 rounded-lg border border-danger-border bg-danger px-4 py-2 text-sm text-danger-strong">
+              ใบนี้ถูกยกเลิกแล้ว
+            </p>
+          )}
+          <div className="mt-4">
+            <RecordView tpl={tpl} rec={rec} />
+          </div>
+        </main>
+        <div className="sticky bottom-0 z-30 border-t border-border bg-surface">
+          <div className="mx-auto flex w-full max-w-6xl items-center justify-between gap-3 px-4 py-3 sm:px-6">
+            <Button variant="outline-primary" onClick={back}>
+              ย้อนกลับ
+            </Button>
+            {!rec.cancelled && (
+              <Button variant="outline-primary" onClick={() => setEditing(true)}>
+                <PencilIcon />
+                แก้ไข
+              </Button>
+            )}
+          </div>
+        </div>
+      </>
+    );
+  }
 
   return (
     <main className="@container mx-auto w-full max-w-6xl px-4 pt-6 sm:px-6">
@@ -137,7 +212,7 @@ export default function RecordPage() {
               </p>
             )
           }
-          onBack={() => router.push(`/qc/form/${tpl.id}`)}
+          onBack={() => (rec ? setEditing(false) : router.push(`/qc/form/${tpl.id}`))}
           onSubmit={({ values, verdicts, failed }) => {
             const saved = saveRecord({
               id: rec?.id,
@@ -159,7 +234,9 @@ export default function RecordPage() {
             toast.success(rec ? `แก้ไข ${saved.no} แล้ว` : `บันทึก ${saved.no} แล้ว`, {
               description: "ตัวอย่าง ยังไม่ได้ต่อหลังบ้าน — รีเฟรชแล้วกลับเป็นค่าตั้งต้น",
             });
-            router.push(`/qc/form/${tpl.id}`);
+            // แก้ใบเดิมแล้วกลับไปหน้าดูใบนั้น ใบใหม่กลับไปหน้ารายการของรายงาน
+            if (rec) setEditing(false);
+            else router.push(`/qc/form/${tpl.id}`);
           }}
         />
       </div>

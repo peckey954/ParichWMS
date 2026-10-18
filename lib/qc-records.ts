@@ -99,6 +99,12 @@ export function saveRecord(r: Omit<QcRecord, "id"> & { id?: string }): QcRecord 
   return rec;
 }
 
+/** ยกเลิกใบ — ไม่ลบทิ้ง ใบยังอยู่ในแท็บยกเลิก รอบนั้นกลับไปว่างให้ตรวจใหม่ */
+export function cancelRecord(id: string) {
+  const r = recordOf(id);
+  if (r) r.cancelled = true;
+}
+
 /** สถานะของหนึ่งรอบในหนึ่งวัน — ใช้วาดวงกลมในปฏิทิน */
 export type SlotState = "pass" | "fail" | "missed" | "future" | "off";
 
