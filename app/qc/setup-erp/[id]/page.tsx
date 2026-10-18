@@ -4,18 +4,9 @@ import * as React from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import {
-  CircleCheckIcon,
-  CircleXIcon,
-  EyeIcon,
-  MinusIcon,
   PlusIcon,
   Trash2Icon,
 } from "lucide-react";
-import {
-  Alert,
-  AlertDescription,
-  AlertTitle,
-} from "@peckey954/ui/components/ui/alert";
 import { Badge } from "@peckey954/ui/components/ui/badge";
 import {
   Breadcrumb,
@@ -27,18 +18,8 @@ import {
 } from "@peckey954/ui/components/ui/breadcrumb";
 import { Button } from "@peckey954/ui/components/ui/button";
 import { Checkbox } from "@peckey954/ui/components/ui/checkbox";
-import {
-  InputGroup,
-  InputGroupAddon,
-  InputGroupButton,
-  InputGroupInput,
-} from "@peckey954/ui/components/ui/input-group";
 import { Input } from "@peckey954/ui/components/ui/input";
 import { Label } from "@peckey954/ui/components/ui/label";
-import {
-  RadioGroup,
-  RadioGroupItem,
-} from "@peckey954/ui/components/ui/radio-group";
 import {
   Select,
   SelectContent,
@@ -53,46 +34,35 @@ import {
   TabsList,
   TabsTrigger,
 } from "@peckey954/ui/components/ui/tabs";
-import { Textarea } from "@peckey954/ui/components/ui/textarea";
 import { cn } from "@peckey954/ui/lib/utils";
 import { toast } from "sonner";
 import { CheckChip } from "@/components/check-chip";
 import { ChipGroup } from "@/components/chip-group";
-import { ChoiceGroup } from "@/components/choice-group";
-import { SchedulePreviewCalendar } from "@/components/qc/schedule-calendar";
 import { TimeField } from "@/components/time-field";
 import { MultiSelectChips } from "@/components/multi-select-chips";
 import { DRAG_ITEM_ATTR, DragHandle } from "@/components/drag-handle";
 import { SearchSelect } from "@/components/qc/search-select";
+import { TemplateForm } from "@/components/qc/template-form";
 import {
   CheckTable,
   RowEditDialog,
   criteriaProblems,
-  rowTitle,
 } from "@/components/qc/check-table";
 import {
   DEFAULT_SCHEDULE,
   DEFAULT_GUARD,
   type GuardAction,
-  MAX_READINGS,
   REF_MENU,
   refMenusFor,
   type RefMenu,
-  usesQualityInspection,
-  describeCriteria,
-  docsPerDay,
   newShift,
   shiftOvernight,
   newRow,
-  paramOf,
-  passValues,
-  readingLabels,
   templateOf,
   OPERATION_POOL,
   PHOTO_KEYS,
   PHOTO_LABEL,
   type PhotoMode,
-  sourcePool,
   SOURCE,
   blankTemplate,
   commitTemplate,
@@ -109,10 +79,8 @@ import {
   STAGE,
   STAGE_KEYS,
   addReportType,
-  REMARK_LABEL,
   DISPOSITIONS,
   dispositionChoices,
-  dispositionRule,
   showsDispositions,
   newDocField,
   stageOf,
@@ -171,29 +139,14 @@ function Editor({ seed, isNew }: { seed: QiTemplate; isNew: boolean }) {
   const [tpl, setTpl] = React.useState<QiTemplate>(seed);
   // หัวข้อที่กำลังเพิ่ม — ยังไม่อยู่ในตาราง จนกว่าจะกดบันทึกในกล่อง
   const [adding, setAdding] = React.useState<QiRow | null>(null);
-  // ดูใบแบบที่ยังไม่ได้สร้าง custom field อะไรเลย — ของแท็บตัวอย่างอย่างเดียว
-  const [plain, setPlain] = React.useState(false);
-  /* ค่าที่คีย์ในแท็บตัวอย่าง เก็บรวมที่นี่ไม่ใช่ในการ์ด เพราะผลรวมทั้งใบต้องอ่าน
-     จากทุกแถวพร้อมกัน — ERPNext เองก็ตัดสินทั้งใบจาก readings ทั้งตาราง */
-  const [tries, setTries] = React.useState<Record<string, RoundState>>({});
-  const tryOf = (id: string) => tries[id] ?? EMPTY_ROUND;
   /* ค่าระบบ — ของจริงอ่านจาก Stock Settings ตัวเดียวทั้งระบบ ที่นี่ไม่มีหลังบ้าน
      จึงอ่านค่าตั้งต้นมาโชว์ ให้เห็นว่า "ตามค่าระบบ" ตอนนี้แปลว่าอะไร */
   const guard = DEFAULT_GUARD;
-  // ใบที่ลง Quality Inspection ติดคำว่า Accepted/Rejected ตายตัว ส่วนใบที่ไปอยู่
-  // doctype ของเราเลือกคำเองได้ ใบตรวจถังจึงใช้ ปกติ/ผิดปกติ ตามกระดาษ
-  const verdict: VerdictWords = usesQualityInspection(tpl)
-    ? "passFail"
-    : "normal";
-  const overall = overallStatus(
-    tpl.rows.map((r) => computeRound(r, tryOf(r.id)).status)
-  );
 
   const patch = (next: Partial<QiTemplate>) => setTpl((p) => ({ ...p, ...next }));
   const patchSchedule = (next: Partial<QiSchedule>) =>
     setTpl((p) => ({ ...p, schedule: { ...p.schedule, ...next } }));
   const stage = stageOf(tpl);
-  const rule = dispositionRule(tpl);
   const choices = dispositionChoices(tpl);
   // เลขหัวข้อเดินตามที่โชว์จริง — ผลตรวจที่ไม่ผ่านซ่อนได้ เลขที่เหลือต้องไม่ข้าม
   const order = [
@@ -742,212 +695,14 @@ function Editor({ seed, isNew }: { seed: QiTemplate; isNew: boolean }) {
             </Section>
           </TabsContent>
 
-          {/* ---------- ตัวอย่างใบตรวจที่ได้ ----------
-               อ่านออกมาจากที่ตั้งไว้ในแท็บแรกสด ๆ ไม่ใช่รูปนิ่ง — แก้เกณฑ์แล้ว
-               เห็นผลทันทีว่าคนหน้างานจะเจอช่องแบบไหน ตั้งจำนวนค่าไว้ 5 ได้ห้าช่องจริง
-
-               ช่องในหน้านี้คีย์ได้จริงและตัดสินผ่าน/ไม่ผ่านด้วยกติกาเดียวกับ ERPNext
-               (เทียบทุกค่ากับ min/max, mean เฉลี่ยเฉพาะช่องที่คีย์แล้ว) — ตั้งเกณฑ์ผิด
-               จะเห็นตั้งแต่ตรงนี้ ไม่ใช่ไปเห็นตอนผู้ตรวจคีย์ใบจริงแล้วตกทุกใบ */}
+          {/* ---------- ตัวอย่างใบตรวจ ----------
+               วาดจากที่ตั้งไว้ในแท็บแรกสด ๆ ด้วยตัวเดียวกับใบตรวจจริงในหน้าเมนู
+               สิ่งที่เห็นตรงนี้คือสิ่งที่ผู้ตรวจจะเจอ ไม่ใช่ภาพจำลองอีกชุด */}
           <TabsContent value="preview" className="mt-6">
-            <Alert variant="brand" className="mb-4">
-              <EyeIcon />
-              <AlertTitle>นี่คือหน้าตาที่ผู้ตรวจจะเห็น</AlertTitle>
-              <AlertDescription>
-                สร้างจากโครงสร้างที่ตั้งไว้ทางแท็บซ้าย แก้โครงแล้วหน้านี้เปลี่ยนตามทันที
-                — ค่าที่คีย์ในหน้านี้ใช้ลองเกณฑ์เท่านั้น ไม่ได้บันทึก
-              </AlertDescription>
-            </Alert>
-
-            <label className="mb-6 flex items-start justify-between gap-4 rounded-lg border border-border bg-card px-4 py-3">
-              <span className="min-w-0">
-                <span className="block text-sm font-medium">
-                  ดูแบบ ERPNext ล้วน
-                </span>
-                <span className="block text-sm text-muted-foreground">
-                  ถอด custom field ออกให้หมด เหลือเฉพาะที่ลง ERPNext ได้วันนี้
-                  โดยไม่ต้องสร้างฟิลด์เพิ่ม — เปิดดูเพื่อเทียบว่าที่เพิ่มมาแลกกับอะไร
-                </span>
-              </span>
-              <Switch checked={plain} onCheckedChange={setPlain} />
-            </label>
-
-            {/* ไล่ให้ครบว่าอะไรหายไป ไม่ใช่ให้ไปไล่จับผิดเองทีละจุด —
-                ของพวกนี้คือรายการที่เดฟต้องสร้างเพิ่มทั้งหมด ไม่มากกว่านี้ */}
-            {plain && (
-              <div className="mb-6 rounded-lg border border-border bg-surface px-4 py-3">
-                <p className="text-sm font-medium">ที่หายไปเมื่อไม่สร้าง custom field</p>
-                <ul className="mt-1 space-y-1 text-sm text-muted-foreground">
-                  <li>ชื่อช่องคีย์รายหัวข้อ — เหลือ Reading 1 … Reading {MAX_READINGS}</li>
-                  <li>บรรทัดเกณฑ์ที่ผู้ตรวจอ่าน</li>
-                  <li>ช่องหมายเหตุรายข้อ — เหลือหมายเหตุท้ายใบอันเดียว</li>
-                  <li>ตัวเลือกจัดการของที่ไม่ผ่าน (Repack / รับสภาพ / ส่งคืน)</li>
-                  <li>ปฏิทินรายเดือนของฟอร์มตามรอบเวลา</li>
-                </ul>
-                <p className="mt-2 text-sm">
-                  <span className="text-muted-foreground">ที่ยังอยู่ครบ: </span>
-                  ช่องคีย์ 1–10 ค่า · เกณฑ์ต่ำสุด–สูงสุด · สูตร · ผ่าน/ไม่ผ่านรายข้อและทั้งใบ ·
-                  หมายเหตุท้ายใบ · ผู้ตรวจและผู้ตรวจทาน
-                </p>
-              </div>
-            )}
-
-            {/* ฟอร์มตามรอบเวลาต้องเห็นปฏิทินด้วย ไม่ใช่เห็นแค่ใบเดียว
-                เพราะสิ่งที่คนเปิดฟอร์มแบบนี้ดูทุกวันคือ "วันไหนยังไม่มีใครทำ" */}
-            {tpl.schedule.recurring && docsPerDay(tpl.schedule) > 0 && !plain && (
-              <div className="mb-6 rounded-xl border border-border bg-card p-4">
-                <p className="font-medium">ปฏิทินรายเดือนที่จะได้</p>
-                <p className="mt-0.5 mb-3 text-sm text-muted-foreground">
-                  หนึ่งจุดคือหนึ่งใบต่อวัน — ตั้งไว้ {docsPerDay(tpl.schedule)} ใบต่อวัน ·
-                  เฉพาะวันทำงาน เว้นวันหยุดตามปฏิทินของบริษัท
-                </p>
-                <SchedulePreviewCalendar
-                  schedule={{
-                    mode: "recurring",
-                    // วันละครั้งไม่มีกะ แต่ปฏิทินนับจุดจากจำนวนช่วงเวลา
-                    // ส่งช่วงหลอกหนึ่งอันไปให้มันวาดจุดเดียว
-                    slots: tpl.schedule.allDay
-                      ? [{ id: "all-day", from: "", to: "" }]
-                      : tpl.schedule.slots,
-                    // ช่องเทาแทนวันหยุดที่มาจาก Holiday List — ตัวอย่างใช้เสาร์–อาทิตย์
-                    // ซึ่งเป็น weekly_off ที่โรงงานส่วนใหญ่ตั้งไว้
-                    skipDays: "weekend",
-                  }}
-                />
-              </div>
-            )}
-
-            <h2 className="text-xl font-semibold tracking-tight">
-              ใบ{tpl.name}
-              {usesQualityInspection(tpl) && " PO260115/01-01"}
-            </h2>
-
-            {/* หัวใบ — ของที่ตรวจกับยอดของมัน
-                Quality Inspection เก็บเองแค่ item_code / item_name / batch_no /
-                sample_size ส่วนผู้ขายกับยอดรับ-ยอดไม่ผ่าน อยู่ที่ใบรับของ
-                ต้องดึงข้าม doctype มาแสดง ไม่ได้เก็บซ้ำไว้ที่ใบตรวจ */}
-            {usesQualityInspection(tpl) && (
-              <PreviewDocHeader item={tpl.targets[0]} />
-            )}
-
-            <div className="mt-6 mb-3 flex flex-wrap items-center justify-between gap-3">
-              <div className="min-w-0">
-                <h3 className="font-semibold">การตรวจสอบ</h3>
-                <FieldNote>
-                  status (หัวใบ) · inspect_and_set_status() ตั้งให้เองจาก readings
-                  ไม่ผ่านข้อเดียว = ทั้งใบไม่ผ่าน
-                </FieldNote>
-              </div>
-              {overall === "pass" && (
-                <Badge appearance="soft" tone="success">
-                  <CircleCheckIcon className="size-3.5" />
-                  ผลรวมทั้งใบ: {VERDICT[plain ? "passFail" : verdict].pass}
-                </Badge>
-              )}
-              {overall === "fail" && (
-                <Badge appearance="soft" tone="danger">
-                  <CircleXIcon className="size-3.5" />
-                  ผลรวมทั้งใบ: {VERDICT[plain ? "passFail" : verdict].fail}
-                </Badge>
-              )}
-              {overall === null && tpl.rows.length > 0 && (
-                <Badge appearance="outline" tone="neutral">
-                  ยังตรวจไม่ครบทุกข้อ
-                </Badge>
-              )}
-            </div>
-
-            <div className="space-y-3">
-              {tpl.rows.map((row, i) =>
-                row.kind === "system" ? (
-                  <PreviewSystemRow
-                    key={row.id}
-                    index={i + 1}
-                    row={row}
-                    plain={plain}
-                    verdict={verdict}
-                    state={tryOf(row.id)}
-                    onChange={(next) =>
-                      setTries((prev) => ({
-                        ...prev,
-                        [row.id]: { ...tryOf(row.id), ...next },
-                      }))
-                    }
-                  />
-                ) : (
-                  <PreviewRow
-                    key={row.id}
-                    index={i + 1}
-                    row={row}
-                    plain={plain}
-                    verdict={verdict}
-                    state={tryOf(row.id)}
-                    onChange={(next) =>
-                      setTries((prev) => ({
-                        ...prev,
-                        [row.id]: { ...tryOf(row.id), ...next },
-                      }))
-                    }
-                  />
-                )
-              )}
-
-              {tpl.rows.length === 0 && (
-                <p className="rounded-lg border border-dashed border-border px-6 py-12 text-center text-sm text-muted-foreground">
-                  ยังไม่มีหัวข้อตรวจ ใบตรวจจึงยังว่างเปล่า
-                </p>
-              )}
-            </div>
-
-            {/* ตัวเลือกเดียวเลือกไว้ให้เลย — ไม่มีอะไรให้ตัดสินใจ กดซ้ำเสียเวลาเปล่า */}
-            {rule !== "none" && !plain && (
-              <div className="mt-4">
-                <p className="text-sm font-medium">
-                  ประเภทการรับสินค้า กรณีไม่ผ่านข้อใดข้อหนึ่ง{" "}
-                  <span
-                    className={cn(
-                      "font-normal",
-                      rule === "required" ? "text-danger-strong" : "text-muted-foreground"
-                    )}
-                  >
-                    {rule === "required" ? "(บังคับเลือก)" : "(ไม่บังคับ)"}
-                  </span>
-                </p>
-                <RadioGroup
-                  key={choices.map((d) => d.id).join()}
-                  className="mt-2 grid gap-2 @lg:grid-cols-3"
-                  defaultValue={choices.length === 1 ? choices[0].id : undefined}
-                >
-                  {choices.map((d) => (
-                    <Label
-                      key={d.id}
-                      htmlFor={`preview-disp-${d.id}`}
-                      className="flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-2.5 font-normal"
-                    >
-                      <RadioGroupItem id={`preview-disp-${d.id}`} value={d.id} />
-                      {d.label}
-                    </Label>
-                  ))}
-                </RadioGroup>
-                <FieldNote custom>custom_disposition ที่ใบตรวจ</FieldNote>
-              </div>
-            )}
-
-            {/* หมายเหตุท้ายใบเป็นของ ERPNext เอง ไม่ต้องสร้างเพิ่ม —
-                คนละช่องกับหมายเหตุรายข้อที่ต้องทำเป็น custom field */}
-            <div className="mt-4 space-y-1.5">
-              <Label htmlFor="preview-remarks">
-                หมายเหตุ{" "}
-                <span className="font-normal text-muted-foreground">(ไม่บังคับ)</span>
-              </Label>
-              <Textarea
-                id="preview-remarks"
-                className="bg-card"
-                rows={3}
-                placeholder="ระบุหมายเหตุ"
-              />
-              <FieldNote>remarks</FieldNote>
-            </div>
+            <TemplateForm
+              tpl={tpl}
+              title={`ใบ${tpl.name || "ยังไม่ได้ตั้งชื่อรายงาน"} ${tpl.linkDocs ? "POXXXXXXXX" : "QCXXXXXXXX"}`}
+            />
           </TabsContent>
         </Tabs>
       </main>
@@ -1299,488 +1054,6 @@ function SwitchLabel({
   );
 }
 
-/* ---------- หัวใบในหน้าตัวอย่าง ----------
-     ของที่ตรวจกับยอดของมัน — ส่วนนี้คือที่ที่เดฟต้องระวังที่สุด เพราะดูเหมือน
-     เป็นหน้าเดียวกันแต่ข้อมูลมาจากสาม doctype
-
-       item_code / item_name / batch_no / sample_size  →  Quality Inspection เอง
-       ชื่อผู้ขาย                                        →  ใบรับของ (supplier)
-       ยอดรับ / ยอดไม่ผ่าน / ยอดเข้าคลัง                 →  แถวสินค้าในใบรับของ
-
-     ยอดพวกนี้ห้ามเก็บซ้ำไว้ที่ใบตรวจ — ใบรับของแก้ยอดทีหลังได้ แล้วเลขสองที่
-     จะไม่ตรงกันโดยไม่มีใครรู้ */
-function PreviewDocHeader({ item }: { item?: string }) {
-  return (
-    <div className="mt-3 rounded-xl border border-border bg-card p-4">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="font-semibold">{item ?? "21-0-0 ฟูเจียนผง"}</span>
-          <span className="text-sm text-muted-foreground">วัตถุดิบ</span>
-          <span className="text-sm text-muted-foreground">·</span>
-          <span className="text-sm text-muted-foreground">Bulk</span>
-          <Badge appearance="soft" tone="brand">
-            A-9M
-          </Badge>
-        </div>
-        <span className="text-sm text-muted-foreground">
-          บริษัท เอชซี อินเตอร์เนชั่นแนล เทรดดิ้ง จำกัด
-        </span>
-      </div>
-
-      <div className="mt-3 grid gap-3 rounded-lg bg-brand px-4 py-3 @lg:grid-cols-4">
-        {[
-          ["ตรวจสอบ (ตัน)", "800.00"],
-          ["ไม่ผ่าน (ตัน)", "-"],
-          ["เข้าคลังเฉลี่ย (ตัน)", "-"],
-          ["เข้าคลัง (ตัน)", "-"],
-        ].map(([label, value]) => (
-          <div key={label}>
-            <p className="text-sm text-muted-foreground">{label}</p>
-            <p className="font-medium tabular-nums">{value}</p>
-          </div>
-        ))}
-      </div>
-
-      <div className="mt-3 grid gap-3 @lg:grid-cols-2">
-        <div>
-          <p className="text-sm text-muted-foreground">ผู้รับสินค้า</p>
-          <p className="font-medium">อลิสา พรสุขสิริ</p>
-        </div>
-        <div>
-          <p className="text-sm text-muted-foreground">ผู้แก้ไขรับสินค้าล่าสุด</p>
-          <p className="font-medium">-</p>
-        </div>
-      </div>
-
-      <div className="mt-3">
-        <FieldNote>
-          item_code · item_name · batch_no · sample_size · reference_name
-        </FieldNote>
-        <FieldNote custom>
-          ชื่อผู้ขายกับยอดตัน ไม่ได้อยู่ที่ใบตรวจ — ต้องดึงจากใบรับของมาแสดง
-        </FieldNote>
-      </div>
-    </div>
-  );
-}
-
-/* ---------- หนึ่งหัวข้อในหน้าตัวอย่าง ----------
-     หัวข้อหนึ่งข้อแสดงเป็นการ์ดเดียว แต่ข้างในแตกเป็นรอบ ๆ ตามที่ตั้งไว้
-     เพราะฝั่ง ERPNext หนึ่งรอบคือหนึ่งแถวใน readings ที่มี status ของตัวเอง
-     คนตรวจจึงเห็นหัวข้อเดียวแบบกระดาษ แต่ข้อมูลที่ได้ตรงกับโครงของจริง */
-type VerdictWords = "passFail" | "normal";
-
-const VERDICT: Record<VerdictWords, { pass: string; fail: string }> = {
-  passFail: { pass: "ผ่าน", fail: "ไม่ผ่าน" },
-  normal: { pass: "ปกติ", fail: "ผิดปกติ" },
-};
-
-/* ค่าที่คีย์ของหนึ่งแถว เก็บไว้ที่หน้า ไม่ใช่ในการ์ด เพราะผลรวมทั้งใบต้องอ่าน
-   จากทุกแถวพร้อมกัน — ERPNext เองก็ตัดสินทั้งใบจาก readings ทั้งตารางเหมือนกัน */
-type RoundState = {
-  /** null = ยังไม่ได้คีย์ ซึ่งไม่ใช่เรื่องเดียวกับศูนย์ */
-  nums: Record<number, number | null>;
-  text: string;
-  manual: "pass" | "fail" | null;
-};
-
-const EMPTY_ROUND: RoundState = { nums: {}, text: "", manual: null };
-
-/* ผ่าน/ไม่ผ่านของหนึ่งแถว คิดด้วยกติกาเดียวกับ inspect_and_set_status
-     manual_inspection ติ๊กไว้  → ระบบไม่ตัดสิน คนเลือกเอง
-     formula_based_criteria    → รันสูตร
-     numeric                   → เทียบทุกค่าที่คีย์กับ min/max ไม่ใช่ค่าเฉลี่ย
-     นอกนั้น                    → เทียบ reading_value กับ value ตรงตัวอักษร
-   ยังไม่มีใครคีย์ = ยังไม่มีผล ไม่ใช่ผ่าน */
-function computeRound(row: QiRow, st: RoundState) {
-  const keyed = Array.from({ length: row.readings }, (_, i) => st.nums[i]).filter(
-    (v): v is number => typeof v === "number"
-  );
-  const sum = keyed.reduce((a, b) => a + b, 0);
-  // ERPNext เฉลี่ยเฉพาะช่องที่คีย์แล้ว (calculate_mean) ไม่ได้หารด้วยจำนวนช่องทั้งหมด
-  const mean = keyed.length ? sum / keyed.length : 0;
-  const touched = row.numeric ? keyed.length > 0 : st.text.trim() !== "";
-
-  const data: Record<string, number | string> = row.numeric
-    ? {
-        ...Object.fromEntries(
-          Array.from({ length: MAX_READINGS }, (_, i) => [
-            `reading_${i + 1}`,
-            st.nums[i] ?? 0,
-          ])
-        ),
-        mean,
-      }
-    : { reading_value: st.text };
-
-  const formulaResult = row.formulaBased ? evalFormula(row.formula, data) : null;
-  const readout = row.formulaBased ? formulaReadout(row.formula, data) : null;
-
-  const status: "pass" | "fail" | null = row.manualInspection
-    ? st.manual
-    : !touched
-      ? null
-      : row.formulaBased
-        ? formulaResult === null
-          ? null
-          : formulaResult
-            ? "pass"
-            : "fail"
-        : row.numeric
-          ? keyed.every((n) => n >= (row.min ?? 0) && n <= (row.max ?? 0))
-            ? "pass"
-            : "fail"
-          : /* ค่าที่ถือว่าผ่านมีได้หลายค่า — ตรงค่าใดค่าหนึ่งก็ผ่าน
-               ของจริงใน ERPNext เป็น acceptance_formula ที่เขียนว่า
-               reading_value in (...) ไม่ใช่เทียบ value ตรง ๆ */
-            passValues(row.value).includes(st.text.trim())
-            ? "pass"
-            : "fail";
-
-  return { keyed, sum, mean, touched, formulaResult, readout, status };
-}
-
-/** ผลรวมทั้งใบ — ไม่ผ่านข้อเดียวคือทั้งใบไม่ผ่าน ตรงกับ inspect_and_set_status */
-function overallStatus(
-  statuses: ("pass" | "fail" | null)[]
-): "pass" | "fail" | null {
-  if (statuses.includes("fail")) return "fail";
-  if (statuses.length > 0 && statuses.every((s) => s !== null)) return "pass";
-  return null;
-}
-
-/* ---------- หนึ่งหัวข้อในหน้าตัวอย่าง = หนึ่งแถวใน readings ---------- */
-/** ช่องเลือกจากรายการของระบบ — ใช้ทั้งหัวเอกสารและหัวข้อที่ดึงจากระบบ */
-function SourceSelect({
-  id,
-  source,
-}: {
-  id: string;
-  source: SourceId | "";
-}) {
-  const pool = source === "" ? [] : sourcePool(source);
-  return (
-    <Select>
-      <SelectTrigger id={id} className="w-full bg-card">
-        <SelectValue
-          placeholder={pool.length === 0 ? "ยังไม่ได้ตั้งแหล่งข้อมูล" : "เลือก"}
-        />
-      </SelectTrigger>
-      <SelectContent>
-        {pool.map((o) => (
-          <SelectItem key={o} value={o}>
-            {o}
-          </SelectItem>
-        ))}
-      </SelectContent>
-    </Select>
-  );
-}
-
-/* ------------------------------------------------------------------
-   หนึ่งหัวข้อที่ดึงจากระบบในใบตรวจ
-
-   ไม่มีเกณฑ์ให้ระบบตัดสิน ผู้ตรวจเลือกจากรายการแล้วชี้ขาดเอง จึงมีแต่ดรอปดาวน์
-   กับปุ่มผ่าน/ไม่ผ่าน ไม่มีช่องคีย์ตัวเลขและไม่มีแถบบอกว่าระบบตัดสินให้แล้ว
------------------------------------------------------------------- */
-
-function PreviewSystemRow({
-  index,
-  row,
-  plain,
-  verdict = "passFail",
-  state,
-  onChange,
-}: {
-  index: number;
-  row: QiRow;
-  plain?: boolean;
-  verdict?: VerdictWords;
-  state: RoundState;
-  onChange: (next: Partial<RoundState>) => void;
-}) {
-  const words = VERDICT[plain ? "passFail" : verdict];
-  const title = rowTitle(row) || "ยังไม่ได้เลือกหัวข้อ";
-
-  return (
-    <div className="rounded-xl border border-border bg-card p-4">
-      <p className="font-medium">
-        {index}. {title}
-      </p>
-      {row.criteria !== "" && !plain && (
-        <p className="mt-0.5 text-sm text-muted-foreground">
-          เกณฑ์: {row.criteria}
-        </p>
-      )}
-
-      <div className="mt-3 flex flex-wrap items-end gap-4">
-        <div className="min-w-56 space-y-1.5">
-          <Label htmlFor={`pv-sys-${row.id}`} className="text-sm">
-            {title}
-          </Label>
-          <SourceSelect id={`pv-sys-${row.id}`} source={row.source ?? ""} />
-        </div>
-
-        <div className="flex gap-2">
-          {(["pass", "fail"] as const).map((k) => (
-            <CheckChip
-              key={k}
-              id={`pv-sys-${row.id}-${k}`}
-              label={k === "pass" ? words.pass : words.fail}
-              checked={state.manual === k}
-              onChange={(v) => onChange({ manual: v ? k : null })}
-            />
-          ))}
-        </div>
-      </div>
-
-      {!plain && (
-        <FieldNote custom={!!row.source && SOURCE[row.source].custom}>
-          {row.source ? SOURCE[row.source].store : "ยังไม่ได้เลือกแหล่งข้อมูล"}
-        </FieldNote>
-      )}
-    </div>
-  );
-}
-
-function PreviewRow({
-  index,
-  row,
-  plain,
-  verdict = "passFail",
-  state,
-  onChange,
-}: {
-  index: number;
-  row: QiRow;
-  /** ถอด custom field ออกหมด — ป้ายช่อง เกณฑ์ที่คนอ่าน และหมายเหตุรายข้อหายไป */
-  plain?: boolean;
-  verdict?: VerdictWords;
-  state: RoundState;
-  onChange: (next: Partial<RoundState>) => void;
-}) {
-  const p = paramOf(row.parameterId);
-  // แบบ ERPNext ล้วนบังคับ Accepted/Rejected เสมอ คำอื่นต้องมี doctype ของตัวเอง
-  const words = VERDICT[plain ? "passFail" : verdict];
-  // ของ ERPNext ล้วนไม่มีชื่อช่องรายหัวข้อ ได้ Reading 1 … 10 ตามที่ doctype ตั้งไว้
-  const labels = plain
-    ? row.numeric
-      ? Array.from({ length: row.readings }, (_, i) => `Reading ${i + 1}`)
-      : ["Reading Value"]
-    : readingLabels(row);
-
-  const { keyed, sum, mean, touched, readout, status } = computeRound(row, state);
-  const tickOnly = row.manualInspection && !row.numeric && !row.formulaBased;
-
-  return (
-    <div className="rounded-xl border border-border bg-card p-4">
-      <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-1">
-        <div className="min-w-0">
-          <p className="font-medium">
-            {index}. {p?.name ?? "ยังไม่ได้เลือกหัวข้อ"}
-          </p>
-          {/* เกณฑ์ที่คนอ่านมาก่อน ส่วนที่เครื่องใช้ตัดสินเป็นบรรทัดรอง —
-              คนยืนตรวจอ่าน (reading_2 + reading_3) / 2500 * 100 ไม่รู้เรื่อง */}
-          {row.criteria && !plain ? (
-            <>
-              <p className="mt-0.5 text-sm text-muted-foreground">
-                เกณฑ์: {row.criteria}
-              </p>
-              <p className="mt-0.5 font-mono text-xs break-all text-muted-foreground">
-                {describeCriteria(row)}
-              </p>
-            </>
-          ) : (
-            <p className="mt-0.5 text-sm text-muted-foreground">
-              เกณฑ์: {describeCriteria(row)}
-            </p>
-          )}
-        </div>
-
-        <div className="ml-auto flex flex-wrap items-center gap-x-3 gap-y-1">
-          {/* ค่าเฉลี่ยคือตัวแปร mean ที่เขียนในสูตรได้ตรง ๆ โชว์ไว้ให้เห็นว่า
-              เลขที่สูตรจะได้คือเลขไหน ไม่ต้องไปคิดเองตอนเขียนสูตร */}
-          {row.numeric && labels.length > 1 && keyed.length > 0 && (
-            <>
-              <span className="text-sm text-muted-foreground">
-                รวม:{" "}
-                <span className="font-medium tabular-nums text-foreground">
-                  {sum.toFixed(2)}
-                </span>
-                {p?.unit ? ` ${p.unit}` : ""}
-              </span>
-              <span className="text-sm text-muted-foreground">
-                เฉลี่ย (mean):{" "}
-                <span className="font-medium tabular-nums text-foreground">
-                  {mean.toFixed(2)}
-                </span>
-                {p?.unit ? ` ${p.unit}` : ""}
-              </span>
-            </>
-          )}
-          {readout && touched && (
-            <span className="text-sm text-muted-foreground">
-              ค่าที่ใช้ตัดสิน:{" "}
-              <span className="font-medium tabular-nums text-foreground">
-                {readout.value.toFixed(2)}
-              </span>{" "}
-              · เกณฑ์ {readout.op} {readout.bound}
-            </span>
-          )}
-          {status === "pass" && (
-            <Badge appearance="soft" tone="success">
-              <CircleCheckIcon className="size-3.5" />
-              {words.pass}
-            </Badge>
-          )}
-          {status === "fail" && (
-            <Badge appearance="soft" tone="danger">
-              <CircleXIcon className="size-3.5" />
-              {words.fail}
-            </Badge>
-          )}
-          {/* ยังไม่คีย์ = ยังไม่มีผล บอกให้ชัดดีกว่าปล่อยว่างจนดูเหมือนป้ายหาย */}
-          {status === null && !touched && !row.manualInspection && (
-            <Badge appearance="outline" tone="neutral">
-              ยังไม่ได้คีย์ค่า
-            </Badge>
-          )}
-          {/* สูตรที่แปลงเป็นเงื่อนไขในเครื่องไม่ได้ ไม่เดาผลให้ —
-              โชว์ป้ายที่อาจไม่ตรงกับของจริงอันตรายกว่าไม่โชว์ */}
-          {status === null && touched && row.formulaBased && (
-            <Badge appearance="outline" tone="warning">
-              สูตรนี้ตัวอย่างคำนวณให้ไม่ได้
-            </Badge>
-          )}
-        </div>
-      </div>
-
-      <div
-        className={cn(
-          "mt-3 grid gap-3",
-          tickOnly && "hidden",
-          labels.length > 2 ? "@lg:grid-cols-4" : "@lg:grid-cols-2"
-        )}
-      >
-        {labels.map((l, i) =>
-          row.numeric ? (
-            <StepperField
-              key={l + i}
-              id={`preview-${row.id}-${i}`}
-              label={l}
-              placeholder="ยังไม่ได้คีย์"
-              step={0.1}
-              value={state.nums[i] ?? null}
-              onChange={(v) => onChange({ nums: { ...state.nums, [i]: v } })}
-            />
-          ) : (
-            <div key={l + i} className="space-y-1.5">
-              <Label htmlFor={`preview-${row.id}-${i}`}>{l}</Label>
-              {/* ตั้งค่าที่ถือว่าผ่านไว้หลายค่า = ให้เลือก ไม่ใช่ให้พิมพ์
-                  พิมพ์เองแล้วสะกดต่างนิดเดียวก็ไม่ตรงกับที่ตั้งไว้ แล้วจะตก
-                  ทั้งที่ของถูกต้อง */}
-              {passValues(row.value).length > 1 ? (
-                <Select
-                  value={state.text}
-                  onValueChange={(v) => onChange({ text: v })}
-                >
-                  <SelectTrigger
-                    id={`preview-${row.id}-${i}`}
-                    className="w-full bg-card"
-                  >
-                    <SelectValue placeholder="เลือกค่าที่ตรวจได้" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {passValues(row.value).map((o) => (
-                      <SelectItem key={o} value={o}>
-                        {o}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              ) : (
-                <Input
-                  id={`preview-${row.id}-${i}`}
-                  className="bg-card"
-                  placeholder={row.value || "ระบุค่าที่ตรวจได้"}
-                  value={state.text}
-                  onChange={(e) => onChange({ text: e.target.value })}
-                />
-              )}
-            </div>
-          )
-        )}
-      </div>
-
-      {/* ติ๊กผู้ตรวจเลือกผลเอง = มีปุ่มสองปุ่มเพิ่มมาในใบจริง และมีได้พร้อม
-          ช่องคีย์ค่าข้างบน ตรงกับฟอร์มกระดาษที่มีทั้งช่องวัดและช่องติ๊ก */}
-      {row.manualInspection && (
-        <div className="mt-3 space-y-1.5">
-          <p className="text-sm text-muted-foreground">ผลการตรวจสอบ</p>
-          <ChoiceGroup
-            label="ผลการตรวจสอบ"
-            value={state.manual ?? ""}
-            onChange={(v) =>
-              onChange({ manual: v === "" ? null : (v as "pass" | "fail") })
-            }
-            options={[
-              { id: "pass" as const, label: words.pass },
-              { id: "fail" as const, label: words.fail },
-            ]}
-          />
-        </div>
-      )}
-
-      {row.remark !== "off" && !plain && (
-        <div className="mt-3 space-y-1">
-          <p className="text-sm text-muted-foreground">
-            หมายเหตุ{" "}
-            <span className="text-xs">
-              ({REMARK_LABEL[row.remark]})
-            </span>
-          </p>
-          <Textarea className="bg-card" rows={2} placeholder="ระบุหมายเหตุ" />
-        </div>
-      )}
-
-      {/* ช่องที่เห็นในข้อนี้ไปลงฟิลด์ไหน — แยกบรรทัดบนของ ERPNext กับบรรทัดล่าง
-          ที่ต้องสร้างเพิ่ม เพราะสองอย่างนี้ราคาต่างกันมากตอนประเมินงาน */}
-      <div className="mt-3 border-t border-border pt-2">
-        <FieldNote>
-          specification ·{" "}
-          {row.numeric
-            ? `reading_1 … reading_${row.readings}`
-            : "reading_value"}{" "}
-          · status
-          {row.numeric && !row.formulaBased ? " · min_value · max_value" : ""}
-          {row.formulaBased ? " · acceptance_formula" : ""}
-          {row.manualInspection ? " · manual_inspection (ของแถวในใบ)" : ""}
-        </FieldNote>
-        {!plain && (
-          <FieldNote custom>{customFieldsOf(row).join(" · ")}</FieldNote>
-        )}
-        {/* เลขสรุปไม่ได้เก็บลงฐานข้อมูล ERPNext ไม่มีฟิลด์ประเภทคำนวณ —
-            เขียนไว้กันเข้าใจว่าจะไปดึงรายงานย้อนหลังจากเลขพวกนี้ได้ */}
-        {row.numeric && row.readings > 1 && !plain && (
-          <FieldNote>
-            รวม · เฉลี่ย · ค่าที่ใช้ตัดสิน คำนวณบนหน้าจอด้วย Client Script ไม่ได้เก็บลงฐานข้อมูล
-          </FieldNote>
-        )}
-      </div>
-    </div>
-  );
-}
-
-/** ฟิลด์ที่ข้อนี้ต้องสร้างเพิ่มใน ERPNext — อ่านจากที่ตั้งไว้ ไม่ได้เขียนตายไว้ */
-function customFieldsOf(row: QiRow): string[] {
-  const out = ["custom_criteria"];
-  if (row.numeric && row.readings > 1)
-    out.push("custom_readings", "custom_reading_labels");
-  if (row.manualInspection) out.push("custom_manual_inspection");
-  if (row.remark !== "off") out.push("custom_remark");
-  return out;
-}
-
 /* ---------- ชิ้นส่วนเล็ก ๆ ---------- */
 
 function Section({
@@ -1812,156 +1085,4 @@ function Section({
       <div className="mt-3">{children}</div>
     </section>
   );
-}
-
-/**
- * ชื่อฟิลด์จริงของ ERPNext ใต้ช่อง — เดฟจะได้แมปได้โดยไม่ต้องเปิดเอกสารเทียบ
- *
- * ช่องที่ ERPNext ไม่มีติดป้าย custom ไว้ด้วย เพราะสองอย่างนี้ราคาต่างกันมาก
- * ของที่มีอยู่แล้วแค่ตั้งค่า ส่วนของที่ติดป้ายต้องสร้างฟิลด์เพิ่มก่อนถึงจะใช้ได้
- */
-function FieldNote({
-  children,
-  custom,
-}: {
-  children: React.ReactNode;
-  custom?: boolean;
-}) {
-  return (
-    <p className="font-mono text-xs text-muted-foreground">
-      {custom && (
-        <Badge
-          appearance="soft"
-          tone="warning"
-          className="mr-1.5 align-middle font-mono text-[10px] uppercase"
-        >
-          custom
-        </Badge>
-      )}
-      {children}
-    </p>
-  );
-}
-
-function StepperField({
-  id,
-  label,
-  hint,
-  placeholder = "ไม่จำกัด",
-  value,
-  step = 1,
-  onChange,
-}: {
-  id: string;
-  label: string;
-  hint?: string;
-  placeholder?: string;
-  value: number | null;
-  step?: number;
-  onChange: (v: number | null) => void;
-}) {
-  // กดปุ่มตอนยังว่างอยู่ = เริ่มนับจากศูนย์ ไม่ใช่ติดลบจากค่าที่ไม่มี
-  const bump = (delta: number) =>
-    onChange(Number(((value ?? 0) + delta).toFixed(2)));
-
-  return (
-    <div className="space-y-1.5">
-      <Label htmlFor={id}>{label}</Label>
-      <InputGroup className="h-10 bg-card">
-        <InputGroupAddon align="inline-start">
-          <InputGroupButton
-            size="icon-sm"
-            aria-label={`ลด${label}`}
-            onClick={() => bump(-step)}
-          >
-            <MinusIcon />
-          </InputGroupButton>
-        </InputGroupAddon>
-        <InputGroupInput
-          id={id}
-          inputMode="decimal"
-          className="text-center tabular-nums"
-          placeholder={placeholder}
-          value={value === null ? "" : String(value)}
-          onChange={(e) => {
-            const raw = e.target.value.trim();
-            onChange(raw === "" ? null : Number(raw));
-          }}
-        />
-        <InputGroupAddon align="inline-end">
-          <InputGroupButton
-            size="icon-sm"
-            aria-label={`เพิ่ม${label}`}
-            onClick={() => bump(step)}
-          >
-            <PlusIcon />
-          </InputGroupButton>
-        </InputGroupAddon>
-      </InputGroup>
-      {hint && <p className="font-mono text-xs text-muted-foreground">{hint}</p>}
-    </div>
-  );
-}
-
-/**
- * ลองสูตรของ ERPNext ในหน้าตัวอย่าง
- *
- * ของจริงรันด้วย frappe.safe_eval ฝั่งเซิร์ฟเวอร์ตอนบันทึก ซึ่งเป็น Python
- * ที่นี่แปลงคำที่ต่างกันให้เป็น JavaScript แล้วรันในเครื่อง — ไวยากรณ์ที่ฟอร์ม
- * จริงใช้มีไม่กี่แบบ (เปรียบเทียบ, and/or/not, in (...)) ครอบได้หมด
- *
- * ผ่านตัวกรองตัวอักษรก่อนเสมอ สูตรที่มีอย่างอื่นปนจะคืน null แล้วหน้าจอ
- * บอกว่าคำนวณให้ไม่ได้ ดีกว่าโชว์ผลที่อาจไม่ตรงกับของจริง
- */
-function runExpr(
-  expr: string,
-  data: Record<string, number | string>
-): unknown {
-  const js = expr
-    .replace(/\bnot\b/g, "!")
-    .replace(/\band\b/g, "&&")
-    .replace(/\bor\b/g, "||")
-    // Python: reading_value in ("A", "B") — JS ไม่มี in แบบนี้
-    .replace(/(\w+)\s+in\s+\(([^)]*)\)/g, "[$2].includes($1)");
-
-  if (!/^[\w\s.+\-*/()<>=!&|,"'[\]]*$/.test(js)) return null;
-
-  try {
-    const keys = Object.keys(data);
-    const fn = new Function(...keys, `"use strict"; return (${js});`);
-    return fn(...keys.map((k) => data[k]));
-  } catch {
-    return null;
-  }
-}
-
-function evalFormula(
-  formula: string,
-  data: Record<string, number | string>
-): boolean | null {
-  const out = runExpr(formula, data);
-  return out === null ? null : Boolean(out);
-}
-
-/**
- * เลขที่สูตรเอาไปเทียบจริง ๆ พร้อมเกณฑ์ของมัน
- *
- * ฟอร์มกระดาษเขียน "% รวม" ไว้หัวข้อ ซึ่งเป็นคนละเลขกับที่เกณฑ์ใช้ตัดสิน
- * (รวมสี่ตะแกรง แต่เกณฑ์คิดจากสองตะแกรงกลาง) โชว์เลขที่ผิดฝั่งแล้วคนหน้างาน
- * จะงงว่าทำไมเลขที่เห็นไม่ตรงกับผลที่ได้ — อ่านฝั่งซ้ายของสูตรมาโชว์แทน
- * จึงตรงกับที่ตัดสินเสมอ ไม่ว่าใครจะแก้สูตรเป็นอะไร
- */
-function formulaReadout(
-  formula: string,
-  data: Record<string, number | string>
-): { value: number; op: string; bound: string } | null {
-  // สูตรที่มีหลายเงื่อนไขต่อกันไม่มีเลขเดียวให้อ่าน
-  if (/\b(and|or|not)\b/.test(formula)) return null;
-
-  const m = formula.match(/^([^<>=!]+)(>=|<=|==|!=|>|<)(.+)$/);
-  if (!m) return null;
-
-  const value = runExpr(m[1], data);
-  if (typeof value !== "number" || !Number.isFinite(value)) return null;
-  return { value, op: m[2], bound: m[3].trim() };
 }

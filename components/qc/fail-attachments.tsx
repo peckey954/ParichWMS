@@ -20,8 +20,20 @@ import { FileViewer } from "@/components/file-viewer";
    ปิดตัวดูแล้วกลับมาที่ฟอร์มเดิม ทุกอย่างยังอยู่
 ------------------------------------------------------------------ */
 
-export function FailAttachments() {
+export function FailAttachments({
+  title = "เอกสาร/รูปภาพ",
+  onCountChange,
+}: {
+  /** ชื่อช่อง — ต่อท้ายด้วย (ไม่บังคับ) / (บังคับ) ตามที่รายงานตั้งไว้ */
+  title?: string;
+  /** จำนวนไฟล์ที่ขึ้นครบแล้ว — ให้ฟอร์มเช็คตอนบันทึกว่าแนบครบตามที่บังคับไหม */
+  onCountChange?: (n: number) => void;
+} = {}) {
   const docs = useDocUpload();
+  const done = docs.files.filter((f) => f.status === "done").length;
+  React.useEffect(() => {
+    onCountChange?.(done);
+  }, [done, onCountChange]);
   const [openId, setOpenId] = React.useState<string | null>(null);
   const viewerFiles = toViewerFiles(docs.files, "เอกสาร/รูปภาพของใบตรวจ");
 
@@ -38,7 +50,7 @@ export function FailAttachments() {
   return (
     <>
       <FileUpload
-        title="เอกสาร/รูปภาพ"
+        title={title}
         dropLabel="อัปโหลด / ลากไฟล์เอกสารหรือรูปภาพ"
         files={docs.files}
         onAdd={docs.add}

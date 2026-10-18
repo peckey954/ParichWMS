@@ -240,8 +240,6 @@ const QC_PAGES: Record<string, { href: string; icon?: string; pending?: number }
   // เท่ากับจำนวนใบในแท็บรอตรวจวัตถุดิบ — ตัวเลขบนการ์ดกับในหน้าต้องตรงกัน
   "t-rm": { href: "/qc/raw-receiving", icon: "filePlus", pending: 11 },
   "t-gr": { href: "/qc/goods-receiving", icon: "packageSearch" },
-  // ใบตรวจในคลังที่ทำซ้ำตามรอบ
-  "t-tank-rm": { href: "/qc/checks", icon: "clipboardCheck", pending: 3 },
 };
 
 /**
@@ -251,8 +249,8 @@ const QC_PAGES: Record<string, { href: string; icon?: string; pending?: number }
  * รายงานจึงไม่ตรงกัน และปิดรายงานแล้วการ์ดยังค้างอยู่ ตอนนี้อ่านจากรายงาน
  * อย่างเดียว ปิดใช้งานแล้วการ์ดหาย เปลี่ยนประเภทแล้วการ์ดย้ายหมวด
  *
- * รายงานที่ยังไม่มีหน้าของตัวเองขึ้นเป็นการ์ดที่ยังกดไม่ได้ — ฟอร์มที่มีขั้น
- * การผลิตใช้หน้าคิวกลางได้เลย
+ * รายงานที่ยังไม่มีหน้าของตัวเองเปิดใบตรวจที่วาดจากรายงาน (/qc/form) — ฟอร์ม
+ * ที่มีขั้นการผลิตใช้หน้าคิวกลางแทน
  */
 export const templateModules = (): ModuleItem[] =>
   QI_TEMPLATES.filter((t) => t.active).map((t) => {
@@ -263,11 +261,13 @@ export const templateModules = (): ModuleItem[] =>
       label: t.name,
       code: t.code,
       icon: page?.icon ?? "packageCheck",
+      // ไม่มีหน้าของตัวเอง — ฟอร์มที่มีขั้นการผลิตใช้หน้าคิว ที่เหลือใช้ใบตรวจ
+      // ที่วาดจากรายงานตรง ๆ ตั้งรายงานเสร็จแล้วกดจากหน้าหลักทำงานได้ทันที
       href:
         page?.href ??
         (t.phase === "production" && t.prodSteps.length > 0
           ? `/qc/queue/${t.id}`
-          : undefined),
+          : `/qc/form/${t.id}`),
       pending: page?.pending,
       reportType: t.reportType || undefined,
       templateIds: [t.id],

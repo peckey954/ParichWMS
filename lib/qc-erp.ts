@@ -291,13 +291,13 @@ export const QI_PARAMETERS: QiParameter[] = [
   // จากใบรายงานการตรวจสอบสินค้าสำเร็จรูป FM-QC-02-03
   { id: "p-seam", name: "การเย็บกระสอบ", group: "บรรจุภัณฑ์", unit: "" },
   // วัตถุดิบที่เก็บในถัง — หนึ่งตัวคือหนึ่งหัวข้อในใบตรวจถัง
-  { id: "p-rm-4205", name: "42-0-5", group: "วัตถุดิบในถัง", unit: "KG" },
-  { id: "p-rm-br", name: "Br", group: "วัตถุดิบในถัง", unit: "KG" },
-  { id: "p-rm-mop", name: "Mop", group: "วัตถุดิบในถัง", unit: "KG" },
-  { id: "p-rm-mg", name: "Mg", group: "วัตถุดิบในถัง", unit: "KG" },
-  { id: "p-rm-dap", name: "Dap", group: "วัตถุดิบในถัง", unit: "KG" },
-  { id: "p-rm-amsu", name: "Ammonium Su", group: "วัตถุดิบในถัง", unit: "KG" },
-  { id: "p-rm-urea", name: "Urea", group: "วัตถุดิบในถัง", unit: "KG" },
+  { id: "p-rm-4205", name: "42-0-5", group: "วัตถุดิบในถัง", unit: "กก." },
+  { id: "p-rm-br", name: "Br", group: "วัตถุดิบในถัง", unit: "กก." },
+  { id: "p-rm-mop", name: "Mop", group: "วัตถุดิบในถัง", unit: "กก." },
+  { id: "p-rm-mg", name: "Mg", group: "วัตถุดิบในถัง", unit: "กก." },
+  { id: "p-rm-dap", name: "Dap", group: "วัตถุดิบในถัง", unit: "กก." },
+  { id: "p-rm-amsu", name: "Ammonium Su", group: "วัตถุดิบในถัง", unit: "กก." },
+  { id: "p-rm-urea", name: "Urea", group: "วัตถุดิบในถัง", unit: "กก." },
   { id: "p-smell", name: "กลิ่นของปุ๋ย", group: "กายภาพ", unit: "" },
   { id: "p-touch", name: "การตรวจสอบด้วยการสัมผัส", group: "กายภาพ", unit: "" },
   { id: "p-bag-formula", name: "กระสอบตรงกับสูตร", group: "บรรจุภัณฑ์", unit: "" },
@@ -1244,14 +1244,6 @@ export const ITEM_POOL = [
 let rowSeq = 0;
 const rid = () => `row-seed-${++rowSeq}`;
 
-/** สี่กะที่โรงงานเดินจริง สองกะกลางวัน สองกะกลางคืน */
-const factoryShifts = (): QcShift[] => [
-  { id: rid(), from: "08:00", to: "12:00" },
-  { id: rid(), from: "13:00", to: "17:00" },
-  { id: rid(), from: "20:00", to: "00:00" },
-  { id: rid(), from: "01:00", to: "05:00" },
-];
-
 /** แถวตัวเลข — ช่วงต่ำ–สูง */
 const range = (
   parameterId: string,
@@ -1647,7 +1639,7 @@ const SEED_TEMPLATES: SeedTemplate[] = [
     subject: "other",
     name: "ตรวจวัตถุดิบในคลัง",
     code: "FM-QC-03-01",
-    active: false,
+    active: true,
     owner: "อลิสา พรสุขสิริ",
     updatedAt: "24/09/2026",
     inspectionType: "inProcess",
@@ -1669,7 +1661,7 @@ const SEED_TEMPLATES: SeedTemplate[] = [
     photo: "onFail",
     effectiveFrom: "01/09/2026",
     effectiveTo: "",
-    manualWholeDoc: false,
+    manualWholeDoc: true,
     multiSample: false,
     targets: [],
     requireBefore: false,
@@ -1681,8 +1673,21 @@ const SEED_TEMPLATES: SeedTemplate[] = [
     schedule: {
       recurring: true,
       allDay: false,
-      slots: factoryShifts(),
+      slots: [
+        { id: "tank-s1", from: "08:30", to: "12:00" },
+        { id: "tank-s2", from: "13:00", to: "18:00" },
+        { id: "tank-s3", from: "19:00", to: "23:00" },
+        { id: "tank-s4", from: "01:00", to: "05:00" },
+      ],
     },
+    productTypes: ["ปุ๋ยจัมโบ้", "ปุ๋ยกระสอบ"],
+    // ผู้ตรวจเลือกถังก่อนเริ่ม — ใบหนึ่งคือถังหนึ่งในหนึ่งรอบ
+    headerOn: true,
+    header: [
+      { id: "hd-tank", kind: "system", label: "", source: "tank", required: true },
+    ],
+    // ถังที่ไม่มีวัตถุดิบตัวนั้นอยู่ ติ๊ก "ไม่มี" ไม่ใช่ปล่อยว่างหรือติ๊กผ่าน
+    verdicts: ["pass", "fail", "na"],
     note: "ตรวจถังตามกะ ไม่มีเอกสารและไม่มีสินค้าผูก — Quality Inspection บังคับ reference_type กับ item_code จึงลงไม่ได้ ใบนี้ไปอยู่ doctype QC Check ตัวเดียวกับสุ่มตรวจเครื่องจักรและคลังสินค้า · และไม่บังคับตรวจครบทุกข้อ ตรวจเท่าที่มีในถัง ซึ่ง Quality Inspection ก็ทำไม่ได้เพราะบังคับว่าทุกแถวต้องมีผล",
   },
   {

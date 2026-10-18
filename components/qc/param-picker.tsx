@@ -155,11 +155,13 @@ export function ParamCombobox({
                 !selected && "text-muted-foreground"
               )}
             >
+              {/* หน่วยต่อท้ายชื่อ — ตัวเลขในใบตรวจอ่านผิดหน่วยคือผลผิดทั้งข้อ
+                  กลุ่มดูได้ในรายการตอนเปิด ไม่ต้องอยู่บนช่อง */}
               {selected
-                ? selected.group
-                  ? `${selected.name} · ${selected.group}`
+                ? selected.unit
+                  ? `${selected.name} (${selected.unit})`
                   : selected.name
-                : "พิมพ์ค้นหาหรือเลือกหัวข้อตรวจ"}
+                : "เลือกหัวข้อ"}
             </span>
             <ChevronDownIcon
               className={cn(

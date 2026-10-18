@@ -38,8 +38,6 @@ import {
   CHECK_SOURCES,
   MAX_READINGS,
   REMARK_LABEL,
-  ROW_KIND,
-  ROW_KINDS,
   SOURCE,
   cloneRow,
   passFormula,
@@ -47,7 +45,6 @@ import {
   paramOf,
   type QiRow,
   type RemarkMode,
-  type RowKind,
   type SourceId,
 } from "@/lib/qc-erp";
 
@@ -193,12 +190,9 @@ export function CheckTable({
       />
 
       <div className="overflow-x-auto rounded-xl border border-border bg-card">
-        <table className="w-full min-w-[900px]">
+        <table className="w-full min-w-[760px]">
           <thead>
             <tr className="border-b border-border text-sm text-muted-foreground">
-              <th className="w-40 px-4 py-3 text-left font-normal">
-                ประเภทข้อมูล
-              </th>
               <th className="px-4 py-3 text-left font-normal">หัวข้อตรวจ</th>
               <th className="px-4 py-3 text-left font-normal">เกณฑ์</th>
               <th className="w-32 px-4 py-3 text-center font-normal">
@@ -210,45 +204,6 @@ export function CheckTable({
           <tbody>
             {rows.map((r, i) => (
               <tr key={r.id} className="border-b border-border last:border-0">
-                <td className="px-4 py-3 align-top">
-                  <Select
-                    value={r.kind}
-                    onValueChange={(v) =>
-                      // สลับประเภทแล้วชื่อหัวข้อใช้ร่วมกันไม่ได้ ล้างทั้งคู่
-                      // ไม่งั้นจะเหลือชื่อจากทะเบียนค้างในข้อที่ดึงจากระบบ
-                      onPatch(r.id, {
-                        kind: v as RowKind,
-                        parameterId: "",
-                        source: undefined,
-                        // แถวที่ดึงจากระบบไม่มีเกณฑ์ให้ระบบตัดสิน ผู้ตรวจเลือก
-                        // จากรายการแล้วชี้ขาดเอง ตั้งให้ตรงกันตั้งแต่สลับประเภท
-                        ...(v === "system"
-                          ? {
-                              numeric: false,
-                              formulaBased: false,
-                              manualInspection: true,
-                              readings: 1,
-                            }
-                          : {}),
-                      })
-                    }
-                  >
-                    <SelectTrigger
-                      aria-label="ประเภทข้อมูล"
-                      className="w-full bg-card"
-                    >
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {ROW_KINDS.map((k) => (
-                        <SelectItem key={k} value={k}>
-                          {ROW_KIND[k].label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </td>
-
                 <td className="px-4 py-3 align-top">
                   {r.kind === "system" ? (
                     <Select
@@ -290,18 +245,8 @@ export function CheckTable({
                       ไม่มีการตัดสิน เนื่องจากเป็นการเลือกข้อมูลที่ใช้ตรวจสอบ
                     </p>
                   ) : (
-                    <div className="py-1">
-                      <p className="text-sm">
-                        {r.criteria.trim() || (
-                          <span className="text-muted-foreground">
-                            ยังไม่ได้เขียนเกณฑ์
-                          </span>
-                        )}
-                      </p>
-                      <p className="text-sm text-muted-foreground">
-                        {judgeSummary(r)}
-                      </p>
-                    </div>
+                    // เกณฑ์ที่เขียนให้คนอ่านอย่างเดียว วิธีตัดสินดูในกล่องตั้งค่า
+                    <p className="py-2 text-sm">{r.criteria.trim() || "-"}</p>
                   )}
                 </td>
 
@@ -368,7 +313,7 @@ export function CheckTable({
 
             {rows.length === 0 && (
               <tr>
-                <td colSpan={5} className="px-4 py-14 text-center">
+                <td colSpan={4} className="px-4 py-14 text-center">
                   <p className="font-medium">ไม่มีข้อมูล</p>
                   <p className="mt-1 text-sm text-muted-foreground">
                     กรุณาเพิ่มหัวข้อตรวจ
@@ -718,26 +663,36 @@ export function RowEditDialog({
           </div>
         </div>
 
-        <DialogFooter className="flex-row items-center gap-3 sm:justify-start">
-          <Button variant="outline-primary" onClick={onClose}>
-            ย้อนกลับ
-          </Button>
-          <span className="h-6 w-px bg-border" aria-hidden />
-          <Button
-            variant="outline"
-            disabled={!onDelete}
-            onClick={() => {
-              onDelete?.();
-              onClose();
-            }}
-          >
-            <Trash2Icon />
-            ลบ
-          </Button>
-          <Button className="ml-auto" onClick={save}>
-            บันทึก
-          </Button>
-        </DialogFooter>
+        {/* เพิ่มใหม่มีแค่ย้อนกลับกับบันทึก เต็มความกว้างคนละครึ่ง — ยังไม่มีแถว
+            ให้ลบ ปุ่มลบที่กดไม่ได้มีแต่ทำให้งง แก้ของเดิมถึงมีปุ่มลบคั่นกลาง */}
+        {onDelete ? (
+          <DialogFooter className="flex-row items-center gap-3 sm:justify-start">
+            <Button variant="outline-primary" onClick={onClose}>
+              ย้อนกลับ
+            </Button>
+            <span className="h-6 w-px bg-border" aria-hidden />
+            <Button
+              variant="outline"
+              onClick={() => {
+                onDelete();
+                onClose();
+              }}
+            >
+              <Trash2Icon />
+              ลบ
+            </Button>
+            <Button className="ml-auto" onClick={save}>
+              บันทึก
+            </Button>
+          </DialogFooter>
+        ) : (
+          <DialogFooter className="grid grid-cols-2 gap-3">
+            <Button variant="outline-primary" onClick={onClose}>
+              ย้อนกลับ
+            </Button>
+            <Button onClick={save}>บันทึก</Button>
+          </DialogFooter>
+        )}
       </DialogContent>
     </Dialog>
   );
