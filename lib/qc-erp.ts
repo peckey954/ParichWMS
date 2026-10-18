@@ -126,12 +126,13 @@ export const FLAG_KEYS = Object.keys(FLAG) as FlagKey[];
 // เขียนกำกับไว้ในหน้าตั้งค่าเลย เดฟจะได้รู้ว่าอันนี้ไม่ได้มากับของเดิม
 // ---------------------------------------------------------------
 
-export type RemarkMode = "off" | "optional" | "onFail";
+export type RemarkMode = "onFail" | "required" | "optional" | "off";
 
 export const REMARK_LABEL: Record<RemarkMode, string> = {
-  off: "ไม่มี",
-  optional: "ไม่บังคับ",
   onFail: "บังคับเมื่อไม่ผ่าน",
+  required: "บังคับ",
+  optional: "ไม่บังคับ",
+  off: "ไม่มี",
 };
 
 // ---------------------------------------------------------------
@@ -990,7 +991,7 @@ export type ReportType = { id: string; label: string; active: boolean };
 export const REPORT_TYPES: ReportType[] = [
   { id: "rt-incoming", label: "ตรวจรับเข้า", active: true },
   { id: "rt-production", label: "ตรวจระหว่างผลิต", active: true },
-  { id: "rt-random", label: "สุ่มตรวจ", active: true },
+  { id: "rt-random", label: "สุ่มตรวจตามรอบทำงาน", active: true },
   { id: "rt-outgoing", label: "ตรวจจ่ายออก", active: true },
 ];
 
@@ -2273,7 +2274,7 @@ export const newShift = (from = "08:00", to = "12:00"): QcShift => ({
 export const cloneRow = (row: QiRow): QiRow => ({ ...row, id: uid("row") });
 
 /**
- * แถวใหม่ — เริ่มที่คนตัดสิน แล้วค่อยเอาติ๊กออกตอนใส่เกณฑ์
+ * แถวใหม่ — เริ่มที่คนตัดสิน ไม่ใช่ตัวเลข แล้วค่อยติ๊กเพิ่มตอนใส่เกณฑ์
  *
  * เคยเริ่มที่ numeric โดยไม่ติ๊ก manual ซึ่งแปลว่าแถวที่เพิ่งกดเพิ่มอยู่ในสถานะ
  * "ตกทุกใบ" ตั้งแต่วินาทีแรก เพราะ min_max_criteria_passed คืน has_reading
@@ -2286,7 +2287,7 @@ export const newRow = (): QiRow => ({
   id: uid("row"),
   kind: "text",
   parameterId: "",
-  numeric: true,
+  numeric: false,
   formulaBased: false,
   manualInspection: true,
   min: null,
@@ -2294,6 +2295,7 @@ export const newRow = (): QiRow => ({
   value: "",
   formula: "",
   readings: 1,
-  remark: "optional",
+  // ไม่ผ่านแล้วต้องบอกเหตุผล — แบบที่ฟอร์มกระดาษของโรงงานใช้แทบทุกข้อ
+  remark: "onFail",
   criteria: "",
 });

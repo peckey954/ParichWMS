@@ -66,6 +66,7 @@ import { DRAG_ITEM_ATTR, DragHandle } from "@/components/drag-handle";
 import { SearchSelect } from "@/components/qc/search-select";
 import {
   CheckTable,
+  RowEditDialog,
   criteriaProblems,
   rowTitle,
 } from "@/components/qc/check-table";
@@ -108,6 +109,7 @@ import {
   STAGE,
   STAGE_KEYS,
   addReportType,
+  REMARK_LABEL,
   DISPOSITIONS,
   dispositionChoices,
   dispositionRule,
@@ -167,6 +169,8 @@ export default function SetupQcTemplatePage() {
 function Editor({ seed, isNew }: { seed: QiTemplate; isNew: boolean }) {
   const router = useRouter();
   const [tpl, setTpl] = React.useState<QiTemplate>(seed);
+  // หัวข้อที่กำลังเพิ่ม — ยังไม่อยู่ในตาราง จนกว่าจะกดบันทึกในกล่อง
+  const [adding, setAdding] = React.useState<QiRow | null>(null);
   // ดูใบแบบที่ยังไม่ได้สร้าง custom field อะไรเลย — ของแท็บตัวอย่างอย่างเดียว
   const [plain, setPlain] = React.useState(false);
   /* ค่าที่คีย์ในแท็บตัวอย่าง เก็บรวมที่นี่ไม่ใช่ในการ์ด เพราะผลรวมทั้งใบต้องอ่าน
@@ -445,13 +449,20 @@ function Editor({ seed, isNew }: { seed: QiTemplate; isNew: boolean }) {
                 onChange={(rows) => patch({ rows })}
                 onPatch={patchRow}
               />
-              <AddButton
-                onClick={() =>
-                  setTpl((p) => ({ ...p, rows: [...p.rows, newRow()] }))
-                }
-              >
+              {/* เปิดกล่องก่อน กรอกครบแล้วกดบันทึกถึงขึ้นในตาราง — ไม่ใส่แถวว่าง
+                  ลงตารางไว้ก่อน ซึ่งเป็นแถวที่ลืมกรอกแล้วค้างเป็นหัวข้อไร้ชื่อ */}
+              <AddButton onClick={() => setAdding(newRow())}>
                 เพิ่มหัวข้อตรวจ
               </AddButton>
+              {adding && (
+                <RowEditDialog
+                  row={adding}
+                  onSave={(row) =>
+                    setTpl((p) => ({ ...p, rows: [...p.rows, row] }))
+                  }
+                  onClose={() => setAdding(null)}
+                />
+              )}
             </Section>
 
             {/* ---------- เชื่อมโยงเอกสาร ----------
@@ -1725,7 +1736,7 @@ function PreviewRow({
           <p className="text-sm text-muted-foreground">
             หมายเหตุ{" "}
             <span className="text-xs">
-              ({row.remark === "onFail" ? "บังคับเมื่อไม่ผ่าน" : "ไม่บังคับ"})
+              ({REMARK_LABEL[row.remark]})
             </span>
           </p>
           <Textarea className="bg-card" rows={2} placeholder="ระบุหมายเหตุ" />

@@ -10,7 +10,6 @@ import {
   PlusIcon,
   Trash2Icon,
 } from "lucide-react";
-import { Badge } from "@peckey954/ui/components/ui/badge";
 import { Button } from "@peckey954/ui/components/ui/button";
 import { Checkbox } from "@peckey954/ui/components/ui/checkbox";
 import {
@@ -32,6 +31,7 @@ import {
 } from "@peckey954/ui/components/ui/select";
 import { Textarea } from "@peckey954/ui/components/ui/textarea";
 import { cn } from "@peckey954/ui/lib/utils";
+import { toast } from "sonner";
 import { CheckChip } from "@/components/check-chip";
 import { ParamCombobox } from "@/components/qc/param-picker";
 import {
@@ -383,7 +383,8 @@ export function CheckTable({
       {editRow && (
         <RowEditDialog
           row={editRow}
-          onChange={(next) => onPatch(editRow.id, next)}
+          onSave={(next) => onPatch(editRow.id, next)}
+          onDelete={() => onChange(rows.filter((x) => x.id !== editRow.id))}
           onClose={() => setEditing(null)}
         />
       )}
@@ -452,15 +453,35 @@ function CriteriaBanner({
    ซึ่งตรงกับ depends_on ของ ERPNext ตัวต่อตัว
 ================================================================== */
 
-function RowEditDialog({
-  row,
-  onChange,
+/**
+ * กล่องตั้งค่าหัวข้อ — แก้ในกล่องก่อน กดบันทึกถึงลงตาราง
+ *
+ * ใช้ทั้งตอนเพิ่มหัวข้อใหม่และแก้ของเดิม ตอนเพิ่มยังไม่มีแถวในตาราง กรอกครบ
+ * แล้วกดบันทึกแถวถึงขึ้น ย้อนกลับคือทิ้ง ไม่เหลือแถวว่างค้างไว้ในตาราง
+ * ไม่ส่ง onDelete มา (ตอนเพิ่มใหม่) ปุ่มลบกดไม่ได้ เพราะยังไม่มีอะไรให้ลบ
+ */
+export function RowEditDialog({
+  row: initial,
+  onSave,
+  onDelete,
   onClose,
 }: {
   row: QiRow;
-  onChange: (next: Partial<QiRow>) => void;
+  onSave: (row: QiRow) => void;
+  onDelete?: () => void;
   onClose: () => void;
 }) {
+  const [row, setRow] = React.useState(initial);
+  const onChange = (next: Partial<QiRow>) => setRow((r) => ({ ...r, ...next }));
+  const save = () => {
+    // ข้อความยังไม่ได้เลือกหัวข้อ — แถวไม่มีชื่อขึ้นในตารางแล้วอ่านไม่ออกว่าคืออะไร
+    if (row.kind === "text" && row.parameterId === "") {
+      toast.error("กรุณาเลือกหัวข้อตรวจ");
+      return;
+    }
+    onSave(row);
+    onClose();
+  };
   const unit = paramOf(row.parameterId)?.unit ?? "";
   const u = unit ? ` (${unit})` : "";
   const labels = row.labels ?? [];
@@ -472,9 +493,11 @@ function RowEditDialog({
     onChange({ labels: next });
   };
 
+  // หลายค่าต่อหัวข้อมีแต่แบบตัวเลข (reading_1…10) — ข้อความมีช่องเดียว
+  // กดเพิ่มจำนวนจึงติ๊กตัวเลขให้ด้วย ไม่งั้นจำนวนที่เพิ่มไปไม่มีที่เก็บ
   const addReading = () => {
     if (row.readings >= MAX_READINGS) return;
-    onChange({ readings: row.readings + 1, labels: [...labels, ""] });
+    onChange({ numeric: true, readings: row.readings + 1, labels: [...labels, ""] });
   };
 
   const removeReading = (i: number) => {
@@ -495,31 +518,23 @@ function RowEditDialog({
         </DialogHeader>
 
         <div className="max-h-[60vh] space-y-4 overflow-y-auto px-1">
-          <div className="grid gap-4 sm:grid-cols-[10rem_1fr]">
-            <div className="space-y-1.5">
-              <Label htmlFor={`${row.id}-kind`}>ประเภทข้อมูล</Label>
-              <Select value={row.kind} disabled>
-                <SelectTrigger id={`${row.id}-kind`} className="w-full bg-card">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {ROW_KINDS.map((k) => (
-                    <SelectItem key={k} value={k}>
-                      {ROW_KIND[k].label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-1.5">
-              <Label htmlFor={`${row.id}-param`}>หัวข้อตรวจ</Label>
+          <div className="space-y-1.5">
+            <Label htmlFor={`${row.id}-param`}>หัวข้อตรวจ</Label>
+            {/* หัวข้อที่ดึงจากระบบชื่อคือแหล่งข้อมูลไปในตัว เปลี่ยนที่ตาราง */}
+            {row.kind === "system" ? (
+              <Input
+                id={`${row.id}-param`}
+                className="bg-card"
+                disabled
+                value={rowTitle(row) || "ยังไม่ได้เลือกข้อมูล"}
+              />
+            ) : (
               <ParamCombobox
                 id={`${row.id}-param`}
                 value={row.parameterId}
                 onChange={(v) => onChange({ parameterId: v })}
               />
-            </div>
+            )}
           </div>
 
           <div className="space-y-1.5">
@@ -537,10 +552,6 @@ function RowEditDialog({
               placeholder="ระบุเกณฑ์"
               onChange={(e) => onChange({ criteria: e.target.value })}
             />
-            <FieldNote custom>
-              custom_criteria — เขียนให้คนที่ยืนตรวจอ่าน คนละช่องกับเกณฑ์ที่
-              เครื่องใช้ตัดสินข้างล่าง
-            </FieldNote>
           </div>
 
           {/* สามตัวนี้ติ๊กพร้อมกันได้จริง ไม่ใช่ตัวเลือกที่แข่งกัน */}
@@ -589,13 +600,6 @@ function RowEditDialog({
                 }
                 onChange={(e) => onChange({ formula: e.target.value })}
               />
-              {/* ตัวแปรที่ใช้ได้เปลี่ยนตามว่าติ๊กตัวเลขไว้ไหม เขียนผิดชุดแล้ว
-                  สูตรจะพังตอนรันจริงโดยหน้าจอไม่ได้บอกอะไร */}
-              <FieldNote>
-                {row.numeric
-                  ? "acceptance_formula · ตัวแปรที่ใช้ได้: reading_1…reading_10 และ mean"
-                  : "acceptance_formula · ตัวแปรที่ใช้ได้: reading_value"}
-              </FieldNote>
             </div>
           ) : row.numeric ? (
             <div className="grid gap-4 sm:grid-cols-2">
@@ -624,27 +628,18 @@ function RowEditDialog({
                 id={`${row.id}-v`}
                 className="bg-card"
                 value={row.value}
-                placeholder="เช่น ปกติ  หรือ  30, 60, 70"
+                placeholder="เช่น ปกติ  หรือหลายตัวเลือก  30, 40, 50"
                 onChange={(e) => onChange({ value: e.target.value })}
               />
               {/* หลายค่าเก็บลง value ตรง ๆ ไม่ได้ เพราะ ERPNext เทียบข้อความ
                   แบบตรงตัว ใส่ "30, 60, 70" แล้วผู้ตรวจคีย์ 60 จะได้ตกทุกใบ
                   ต้องแปลงเป็น acceptance_formula ซึ่งเป็นทางที่ ERPNext
                   เตรียมไว้เองอยู่แล้ว ไม่ต้องสร้างฟิลด์ใหม่ */}
-              {passFormula(row.value) ? (
-                <>
-                  <p className="text-sm text-muted-foreground">
-                    คั่นด้วย , หรือ / = ได้ค่าใดค่าหนึ่งก็ผ่าน —{" "}
-                    {passValues(row.value).join(" · ")}
-                  </p>
-                  <FieldNote>
-                    acceptance_formula = {passFormula(row.value)}
-                  </FieldNote>
-                </>
-              ) : (
-                <FieldNote>
-                  value · คั่นด้วย , ถ้ามีหลายค่าที่ถือว่าผ่าน
-                </FieldNote>
+              {passFormula(row.value) && (
+                <p className="text-sm text-muted-foreground">
+                  คั่นด้วย , หรือ / = ได้ค่าใดค่าหนึ่งก็ผ่าน —{" "}
+                  {passValues(row.value).join(" · ")}
+                </p>
               )}
             </div>
           )}
@@ -658,8 +653,7 @@ function RowEditDialog({
           {/* จำนวนค่า = จำนวนช่องที่ตั้งชื่อไว้ ไม่ใช่ตัวเลขแยกอีกช่อง
               นับจากรายการตรง ๆ แล้วตั้งชื่อไปพร้อมกัน จะได้ไม่มีทางที่จำนวนกับ
               ชื่อไม่ตรงกัน ซึ่งเกิดได้แน่ถ้าให้ปรับเลขกับแก้ชื่อคนละที่ */}
-          {row.numeric && (
-            <div className="space-y-2">
+          <div className="space-y-2">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <p className="font-semibold">จำนวนค่าที่ต้องระบุ</p>
                 <Button
@@ -673,7 +667,8 @@ function RowEditDialog({
                 </Button>
               </div>
 
-              {Array.from({ length: row.readings }, (_, i) => (
+              {/* ช่องเดียวไม่ต้องตั้งชื่อ — ขึ้นรายการเมื่อมีมากกว่าหนึ่งค่า */}
+              {row.readings > 1 && Array.from({ length: row.readings }, (_, i) => (
                 <div key={i} className="space-y-1.5">
                   <Label htmlFor={`${row.id}-l${i}`}>
                     ชื่อช่องที่ต้องระบุ{" "}
@@ -701,14 +696,7 @@ function RowEditDialog({
                   </div>
                 </div>
               ))}
-
-              <FieldNote custom={row.readings > 1}>
-                {row.readings > 1
-                  ? `reading_1…reading_${row.readings} · custom_reading_labels — ERPNext ตั้งป้ายไว้ตายตัวว่า Reading 1…10 แก้รายหัวข้อไม่ได้`
-                  : "reading_1"}
-              </FieldNote>
-            </div>
-          )}
+          </div>
 
           <div className="space-y-1.5">
             <Label htmlFor={`${row.id}-r`}>หมายเหตุหัวข้อ</Label>
@@ -727,15 +715,28 @@ function RowEditDialog({
                 ))}
               </SelectContent>
             </Select>
-            <FieldNote custom>custom_remark ที่แถวของใบตรวจ</FieldNote>
           </div>
         </div>
 
-        <DialogFooter className="grid grid-cols-2 gap-3">
+        <DialogFooter className="flex-row items-center gap-3 sm:justify-start">
           <Button variant="outline-primary" onClick={onClose}>
             ย้อนกลับ
           </Button>
-          <Button onClick={onClose}>บันทึก</Button>
+          <span className="h-6 w-px bg-border" aria-hidden />
+          <Button
+            variant="outline"
+            disabled={!onDelete}
+            onClick={() => {
+              onDelete?.();
+              onClose();
+            }}
+          >
+            <Trash2Icon />
+            ลบ
+          </Button>
+          <Button className="ml-auto" onClick={save}>
+            บันทึก
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -790,25 +791,3 @@ function StepperField({
   );
 }
 
-function FieldNote({
-  children,
-  custom,
-}: {
-  children: React.ReactNode;
-  custom?: boolean;
-}) {
-  return (
-    <p className="mt-1.5 font-mono text-xs text-muted-foreground">
-      {custom && (
-        <Badge
-          appearance="soft"
-          tone="warning"
-          className="mr-1.5 align-middle font-mono text-[10px] uppercase"
-        >
-          custom
-        </Badge>
-      )}
-      {children}
-    </p>
-  );
-}
