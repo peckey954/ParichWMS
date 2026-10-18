@@ -11,6 +11,7 @@
 
 import {
   QI_TEMPLATES,
+  sourcePool,
   templateOf,
   type QcShift,
   type QiTemplate,
@@ -35,6 +36,8 @@ export type QcRecord = {
   values: Record<string, { nums: string[]; text: string; source: string; remark: string }>;
   disposition: string;
   note: string;
+  /** ผลรวมที่ผู้ตรวจชี้เอง — ใบที่ตั้ง "ผู้ตรวจตัดสินเองทั้งใบ" */
+  whole?: "" | "pass" | "fail";
   by: string;
   editor?: string;
   status: "pass" | "fail";
@@ -140,13 +143,12 @@ function rng(seed: number) {
 const INSPECTORS = ["อลิสา พรสุขสิริ", "ณัฐพล ศรีวิไล", "สมชาย ใจดี"];
 
 function seedRecords(tpl: QiTemplate, days: number) {
-  const rand = rng(tpl.id.length * 7919 + 17);
+  const rand = rng(tpl.id.length * 7919 + tpl.id.charCodeAt(2) * 31 + 17);
   const now = new Date();
   const slots = tpl.schedule.slots;
-  const pool =
-    tpl.headerOn && tpl.header[0]?.source === "tank"
-      ? ["ถัง T1", "ถัง T2", "ถัง T3", "ถัง T4"]
-      : [""];
+  const pick = <T,>(xs: T[]) => xs[Math.floor(rand() * xs.length)];
+  // ขนาดบรรจุที่โรงงานมีจริง ใช้กับข้อที่คีย์ขนาดบนกระสอบเทียบน้ำหนักที่ชั่ง
+  const PACKS = [50, 25, 40];
 
   for (let back = days; back >= 1; back--) {
     const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() - back);
@@ -157,21 +159,37 @@ function seedRecords(tpl: QiTemplate, days: number) {
       if (roll < 0.05) return; // ขาดตรวจ
       const fail = roll > 0.88;
       const results: QcRecord["results"] = {};
+      const values: QcRecord["values"] = {};
       const failRows: string[] = [];
-      tpl.rows.forEach((row) => {
+      tpl.rows.forEach((row, ri) => {
         const r = rand();
-        if (fail && r < 0.25) {
+        const bad = fail && (r < 0.25 || (ri === 0 && failRows.length === 0));
+        if (row.numeric && row.formulaBased && row.readings === 2) {
+          // ขนาดบรรจุ / น้ำหนักที่ชั่ง — ผ่านคือเกินขนาดอย่างน้อย 0.2 กก.
+          const pack = pick(PACKS);
+          const over = bad ? 0.1 : 0.2 + Math.round(rand() * 4) / 10;
+          values[row.id] = {
+            nums: [String(pack), String(Math.round((pack + over) * 10) / 10)],
+            text: "",
+            source: "",
+            remark: bad ? "น้ำหนักขาด ส่งกลับไลน์ชั่งใหม่" : "",
+          };
+        }
+        if (bad) {
           results[row.id] = "fail";
           failRows.push(row.id);
         } else results[row.id] = tpl.verdicts.includes("na") && r > 0.93 ? "na" : "pass";
       });
-      if (fail && failRows.length === 0 && tpl.rows[0]) {
-        results[tpl.rows[0].id] = "fail";
-        failRows.push(tpl.rows[0].id);
-      }
       const [h, m] = slot.from.split(":").map(Number);
-      const mins = h * 60 + m + 10 + Math.floor(rand() * 70);
-      const by = INSPECTORS[Math.floor(rand() * INSPECTORS.length)];
+      const span = slot.to > slot.from ? 60 * 8 : 70;
+      const mins = h * 60 + m + 10 + Math.floor(rand() * span);
+      const header: Record<string, string> = {};
+      if (tpl.headerOn)
+        for (const f of tpl.header)
+          if (f.kind === "system" && f.source) {
+            const pool = sourcePool(f.source);
+            header[f.id] = f.source === "tank" ? pool[si % pool.length] : pick(pool);
+          }
       RECORDS.push({
         id: `rec-seed-${tpl.id}-${date}-${si}`,
         tplId: tpl.id,
@@ -179,12 +197,18 @@ function seedRecords(tpl: QiTemplate, days: number) {
         date,
         time: `${pad(Math.floor(mins / 60) % 24)}:${pad(mins % 60)}`,
         slotId: slot.id,
-        header: tpl.header[0] ? { [tpl.header[0].id]: pool[si % pool.length] } : {},
+        header,
         results,
-        values: {},
+        values,
         disposition: "",
-        note: failRows.length > 0 ? "ระดับในถังต่ำกว่ากำหนด แจ้งคลังเติมแล้ว" : "",
-        by,
+        note:
+          failRows.length === 0
+            ? ""
+            : tpl.id === "t-tank-rm"
+              ? "ระดับในถังต่ำกว่ากำหนด แจ้งคลังเติมแล้ว"
+              : "แจ้งหัวหน้าไลน์แล้ว",
+        whole: tpl.manualWholeDoc ? (failRows.length > 0 ? "fail" : "pass") : undefined,
+        by: pick(INSPECTORS),
         editor: rand() > 0.85 ? "อลิสา พรสุขสิริ" : undefined,
         status: failRows.length > 0 ? "fail" : "pass",
         cancelled: rand() > 0.97,

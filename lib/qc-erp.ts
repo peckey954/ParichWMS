@@ -260,6 +260,7 @@ export const QI_PARAMETERS: QiParameter[] = [
   { id: "p-p", name: "ฟอสฟอรัส (P)", group: "เคมี", unit: "%" },
   { id: "p-k", name: "โพแทสเซียม (K)", group: "เคมี", unit: "%" },
   { id: "p-weight", name: "น้ำหนักบรรจุ", group: "บรรจุภัณฑ์", unit: "กก." },
+  { id: "p-fg-weight", name: "น้ำหนักของปุ๋ย", group: "บรรจุภัณฑ์", unit: "กก." },
   { id: "p-bag", name: "สภาพกระสอบ", group: "บรรจุภัณฑ์", unit: "" },
   { id: "p-label", name: "ป้ายฉลาก", group: "บรรจุภัณฑ์", unit: "" },
   { id: "p-coa", name: "เอกสาร COA", group: "เอกสาร", unit: "" },
@@ -345,7 +346,9 @@ export type SourceId =
   | "user"
   | "warehouse"
   | "machine"
-  | "tank";
+  | "tank"
+  | "prodMachine"
+  | "sling";
 
 export const SOURCE: Record<
   SourceId,
@@ -417,6 +420,20 @@ export const SOURCE: Record<
     custom: true,
     pool: ["ถัง T1", "ถัง T2", "ถัง T3", "ถัง T4"],
   },
+  // เครื่องผลิตคือไลน์ที่ผลิตกระสอบนั้น คนละอย่างกับเครื่องจักรที่ถูกตรวจ
+  prodMachine: {
+    label: "เครื่องผลิต",
+    store: "Quality Inspection · custom_workstation → Workstation",
+    custom: true,
+    pool: ["ไลน์ 1", "ไลน์ 2", "ไลน์กลาง"],
+  },
+  // สลิงที่ใช้ยกกระสอบ — กระดาษจดเป็นขนาด
+  sling: {
+    label: "สลิง",
+    store: "Quality Inspection · custom_sling",
+    custom: true,
+    pool: ["สลิง 30", "สลิง 35", "สลิง 40"],
+  },
 };
 
 export const SOURCE_IDS = Object.keys(SOURCE) as SourceId[];
@@ -430,7 +447,14 @@ export const sourcePool = (id: SourceId): string[] =>
 export const CHECK_SOURCES: SourceId[] = ["item", "warehouse", "machine"];
 
 /** ส่วนหัวเอกสารดึงได้สี่อย่าง — ของที่ใบหนึ่งใบผูกอยู่ ไม่ใช่ของที่ถูกตัดสิน */
-export const HEADER_SOURCES: SourceId[] = ["item", "machine", "warehouse", "tank"];
+export const HEADER_SOURCES: SourceId[] = [
+  "item",
+  "machine",
+  "warehouse",
+  "tank",
+  "prodMachine",
+  "sling",
+];
 
 // ---------------------------------------------------------------
 // ช่องในส่วนหัวเอกสาร — ผู้ตรวจกรอกครั้งเดียวต่อใบ
@@ -1776,6 +1800,60 @@ const SEED_TEMPLATES: SeedTemplate[] = [
     onNotSubmitted: "system",
     schedule: { ...DEFAULT_SCHEDULE },
     note: "ตรวจสถานที่ ไม่ใช่ของชิ้นใดชิ้นหนึ่ง — ต้องทำ doctype แยก ซึ่งใช้ตัวเดียวกับตรวจเครื่องจักรได้ และได้คำว่า ปกติ/ผิดปกติ ตามฟอร์มกระดาษกลับมาด้วย",
+  },
+  {
+    id: "t-fg-sample",
+    // สุ่มกระสอบจากไลน์ระหว่างวัน ชั่งเทียบกับขนาดบรรจุที่พิมพ์บนกระสอบ
+    // ไม่ได้เกิดจากเอกสาร ผู้ตรวจเลือกสินค้า เครื่องผลิต และสลิงเองก่อนเริ่ม
+    subject: "item",
+    name: "สุ่มตรวจผลิตภัณฑ์สำเร็จรูป",
+    code: "FM-QC-02-06",
+    active: true,
+    owner: "อลิสา พรสุขสิริ",
+    updatedAt: "24/09/2026",
+    inspectionType: "inProcess",
+    rows: [
+      {
+        ...formula(
+          "p-fg-weight",
+          "reading_2 >= reading_1 + 0.2",
+          2,
+          "น้ำหนักต่อกระสอบ >=50.2 /25.2/40.2 กก.",
+          "optional",
+          ["ขนาดบรรจุ", "น้ำหนัก"]
+        ),
+      },
+    ],
+    phase: "",
+    prodSteps: [],
+    refMenu: "",
+    operations: [],
+    photo: "optional",
+    effectiveFrom: "01/09/2026",
+    effectiveTo: "",
+    // ข้อน้ำหนักระบบตัดสินให้ แต่ทั้งใบผู้ตรวจชี้เอง — ดูกระสอบจริงด้วยตา
+    // เย็บด้าย ตัวเลขบนกระสอบ ซึ่งไม่ได้แตกเป็นหัวข้อในใบนี้
+    manualWholeDoc: true,
+    multiSample: false,
+    targets: [],
+    requireBefore: false,
+    dispositions: [],
+    requireDisposition: false,
+    onRejected: "system",
+    onNotSubmitted: "system",
+    schedule: {
+      recurring: true,
+      allDay: false,
+      slots: [{ id: "fg-s1", from: "08:30", to: "23:00" }],
+    },
+    reportType: "rt-random",
+    headerOn: true,
+    header: [
+      { id: "hd-fg-item", kind: "system", label: "", source: "item", required: true },
+      { id: "hd-fg-line", kind: "system", label: "", source: "prodMachine", required: true },
+      { id: "hd-fg-sling", kind: "system", label: "", source: "sling", required: true },
+    ],
+    verdicts: ["pass", "fail"],
   },
   {
     id: "t-issue",

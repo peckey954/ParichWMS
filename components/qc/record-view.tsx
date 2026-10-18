@@ -9,6 +9,7 @@ import {
   VERDICT_OPTION_LABEL,
   dispositionOf,
   paramOf,
+  readingLabels,
   type DocField,
   type QiRow,
   type QiTemplate,
@@ -98,8 +99,13 @@ export function RecordView({ tpl, rec }: { tpl: QiTemplate; rec: QcRecord }) {
         {tpl.rows.map((row, i) => {
           const v = rec.results[row.id];
           const val = rec.values[row.id];
-          const reading =
-            val?.nums?.filter(Boolean).join(" · ") || val?.text || val?.source || "";
+          // ตัวเลขโชว์คู่กับชื่อช่อง — "50 · 50.4" อ่านไม่ออกว่าตัวไหนคืออะไร
+          const labels = readingLabels(row);
+          const nums = (val?.nums ?? [])
+            .map((n, k) => (n ? `${labels[k] ?? `ครั้งที่ ${k + 1}`} ${n}` : ""))
+            .filter(Boolean)
+            .join(" · ");
+          const reading = nums || val?.text || val?.source || "";
           return (
             <section key={row.id} className="rounded-xl border border-border bg-card p-4">
               <div className="flex flex-wrap items-start justify-between gap-2">

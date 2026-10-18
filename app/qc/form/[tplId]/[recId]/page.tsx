@@ -52,7 +52,13 @@ function valuesOf(r: QcRecord): FormValues {
       source: r.values[id]?.source ?? "",
       remark: r.values[id]?.remark ?? "",
     };
-  return { header: r.header, rows, disposition: r.disposition, note: r.note };
+  return {
+    header: r.header,
+    rows,
+    disposition: r.disposition,
+    note: r.note,
+    whole: r.whole ?? "",
+  };
 }
 
 export default function RecordPage() {
@@ -213,7 +219,7 @@ export default function RecordPage() {
             )
           }
           onBack={() => (rec ? setEditing(false) : router.push(`/qc/form/${tpl.id}`))}
-          onSubmit={({ values, verdicts, failed }) => {
+          onSubmit={({ values, verdicts, overall }) => {
             const saved = saveRecord({
               id: rec?.id,
               tplId: tpl.id,
@@ -226,9 +232,10 @@ export default function RecordPage() {
               values: values.rows,
               disposition: values.disposition,
               note: values.note,
+              whole: values.whole,
               by: rec?.by ?? ME,
               editor: rec ? ME : undefined,
-              status: failed ? "fail" : "pass",
+              status: overall,
               cancelled: rec?.cancelled ?? false,
             });
             toast.success(rec ? `แก้ไข ${saved.no} แล้ว` : `บันทึก ${saved.no} แล้ว`, {
