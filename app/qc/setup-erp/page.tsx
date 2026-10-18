@@ -55,7 +55,6 @@ import { cn } from "@peckey954/ui/lib/utils";
 import { ChipGroup } from "@/components/chip-group";
 import { DateSelect, formatDateSlash } from "@/components/date-select";
 import { MultiSelectChips } from "@/components/multi-select-chips";
-import { EmptyBox } from "@/components/qc/system-settings";
 import {
   ROW_HOVER_NAV,
   TablePager,
@@ -64,6 +63,7 @@ import {
 import {
   NEW_TEMPLATE_ID,
   QI_TEMPLATES,
+  PHASE,
   REF_MENU,
   REPORT_TYPES,
   STAGE,
@@ -71,6 +71,7 @@ import {
   reportTypeOf,
   setTemplateActive,
   stageOf,
+  type Phase,
   type QiTemplate,
 } from "@/lib/qc-erp";
 
@@ -303,17 +304,25 @@ function FilterButton({
   );
 }
 
-/** ช่วงการตรวจสอบสองบรรทัด ไทยบน อังกฤษล่าง — ไม่มีคือรายงานที่ไม่ผูกเอกสาร */
+/** ประเภทการตรวจสอบสองบรรทัด ไทยบน อังกฤษล่าง — ช่วงใหญ่ ไม่แตกขั้นการผลิต
+ *  ขั้นก่อน/ระหว่าง/หลังผลิตดูได้ในหน้ารายงาน ตารางนี้ไว้กวาดตาว่าใบอยู่ช่วงไหน
+ *  ไม่มีคือรายงานที่ไม่ผูกเอกสาร */
 function StageCell({ t }: { t: QiTemplate }) {
-  const s = stageOf(t);
-  if (s === "") return <span className="text-muted-foreground">-</span>;
+  if (!t.linkDocs || t.phase === "") return <span className="text-muted-foreground">-</span>;
   return (
     <>
-      <span>{STAGE[s].label}</span>
-      <span className="block text-sm text-muted-foreground">{STAGE[s].erp}</span>
+      <span>{PHASE[t.phase].label}</span>
+      <span className="block text-sm text-muted-foreground">{PHASE_ERP[t.phase]}</span>
     </>
   );
 }
+
+/** ป้ายอังกฤษของช่วงใหญ่ตามที่หน้าจอใช้ — PHASE.erp เป็นค่าใน ERPNext ที่มีเว้นวรรค */
+const PHASE_ERP: Record<Phase, string> = {
+  incoming: "Incoming",
+  production: "Inprocess",
+  outgoing: "Outgoing",
+};
 
 /* ---------- จอแคบ ----------
      การ์ดทีละใบ — ตารางหกคอลัมน์บีบจนอ่านไม่ออกบนมือถือ
@@ -384,6 +393,7 @@ function TemplateTable({
         <TableHeader>
           <TableRow>
             <TableHead className="min-w-56 pl-4">ชื่อรายงาน</TableHead>
+            <TableHead className="min-w-32">ประเภทรายงาน</TableHead>
             <TableHead className="min-w-28">ประเภทการตรวจสอบ</TableHead>
             <TableHead className="min-w-32">เอกสารอ้างอิง</TableHead>
             <TableHead className="min-w-40">ผู้ทำรายการ</TableHead>
@@ -404,10 +414,15 @@ function TemplateTable({
                 <span className="block text-sm text-muted-foreground">{t.code}</span>
               </TableCell>
               <TableCell>
+                {reportTypeOf(t.reportType)?.label ?? (
+                  <span className="text-muted-foreground">-</span>
+                )}
+              </TableCell>
+              <TableCell>
                 <StageCell t={t} />
               </TableCell>
               <TableCell>
-                {t.refMenu === "" ? (
+                {!t.linkDocs || t.refMenu === "" ? (
                   <span className="text-muted-foreground">-</span>
                 ) : (
                   REF_MENU[t.refMenu].label
@@ -510,6 +525,15 @@ function Pager({
           </form>
         )}
       </div>
+    </div>
+  );
+}
+
+function EmptyBox({ text }: { text: string }) {
+  return (
+    <div className="mt-4 rounded-xl border border-dashed border-border px-6 py-14 text-center">
+      <p className="font-medium">{text}</p>
+      <p className="mt-1 text-sm text-muted-foreground">ลองใช้คำค้นสั้นลง</p>
     </div>
   );
 }

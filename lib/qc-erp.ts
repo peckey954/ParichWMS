@@ -162,6 +162,8 @@ export type QiParameter = {
    * เพราะความชื้นของวัตถุดิบกับของสินค้าสำเร็จรูปใช้เกณฑ์คนละตัว
    */
   description?: string;
+  /** ปิดแล้วไม่ขึ้นให้เลือกในหัวข้อตรวจของฟอร์ม ฟอร์มที่ใช้อยู่แล้วไม่กระทบ */
+  active?: boolean;
 };
 
 /**
@@ -178,6 +180,22 @@ export const QI_GROUPS = [
   "เครื่องจักร",
   "วัตถุดิบในถัง",
 ];
+
+export function setParameterActive(id: string, on: boolean) {
+  const p = QI_PARAMETERS.find((x) => x.id === id);
+  if (p) p.active = on;
+}
+
+/** กลุ่มที่ปิดไว้ — เก็บแยกเพราะกลุ่มเป็นแค่ชื่อ ไม่ได้เป็นก้อนข้อมูลที่มีช่องเพิ่มได้
+ *  ปิดแล้วหัวข้อในกลุ่มยังอยู่ แค่ไม่เสนอกลุ่มนี้ตอนสร้างหัวข้อใหม่ */
+export const QI_GROUPS_OFF = new Set<string>();
+
+export const groupActive = (g: string) => !QI_GROUPS_OFF.has(g);
+
+export function setGroupActive(g: string, on: boolean) {
+  if (on) QI_GROUPS_OFF.delete(g);
+  else QI_GROUPS_OFF.add(g);
+}
 
 /** กี่หัวข้อที่อยู่ในกลุ่มนี้ — ใช้กันลบกลุ่มที่ยังมีคนใช้ */
 export const groupUsedBy = (group: string) =>
@@ -203,6 +221,8 @@ export function renameGroup(from: string, to: string) {
   else QI_GROUPS[i] = name;
 
   for (const p of QI_PARAMETERS) if (p.group === from) p.group = name;
+  // ปิดไว้ก่อนเปลี่ยนชื่อ ชื่อใหม่ก็ต้องยังปิดอยู่
+  if (QI_GROUPS_OFF.delete(from)) QI_GROUPS_OFF.add(name);
 }
 
 /** ลบได้เฉพาะกลุ่มที่ไม่มีหัวข้อไหนอยู่ */
@@ -963,14 +983,30 @@ export const VERDICT_OPTION_KEYS = Object.keys(
 // เพิ่มได้จากช่องเลือกในหน้าตั้งค่ารายงาน หมวดใหม่ขึ้นในหน้าหลักทันทีที่มีรายงานใช้
 // ---------------------------------------------------------------
 
-export type ReportType = { id: string; label: string };
+/** active = ปิดแล้วหมวดนี้ไม่ขึ้นในหน้าหลัก และเลือกให้รายงานใหม่ไม่ได้
+ *  รายงานที่อยู่ในหมวดนี้อยู่แล้วไม่ถูกย้ายออก เปิดกลับมาก็อยู่ที่เดิม */
+export type ReportType = { id: string; label: string; active: boolean };
 
 export const REPORT_TYPES: ReportType[] = [
-  { id: "rt-incoming", label: "ตรวจรับเข้า" },
-  { id: "rt-production", label: "ตรวจระหว่างผลิต" },
-  { id: "rt-random", label: "สุ่มตรวจ" },
-  { id: "rt-outgoing", label: "ตรวจจ่ายออก" },
+  { id: "rt-incoming", label: "ตรวจรับเข้า", active: true },
+  { id: "rt-production", label: "ตรวจระหว่างผลิต", active: true },
+  { id: "rt-random", label: "สุ่มตรวจ", active: true },
+  { id: "rt-outgoing", label: "ตรวจจ่ายออก", active: true },
 ];
+
+/** กี่รายงานที่อยู่ในประเภทนี้ */
+export const reportTypeUsedBy = (id: string) =>
+  QI_TEMPLATES.filter((t) => t.reportType === id).length;
+
+export function renameReportType(id: string, label: string) {
+  const t = REPORT_TYPES.find((x) => x.id === id);
+  if (t && label.trim()) t.label = label.trim();
+}
+
+export function setReportTypeActive(id: string, on: boolean) {
+  const t = REPORT_TYPES.find((x) => x.id === id);
+  if (t) t.active = on;
+}
 
 export const reportTypeOf = (id: string | undefined) =>
   REPORT_TYPES.find((t) => t.id === id);
@@ -982,7 +1018,7 @@ export function addReportType(label: string): ReportType {
     (t) => t.label.toLowerCase() === name.toLowerCase()
   );
   if (dup) return dup;
-  const t = { id: uid("rt"), label: name };
+  const t = { id: uid("rt"), label: name, active: true };
   REPORT_TYPES.push(t);
   return t;
 }
@@ -1333,32 +1369,6 @@ const fgRound = (): QiRow[] => [
   range("p-moist", 0, 80, 1, "ความชื้นต้องไม่เกิน 80%"),
 ];
 
-/**
- * แถวที่ผู้ตรวจเลือกจากรายการของระบบ — ไม่มีเกณฑ์ให้ระบบตัดสิน
- *
- * ชื่อหัวข้อคือตัวแหล่งข้อมูลไปในตัว จึงไม่ต้องมี parameterId
- */
-const fromSystem = (
-  source: SourceId,
-  criteria = "",
-  remark: RemarkMode = "onFail"
-): QiRow => ({
-  id: rid(),
-  kind: "system",
-  source,
-  parameterId: "",
-  numeric: false,
-  formulaBased: false,
-  manualInspection: true,
-  min: null,
-  max: null,
-  value: "",
-  formula: "",
-  readings: 1,
-  remark,
-  criteria,
-});
-
 /** แถวที่ระบบไม่ตัดสิน ผู้ตรวจติ๊กเอง */
 const manual = (
   parameterId: string,
@@ -1396,14 +1406,16 @@ const manual = (
 --------------------------------------------------------------- */
 
 const SEED_TEMPLATES: SeedTemplate[] = [
-  // ---------- 1 อ้างอิงเอกสาร ----------
+  // ---------- ชุดรายงานตามหน้าตั้งค่ารายงาน ----------
+  // ตรวจรับเข้า → ระหว่างผลิต → สุ่มตรวจตามรอบ (ปิดไว้) → จ่ายออก
   {
     id: "t-rm",
     subject: "item",
-    name: "ตรวจรับวัตถุดิบ (RM)",
+    name: "ตรวจรับวัตถุดิบ",
     code: "FM-QC-01-01",
     active: true,
     owner: "อลิสา พรสุขสิริ",
+    editor: "อลิสา พรสุขสิริ",
     updatedAt: "24/09/2026",
     inspectionType: "incoming",
     rows: [
@@ -1443,12 +1455,87 @@ const SEED_TEMPLATES: SeedTemplate[] = [
     schedule: { ...DEFAULT_SCHEDULE },
   },
   {
+    id: "t-gr",
+    subject: "item",
+    name: "ตรวจรับสินค้า",
+    code: "FM-QC-01-02",
+    active: true,
+    owner: "อลิสา พรสุขสิริ",
+    editor: "อลิสา พรสุขสิริ",
+    updatedAt: "24/09/2026",
+    inspectionType: "incoming",
+    rows: [
+      formula(
+        "p-size",
+        "(reading_2 + reading_3) / 2500 * 100 >= 80",
+        4,
+        "เม็ดปุ๋ยขนาด 2–4 มม. ไม่น้อยกว่า 80% ของตัวอย่าง 2,500 g",
+        "optional",
+        [
+          "น้ำหนักเม็ดปุ๋ย 4 มม.",
+          "น้ำหนักเม็ดปุ๋ย 3.15 มม.",
+          "น้ำหนักเม็ดปุ๋ย 2 มม.",
+          "น้ำหนักเม็ดปุ๋ย 0.5 มม.",
+        ]
+      ),
+      // ใช้ mean ที่ ERPNext เตรียมไว้ให้ ไม่ต้องบวกเองแล้วหารห้า —
+      // เขียนเองแล้วเปลี่ยนจำนวนครั้งที่วัดเมื่อไหร่ สูตรพังเงียบ ๆ เมื่อนั้น
+      formula("p-hard", "mean >= 0.4", 5, "ค่าเฉลี่ยความแข็งของเม็ดปุ๋ย ไม่น้อยกว่า 0.4 กก."),
+      range("p-moist", 0, 10, 1, "ความชื้นของเม็ดปุ๋ย น้อยกว่า 10%"),
+    ],
+    phase: "incoming",
+    prodSteps: [],
+    refMenu: "prProduct",
+    operations: [],
+    photo: "onFail",
+    effectiveFrom: "01/09/2026",
+    effectiveTo: "",
+    manualWholeDoc: false,
+    multiSample: false,
+    targets: [],
+    requireBefore: true,
+    dispositions: ["accept", "repack", "return"],
+    requireDisposition: true,
+    onRejected: "system",
+    onNotSubmitted: "system",
+    schedule: { ...DEFAULT_SCHEDULE },
+  },
+  {
+    id: "t-coa",
+    subject: "other",
+    name: "ตรวจการรับเอกสาร",
+    code: "FM-QC-04-02",
+    active: true,
+    owner: "อลิสา พรสุขสิริ",
+    updatedAt: "24/09/2026",
+    inspectionType: "incoming",
+    rows: [value("p-coa-complete", "ครบ"), value("p-coa-match", "ตรง")],
+    phase: "",
+    prodSteps: [],
+    refMenu: "",
+    operations: [],
+    photo: "onFail",
+    effectiveFrom: "01/09/2026",
+    effectiveTo: "",
+    manualWholeDoc: false,
+    multiSample: false,
+    targets: [],
+    requireBefore: false,
+    dispositions: [],
+    requireDisposition: false,
+    onRejected: "system",
+    onNotSubmitted: "system",
+    schedule: { ...DEFAULT_SCHEDULE },
+    note: "เป็นทะเบียนรับเอกสาร วันหนึ่งรับกี่ใบก็ได้ ไม่ใช่การตรวจสินค้า — ต้องทำ doctype แยกที่เพิ่มแถวเองได้",
+  },
+  {
     id: "t-pre",
     subject: "item",
     name: "ตรวจก่อนผลิต",
     code: "FM-QC-01-03",
     active: true,
     owner: "อลิสา พรสุขสิริ",
+    editor: "อลิสา พรสุขสิริ",
     updatedAt: "24/09/2026",
     inspectionType: "inProcess",
     rows: [
@@ -1458,7 +1545,7 @@ const SEED_TEMPLATES: SeedTemplate[] = [
     ],
     phase: "production",
     prodSteps: ["pre"],
-    refMenu: "stockEntry",
+    refMenu: "jobCard",
     operations: [],
     photo: "onFail",
     effectiveFrom: "01/09/2026",
@@ -1475,12 +1562,59 @@ const SEED_TEMPLATES: SeedTemplate[] = [
     note: "ERPNext ไม่มีติ๊กบังคับตรวจก่อนผลิตที่ข้อมูลสินค้า มีแค่ก่อนซื้อกับก่อนส่ง — ถ้าต้องห้ามเดินเครื่องจนกว่าจะตรวจ ต้องเขียน validation เอง",
   },
   {
+    id: "t-inproc",
+    subject: "item",
+    name: "ตรวจระหว่างผลิต",
+    code: "FM-QC-02-03",
+    active: true,
+    owner: "อลิสา พรสุขสิริ",
+    editor: "อลิสา พรสุขสิริ",
+    updatedAt: "24/09/2026",
+    inspectionType: "inProcess",
+    /* ทุกข้อเป็นติ๊กผ่าน/ไม่ผ่านล้วน ไม่มีช่องคีย์ค่า — ตรงกับกระดาษที่มีแต่
+       ช่องติ๊กกับคอลัมน์เกณฑ์มาตรฐานให้อ่าน แม้แต่ข้อน้ำหนักกับความชื้นที่มี
+       ตัวเลขในเกณฑ์ ผู้ตรวจก็ชั่งแล้วติ๊กเอา ไม่ได้คีย์ตัวเลขลงใบ
+
+       แปดแถว ไม่ใช่ยี่สิบสี่ — "ตรวจครั้งที่ 1/2/3" บนกระดาษคือเปิดใบด้วย
+       เทมเพลตนี้สามรอบ ไม่ใช่สามชุดแถวในใบเดียว */
+    rows: fgRound(),
+    /* สามรอบบนกระดาษคือสามจุดของการผลิตรอบเดียว ไม่ใช่สามครั้งที่รับของ
+       ก่อนผลิต = ตอนโอนวัตถุดิบเข้าไลน์ · ระหว่างผลิต = ใบงานของขั้นตอนที่ติ๊กไว้
+       หลังผลิตเสร็จ = ตอนรับสินค้าสำเร็จรูปเข้าคลัง */
+    phase: "production",
+    prodSteps: ["during"],
+    refMenu: "jobCard",
+    operations: ["ผสมปุ๋ย", "บรรจุกระสอบ"],
+    photo: "onFail",
+    effectiveFrom: "01/09/2026",
+    effectiveTo: "",
+    manualWholeDoc: false,
+    multiSample: false,
+    targets: ["ปุ๋ยสูตร 15-15-15 กระสอบ 50 กก."],
+    requireBefore: true,
+    dispositions: ["accept", "repack"],
+    requireDisposition: true,
+    onRejected: "system",
+    onNotSubmitted: "system",
+    // หัวใบที่ผู้ตรวจเลือกก่อนเริ่ม — สองช่องนี้กลายเป็นตัวกรองในหน้าคิวเองด้วย
+    headerOn: true,
+    header: [
+      { id: "hd-inproc-item", kind: "system", label: "", source: "item", required: true },
+      { id: "hd-inproc-mc", kind: "system", label: "", source: "machine", required: true },
+      { id: "hd-inproc-wh", kind: "system", label: "", source: "warehouse", required: false },
+    ],
+    // ใบเกิดจากเอกสารรับของ ไม่ใช่ตามรอบเวลา — คอลัมน์ "ตรวจครั้งที่ 1/2/3"
+    // ของกระดาษเป็นการตรวจซ้ำในการรับครั้งเดียวกัน ไม่ใช่สามกะในหนึ่งวัน
+    schedule: { ...DEFAULT_SCHEDULE },
+  },
+  {
     id: "t-post",
     subject: "item",
     name: "ตรวจหลังผลิต",
     code: "FM-QC-01-04",
     active: true,
     owner: "อลิสา พรสุขสิริ",
+    editor: "อลิสา พรสุขสิริ",
     updatedAt: "24/09/2026",
     inspectionType: "inProcess",
     rows: [
@@ -1490,7 +1624,7 @@ const SEED_TEMPLATES: SeedTemplate[] = [
     ],
     phase: "production",
     prodSteps: ["post"],
-    refMenu: "stockEntry",
+    refMenu: "jobCard",
     operations: [],
     photo: "onFail",
     effectiveFrom: "01/09/2026",
@@ -1505,14 +1639,57 @@ const SEED_TEMPLATES: SeedTemplate[] = [
     onNotSubmitted: "system",
     schedule: { ...DEFAULT_SCHEDULE },
   },
-
-  // ---------- 2 สุ่มตรวจ ไม่อ้างอิงเอกสาร ----------
+  {
+    id: "t-tank-rm",
+    // ตรวจถัง ไม่ใช่ตรวจของที่กำลังเคลื่อนไหวตามเอกสาร — ใบจึงไม่มีสินค้าและ
+    // ไม่มีเอกสารอ้างอิง ซึ่ง Quality Inspection รับไม่ได้เพราะบังคับทั้งสองอย่าง
+    subject: "other",
+    name: "ตรวจวัตถุดิบในคลัง",
+    code: "FM-QC-03-01",
+    active: false,
+    owner: "อลิสา พรสุขสิริ",
+    updatedAt: "24/09/2026",
+    inspectionType: "inProcess",
+    // ใบเกิดจากนาฬิกา ไม่ได้เกิดจากเอกสาร — เว้นว่างไว้ให้ตรงกับความจริง
+    // หนึ่งวัตถุดิบคือหนึ่งข้อ ติ๊กปกติ/ผิดปกติ ไม่มีค่าให้คีย์ ตามใบจริง
+    rows: [
+      manual("p-rm-4205"),
+      manual("p-rm-br"),
+      manual("p-rm-mop"),
+      manual("p-rm-mg"),
+      manual("p-rm-dap"),
+      manual("p-rm-amsu"),
+      manual("p-rm-urea"),
+    ],
+    phase: "",
+    prodSteps: [],
+    refMenu: "",
+    operations: [],
+    photo: "onFail",
+    effectiveFrom: "01/09/2026",
+    effectiveTo: "",
+    manualWholeDoc: false,
+    multiSample: false,
+    targets: [],
+    requireBefore: false,
+    dispositions: [],
+    requireDisposition: false,
+    onRejected: "system",
+    onNotSubmitted: "system",
+    // สี่กะต่อวัน เฉพาะวันทำงาน — วันหยุดมาจาก Holiday List ของบริษัท
+    schedule: {
+      recurring: true,
+      allDay: false,
+      slots: factoryShifts(),
+    },
+    note: "ตรวจถังตามกะ ไม่มีเอกสารและไม่มีสินค้าผูก — Quality Inspection บังคับ reference_type กับ item_code จึงลงไม่ได้ ใบนี้ไปอยู่ doctype QC Check ตัวเดียวกับสุ่มตรวจเครื่องจักรและคลังสินค้า · และไม่บังคับตรวจครบทุกข้อ ตรวจเท่าที่มีในถัง ซึ่ง Quality Inspection ก็ทำไม่ได้เพราะบังคับว่าทุกแถวต้องมีผล",
+  },
   {
     id: "t-machine",
     subject: "other",
     name: "สุ่มตรวจเครื่องจักร",
     code: "FM-QC-02-01",
-    active: true,
+    active: false,
     owner: "อลิสา พรสุขสิริ",
     updatedAt: "24/09/2026",
     inspectionType: "inProcess",
@@ -1561,7 +1738,7 @@ const SEED_TEMPLATES: SeedTemplate[] = [
     subject: "other",
     name: "สุ่มตรวจคลังสินค้า",
     code: "FM-QC-02-02",
-    active: true,
+    active: false,
     owner: "อลิสา พรสุขสิริ",
     updatedAt: "24/09/2026",
     inspectionType: "inProcess",
@@ -1595,181 +1772,9 @@ const SEED_TEMPLATES: SeedTemplate[] = [
     note: "ตรวจสถานที่ ไม่ใช่ของชิ้นใดชิ้นหนึ่ง — ต้องทำ doctype แยก ซึ่งใช้ตัวเดียวกับตรวจเครื่องจักรได้ และได้คำว่า ปกติ/ผิดปกติ ตามฟอร์มกระดาษกลับมาด้วย",
   },
   {
-    id: "t-fg-sample",
-    subject: "other",
-    name: "สุ่มตรวจผลิตภัณฑ์สำเร็จรูป",
-    code: "FM-QC-02-06",
-    active: true,
-    owner: "อลิสา พรสุขสิริ",
-    updatedAt: "24/09/2026",
-    inspectionType: "inProcess",
-    /* สี่คอลัมน์ตรงตามกระดาษ — สูตร เครื่องผลิต น้ำหนัก สลิง
-       คอลัมน์ วันที่ / ตรวจสอบ ผ่าน-ไม่ผ่าน / หมายเหตุ ไม่ได้ตั้งเป็นหัวข้อ
-       เพราะมากับตัวใบอยู่แล้ว (report_date · status · remarks)
-       ตั้งซ้ำคือได้สองที่ที่ขัดกันเองวันหนึ่ง
-
-       เกณฑ์บนหัวกระดาษเป็นเกณฑ์ของทั้งแถว ไม่ใช่ของคอลัมน์ไหนคอลัมน์หนึ่ง
-       วางไว้ที่สูตรซึ่งเป็นตัวระบุว่ากระสอบไหน */
-    rows: [
-      fromSystem("item", "การเย็บด้ายต้องติด ตัวเลขของกระสอบต้องชัด"),
-      fromSystem("machine"),
-      range("p-weight", null, null, 1, "ชั่งแล้วบันทึกน้ำหนักที่ได้"),
-      value("p-sling", "30 / 35 / 40", "ต้องตรงกับที่ระบุในใบสั่งผลิต"),
-    ],
-    phase: "",
-    prodSteps: [],
-    refMenu: "",
-    operations: [],
-    photo: "onFail",
-    effectiveFrom: "01/09/2026",
-    effectiveTo: "",
-    manualWholeDoc: false,
-    // หนึ่งกระสอบที่สุ่ม = หนึ่งใบ ไม่ใช่หนึ่งคอลัมน์ในใบเดียว
-    multiSample: true,
-    targets: [],
-    requireBefore: false,
-    dispositions: [],
-    requireDisposition: false,
-    onRejected: "system",
-    onNotSubmitted: "system",
-    schedule: { ...DEFAULT_SCHEDULE },
-    note: "สุ่มเองตามรอบผลิต ไม่มีเอกสารเป็นตัวเปิดใบ — reference_type เป็น reqd ของ Quality Inspection ใบนี้จึงไปอยู่ doctype QC Check ตัวเดียวกับสุ่มตรวจเครื่องจักรและคลังสินค้า · และสูตรเปลี่ยนไปทุกกระสอบที่สุ่ม ซึ่ง Quality Inspection รับไม่ได้อยู่แล้วเพราะ item_code มีใบละตัวเดียว ส่วนตาราง readings ไม่มีช่องสินค้าเลย",
-  },
-  {
-    id: "t-inproc",
-    subject: "item",
-    name: "ตรวจรับสินค้า (External / Finish Good)",
-    code: "FM-QC-02-03",
-    active: true,
-    owner: "อลิสา พรสุขสิริ",
-    updatedAt: "24/09/2026",
-    inspectionType: "inProcess",
-    /* ทุกข้อเป็นติ๊กผ่าน/ไม่ผ่านล้วน ไม่มีช่องคีย์ค่า — ตรงกับกระดาษที่มีแต่
-       ช่องติ๊กกับคอลัมน์เกณฑ์มาตรฐานให้อ่าน แม้แต่ข้อน้ำหนักกับความชื้นที่มี
-       ตัวเลขในเกณฑ์ ผู้ตรวจก็ชั่งแล้วติ๊กเอา ไม่ได้คีย์ตัวเลขลงใบ
-
-       แปดแถว ไม่ใช่ยี่สิบสี่ — "ตรวจครั้งที่ 1/2/3" บนกระดาษคือเปิดใบด้วย
-       เทมเพลตนี้สามรอบ ไม่ใช่สามชุดแถวในใบเดียว */
-    rows: fgRound(),
-    /* สามรอบบนกระดาษคือสามจุดของการผลิตรอบเดียว ไม่ใช่สามครั้งที่รับของ
-       ก่อนผลิต = ตอนโอนวัตถุดิบเข้าไลน์ · ระหว่างผลิต = ใบงานของขั้นตอนที่ติ๊กไว้
-       หลังผลิตเสร็จ = ตอนรับสินค้าสำเร็จรูปเข้าคลัง */
-    phase: "production",
-    prodSteps: ["pre", "during", "post"],
-    refMenu: "jobCard",
-    operations: ["ผสมปุ๋ย", "บรรจุกระสอบ"],
-    photo: "onFail",
-    effectiveFrom: "01/09/2026",
-    effectiveTo: "",
-    manualWholeDoc: false,
-    multiSample: false,
-    targets: ["ปุ๋ยสูตร 15-15-15 กระสอบ 50 กก."],
-    requireBefore: true,
-    dispositions: ["accept", "repack"],
-    requireDisposition: true,
-    onRejected: "system",
-    onNotSubmitted: "system",
-    // หัวใบที่ผู้ตรวจเลือกก่อนเริ่ม — สองช่องนี้กลายเป็นตัวกรองในหน้าคิวเองด้วย
-    headerOn: true,
-    header: [
-      { id: "hd-inproc-item", kind: "system", label: "", source: "item", required: true },
-      { id: "hd-inproc-mc", kind: "system", label: "", source: "machine", required: true },
-      { id: "hd-inproc-wh", kind: "system", label: "", source: "warehouse", required: false },
-    ],
-    // ใบเกิดจากเอกสารรับของ ไม่ใช่ตามรอบเวลา — คอลัมน์ "ตรวจครั้งที่ 1/2/3"
-    // ของกระดาษเป็นการตรวจซ้ำในการรับครั้งเดียวกัน ไม่ใช่สามกะในหนึ่งวัน
-    schedule: { ...DEFAULT_SCHEDULE },
-  },
-
-  // ---------- 3 ตรวจตามรอบกะ ----------
-  {
-    id: "t-tank-rm",
-    // ตรวจถัง ไม่ใช่ตรวจของที่กำลังเคลื่อนไหวตามเอกสาร — ใบจึงไม่มีสินค้าและ
-    // ไม่มีเอกสารอ้างอิง ซึ่ง Quality Inspection รับไม่ได้เพราะบังคับทั้งสองอย่าง
-    subject: "other",
-    name: "ตรวจวัตถุดิบในคลัง",
-    code: "FM-QC-03-01",
-    active: true,
-    owner: "อลิสา พรสุขสิริ",
-    updatedAt: "24/09/2026",
-    inspectionType: "inProcess",
-    // ใบเกิดจากนาฬิกา ไม่ได้เกิดจากเอกสาร — เว้นว่างไว้ให้ตรงกับความจริง
-    // หนึ่งวัตถุดิบคือหนึ่งข้อ ติ๊กปกติ/ผิดปกติ ไม่มีค่าให้คีย์ ตามใบจริง
-    rows: [
-      manual("p-rm-4205"),
-      manual("p-rm-br"),
-      manual("p-rm-mop"),
-      manual("p-rm-mg"),
-      manual("p-rm-dap"),
-      manual("p-rm-amsu"),
-      manual("p-rm-urea"),
-    ],
-    phase: "",
-    prodSteps: [],
-    refMenu: "",
-    operations: [],
-    photo: "onFail",
-    effectiveFrom: "01/09/2026",
-    effectiveTo: "",
-    manualWholeDoc: false,
-    multiSample: false,
-    targets: [],
-    requireBefore: false,
-    dispositions: [],
-    requireDisposition: false,
-    onRejected: "system",
-    onNotSubmitted: "system",
-    // สี่กะต่อวัน เฉพาะวันทำงาน — วันหยุดมาจาก Holiday List ของบริษัท
-    schedule: {
-      recurring: true,
-      allDay: false,
-      slots: factoryShifts(),
-    },
-    note: "ตรวจถังตามกะ ไม่มีเอกสารและไม่มีสินค้าผูก — Quality Inspection บังคับ reference_type กับ item_code จึงลงไม่ได้ ใบนี้ไปอยู่ doctype QC Check ตัวเดียวกับสุ่มตรวจเครื่องจักรและคลังสินค้า · และไม่บังคับตรวจครบทุกข้อ ตรวจเท่าที่มีในถัง ซึ่ง Quality Inspection ก็ทำไม่ได้เพราะบังคับว่าทุกแถวต้องมีผล",
-  },
-  {
-    id: "t-tank-fg",
-    subject: "item",
-    name: "ตรวจสินค้าในคลัง",
-    code: "FM-QC-03-02",
-    active: true,
-    owner: "อลิสา พรสุขสิริ",
-    updatedAt: "24/09/2026",
-    inspectionType: "inProcess",
-    rows: [
-      range("p-moist", 0, 2),
-      range("p-warehouse-temp", 20, 35),
-      value("p-bag", "ปกติ"),
-    ],
-    /* ตรวจของที่นอนอยู่ในคลังตามรอบ ไม่ได้เกิดจากการเบิกหรือการโอน จึงไม่มี
-       เอกสารเป็นตัวเปิดใบ — เคยผูกไว้กับเบิก-โอนสต็อกซึ่งผิด เพราะใบนี้จะเด้ง
-       ก็ต่อเมื่อมีคนเบิกของ แต่ความตั้งใจคือตรวจทุกวันไม่ว่าจะมีคนเบิกหรือไม่ */
-    phase: "",
-    prodSteps: [],
-    refMenu: "",
-    operations: [],
-    photo: "onFail",
-    effectiveFrom: "01/09/2026",
-    effectiveTo: "",
-    manualWholeDoc: false,
-    multiSample: false,
-    targets: ["ปุ๋ยสูตร 15-15-15 กระสอบ 50 กก."],
-    requireBefore: false,
-    dispositions: [],
-    requireDisposition: false,
-    onRejected: "system",
-    onNotSubmitted: "system",
-    schedule: {
-      recurring: true,
-      // ฟอร์มนี้ขอแค่ตรวจสักครั้งในวัน ไม่ได้ผูกกับกะ
-      allDay: true,
-      slots: [],
-    },
-  },
-  {
     id: "t-issue",
     subject: "item",
-    name: "ตรวจสอบการจ่ายปุ๋ย",
+    name: "ตรวจจ่ายวัตถุดิบ",
     code: "FM-QC-03-03",
     active: true,
     owner: "อลิสา พรสุขสิริ",
@@ -1778,7 +1783,7 @@ const SEED_TEMPLATES: SeedTemplate[] = [
     rows: [range("p-weight", 49.5, 50.5, 3), value("p-bag", "ปกติ")],
     phase: "outgoing",
     prodSteps: [],
-    refMenu: "deliveryNote",
+    refMenu: "stockEntry",
     operations: [],
     photo: "onFail",
     effectiveFrom: "01/09/2026",
@@ -1794,63 +1799,34 @@ const SEED_TEMPLATES: SeedTemplate[] = [
     schedule: { ...DEFAULT_SCHEDULE },
     note: "ถ้าใบเดียวสุ่มหลายสูตรพร้อมกัน ต้องแตกเป็นหลายใบ (ใบละสินค้า) หรือทำหน้าจอที่กดครั้งเดียวแล้วยิงสร้างหลายใบ",
   },
-
-  // ---------- 4 เมื่อมี request เข้ามา ----------
   {
-    id: "t-complaint",
-    subject: "other",
-    name: "ร้องเรียนลูกค้า",
-    code: "FM-QC-04-01",
-    active: false,
+    id: "t-issue-fg",
+    subject: "item",
+    name: "ตรวจจ่ายสินค้า",
+    code: "FM-QC-03-04",
+    active: true,
     owner: "อลิสา พรสุขสิริ",
+    editor: "อลิสา พรสุขสิริ",
     updatedAt: "24/09/2026",
     inspectionType: "outgoing",
-    rows: [value("p-complaint", "รับเรื่องแล้ว"), manual("p-trace")],
-    phase: "",
+    rows: [range("p-weight", 49.5, 50.5, 3), value("p-bag", "ปกติ")],
+    phase: "outgoing",
     prodSteps: [],
-    refMenu: "",
+    refMenu: "stockEntry",
     operations: [],
     photo: "onFail",
     effectiveFrom: "01/09/2026",
     effectiveTo: "",
     manualWholeDoc: false,
     multiSample: false,
-    targets: [],
+    targets: ["ปุ๋ยสูตร 15-15-15 กระสอบ 50 กก.", "ปุ๋ยสูตร 16-20-0 กระสอบ 50 กก."],
     requireBefore: false,
-    dispositions: ["accept", "return"],
+    dispositions: ["accept", "repack"],
     requireDisposition: true,
     onRejected: "system",
     onNotSubmitted: "system",
     schedule: { ...DEFAULT_SCHEDULE },
-    note: "ไม่ใช่การตรวจของ แต่เป็นการรับเรื่อง — ERPNext มีให้แล้วในโมดูล Quality Management: Quality Feedback รับเรื่อง → Non Conformance บันทึกสิ่งที่ไม่เป็นไปตามเกณฑ์ → Quality Action ตามแก้จนจบ ควรใช้ของมันแทนทำเอง",
-  },
-  {
-    id: "t-coa",
-    subject: "other",
-    name: "บันทึกการรับเอกสาร COA",
-    code: "FM-QC-04-02",
-    active: true,
-    owner: "อลิสา พรสุขสิริ",
-    updatedAt: "24/09/2026",
-    inspectionType: "incoming",
-    rows: [value("p-coa-complete", "ครบ"), value("p-coa-match", "ตรง")],
-    phase: "",
-    prodSteps: [],
-    refMenu: "",
-    operations: [],
-    photo: "onFail",
-    effectiveFrom: "01/09/2026",
-    effectiveTo: "",
-    manualWholeDoc: false,
-    multiSample: false,
-    targets: [],
-    requireBefore: false,
-    dispositions: [],
-    requireDisposition: false,
-    onRejected: "system",
-    onNotSubmitted: "system",
-    schedule: { ...DEFAULT_SCHEDULE },
-    note: "เป็นทะเบียนรับเอกสาร วันหนึ่งรับกี่ใบก็ได้ ไม่ใช่การตรวจสินค้า — ต้องทำ doctype แยกที่เพิ่มแถวเองได้",
+    note: "ถ้าใบเดียวสุ่มหลายสูตรพร้อมกัน ต้องแตกเป็นหลายใบ (ใบละสินค้า) หรือทำหน้าจอที่กดครั้งเดียวแล้วยิงสร้างหลายใบ",
   },
 ];
 
@@ -1904,13 +1880,13 @@ export const REF_MENU: Record<
     phases: ["incoming"],
   },
   prProduct: {
-    label: "ใบรับสินค้า / ทั่วไป",
+    label: "ใบรับสินค้า/ทั่วไป",
     erp: "Purchase Receipt",
     phases: ["incoming"],
   },
-  jobCard: { label: "ใบงานผลิต", erp: "Job Card", phases: ["production"] },
+  jobCard: { label: "ใบสั่งผลิต", erp: "Job Card", phases: ["production"] },
   stockEntry: {
-    label: "ใบเบิก / จ่ายสต็อก",
+    label: "ใบเบิก/จ่ายสต็อก",
     erp: "Stock Entry",
     phases: ["incoming", "production", "outgoing"],
   },

@@ -289,9 +289,11 @@ export const headerLabelOf = (source: SourceId) => SOURCE[source].label;
 
 /** ผลตรวจทั้งหมดของล็อตนี้ในเทมเพลตนี้ — ไม่รวมของฟอร์มอื่น */
 export const resultsOf = (lot: Lot, tplId: string): StageResult[] =>
-  Object.entries(lot.done)
-    .filter(([k]) => k.startsWith(`${tplId}:`))
-    .map(([, r]) => r);
+  // นับเฉพาะจุดที่เทมเพลตยังมีอยู่ — ตัดขั้นออกจากเทมเพลตแล้ว ผลเก่าของขั้นนั้น
+  // ต้องไม่มาทำให้ล็อตดูเหมือนตรวจไปแล้วหรือมีข้อตก
+  checkpointsOfQueue(tplId)
+    .map((c) => lot.done[`${tplId}:${c.key}`])
+    .filter((r): r is StageResult => r !== undefined);
 
 export const lotOf = (id: string) => LOTS.find((l) => l.id === id);
 

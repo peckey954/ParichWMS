@@ -169,51 +169,8 @@ export const MODULES: ModuleItem[] = [
   },
 
   // ---------- การตรวจคุณภาพสินค้า ----------
-  {
-    id: "qc-raw",
-    group: "qc",
-    label: "ตรวจรับวัตถุดิบ",
-    code: "FM-QC-02-03",
-    icon: "filePlus",
-    href: "/qc/raw-receiving",
-    // เท่ากับจำนวนใบในแท็บรอตรวจวัตถุดิบ — ตัวเลขบนการ์ดกับในหน้าต้องตรงกัน
-    pending: 11,
-    templateIds: ["t-rm"],
-  },
-  {
-    id: "qc-fg-in",
-    group: "qc",
-    label: "ตรวจรับสินค้า",
-    code: "FM-QC-02-03",
-    icon: "packageSearch",
-    href: "/qc/goods-receiving",
-    reportType: "rt-incoming",
-  },
-  {
-    id: "qc-pre",
-    group: "qc",
-    label: "ตรวจวัตถุดิบก่อนผลิต",
-    shortLabel: "ตรวจก่อนผลิต",
-    code: "FM-PD-01-03",
-    icon: "listTodo",
-    templateIds: ["t-pre"],
-  },
-  {
-    id: "qc-check",
-    group: "qc",
-    label: "QC ตรวจสอบ",
-    code: "FM-QC-02-05",
-    icon: "clipboardCheck",
-    href: "/qc/checks",
-    pending: 3,
-    // หน้านี้คือใบตรวจในคลังที่ทำซ้ำตามรอบ ทั้งวัตถุดิบและสินค้า
-    templateIds: ["t-tank-rm", "t-tank-fg"],
-  },
-  { id: "qc-machine", group: "qc", label: "ตรวจเครื่องจักร", code: "FM-PD-01-03", icon: "scanSearch", templateIds: ["t-machine"] },
-  { id: "qc-inline", group: "qc", label: "ตรวจระหว่างผลิต", code: "FM-ST-01-02", icon: "searchCheck", reportType: "rt-production" },
-  { id: "qc-post", group: "qc", label: "ตรวจหลังผลิต", code: "FM-QC-02-04", icon: "packageCheck", templateIds: ["t-post"] },
-  { id: "qc-warehouse", group: "qc", label: "ตรวจคลังสินค้า", code: "FM-ST-01-02", icon: "search", templateIds: ["t-warehouse"] },
-  { id: "qc-complaint", group: "qc", label: "ร้องเรียนลูกค้า", code: "FM-PD-01-03", icon: "complaint", pending: 2, templateIds: ["t-complaint"] },
+  // ไม่มีรายการตายตัว — การ์ดทุกใบงอกจากรายงานที่เปิดใช้งาน (templateModules)
+  // หน้าทำงานของแต่ละรายงานผูกไว้ที่ QC_PAGES ข้างล่าง
 
   // ---------- บัญชี ----------
   {
@@ -274,32 +231,48 @@ export const SETTINGS_ITEMS: ModuleItem[] = MODULES.filter(
 );
 
 /**
- * เมนูที่งอกจากเทมเพลต — ตั้งเทมเพลตเสร็จแล้วมีที่ให้ทำงานทันที
+ * หน้าทำงานของรายงานที่มีหน้าของตัวเองแล้ว — คีย์คือ id ของรายงาน
  *
- * เคยต้องมาเพิ่มเมนูมือทุกครั้งที่มีฟอร์มใหม่ ซึ่งแปลว่าวันหนึ่งจะลืม แล้ว
- * เทมเพลตที่ตั้งไว้จะไม่มีใครเจอ — เกิดขึ้นแล้วกับฟอร์มตรวจสินค้าสำเร็จรูป
- *
- * งอกทุกเทมเพลตที่เปิดใช้และยังไม่มีการ์ดของตัวเอง ไปอยู่หมวดย่อยตามประเภท
- * รายงานที่ตั้งไว้ ตั้งประเภทใหม่แล้วหมวดใหม่ขึ้นในหน้าหลักเลย
- *
- * หน้าคิวทำได้แค่ฟอร์มที่มีขั้นย่อยของการผลิต — ที่เหลือขึ้นเป็นการ์ดที่ยังกด
- * ไม่ได้ ดีกว่าไม่ขึ้นเลยจนคนนึกว่าตั้งไม่ติด
+ * ชื่อ รหัส และหมวดย่อยไม่ได้เก็บที่นี่ อ่านจากรายงานเสมอ แก้ชื่อในหน้าตั้งค่า
+ * แล้วการ์ดเปลี่ยนตาม ที่นี่เก็บแค่สิ่งที่หน้าตั้งค่าไม่รู้ คือหน้าไหนกับงานค้าง
  */
-export const templateModules = (): ModuleItem[] => {
-  const claimed = new Set(MODULES.flatMap((m) => m.templateIds ?? []));
-  return QI_TEMPLATES.filter((t) => t.active && !claimed.has(t.id)).map((t) => ({
-    id: `qc-tpl-${t.id}`,
-    group: "qc" as const,
-    label: t.name,
-    code: t.code,
-    icon: "packageCheck",
-    href:
-      t.phase === "production" && t.prodSteps.length > 0
-        ? `/qc/queue/${t.id}`
-        : undefined,
-    reportType: t.reportType || undefined,
-  }));
+const QC_PAGES: Record<string, { href: string; icon?: string; pending?: number }> = {
+  // เท่ากับจำนวนใบในแท็บรอตรวจวัตถุดิบ — ตัวเลขบนการ์ดกับในหน้าต้องตรงกัน
+  "t-rm": { href: "/qc/raw-receiving", icon: "filePlus", pending: 11 },
+  "t-gr": { href: "/qc/goods-receiving", icon: "packageSearch" },
+  // ใบตรวจในคลังที่ทำซ้ำตามรอบ
+  "t-tank-rm": { href: "/qc/checks", icon: "clipboardCheck", pending: 3 },
 };
+
+/**
+ * การ์ดของหมวดตรวจคุณภาพ — หนึ่งรายงานที่เปิดใช้งาน = หนึ่งการ์ด
+ *
+ * เคยเป็นรายการที่เขียนไว้ตายตัวปนกับที่งอกจากเทมเพลต ชื่อบนการ์ดกับชื่อ
+ * รายงานจึงไม่ตรงกัน และปิดรายงานแล้วการ์ดยังค้างอยู่ ตอนนี้อ่านจากรายงาน
+ * อย่างเดียว ปิดใช้งานแล้วการ์ดหาย เปลี่ยนประเภทแล้วการ์ดย้ายหมวด
+ *
+ * รายงานที่ยังไม่มีหน้าของตัวเองขึ้นเป็นการ์ดที่ยังกดไม่ได้ — ฟอร์มที่มีขั้น
+ * การผลิตใช้หน้าคิวกลางได้เลย
+ */
+export const templateModules = (): ModuleItem[] =>
+  QI_TEMPLATES.filter((t) => t.active).map((t) => {
+    const page = QC_PAGES[t.id];
+    return {
+      id: `qc-tpl-${t.id}`,
+      group: "qc" as const,
+      label: t.name,
+      code: t.code,
+      icon: page?.icon ?? "packageCheck",
+      href:
+        page?.href ??
+        (t.phase === "production" && t.prodSteps.length > 0
+          ? `/qc/queue/${t.id}`
+          : undefined),
+      pending: page?.pending,
+      reportType: t.reportType || undefined,
+      templateIds: [t.id],
+    };
+  });
 
 /** หมวดย่อยของการ์ด — การ์ดที่ผูกเทมเพลตอ่านจากเทมเพลต ไม่ใช่ค่าที่เขียนค้างไว้ */
 export const reportTypeOfModule = (m: ModuleItem): string | undefined => {
@@ -318,7 +291,8 @@ export function subgroupsOf(
   if (!items.some((m) => reportTypeOfModule(m))) {
     return [{ id: "all", label: null, items }];
   }
-  const known = REPORT_TYPES.map((t) => ({
+  // ประเภทที่ปิดไว้ในหน้าตั้งค่าระบบไม่ขึ้นเป็นหมวดย่อย
+  const known = REPORT_TYPES.filter((t) => t.active).map((t) => ({
     id: t.id,
     label: t.label as string | null,
     items: items.filter((m) => reportTypeOfModule(m) === t.id),

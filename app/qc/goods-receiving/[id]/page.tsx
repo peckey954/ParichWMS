@@ -116,7 +116,7 @@ function ReceivingSheet({ doc }: { doc: NonNullable<ReturnType<typeof findDoc>> 
   /* บังคับเลือกไหม และเลือกอะไรได้บ้าง มาจากเทมเพลต — ผูกเอกสารแล้วตั้ง
      บังคับเลือกผลตรวจคือต้องเลือก ไม่ผูกเอกสารเลือกหรือไม่ก็ได้ ตั้ง Warn/Stop
      คือไม่มีขั้นนี้ ตัวเลือกเดียวเลือกไว้ให้เลย */
-  const rule = formDisposition(undefined);
+  const rule = formDisposition("t-gr");
   const choices = DISPOSITIONS.filter((d) => rule.ids.includes(d.id));
   const askDisposition = hasFail && rule.rule !== "none";
   const picked: Disposition | null =

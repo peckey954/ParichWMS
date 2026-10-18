@@ -363,7 +363,10 @@ function Editor({ seed, isNew }: { seed: QiTemplate; isNew: boolean }) {
                     id="tpl-type"
                     value={tpl.reportType}
                     placeholder="เลือกประเภท"
-                    options={REPORT_TYPES.map((t) => ({
+                    // ประเภทที่ปิดไว้เลือกใหม่ไม่ได้ แต่ตัวที่รายงานนี้ใช้อยู่ต้องยังเห็น
+                    options={REPORT_TYPES.filter(
+                      (t) => t.active || t.id === tpl.reportType
+                    ).map((t) => ({
                       value: t.id,
                       label: t.label,
                     }))}

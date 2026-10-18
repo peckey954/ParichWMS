@@ -39,6 +39,7 @@ import { toast } from "sonner";
 import {
   QI_GROUPS,
   QI_PARAMETERS,
+  groupActive,
   addGroup,
   addParameter,
   updateParameter,
@@ -91,8 +92,11 @@ export function ParamCombobox({
 
   const selected = paramOf(value);
   const q = search.trim().toLowerCase();
+  // หัวข้อที่ปิดในหน้าตั้งค่าระบบไม่เสนอให้เลือกใหม่ ตัวที่เลือกอยู่แล้วยังเห็น
   const matches = QI_PARAMETERS.filter(
-    (p) => !q || p.name.toLowerCase().includes(q) || p.group.toLowerCase().includes(q)
+    (p) =>
+      (p.active !== false || p.id === value) &&
+      (!q || p.name.toLowerCase().includes(q) || p.group.toLowerCase().includes(q))
   );
   const exact = QI_PARAMETERS.some(
     (p) => p.name.trim().toLowerCase() === q && q !== ""
@@ -509,7 +513,10 @@ function GroupCombobox({
   const listId = React.useId();
 
   const q = search.trim().toLowerCase();
-  const matches = QI_GROUPS.filter((g) => !q || g.toLowerCase().includes(q));
+  // กลุ่มที่ปิดไว้ไม่เสนอให้เลือกใหม่ ตัวที่เลือกอยู่แล้วยังเห็น
+  const matches = QI_GROUPS.filter(
+    (g) => (groupActive(g) || g === value) && (!q || g.toLowerCase().includes(q))
+  );
   const exact = QI_GROUPS.some((g) => g.toLowerCase() === q && q !== "");
 
   const pick = (g: string) => {

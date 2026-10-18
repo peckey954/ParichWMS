@@ -116,14 +116,14 @@ export default function QcQueuePage() {
         <BreadcrumbList>
           <BreadcrumbItem>
             <BreadcrumbPage className="text-primary">
-              ตรวจสอบสินค้าสำเร็จรูป
+              {tpl?.name ?? "คิวตรวจ"}
             </BreadcrumbPage>
           </BreadcrumbItem>
         </BreadcrumbList>
       </Breadcrumb>
 
       <h1 className="mt-3 text-2xl font-semibold tracking-tight">
-        ตรวจสอบสินค้าสำเร็จรูป
+        {tpl?.name ?? "คิวตรวจ"}
       </h1>
       {/* บอกว่าเมนูนี้เดินตามเทมเพลตไหน ไม่งั้นพอหัวข้อตรวจเปลี่ยนจะหาไม่เจอ
           ว่าไปแก้ที่ไหน */}
