@@ -121,10 +121,19 @@ export const MODULES: ModuleItem[] = [
   },
 
   // ---------- การรับเข้าสินค้า ----------
-  // ยังไม่มีหน้าของตัวเอง การ์ดจึงกดไม่ได้และขึ้นป้ายบอกไว้
+  // การ์ดที่ยังไม่มีหน้าของตัวเองกดไม่ได้และขึ้นป้ายบอกไว้
   { id: "rcv-raw", group: "receiving", label: "รับเข้าวัตถุดิบ", code: "FM-ST-01-05", icon: "rcvRaw" },
   { id: "rcv-production", group: "receiving", label: "รับเข้าผลิต", code: "FM-PD-01-03", icon: "rcvProduction" },
-  { id: "rcv-product", group: "receiving", label: "รับเข้าสินค้า", code: "FM-ST-01-05", icon: "rcvProduct" },
+  {
+    id: "rcv-product",
+    group: "receiving",
+    label: "รับเข้าสินค้า",
+    code: "FM-ST-01-05",
+    icon: "rcvProduct",
+    href: "/receiving/product",
+    // เท่ากับแท็บรอรับเข้าในหน้ารับเข้าสินค้า (lib/goods-receiving)
+    pending: 11,
+  },
   {
     id: "rcv-general",
     group: "receiving",
