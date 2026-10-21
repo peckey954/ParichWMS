@@ -320,3 +320,9 @@
   --color-tone-violet: var(--tone-violet);
   --color-tone-violet-foreground: var(--tone-violet-foreground);
 }
+
+/* เส้นเลเซอร์ในกรอบสแกนบาร์โค้ด (จำลอง) — วิ่งขึ้นลงในกรอบส่อง */
+@keyframes scan-line {
+  from { top: 8%; }
+  to { top: 92%; }
+}
