@@ -51,6 +51,9 @@ import {
   CATEGORIES,
   CATEGORY_LABEL,
   INBOUND_DOCS,
+  isInboundOpen,
+  inboundTabRequested,
+  clearInboundTabRequest,
   ISSUE_DOCS,
   PRODUCTS,
   countByCategory,
@@ -116,7 +119,11 @@ function GeneralStockView() {
   // ทุกอย่างที่ตัวกรองเป็นเจ้าของอยู่ในก้อนเดียว แก้ในกล่องแล้วกดตกลงทีเดียวจบ
   const [view, setView] = React.useState<StockView>(STOCK_VIEW_DEFAULT);
   const [filterOpen, setFilterOpen] = React.useState(false);
-  const [tab, setTab] = React.useState<"stock" | "inbound" | "issue">("stock");
+  // กลับมาจากบันทึกใบรับเข้า ต้องเปิดแท็บรอรับเข้าค้างไว้ให้เห็นผล
+  const [tab, setTab] = React.useState<"stock" | "inbound" | "issue">(() =>
+    inboundTabRequested() ? "inbound" : "stock"
+  );
+  React.useEffect(() => clearInboundTabRequest(), []);
   const [inboundQuery, setInboundQuery] = React.useState("");
   const [issueQuery, setIssueQuery] = React.useState("");
   const [issueKind, setIssueKind] = React.useState<IssueKind>("all");
@@ -174,7 +181,8 @@ function GeneralStockView() {
             )
         );
 
-  const inboundVisible = INBOUND_DOCS.filter((d) =>
+  const openInbound = INBOUND_DOCS.filter(isInboundOpen);
+  const inboundVisible = openInbound.filter((d) =>
     matchesInbound(d, inboundQuery)
   );
 
@@ -305,7 +313,7 @@ function GeneralStockView() {
                 สต็อก ({PRODUCTS.length})
               </TabsTrigger>
               <TabsTrigger value="inbound" className="flex-1">
-                รอรับเข้า ({INBOUND_DOCS.length})
+                รอรับเข้า ({openInbound.length})
               </TabsTrigger>
               <TabsTrigger value="issue" className="flex-1">
                 รอจ่าย/คืน ({ISSUE_DOCS.length})

@@ -1093,6 +1093,32 @@ export function setPieceZones(ids: string[], zone: string) {
   for (const id of ids) ZONE_PICKED.set(id, zone);
 }
 
+/**
+ * ใบที่เลือกโซนครบทุกชิ้นแล้วกดบันทึก — ถือว่ารับเข้าเสร็จ ออกจากแท็บรอรับเข้า
+ * เก็บไว้ในหน่วยความจำเหมือน ZONE_PICKED เพราะยังไม่มีหลังบ้าน
+ */
+const CLOSED_INBOUND = new Set<string>();
+
+export function closeInbound(id: string) {
+  CLOSED_INBOUND.add(id);
+}
+
+export const isInboundOpen = (d: InboundDoc) => !CLOSED_INBOUND.has(d.id);
+
+/**
+ * บันทึกใบรับเข้าแล้วพากลับหน้าสต็อก ต้องเปิดแท็บรอรับเข้าให้เลย
+ * ส่งผ่านตัวแปรนี้แทนพารามิเตอร์ในที่อยู่ — การนำทางฝั่งเครื่องอ่านได้ทันที
+ * ไม่ต้องห่อ Suspense ทั้งหน้าเพื่อ useSearchParams
+ */
+let INBOUND_TAB_REQUEST = false;
+export function requestInboundTab() {
+  INBOUND_TAB_REQUEST = true;
+}
+export const inboundTabRequested = () => INBOUND_TAB_REQUEST;
+export function clearInboundTabRequest() {
+  INBOUND_TAB_REQUEST = false;
+}
+
 export function getInboundReceipt(id: string): InboundReceipt | undefined {
   const doc = INBOUND_DOCS.find((d) => d.id === id);
   if (!doc) return undefined;

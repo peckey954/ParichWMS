@@ -26,12 +26,10 @@ import {
 } from "@/lib/general-stock";
 
 /* ------------------------------------------------------------------
-   เลือกโซนรับเข้า — หน้าเต็มสำหรับจอแคบ
+   เลือกโซนรับเข้า — หน้าเต็ม ทั้งจอคอมและมือถือ (Flow เพิ่มโซน ใน Figma)
 
-   งานเดียวกับกล่องบนจอกว้าง (ZoneAssignDialog) แต่คนที่ทำงานนี้จริงยืนอยู่
-   หน้ากองของโดยมีแค่มือถือในมือ กล่องบนมือถือเหลือความสูงให้รายการไม่ถึงครึ่งจอ
-   ทั้งที่รายการคือสิ่งที่ต้องกวาดตาหามากที่สุดในงานนี้ จอแคบจึงมาเป็นหน้าของตัวเอง
-   เห็นเลขที่กับโซนของแต่ละชิ้นเต็ม ๆ
+   รายการคือสิ่งที่ต้องกวาดตาหามากที่สุดในงานนี้ จึงเป็นหน้าของตัวเอง
+   ไม่ใช่กล่องบนหน้าใบรับเข้า กล้องสแกนเปิดเป็นกล่องบนหน้านี้ได้โดยไม่ซ้อนกล่องอื่น
 
    เข้ามาได้จากปุ่ม "เลือกโซนรับเข้า" ในหน้าใบรับเข้า และเปิดตรงจากลิงก์ได้ด้วย
    เพราะอ่านใบจาก id ในที่อยู่เอง ไม่ได้รอรับของจากหน้าก่อนหน้า
@@ -59,15 +57,15 @@ function ZoneSheet({ receipt }: { receipt: InboundReceipt }) {
     const ids = [...state.picked];
     // เก็บลงที่ที่หน้าใบรับเข้าอ่านเจอ ไม่ใช่ state ของหน้านี้ที่ตายตอนออกจากหน้า
     setPieceZones(ids, state.zone);
-    toast.success(`เลือกโซน ${state.zone} แล้ว`, {
-      description: `${ids.length} ชิ้น`,
+    toast.success("เลือกโซนรับเข้าสำเร็จ", {
+      description: `${ids.length} รายการ`,
     });
     router.push(`/stock/inbound/${doc.id}`);
   };
 
   return (
     <div className="flex min-h-[calc(100vh-3.5rem)] flex-col">
-      <main className="mx-auto w-full max-w-3xl flex-1 px-4 pt-6 pb-6 sm:px-6">
+      <main className="mx-auto w-full max-w-6xl flex-1 px-4 pt-6 pb-6 sm:px-6">
         <Crumbs docId={doc.id} />
 
         <h1 className="mt-4 text-2xl font-semibold tracking-tight">
@@ -86,11 +84,12 @@ function ZoneSheet({ receipt }: { receipt: InboundReceipt }) {
       </main>
 
       {/* ---------- แถบล่าง ----------
-           ผลสแกนอยู่เหนือปุ่มบันทึก เห็นพร้อมกันว่าเพิ่งได้ชิ้นไหนมาและกำลังจะบันทึก */}
+           มือถือ: ผลสแกนทั้งรอบอยู่เหนือปุ่มบันทึก (จอคอมบอกผลด้วย toast แทน)
+           จอคอม: ย้อนกลับชิดซ้าย บันทึกชิดขวา ตามแถบล่างของหน้าอื่น ๆ */}
       <div className="sticky bottom-0 z-30 border-t border-border bg-surface">
-        <div className="mx-auto w-full max-w-3xl px-4 py-3 sm:px-6">
+        <div className="mx-auto w-full max-w-6xl px-4 py-3 sm:px-6">
           <ZoneScanResult state={state} />
-          <div className="mt-3 grid grid-cols-2 gap-3 first:mt-0">
+          <div className="mt-3 grid grid-cols-2 gap-3 first:mt-0 sm:flex sm:justify-between">
             <Button variant="outline-primary" onClick={() => router.back()}>
               ย้อนกลับ
             </Button>

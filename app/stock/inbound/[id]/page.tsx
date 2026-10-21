@@ -3,7 +3,17 @@
 import * as React from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { ChevronDownIcon, PlusIcon } from "lucide-react";
+import { ChevronDownIcon } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@peckey954/ui/components/ui/alert-dialog";
 import { Badge } from "@peckey954/ui/components/ui/badge";
 import {
   Breadcrumb,
@@ -41,16 +51,16 @@ import {
   STICKY_HEAD,
   TableFrame,
 } from "@/components/stock/doc-parts";
-import { ZoneAssignDialog } from "@/components/stock/zone-assign";
 import {
+  closeInbound,
   getInboundReceipt,
+  requestInboundTab,
   livePieces,
   outstandingQty,
   pieceStatus,
   receivedCount,
   receivedTons,
   rejectedTons,
-  setPieceZones,
   stockedTons,
   waitingZoneCount,
   formatQty,
@@ -72,7 +82,11 @@ import {
 
    โซนไม่ได้กรอกตอนรับของ — คนละคนคนละเวลา คนรับของยืนอยู่หน้าโกดัง
    ส่วนคนเก็บของเข้าโซนมาทีหลัง ชิ้นที่ยังไม่มีโซนจึงเป็นสถานะปกติที่รอได้
-   ปุ่ม "ระบุโซน" คือทางเข้าของงานนั้น
+   ปุ่ม "เลือกโซนรับเข้า" คือทางเข้าของงานนั้น และเป็นปุ่มเดียวของหน้านี้
+   (Flow เพิ่มโซน ใน Figma)
+
+   บันทึกที่แถบล่าง — เลือกโซนครบทุกชิ้น = รับเข้าเสร็จ ใบออกจากแท็บรอรับเข้า
+   ยังไม่ครบ = เตือนก่อน บันทึกได้ แต่ใบยังค้างอยู่ที่รอรับเข้า
 ------------------------------------------------------------------ */
 
 const STATUS_CHIP: Record<PieceStatus, string> = {
@@ -117,25 +131,33 @@ function ReceiptSheet({ receipt }: { receipt: InboundReceipt }) {
   const router = useRouter();
   const { doc, meta } = receipt;
 
-  // ไม่มีหลังบ้านจริง โซนที่เพิ่งระบุจึงเก็บไว้ในหน้านี้ก่อน
-  const [pieces, setPieces] = React.useState<InboundPiece[]>(receipt.pieces);
+  // โซนที่หน้าเลือกโซนบันทึกไว้ ใบที่สร้างใหม่ตอนเปิดหน้านี้อ่านมาให้แล้ว
+  const pieces: InboundPiece[] = receipt.pieces;
   const [tab, setTab] = React.useState<TabId>("live");
-  const [zoneOpen, setZoneOpen] = React.useState(false);
+  const [confirmOpen, setConfirmOpen] = React.useState(false);
 
   const live = livePieces(pieces);
   const cancelled = pieces.filter((p) => p.cancelled);
   const shown = tab === "live" ? live : cancelled;
   const waiting = waitingZoneCount(pieces);
 
-  const assignZone = (ids: string[], zone: string) => {
-    const set = new Set(ids);
-    setPieces((prev) => prev.map((p) => (set.has(p.id) ? { ...p, zone } : p)));
-    // เขียนลงที่เดียวกับที่หน้าเลือกโซนของจอแคบเขียน ไม่งั้นสองทางนี้จะจำคนละอย่าง
-    setPieceZones(ids, zone);
-    toast.success(`เลือกโซน ${zone} แล้ว`, {
-      description: `${ids.length} ชิ้น`,
-    });
+  /** บันทึกแล้วกลับไปแท็บรอรับเข้า — ครบทุกชิ้นใบจะหายจากแท็บนั้นไป */
+  const finish = () => {
+    if (waiting === 0) {
+      closeInbound(doc.id);
+      toast.success("รับเข้าสินค้าสำเร็จ", {
+        description: `ใบสั่งซื้อ: ${doc.code}`,
+      });
+    } else {
+      toast.success("เลือกโซนรับเข้าสำเร็จ", {
+        description: `${live.length - waiting} รายการ`,
+      });
+    }
+    requestInboundTab();
+    router.push("/stock");
   };
+
+  const save = () => (waiting > 0 ? setConfirmOpen(true) : finish());
 
   return (
     // เนื้อหาสั้นกว่าจอได้ (ใบที่ยังไม่มีชิ้นที่รับเข้าเลย) — ถ้าไม่กำหนดความสูง
@@ -245,44 +267,15 @@ function ReceiptSheet({ receipt }: { receipt: InboundReceipt }) {
         {/* ---------- รอบการรับเข้าสินค้า ---------- */}
         <div className="mt-8 flex flex-wrap items-center justify-between gap-3">
           <h2 className="text-lg font-semibold">รอบการรับเข้าสินค้า</h2>
-          <div className="flex flex-wrap items-center gap-2">
-            {/* ตัวเลขบนปุ่มคือจำนวนชิ้นที่ยังรอโซน คนที่เข้ามาทำงานนี้โดยเฉพาะ
-                ต้องรู้ตั้งแต่เปิดหน้าว่ามีงานค้างอยู่กี่ชิ้น ไม่ต้องไล่อ่านทั้งตาราง
-
-                จอแคบพาไปหน้าเลือกโซนเต็มหน้า จอกว้างเปิดเป็นกล่องบนหน้านี้เลย
-                งานเดียวกัน แต่บนมือถือต้องเห็นรายการเต็มจอ ไม่ใช่มองผ่านช่องกล่อง
-                ที่เหลือความสูงให้รายการไม่ถึงครึ่งจอ */}
-            {live.length === 0 ? (
-              <Button variant="outline-primary" disabled>
-                เลือกโซนรับเข้า
-              </Button>
-            ) : (
-              <>
-                <Button
-                  asChild
-                  variant="outline-primary"
-                  className="@2xl:hidden"
-                >
-                  <Link href={`/stock/inbound/${doc.id}/zone`}>
-                    เลือกโซนรับเข้า{waiting > 0 ? ` (${waiting})` : ""}
-                  </Link>
-                </Button>
-                <Button
-                  variant="outline-primary"
-                  className="hidden @2xl:inline-flex"
-                  onClick={() => setZoneOpen(true)}
-                >
-                  เลือกโซนรับเข้า{waiting > 0 ? ` (${waiting})` : ""}
-                </Button>
-              </>
-            )}
+          {/* หน้าเลือกโซนเป็นหน้าเต็มทั้งจอคอมและมือถือ — รายการคือของที่ต้อง
+              กวาดตาหามากที่สุด ไม่ควรมองผ่านช่องกล่อง */}
+          {live.length === 0 ? (
+            <Button disabled>เลือกโซนรับเข้า</Button>
+          ) : (
             <Button asChild>
-              <Link href={`/stock/inbound/${doc.id}/add`}>
-                <PlusIcon />
-                เพิ่มการรับเข้าสินค้า
-              </Link>
+              <Link href={`/stock/inbound/${doc.id}/zone`}>เลือกโซนรับเข้า</Link>
             </Button>
-          </div>
+          )}
         </div>
 
         <ChipGroup
@@ -303,7 +296,7 @@ function ReceiptSheet({ receipt }: { receipt: InboundReceipt }) {
             </p>
             {tab === "live" && (
               <p className="mt-1 text-sm text-muted-foreground">
-                กดเพิ่มการรับเข้าสินค้าเมื่อรถมาถึง
+                ชิ้นที่รับเข้าจะขึ้นที่นี่หลังรถมาถึง
               </p>
             )}
           </div>
@@ -357,23 +350,32 @@ function ReceiptSheet({ receipt }: { receipt: InboundReceipt }) {
 
       {/* ---------- แถบปุ่มล่าง ---------- */}
       <div className="sticky bottom-0 z-30 border-t border-border bg-surface">
-        <div className="mx-auto flex w-full max-w-6xl items-center px-8 py-3">
+        <div className="mx-auto flex w-full max-w-6xl items-center justify-between gap-3 px-8 py-3 max-sm:px-4">
           <Button variant="outline-primary" onClick={() => router.back()}>
             ย้อนกลับ
+          </Button>
+          <Button disabled={live.length === 0} onClick={save}>
+            บันทึก
           </Button>
         </div>
       </div>
 
-      {/* เมานต์เฉพาะตอนเปิด สถานะที่เลือก/สแกนไว้จึงเริ่มใหม่ทุกครั้ง
-          ไม่ใช่ค้างของรอบก่อนไว้ให้คนถัดไปกดทับโดยไม่รู้ตัว */}
-      {zoneOpen && (
-        <ZoneAssignDialog
-          open
-          onOpenChange={setZoneOpen}
-          pieces={live}
-          onAssign={assignZone}
-        />
-      )}
+      {/* บันทึกทั้งที่ยังมีชิ้นไม่มีโซน — ทำได้ แต่ต้องรู้ก่อนว่าใบยังค้างที่รอรับเข้า */}
+      <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+        <AlertDialogContent size="sm" className="data-[size=sm]:max-w-[22rem]">
+          <AlertDialogHeader>
+            <AlertDialogTitle>พบสินค้าที่ยังไม่ได้เลือกโซน</AlertDialogTitle>
+            <AlertDialogDescription>
+              สินค้าบางรายการยังไม่ได้เลือกโซน
+              หากบันทึกรายการจะยังคงอยู่ในสถานะรอรับเข้า
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel variant="outline-primary">ย้อนกลับ</AlertDialogCancel>
+            <AlertDialogAction onClick={finish}>บันทึก</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

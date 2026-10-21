@@ -2,14 +2,22 @@
 
 import * as React from "react";
 import {
-  ArrowLeftIcon,
-  CircleAlertIcon,
   CircleCheckIcon,
-  KeyboardIcon,
+  CircleXIcon,
   RotateCcwIcon,
   ScanBarcodeIcon,
   XIcon,
 } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@peckey954/ui/components/ui/alert-dialog";
 import { Badge } from "@peckey954/ui/components/ui/badge";
 import { Button } from "@peckey954/ui/components/ui/button";
 import { Checkbox } from "@peckey954/ui/components/ui/checkbox";
@@ -17,8 +25,6 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
-  DialogFooter,
-  DialogHeader,
   DialogTitle,
 } from "@peckey954/ui/components/ui/dialog";
 import { Input } from "@peckey954/ui/components/ui/input";
@@ -32,67 +38,49 @@ import {
 } from "@peckey954/ui/components/ui/select";
 import { Spinner } from "@peckey954/ui/components/ui/spinner";
 import { cn } from "@peckey954/ui/lib/utils";
+import { toast } from "sonner";
 import { ZONES, formatQty, type InboundPiece } from "@/lib/general-stock";
 
 /* ------------------------------------------------------------------
-   เลือกโซนรับเข้า
+   เลือกโซนรับเข้า — ตาม Flow เพิ่มโซน ใน Figma (Tab 2.2 Stock-In Choose Zone)
 
-   คนที่ทำงานนี้ไม่ใช่คนเดียวกับคนที่รับของหน้าโกดัง และมาทำทีหลัง
-   มือถืออยู่ในมือ ของกองอยู่ตรงหน้า ลำดับที่ทำจริงคือ
+   คนที่ทำงานนี้ไม่ใช่คนเดียวกับคนที่รับของหน้าโกดัง และมาทำทีหลัง ลำดับที่ทำจริงคือ
 
      1  ยืนอยู่หน้าโซนไหน เลือกโซนนั้นไว้ก่อน
      2  ไล่สแกนเลขที่ติดบนของที่กำลังจะวางลงตรงนั้น หรือค้นหาเลขแล้วติ๊กจากรายการ
      3  กดบันทึกครั้งเดียวให้ทุกชิ้นที่เลือกไว้
 
-   โซนจึงอยู่บนสุด ไม่ใช่ท้ายกล่อง และไม่ถามโซนซ้ำทุกชิ้น เพราะของที่ยกลงมา
-   พร้อมกันแทบทั้งหมดไปโซนเดียวกัน
+   เป็นหน้าเต็มทั้งจอคอมและมือถือ (/stock/inbound/[id]/zone) ไม่ใช่กล่องบนหน้าใบ
 
-   ---------- สองหน้าจอ หนึ่งชุดตรรกะ ----------
+   ---------- สองปุ่มเสมอ ----------
 
-   จอกว้างเปิดเป็นกล่อง (ZoneAssignDialog) จอแคบเป็นหน้าเต็มของตัวเอง
-   (/stock/inbound/[id]/zone) เพราะกล่องบนมือถือเหลือความสูงให้รายการไม่ถึงครึ่งจอ
-   ทั้งที่รายการคือของที่ต้องกวาดตาหามากที่สุดในงานนี้
+     สแกนเลขที่สินค้า  เปิดกล้อง
+     สแกนจากรูปภาพ    หยิบรูปป้ายที่ถ่ายไว้ (มือถือ = คลังรูป, คอม = เลือกไฟล์/ลากมาวาง)
+                       เลือกได้หลายรูป อ่านเลขแล้วจบ ไม่เก็บรูป
 
-   ทั้งสองทางใช้ useZoneAssign + ZoneAssignFields ตัวเดียวกัน ต่างกันแค่กรอบ
-   ที่ห่ออยู่ข้างนอกกับที่วางแถบผลสแกน
+   ---------- ผลสแกน: จอคอมกับมือถือบอกคนละแบบ ----------
 
-   ---------- สแกนกล้องกับสแกนจากรูปเป็นคนละปุ่ม ----------
+   จอคอม    กล้องเป็นกล่อง มีแค่ "กำลังค้นหาบาร์โค้ด..." อ่านติดแล้วกล่องปิดเอง
+            ติ๊กในรายการ แล้วบอกผลด้วย toast มุมล่างขวา ("สแกนสำเร็จ" / ไม่พบ)
+   มือถือ   กล้องเต็มจอ อ่านติดแล้วค้างหน้ากล้องไว้ บอกผลในแผงล่าง ให้กด "สแกน"
+            ชิ้นต่อไปได้ทันที กด "เสร็จสิ้น" แล้วสรุปผลทั้งรอบเป็นแถบเหนือปุ่มบันทึก
 
-   เดิมเป็นปุ่มเดียวที่ส่งต่อให้เครื่องเด้งเมนูเลือกเองว่าถ่ายหรือหยิบรูป คนใช้จริง
-   ไม่รู้ว่ากดแล้วจะได้อะไร จึงแยกเป็นสองทางที่หน้าตาต่างกันชัด
+   ทั้งสองแบบไม่มีไอคอนสถานะทับบนบาร์โค้ด — ผลอยู่ที่ข้อความ ไม่ใช่ที่ภาพกล้อง
 
-     สแกนเลขที่สินค้า  กล้องเต็มจอ อ่านติดแล้วติ๊กให้ทันที สแกนต่อชิ้นถัดไปได้เลย
-     สแกนจากรูปภาพ    ป้ายที่ถ่ายเก็บไว้ตอนลงของ (ตอนนั้นมือไม่ว่าง) — บนมือถือ
-                       หยิบจากรูปในเครื่อง บนคอมเลือกไฟล์หรือลากรูปมาวาง
-                       อ่านเลขแล้วจบ ไม่เก็บรูป เพราะของที่ต้องการคือเลข ไม่ใช่รูป
-
-   การส่องกล้องอยู่ในหน้าของมันเองเต็มจอ ไม่ฝังในหน้านี้ กรอบในหน้านี้สูงได้ไม่ถึง
-   สองร้อยพิกเซลถ้าจะยังเห็นรายการ เล็งบาร์โค้ดในกรอบเท่านั้นยาก และกล้องจะเปิด
-   ค้างอยู่ตลอดเวลาที่เลื่อนดูรายการ กรอบในหน้านี้จึงเป็นแค่ทางเข้า
-
-   ทั้งสองทางลงเอยที่เดียวกัน: เจอชิ้นที่ตรงก็ติ๊กในรายการพร้อมบอก "เลือกสินค้าแล้ว"
-   ไม่เจอก็บอกตรง ๆ ว่าไม่พบ แล้วให้ลองใหม่หรือกรอกเลขเองได้จากตรงนั้นเลย
+   ไม่พบสินค้ามีปุ่ม "ระบุเลข" เสมอ กดแล้วพากลับมาหน้านี้ เลื่อนไปที่ช่องระบุเลข
+   พร้อมเคอร์เซอร์ในช่อง ไม่ต้องไล่หาเอง
 
    ---------- ยังเป็นของจำลอง ----------
 
    กล้องกับการถอดบาร์โค้ดยังไม่ได้ต่อของจริง เลขที่อ่านได้มาจากชิ้นในใบนี้เอง
    ส่วนผลไม่พบสลับได้จากชิป "ผลจำลอง" เพื่อดู flow ให้ครบทั้งสองทาง
-   ของจริงต้องถอดในเครื่อง ไม่ใช่ส่งรูปขึ้นเซิร์ฟเวอร์ให้รอบนไวไฟโกดัง —
-   เปลี่ยนแค่ที่มาของเลข จังหวะที่เห็นทั้งหมดคงเดิม
 ------------------------------------------------------------------ */
 
-/** มาจากทางไหน — ปุ่มลองใหม่ต้องพากลับทางเดิม */
+/** มาจากทางไหน — ข้อความผลต่างกันนิดหน่อยตามทาง */
 type Via = "scan" | "photo" | "manual";
 
-/** ผลของการสแกน/สแกนจากรูป/พิมพ์เลขครั้งล่าสุด — piece มีเมื่อเจอชิ้นจริง */
-type ScanResult = {
-  ok: boolean;
-  text: string;
-  piece?: InboundPiece;
-  /** เลขที่อ่านได้แต่ไม่ตรงกับชิ้นไหน — โชว์ให้เทียบกับป้ายจริง */
-  code?: string;
-  via: Via;
-} | null;
+/** ผลรวมของหนึ่งรอบ (เปิดกล้องหนึ่งครั้ง / เลือกรูปหนึ่งชุด / กด Enter หนึ่งครั้ง) */
+type Report = { via: Via; found: InboundPiece[]; missing: string[] };
 
 /** ผลที่เดโมจะให้ออก — ยังไม่มีตัวถอดบาร์โค้ดจริง */
 type Simulate = "found" | "notfound";
@@ -107,15 +95,12 @@ const READ_MS = 900;
 /** เวลาส่องกล้องจนจับติด */
 const AIM_MS = 1800;
 
-/**
- * ช่องเลขที่กับช่องไฟล์ — ปุ่มในกล่องสแกนและแถบผลต้องสั่งมันได้ หาด้วย id
- * แทนการส่ง ref ไปกับ state เพราะกล่องกับหน้าเต็มไม่เคยเปิดพร้อมกัน
- */
+/** ช่องเลขที่กับช่องไฟล์ — ปุ่มในกล่องสแกนและแถบผลต้องสั่งมันได้ หาด้วย id */
 const CODE_INPUT_ID = "zone-code";
 const PHOTO_INPUT_ID = "zone-photo";
 
-/** จอแคบ = ถือมือถืออยู่ สแกนจากรูปคือหยิบจากรูปในเครื่อง ไม่ใช่เลือกไฟล์จากคอม */
-function useIsPhone() {
+/** จอแคบ = ถือมือถืออยู่ */
+export function useIsPhone() {
   return React.useSyncExternalStore(
     (cb) => {
       const mq = window.matchMedia("(max-width: 639px)");
@@ -127,14 +112,18 @@ function useIsPhone() {
   );
 }
 
+const pieceLine = (p: InboundPiece) =>
+  `${p.receiptCode} ${p.packing} · ${formatQty(p.qty)} ตัน`;
+
 export function useZoneAssign(pieces: InboundPiece[]) {
+  const isPhone = useIsPhone();
   const [picked, setPicked] = React.useState<Set<string>>(new Set());
   const [zone, setZone] = React.useState<string>();
   const [query, setQuery] = React.useState("");
-  const [result, setResult] = React.useState<ScanResult>(null);
+  /** ผลรอบล่าสุดที่โชว์เป็นแถบบนมือถือ — จอคอมใช้ toast แทน จึงว่างตลอด */
+  const [report, setReport] = React.useState<Report | null>(null);
   const [simulate, setSimulateState] = React.useState<Simulate>("found");
-  const [scannerOpen, setScannerOpen] = React.useState(false);
-  /** รูปที่กำลังอ่านอยู่ตอนนี้ — null คือว่าง */
+  const [scannerOpen, setScannerOpenState] = React.useState(false);
   const [reading, setReading] = React.useState<Reading>(null);
   /** ชิ้นที่เพิ่งได้มา — กะพริบในรายการให้ตาตามทัน */
   const [flashId, setFlashId] = React.useState<string>();
@@ -142,6 +131,7 @@ export function useZoneAssign(pieces: InboundPiece[]) {
   // อ่านค่าล่าสุดจากในตัวจับเวลาโดยไม่ต้องผูกมันไว้กับ state ทุกตัว
   const pickedRef = React.useRef(picked);
   const simulateRef = React.useRef(simulate);
+  const sessionRef = React.useRef<Report | null>(null);
   const timersRef = React.useRef<ReturnType<typeof setTimeout>[]>([]);
   const flashTimer = React.useRef<ReturnType<typeof setTimeout>>(undefined);
 
@@ -156,8 +146,6 @@ export function useZoneAssign(pieces: InboundPiece[]) {
     setSimulateState(v);
   };
 
-  // ออกจากหน้า/ปิดกล่องกลางคันแล้วตัวจับเวลาต้องตายตาม ไม่งั้นมันไปเซ็ต state
-  // ของสิ่งที่ถอดไปแล้ว
   React.useEffect(() => {
     return () => {
       for (const t of timersRef.current) clearTimeout(t);
@@ -186,8 +174,7 @@ export function useZoneAssign(pieces: InboundPiece[]) {
 
   /**
    * ชิปเลือกรวดเดียว — ครบอยู่แล้วกดซ้ำคือเอาออก
-   * ทบเข้ากับที่เลือกไว้เดิม ไม่ใช่เขียนทับ ไม่งั้นค้นหารอบใหม่แล้วกดชิป
-   * ของที่ติ๊กไว้ก่อนหน้าหายไปทั้งชุดโดยไม่ได้ตั้งใจ
+   * ทบเข้ากับที่เลือกไว้เดิม ไม่ใช่เขียนทับ
    */
   const toggleAll = (list: InboundPiece[]) => {
     const remove = isAllPicked(list);
@@ -205,15 +192,92 @@ export function useZoneAssign(pieces: InboundPiece[]) {
     for (const t of timersRef.current) clearTimeout(t);
     setReading(null);
     setPicked(new Set());
-    setResult(null);
+    pickedRef.current = new Set();
+    setReport(null);
     setQuery("");
   };
+
+  /** เปลี่ยนโซนหลังยืนยันแล้ว — ของที่ติ๊กไว้เป็นของโซนเดิม ล้างทิ้งทั้งหมด */
+  const changeZone = (next: string) => {
+    clearAll();
+    setZone(next);
+  };
+
+  const focusManual = () => {
+    setScannerOpen(false);
+    // รอกล่องสแกนปิดก่อน ไม่งั้นมันคืนโฟกัสไปที่ปุ่มสแกนทับ
+    setTimeout(() => {
+      const input = document.getElementById(CODE_INPUT_ID);
+      if (!(input instanceof HTMLInputElement)) return;
+      input.scrollIntoView({ block: "center", behavior: "smooth" });
+      input.focus({ preventScroll: true });
+      input.select();
+    }, 80);
+  };
+
+  // ---------- รอบของการสแกน ----------
+
+  const startSession = (via: Via) => {
+    sessionRef.current = { via, found: [], missing: [] };
+    setReport(null);
+  };
+
+  /**
+   * จบรอบ — จอคอมบอกด้วย toast มุมล่างขวา มือถือค้างเป็นแถบเหนือปุ่มบันทึก
+   * ทั้งสองแบบแยก "เจอ" กับ "ไม่พบ" เป็นคนละก้อน เพราะสแกนหลายรูปได้ทั้งสองอย่าง
+   * พร้อมกัน ไม่ควรให้อันหนึ่งกลบอีกอัน
+   */
+  const endSession = () => {
+    const rep = sessionRef.current;
+    sessionRef.current = null;
+    if (!rep || (rep.found.length === 0 && rep.missing.length === 0)) return;
+    if (isPhone) {
+      setReport(rep);
+      return;
+    }
+    if (rep.found.length > 0) {
+      const one = rep.found.length === 1 ? rep.found[0] : undefined;
+      toast.custom(() => (
+        <ResultCard
+          tone="ok"
+          className="w-[min(32rem,calc(100vw-2rem))] shadow-lg"
+          title={rep.via === "manual" ? "เลือกสินค้าแล้ว" : "สแกนสำเร็จ"}
+          detail={one ? pieceLine(one) : `${rep.found.length} รายการ`}
+          zone={one ? (one.zone ?? null) : undefined}
+        />
+      ));
+    }
+    if (rep.missing.length > 0) {
+      toast.custom((id) => (
+        <ResultCard
+          tone="error"
+          className="w-[min(32rem,calc(100vw-2rem))] shadow-lg"
+          title="ไม่พบสินค้าที่ตรงกับบาร์โค้ด"
+          detail={
+            rep.missing.length === 1
+              ? rep.missing[0]
+              : `${rep.missing.length} รายการ`
+          }
+          onManual={() => {
+            toast.dismiss(id);
+            focusManual();
+          }}
+        />
+      ));
+    }
+  };
+
+  /** เปิด/ปิดกล้อง — เปิดคือเริ่มรอบใหม่ ปิดคือจบรอบแล้วบอกผล */
+  function setScannerOpen(open: boolean) {
+    if (open) startSession("scan");
+    else if (sessionRef.current?.via === "scan") endSession();
+    setScannerOpenState(open);
+  }
 
   /**
    * เลขที่ที่ "กล้อง" จะอ่านได้ในรอบนี้
    *
-   * โหมดเจอ: หยิบชิ้นที่ยังไม่ได้เลือกและยังไม่มีโซนก่อน เพราะนั่นคืองานที่คน
-   * เปิดหน้านี้มาทำ null คือไม่เหลือให้เลือกแล้ว
+   * โหมดเจอ: หยิบชิ้นที่ยังไม่ได้เลือกและยังไม่มีโซนก่อน null คือไม่เหลือให้เลือกแล้ว
    * โหมดไม่พบ: เลขหน้าตาเหมือนของในใบ แต่ไม่ตรงกับชิ้นไหน
    */
   const mockRead = (): string | null => {
@@ -229,29 +293,20 @@ export function useZoneAssign(pieces: InboundPiece[]) {
   };
 
   /**
-   * ได้เลขมาหนึ่งเลข — เทียบกับชิ้นในใบ ติ๊กให้ถ้าเจอ
+   * ได้เลขมาหนึ่งเลข — เทียบกับชิ้นในใบ ติ๊กให้ถ้าเจอ แล้วนับเข้ารอบที่กำลังทำอยู่
    *
    * ล้างคำค้นทิ้งด้วย ไม่งั้นชิ้นที่เพิ่งเลือกอาจอยู่นอกคำค้นเดิมจนไม่เห็นในรายการ
-   * แล้วดูเหมือนไม่มีอะไรเกิดขึ้น
    */
   const applyCode = (
-    code: string | null,
-    via: Via
+    code: string | null
   ): { outcome: Outcome; piece?: InboundPiece } => {
-    if (code === null) {
-      setResult({ ok: true, text: "เลือกครบทุกชิ้นในใบนี้แล้ว", via });
-      return { outcome: "empty" };
-    }
+    const session = sessionRef.current;
+    if (code === null) return { outcome: "empty" };
     const hit = pieces.find(
       (p) => p.receiptCode.toUpperCase() === code.trim().toUpperCase()
     );
     if (!hit) {
-      setResult({
-        ok: false,
-        text: "ไม่พบสินค้าที่ตรงกับบาร์โค้ดนี้",
-        code,
-        via,
-      });
+      session?.missing.push(code);
       return { outcome: "notfound" };
     }
 
@@ -259,122 +314,83 @@ export function useZoneAssign(pieces: InboundPiece[]) {
     clearTimeout(flashTimer.current);
     setFlashId(hit.id);
     flashTimer.current = setTimeout(() => setFlashId(undefined), 1600);
+    if (session && !session.found.some((p) => p.id === hit.id))
+      session.found.push(hit);
 
-    if (pickedRef.current.has(hit.id)) {
-      setResult({ ok: true, text: "สินค้านี้เลือกไว้แล้ว", piece: hit, via });
-      return { outcome: "already", piece: hit };
-    }
+    if (pickedRef.current.has(hit.id)) return { outcome: "already", piece: hit };
     // อัปเดต ref ทันที รูปถัดไปในชุดเดียวกันจะได้ไม่หยิบชิ้นเดิมซ้ำ
     pickedRef.current = new Set(pickedRef.current).add(hit.id);
     setPicked((prev) => new Set(prev).add(hit.id));
-    setResult({ ok: true, text: "เลือกสินค้าแล้ว", piece: hit, via });
     return { outcome: "found", piece: hit };
   };
 
   /**
    * อ่านรูปทีละใบ ติ๊กไปทีละชิ้น ไม่ใช่รอครบแล้วค่อยติ๊กรวดเดียว
-   *
-   * เลือกมาห้ารูปแล้วเงียบไปสี่วินาทีครึ่ง คนจะนึกว่าค้าง เห็นรายการติ๊กไล่ลงมา
-   * ทีละบรรทัดบอกได้ทั้งว่ายังทำงานอยู่และได้ชิ้นไหนไปแล้วบ้าง
-   * หลายรูปจบแล้วสรุปรวมในแถบผลครั้งเดียว ว่าได้กี่ชิ้น รูปไหนไม่พบ
+   * เห็นรายการติ๊กไล่ลงมาบอกได้ทั้งว่ายังทำงานอยู่และได้ชิ้นไหนไปแล้วบ้าง
    */
-  const readPhoto = (
-    total: number,
-    index: number,
-    tally: { found: number; missing: string[] }
-  ) => {
+  const readPhoto = (total: number, index: number) => {
     timersRef.current = [
       setTimeout(() => {
-        const code = mockRead();
-        const { outcome } = applyCode(code, "photo");
-        if (outcome === "found") tally.found += 1;
-        if (outcome === "notfound" && code) tally.missing.push(code);
-
+        const { outcome } = applyCode(mockRead());
         if (index + 1 < total && outcome !== "empty") {
           setReading({ done: index + 1, total });
-          readPhoto(total, index + 1, tally);
+          readPhoto(total, index + 1);
           return;
         }
         setReading(null);
-        if (total === 1 || outcome === "empty") return;
-        setResult(
-          tally.missing.length > 0
-            ? {
-                ok: false,
-                text: `ไม่พบสินค้าที่ตรงกับบาร์โค้ด ${tally.missing.length} จาก ${total} รูป`,
-                code: tally.missing.join(", "),
-                via: "photo",
-              }
-            : {
-                ok: true,
-                text: `เลือกสินค้าแล้ว ${tally.found} รายการ จาก ${total} รูป`,
-                via: "photo",
-              }
-        );
+        if (outcome === "empty" && sessionRef.current?.found.length === 0)
+          toast.info("เลือกครบทุกชิ้นในใบนี้แล้ว");
+        endSession();
       }, READ_MS),
     ];
   };
 
-  /**
-   * สแกนจากรูปที่ถ่ายไว้ — อ่านเลขแล้วทิ้งรูป ไม่เก็บไว้ที่ไหน
-   *
-   * กรองเอาเฉพาะรูปก่อน หยิบ pdf มาแล้วปล่อยให้เดินจังหวะต่อคือหลอกว่าอ่านได้
-   * ทั้งที่อ่านไม่ได้
-   */
+  /** สแกนจากรูปที่ถ่ายไว้ — อ่านเลขแล้วทิ้งรูป ไม่เก็บไว้ที่ไหน */
   const scanPhotos = (files: File[]) => {
     if (reading) return;
     const photos = files.filter((f) => f.type.startsWith("image/"));
     if (photos.length === 0) {
-      setResult({
-        ok: false,
-        text: "ไฟล์นี้ไม่ใช่รูป อ่านบาร์โค้ดไม่ได้",
-        via: "photo",
-      });
+      toast.error("ไฟล์นี้ไม่ใช่รูป อ่านบาร์โค้ดไม่ได้");
       return;
     }
-    setResult(null);
+    startSession("photo");
     setReading({ done: 0, total: photos.length });
-    readPhoto(photos.length, 0, { found: 0, missing: [] });
+    readPhoto(photos.length, 0);
   };
 
   /**
-   * เอ็นเทอร์ในช่องเลขที่
-   *
-   * เครื่องยิงบาร์โค้ดพิมพ์เลขให้เองแล้วเคาะเอ็นเทอร์ต่อท้าย ยิงแล้วต้องยกมือ
-   * ไปติ๊กในรายการอีกทีคือเสียจังหวะเปล่า ๆ เลขตรงเป๊ะหรือคำค้นเหลือชิ้นเดียว
-   * ก็ติ๊กให้ ไม่มีชิ้นไหนตรงเลยก็บอกว่าไม่พบ แต่ถ้ายังเหลือหลายชิ้นไม่เดาให้
+   * เอ็นเทอร์ในช่องเลขที่ — เครื่องยิงบาร์โค้ดพิมพ์เลขให้เองแล้วเคาะเอ็นเทอร์ต่อท้าย
+   * เลขตรงเป๊ะหรือคำค้นเหลือชิ้นเดียวก็ติ๊กให้ ไม่มีชิ้นไหนตรงเลยก็บอกว่าไม่พบ
+   * แต่ถ้ายังเหลือหลายชิ้นไม่เดาให้
    */
   const acceptOnlyMatch = () => {
     if (!q) return;
     const exact = pieces.find((p) => p.receiptCode.toUpperCase() === q);
-    if (exact) return void applyCode(exact.receiptCode, "manual");
-    if (visible.length === 1)
-      return void applyCode(visible[0].receiptCode, "manual");
-    if (visible.length === 0) applyCode(query.trim(), "manual");
-  };
-
-  const focusManual = () => {
-    setScannerOpen(false);
-    // รอกล่องสแกนปิดก่อน ไม่งั้นมันคืนโฟกัสไปที่ปุ่มสแกนทับ
-    setTimeout(() => {
-      const input = document.getElementById(CODE_INPUT_ID);
-      if (input instanceof HTMLInputElement) {
-        input.focus();
-        input.select();
-      }
-    }, 50);
+    const code = exact
+      ? exact.receiptCode
+      : visible.length === 1
+        ? visible[0].receiptCode
+        : visible.length === 0
+          ? query.trim()
+          : null;
+    if (code === null) return;
+    startSession("manual");
+    applyCode(code);
+    endSession();
   };
 
   const pickPhotos = () => document.getElementById(PHOTO_INPUT_ID)?.click();
 
   return {
+    isPhone,
     pieces,
     picked,
     zone,
     setZone,
+    changeZone,
     query,
     setQuery,
-    result,
+    report,
     reading,
     simulate,
     setSimulate,
@@ -399,28 +415,33 @@ export function useZoneAssign(pieces: InboundPiece[]) {
 
 export type ZoneAssign = ReturnType<typeof useZoneAssign>;
 
-/** ตัวหน้าจอทั้งชุด ตั้งแต่โซนลงไปถึงรายการ — ใช้ร่วมกันทั้งกล่องและหน้าเต็ม */
+/** ตัวหน้าจอทั้งชุด ตั้งแต่โซนลงไปถึงรายการ */
 export function ZoneAssignFields({
   state,
   listClassName,
-  scannerInDialog = true,
 }: {
   state: ZoneAssign;
-  /** ความสูงกรอบรายการ กล่องกับหน้าเต็มมีที่ว่างให้ไม่เท่ากัน */
+  /** ความสูงกรอบรายการ */
   listClassName?: string;
-  /** false เมื่อคนห่อเอากล้องไปวางเอง (กล่องบนจอคอม) ไม่ต้องเปิดกล่องซ้อน */
-  scannerInDialog?: boolean;
 }) {
   const { pieces, picked, visible, waiting } = state;
+  /** โซนที่กำลังจะเปลี่ยนไป — รอคนยืนยันก่อนเพราะของที่ติ๊กไว้จะหายหมด */
+  const [pendingZone, setPendingZone] = React.useState<string>();
 
   return (
     <div className="space-y-4">
       {/* ---------- โซนปลายทาง ----------
-           อยู่บนสุด เพราะลำดับที่คนทำจริงคือยืนอยู่หน้าโซนก่อน แล้วค่อยไล่สแกน
-           ของที่จะวางลงตรงนั้น ไม่ใช่สแกนไปเรื่อยแล้วค่อยนึกตอนท้ายว่าจะลงตรงไหน */}
+           อยู่บนสุด เพราะลำดับที่คนทำจริงคือยืนอยู่หน้าโซนก่อน แล้วค่อยไล่สแกน */}
       <div className="space-y-2">
         <Label htmlFor="zone-target">โซน</Label>
-        <Select value={state.zone} onValueChange={state.setZone}>
+        <Select
+          value={state.zone}
+          onValueChange={(v) => {
+            if (state.zone && v !== state.zone && picked.size > 0)
+              setPendingZone(v);
+            else state.setZone(v);
+          }}
+        >
           <SelectTrigger id="zone-target" className="w-full bg-card">
             <SelectValue placeholder="เลือกโซนรับเข้า" />
           </SelectTrigger>
@@ -445,15 +466,14 @@ export function ZoneAssignFields({
 
       {/* ---------- ระบุเลขที่เอง ----------
            ป้ายเปื้อน ป้ายยับ หรือของวางชิดกำแพงจนส่องไม่ติด เป็นเรื่องที่เกิดทุกวัน
-           ทางนี้จึงเปิดไว้ตลอด ไม่ใช่โผล่เฉพาะตอนสแกนไม่ติด
-           พิมพ์แล้วรายการข้างล่างหดตามทันที ไม่มีปุ่มเพิ่มให้ต้องกดอีกที */}
-      <div className="space-y-2">
-        <Label htmlFor={CODE_INPUT_ID}>ระบุเลขที่รับสินค้า</Label>
+           ทางนี้จึงเปิดไว้ตลอด เครื่องยิงบาร์โค้ดก็ยิงเข้าช่องนี้ได้เลย */}
+      <div className="scroll-mt-24 space-y-2">
+        <Label htmlFor={CODE_INPUT_ID}>ระบุเลขที่สินค้า</Label>
         <Input
           id={CODE_INPUT_ID}
           autoComplete="off"
           className="bg-card"
-          placeholder="ระบุเลขที่รับสินค้า แล้วกด Enter"
+          placeholder="ระบุเลขที่สินค้า"
           value={state.query}
           onKeyDown={(e) => {
             if (e.key !== "Enter") return;
@@ -464,10 +484,7 @@ export function ZoneAssignFields({
         />
       </div>
 
-      {/* ---------- เลือกรวดเดียว + ยอดที่เลือกไว้ ----------
-           สองชิปนี้คือ "ลงโซนเดียวกันทั้งกอง" ในทางปฏิบัติ สแกนทีละชิ้นห้าสิบครั้ง
-           คืองานเปล่า แยกเป็นสองชิปเพราะเป็นคนละเรื่องกัน — ทั้งหมดรวมของที่เก็บ
-           เข้าที่ไปแล้วด้วย (คือย้ายโซนทั้งใบ) ส่วนอีกชิปแตะเฉพาะของที่ยังค้าง */}
+      {/* ---------- เลือกรวดเดียว + ยอดที่เลือกไว้ ---------- */}
       <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
         <div className="flex flex-wrap items-center gap-2">
           <ActionChip
@@ -498,10 +515,7 @@ export function ZoneAssignFields({
             variant="ghost"
             size="sm"
             className="text-primary hover:text-primary"
-            disabled={
-              picked.size === 0 &&
-              state.query === ""
-            }
+            disabled={picked.size === 0 && state.query === ""}
             onClick={state.clearAll}
           >
             <RotateCcwIcon />
@@ -540,65 +554,81 @@ export function ZoneAssignFields({
         )}
       </div>
 
-      {scannerInDialog && <ScannerDialog state={state} />}
+      <ScannerDialog state={state} />
+
+      {/* ---------- เปลี่ยนโซนทั้งที่ติ๊กของไว้แล้ว ---------- */}
+      <AlertDialog
+        open={pendingZone !== undefined}
+        onOpenChange={(o) => !o && setPendingZone(undefined)}
+      >
+        <AlertDialogContent size="sm" className="data-[size=sm]:max-w-[22rem]">
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              พบข้อมูลมีการเลือกโซนไว้ก่อนหน้าแล้ว
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              หากเปลี่ยนโซน ข้อมูลที่เลือกไว้ก่อนหน้าจะถูกล้าง
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel variant="outline-primary">ย้อนกลับ</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (pendingZone) state.changeZone(pendingZone);
+                setPendingZone(undefined);
+              }}
+            >
+              เปลี่ยนโซน
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
 
 /* ------------------------------------------------------------------
-   สองทางเข้า — สแกนกล้องกับสแกนจากรูป
-
-   กรอบเส้นประเดียวตามดีไซน์ Parich แต่สองปุ่มแยกกัน ชื่อบอกตรง ๆ ว่ากดแล้วได้อะไร
-   สแกนเปิดกล้องเต็มจอ สแกนจากรูปหยิบรูปที่ถ่ายเก็บไว้
+   สองทางเข้า — สแกนกล้องกับสแกนจากรูป (สองปุ่มเสมอ)
 
    บนมือถือหยิบจากคลังรูป บนคอมเลือกไฟล์หรือลากรูปมาวางในกรอบ
    ไม่ใส่ capture ในช่องไฟล์ — ทางถ่ายใหม่มีปุ่มสแกนแล้ว ปุ่มนี้มีไว้หยิบรูปเก่า
-
    ล้างค่าในช่องทุกครั้งหลังหยิบ ไม่งั้นเลือก "รูปเดิม" ซ้ำรอบสองจะไม่เกิด change
 ------------------------------------------------------------------ */
 
 function CaptureTiles({ state }: { state: ZoneAssign }) {
-  const isPhone = useIsPhone();
   const [dragging, setDragging] = React.useState(false);
 
   return (
     <div
       onDragOver={(e) => {
-        if (isPhone || state.reading) return;
+        if (state.isPhone || state.reading) return;
         e.preventDefault();
         setDragging(true);
       }}
       onDragLeave={() => setDragging(false)}
       onDrop={(e) => {
-        if (isPhone) return;
+        if (state.isPhone) return;
         e.preventDefault();
         setDragging(false);
         state.scanPhotos([...e.dataTransfer.files]);
       }}
       className={cn(
-        "flex flex-col items-center gap-3 rounded-xl border border-dashed border-primary bg-brand px-4 py-6 text-center transition-colors",
+        "flex flex-col items-center gap-3 rounded-xl border border-dashed border-primary bg-brand px-4 py-8 text-center transition-colors",
         dragging && "bg-brand-hover ring-[3px] ring-primary/30"
       )}
     >
       {state.reading ? (
-        <Spinner className="size-7 text-primary" />
+        <Spinner className="size-7 text-muted-foreground" />
       ) : (
         <ScanBarcodeIcon className="size-7 text-muted-foreground" />
       )}
-      <div>
-        <p className="font-medium">
-          {!state.reading
-            ? "สแกนเลขที่เพื่อเลือกโซนรับสินค้าเข้าคลัง"
-            : state.reading.total > 1
-              ? `กำลังอ่านรูปที่ ${state.reading.done + 1} จาก ${state.reading.total}...`
-              : "กำลังอ่านบาร์โค้ดจากรูป..."}
-        </p>
-        {!isPhone && !state.reading && (
-          <p className="mt-0.5 text-xs text-muted-foreground">
-            หรือลากรูปมาวางในกรอบนี้
-          </p>
-        )}
-      </div>
+      <p className="font-medium">
+        {!state.reading
+          ? "สแกนเลขที่เพื่อเลือกโซนรับสินค้าเข้าคลัง"
+          : state.reading.total > 1
+            ? `กำลังอ่านรูปที่ ${state.reading.done + 1} จาก ${state.reading.total}...`
+            : "กำลังอ่านบาร์โค้ดจากรูป..."}
+      </p>
 
       <div className="flex flex-wrap justify-center gap-2">
         <Button
@@ -695,14 +725,9 @@ function SimulateToggle({
 /* ------------------------------------------------------------------
    กล่องสแกน — ภาพจำลองของกล้อง
 
-   มือถือเปิดเต็มจอ เหมือนแอปกล้องที่คนคุ้น จอกว้างเป็นกล่องกลางจอ (กล้องเว็บแคม)
-   จังหวะ: ส่องหา → จับติด → บอกผล
-
-     เจอ      ติ๊กในรายการให้แล้ว บอก "เลือกสินค้าแล้ว" กดสแกนชิ้นถัดไปได้ทันที
-              ไม่ปิดกล่องเอง เพราะงานจริงคือไล่สแกนทีละหลายชิ้น
-     ไม่พบ    บอกเลขที่อ่านได้ให้เทียบกับป้าย แล้วให้สแกนใหม่หรือกรอกเลขเอง
-
-   ป้ายในกรอบคือเลขที่ที่ "กล้อง" กำลังจะอ่าน วาดไว้ให้เห็นว่าส่องอะไรอยู่
+   จอคอม   กล่องกลางจอ มีแค่ "กำลังค้นหาบาร์โค้ด..." อ่านติดแล้วปิดเอง ผลไปที่ toast
+   มือถือ  เต็มจอ อ่านติดแล้วค้างไว้ บอกผลในแผงล่าง กด "สแกน" ชิ้นถัดไป
+           หรือ "เสร็จสิ้น" กลับไปหน้าเลือกโซน
 ------------------------------------------------------------------ */
 
 type ScanPhase =
@@ -710,54 +735,7 @@ type ScanPhase =
   | { kind: Outcome; code: string | null; piece?: InboundPiece };
 
 function ScannerDialog({ state }: { state: ZoneAssign }) {
-  const isPhone = useIsPhone();
-  const close = () => state.setScannerOpen(false);
-
-  return (
-    <Dialog open={state.scannerOpen} onOpenChange={state.setScannerOpen}>
-      <DialogContent
-        showCloseButton={false}
-        className={cn(
-          "flex flex-col gap-0 overflow-hidden p-0",
-          isPhone
-            ? "inset-0 h-dvh max-w-none translate-x-0 translate-y-0 rounded-none border-0"
-            : "sm:max-w-md"
-        )}
-      >
-        <div className="flex items-center justify-between gap-2 border-b border-border px-4 py-3">
-          <div>
-            <DialogTitle className="text-base">สแกนบาร์โค้ด</DialogTitle>
-            <DialogDescription className="mt-0.5 text-xs">
-              เล็งกรอบให้ตรงบาร์โค้ดบนป้ายสินค้า
-            </DialogDescription>
-          </div>
-          <Button variant="ghost" size="icon" aria-label="ปิด" onClick={close}>
-            <XIcon />
-          </Button>
-        </div>
-        <ScannerBody
-          state={state}
-          viewfinderClassName={isPhone ? "min-h-0 flex-1" : "aspect-[4/3]"}
-          panelClassName="p-4 pb-[max(1rem,env(safe-area-inset-bottom))]"
-        />
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-/**
- * ตัวกล้องกับแผงผล — ใช้ได้ทั้งในกล่องของตัวเอง (มือถือ) และฝังในกล่องเลือกโซน
- * (จอคอม) ซึ่งสลับเนื้อหาในกล่องเดิมแทนการเปิดกล่องซ้อนกล่อง
- */
-function ScannerBody({
-  state,
-  viewfinderClassName,
-  panelClassName,
-}: {
-  state: ZoneAssign;
-  viewfinderClassName?: string;
-  panelClassName?: string;
-}) {
+  const { isPhone } = state;
   const open = state.scannerOpen;
   const [phase, setPhase] = React.useState<ScanPhase>({
     kind: "aiming",
@@ -766,19 +744,24 @@ function ScannerBody({
   const [round, setRound] = React.useState(0);
 
   // เริ่มรอบส่องใหม่ทุกครั้งที่เปิด กดสแกนต่อ หรือสลับผลจำลองระหว่างส่อง
-  const { mockRead, applyCode } = state;
-  const readRef = React.useRef({ mockRead, applyCode });
+  const { mockRead, applyCode, setScannerOpen } = state;
+  const live = React.useRef({ mockRead, applyCode, setScannerOpen, isPhone });
   React.useEffect(() => {
-    readRef.current = { mockRead, applyCode };
+    live.current = { mockRead, applyCode, setScannerOpen, isPhone };
   });
 
   React.useEffect(() => {
     if (!open) return;
-    const code = readRef.current.mockRead();
+    const code = live.current.mockRead();
     setPhase({ kind: "aiming", code });
     const t = setTimeout(() => {
-      const { outcome, piece } = readRef.current.applyCode(code, "scan");
+      const { outcome, piece } = live.current.applyCode(code);
       setPhase({ kind: outcome, code, piece });
+      // จอคอมไม่ค้างหน้ากล้อง อ่านติดแล้วปิดเอง ผลไปบอกที่ toast
+      if (!live.current.isPhone) {
+        if (outcome === "empty") toast.info("เลือกครบทุกชิ้นในใบนี้แล้ว");
+        live.current.setScannerOpen(false);
+      }
     }, AIM_MS);
     return () => clearTimeout(t);
   }, [open, round, state.simulate]);
@@ -787,122 +770,185 @@ function ScannerBody({
   const close = () => state.setScannerOpen(false);
 
   return (
-    <>
-      <Viewfinder phase={phase} className={viewfinderClassName}>
-        {phase.kind === "aiming" && <SimulateToggle state={state} dark />}
-      </Viewfinder>
-
-      <div className={cn("space-y-3", panelClassName)}>
-        <ScanPanel
-          phase={phase}
-          picked={state.picked.size}
-          total={state.pieces.length}
-        />
-
-        {phase.kind === "aiming" ? (
-          <Button
-            variant="outline-primary"
-            className="w-full"
-            onClick={state.focusManual}
-          >
-            <KeyboardIcon />
-            กรอกเลขเอง
-          </Button>
-        ) : phase.kind === "notfound" ? (
-          <div className="grid grid-cols-2 gap-3">
-            <Button variant="outline-primary" onClick={state.focusManual}>
-              <KeyboardIcon />
-              กรอกเลขเอง
-            </Button>
-            <Button onClick={again}>
-              <RotateCcwIcon />
-              สแกนใหม่
-            </Button>
-          </div>
-        ) : phase.kind === "empty" ? (
-          <Button className="w-full" onClick={close}>
-            เสร็จสิ้น
-          </Button>
-        ) : (
-          <div className="grid grid-cols-2 gap-3">
-            <Button variant="outline-primary" onClick={close}>
-              เสร็จสิ้น
-            </Button>
-            <Button onClick={again}>
-              <ScanBarcodeIcon />
-              สแกนชิ้นถัดไป
-            </Button>
-          </div>
+    <Dialog open={open} onOpenChange={state.setScannerOpen}>
+      <DialogContent
+        showCloseButton={false}
+        className={cn(
+          "flex flex-col gap-0 overflow-hidden p-0",
+          isPhone
+            ? "inset-0 h-dvh max-w-none translate-x-0 translate-y-0 rounded-none border-0"
+            : "sm:max-w-3xl"
         )}
-      </div>
-    </>
+      >
+        <div className="flex items-start justify-between gap-2 px-6 pt-5 pb-4 max-sm:px-4">
+          <div>
+            <DialogTitle className="text-lg">สแกนบาร์โค้ด</DialogTitle>
+            <DialogDescription className="mt-1">
+              วางบาร์โค้ดให้อยู่ในตำแหน่งสแกน
+            </DialogDescription>
+          </div>
+          <Button variant="ghost" size="icon" aria-label="ปิด" onClick={close}>
+            <XIcon />
+          </Button>
+        </div>
+
+        <Viewfinder
+          phase={phase}
+          className={isPhone ? "min-h-0 flex-1" : "h-[min(58dvh,580px)]"}
+        >
+          {phase.kind === "aiming" && <SimulateToggle state={state} dark />}
+        </Viewfinder>
+
+        <div className="space-y-3 p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
+          {phase.kind === "aiming" || !isPhone ? (
+            <div className="flex min-h-14 items-center justify-center gap-2 text-sm text-muted-foreground">
+              <Spinner className="size-4" />
+              กำลังค้นหาบาร์โค้ด...
+            </div>
+          ) : (
+            <>
+              <ScanPanel
+                phase={phase}
+                picked={state.picked.size}
+                total={state.pieces.length}
+                onManual={state.focusManual}
+              />
+              {phase.kind === "empty" ? (
+                <Button className="w-full" onClick={close}>
+                  เสร็จสิ้น
+                </Button>
+              ) : (
+                <div className="grid grid-cols-2 gap-3">
+                  <Button variant="outline-primary" onClick={close}>
+                    เสร็จสิ้น
+                  </Button>
+                  <Button onClick={again}>
+                    <ScanBarcodeIcon />
+                    สแกน
+                  </Button>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 
+/** ผลของการส่องครั้งล่าสุดในหน้ากล้องบนมือถือ */
 function ScanPanel({
   phase,
   picked,
   total,
+  onManual,
 }: {
   phase: ScanPhase;
   picked: number;
   total: number;
+  onManual: () => void;
 }) {
-  if (phase.kind === "aiming")
-    return (
-      <div className="flex min-h-14 items-center justify-center gap-2 text-sm text-muted-foreground">
-        <Spinner className="size-4" />
-        กำลังค้นหาบาร์โค้ด...
-      </div>
-    );
-
   if (phase.kind === "notfound")
     return (
-      <div className="flex min-h-14 items-start gap-2 rounded-lg border border-danger-border bg-danger px-3 py-2.5">
-        <CircleAlertIcon className="mt-0.5 size-4 shrink-0 text-danger-strong" />
-        <div className="min-w-0">
-          <p className="text-sm font-medium text-danger-strong">
-            ไม่พบสินค้าที่ตรงกับบาร์โค้ดนี้
-          </p>
-          <p className="mt-0.5 truncate text-xs text-muted-foreground">
-            อ่านได้ {phase.code} — ตรวจป้ายแล้วสแกนใหม่ หรือกรอกเลขเอง
-          </p>
-        </div>
-      </div>
+      <ResultCard
+        tone="error"
+        title="ไม่พบสินค้าที่ตรงกับบาร์โค้ด"
+        detail={phase.code ?? ""}
+        onManual={onManual}
+      />
     );
-
   if (phase.kind === "empty")
-    return (
-      <div className="flex min-h-14 items-center gap-2 rounded-lg border border-primary bg-brand px-3 py-2.5 text-sm font-medium text-primary">
-        <CircleCheckIcon className="size-4 shrink-0" />
-        เลือกครบทุกชิ้นในใบนี้แล้ว
-      </div>
-    );
-
-  const p = phase.piece;
+    return <ResultCard tone="ok" title="เลือกครบทุกชิ้นในใบนี้แล้ว" />;
+  const p = "piece" in phase ? phase.piece : undefined;
   return (
-    <div className="flex min-h-14 items-start justify-between gap-2 rounded-lg border border-primary bg-brand px-3 py-2.5">
+    <ResultCard
+      tone="ok"
+      title={phase.kind === "already" ? "สินค้านี้เลือกไว้แล้ว" : "เลือกสินค้าแล้ว"}
+      detail={p ? `${p.receiptCode} · ${p.packing} · ${formatQty(p.qty)} ตัน` : undefined}
+      aside={
+        <span className="text-xs text-muted-foreground tabular-nums">
+          {picked}/{total}
+        </span>
+      }
+    />
+  );
+}
+
+/**
+ * การ์ดผล — ใช้ร่วมกันทั้ง toast (จอคอม) แถบเหนือปุ่มบันทึก (มือถือ) และแผงหน้ากล้อง
+ * ไม่พบสินค้ามีปุ่ม "ระบุเลข" ติดมาเสมอ
+ */
+function ResultCard({
+  tone,
+  title,
+  detail,
+  zone,
+  aside,
+  onManual,
+  className,
+}: {
+  tone: "ok" | "error";
+  title: string;
+  detail?: string;
+  /** undefined = ไม่โชว์ป้ายโซน, null = ชิ้นนั้นยังไม่มีโซน */
+  zone?: string | null;
+  aside?: React.ReactNode;
+  onManual?: () => void;
+  className?: string;
+}) {
+  const ok = tone === "ok";
+  return (
+    <div
+      className={cn(
+        "flex items-center justify-between gap-3 rounded-lg border px-4 py-3",
+        ok ? "border-primary/40 bg-brand" : "border-danger-border bg-danger",
+        className
+      )}
+    >
       <div className="flex min-w-0 items-start gap-2">
-        <CircleCheckIcon className="mt-0.5 size-4 shrink-0 text-primary" />
+        {ok ? (
+          <CircleCheckIcon className="mt-0.5 size-4 shrink-0 text-primary" />
+        ) : (
+          <CircleXIcon className="mt-0.5 size-4 shrink-0 text-danger-strong" />
+        )}
         <div className="min-w-0">
-          <p className="text-sm font-medium text-primary">
-            {phase.kind === "already" ? "สินค้านี้เลือกไว้แล้ว" : "เลือกสินค้าแล้ว"}
+          <p
+            className={cn(
+              "text-sm font-semibold",
+              ok ? "text-primary" : "text-danger-strong"
+            )}
+          >
+            {title}
           </p>
-          {p && (
-            <p className="mt-0.5 truncate text-xs text-muted-foreground">
-              {p.receiptCode} {p.packing} · {formatQty(p.qty)} ตัน
+          {detail && (
+            <p
+              className={cn(
+                "mt-0.5 truncate text-sm",
+                ok ? "text-primary/80" : "text-danger-strong/80"
+              )}
+            >
+              {detail}
             </p>
           )}
         </div>
       </div>
-      <span className="shrink-0 text-xs text-muted-foreground tabular-nums">
-        {picked}/{total}
-      </span>
+      {aside}
+      {zone !== undefined && <ZoneTag zone={zone ?? undefined} />}
+      {onManual && (
+        <Button
+          size="sm"
+          variant="outline"
+          className="shrink-0 bg-card"
+          onClick={onManual}
+        >
+          ระบุเลข
+        </Button>
+      )}
     </div>
   );
 }
 
-/** ภาพกล้องจำลอง — ป้ายสินค้าในกรอบส่อง เส้นเลเซอร์วิ่งระหว่างส่องหา */
+/** ภาพกล้องจำลอง — ส่องหาอยู่มีกรอบกับเลเซอร์ อ่านติดแล้วเหลือแค่ป้าย */
 function Viewfinder({
   phase,
   className,
@@ -913,25 +959,15 @@ function Viewfinder({
   children?: React.ReactNode;
 }) {
   const aiming = phase.kind === "aiming";
-  const bad = phase.kind === "notfound";
-  const frame = aiming
-    ? "border-white"
-    : bad
-      ? "border-danger-strong"
-      : "border-success-strong";
 
   return (
     <div
       className={cn(
-        "relative flex flex-col items-center justify-center gap-4 overflow-hidden bg-neutral-900 px-4 py-6",
+        "relative flex flex-col items-center justify-center gap-6 overflow-hidden bg-neutral-950 px-4 py-6",
         className
       )}
     >
-      {/* แสงเงาให้รู้สึกว่าเป็นภาพจากกล้อง ไม่ใช่กล่องดำเปล่า */}
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(255,255,255,0.12),transparent_70%)]" />
-
       <div className="relative w-full max-w-72">
-        {/* ป้ายสินค้า */}
         <div
           className={cn(
             "mx-auto w-[85%] rounded-md bg-white px-4 py-3 text-neutral-900 shadow-lg transition-transform duration-500",
@@ -955,38 +991,17 @@ function Viewfinder({
           )}
         </div>
 
-        {/* กรอบส่อง — มุมสี่มุม เปลี่ยนสีตามผล */}
-        <div className="pointer-events-none absolute -inset-3">
-          {[
-            "top-0 left-0 border-t-4 border-l-4 rounded-tl-lg",
-            "top-0 right-0 border-t-4 border-r-4 rounded-tr-lg",
-            "bottom-0 left-0 border-b-4 border-l-4 rounded-bl-lg",
-            "bottom-0 right-0 border-b-4 border-r-4 rounded-br-lg",
-          ].map((c) => (
-            <span
-              key={c}
-              className={cn("absolute size-7 transition-colors", frame, c)}
-            />
-          ))}
-          {aiming && (
+        {aiming && (
+          <div className="pointer-events-none absolute -inset-3">
+            {[
+              "top-0 left-0 border-t-4 border-l-4 rounded-tl-lg",
+              "top-0 right-0 border-t-4 border-r-4 rounded-tr-lg",
+              "bottom-0 left-0 border-b-4 border-l-4 rounded-bl-lg",
+              "bottom-0 right-0 border-b-4 border-r-4 rounded-br-lg",
+            ].map((c) => (
+              <span key={c} className={cn("absolute size-7 border-white", c)} />
+            ))}
             <span className="absolute inset-x-2 h-0.5 animate-[scan-line_1.4s_ease-in-out_infinite_alternate] bg-red-500 shadow-[0_0_10px_2px_rgba(239,68,68,0.7)]" />
-          )}
-        </div>
-
-        {!aiming && phase.kind !== "empty" && (
-          <div className="absolute inset-0 flex items-center justify-center">
-            <span
-              className={cn(
-                "flex size-14 items-center justify-center rounded-full text-white shadow-lg",
-                bad ? "bg-danger-strong" : "bg-success-strong"
-              )}
-            >
-              {bad ? (
-                <XIcon className="size-8" />
-              ) : (
-                <CircleCheckIcon className="size-8" />
-              )}
-            </span>
           </div>
         )}
       </div>
@@ -1029,173 +1044,37 @@ function Barcode({ value, className }: { value: string; className?: string }) {
 }
 
 /**
- * แถบผลล่าสุด — อยู่ติดปุ่มบันทึก ไม่ใช่ toast มุมจอ
- *
- * ของหน้าตาเหมือนกันห้าสิบชิ้นวางกองกัน ต้องเห็นว่าเพิ่งได้ "ชิ้นไหน" และมันมี
- * โซนอยู่ก่อนแล้วหรือเปล่า ก่อนกดบันทึก สแกนรัว ๆ หลายชิ้น toast จะซ้อนกัน
- * จนอ่านไม่ทัน แถบนี้ทับของเดิมเสมอจึงเหลือให้อ่านทีละอันเดียว
- *
- * ไม่พบสินค้า: มีปุ่มพากลับทางเดิม (สแกนใหม่/เลือกรูปใหม่) กับกรอกเลขเองติดมาด้วย
+ * แถบผลบนมือถือ — สรุปทั้งรอบเหนือปุ่มบันทึก (จอคอมใช้ toast จึงไม่ขึ้นแถบนี้)
+ * เจอกับไม่พบแยกเป็นคนละการ์ด สแกนหลายรูปได้ทั้งสองอย่างพร้อมกัน
  */
 export function ZoneScanResult({ state }: { state: ZoneAssign }) {
-  const { result } = state;
-  if (!result) return null;
-  const p = result.piece;
-  const missing = !result.ok && result.code !== undefined;
+  const rep = state.report;
+  if (!rep) return null;
+  const one = rep.found.length === 1 ? rep.found[0] : undefined;
 
   return (
-    <div
-      className={cn(
-        "flex flex-wrap items-center justify-between gap-x-3 gap-y-2 rounded-lg border px-4 py-3",
-        result.ok
-          ? "border-primary bg-brand"
-          : "border-danger-border bg-danger"
+    <div className="space-y-2">
+      {rep.found.length > 0 && (
+        <ResultCard
+          tone="ok"
+          title="เลือกสินค้าแล้ว"
+          detail={one ? pieceLine(one) : `${rep.found.length} รายการ`}
+          zone={one ? (one.zone ?? null) : undefined}
+        />
       )}
-    >
-      <div className="flex min-w-0 items-start gap-2">
-        {result.ok ? (
-          <CircleCheckIcon className="mt-0.5 size-4 shrink-0 text-primary" />
-        ) : (
-          <CircleAlertIcon className="mt-0.5 size-4 shrink-0 text-danger-strong" />
-        )}
-        <div className="min-w-0">
-          <p
-            className={cn(
-              "text-sm font-medium",
-              result.ok ? "text-primary" : "text-danger-strong"
-            )}
-          >
-            {result.text}
-          </p>
-          {p && (
-            <p className="mt-0.5 truncate text-sm text-muted-foreground">
-              {p.receiptCode} {p.packing} · {formatQty(p.qty)} ตัน
-            </p>
-          )}
-          {missing && (
-            <p className="mt-0.5 truncate text-sm text-muted-foreground">
-              {result.via === "manual" ? "เลขที่" : "บาร์โค้ด"} {result.code}
-            </p>
-          )}
-        </div>
-      </div>
-      {p && <ZoneTag zone={p.zone} />}
-      {missing && result.via !== "manual" && (
-        <div className="flex gap-2">
-          <Button
-            size="sm"
-            variant="ghost"
-            className="text-primary hover:text-primary"
-            onClick={state.focusManual}
-          >
-            กรอกเลขเอง
-          </Button>
-          <Button
-            size="sm"
-            variant="outline-primary"
-            onClick={() =>
-              result.via === "scan"
-                ? state.setScannerOpen(true)
-                : state.pickPhotos()
-            }
-          >
-            {result.via === "scan" ? "สแกนใหม่" : "เลือกรูปใหม่"}
-          </Button>
-        </div>
+      {rep.missing.length > 0 && (
+        <ResultCard
+          tone="error"
+          title="ไม่พบสินค้าที่ตรงกับบาร์โค้ด"
+          detail={
+            rep.missing.length === 1
+              ? rep.missing[0]
+              : `${rep.missing.length} รายการ`
+          }
+          onManual={state.focusManual}
+        />
       )}
     </div>
-  );
-}
-
-export function ZoneAssignDialog({
-  open,
-  onOpenChange,
-  pieces,
-  onAssign,
-}: {
-  open: boolean;
-  onOpenChange: (v: boolean) => void;
-  /** ชิ้นที่ยังไม่ถูกยกเลิก — ทั้งที่มีโซนแล้วและยังไม่มี */
-  pieces: InboundPiece[];
-  onAssign: (ids: string[], zone: string) => void;
-}) {
-  const state = useZoneAssign(pieces);
-
-  const submit = () => {
-    if (!state.zone || state.picked.size === 0) return;
-    onAssign([...state.picked], state.zone);
-    onOpenChange(false);
-  };
-
-  // กล่องซ้อนกล่องบนจอคอมดูเหมือนสองหน้าต่างทับกัน — สแกนจึงสลับเนื้อหา
-  // ในกล่องเดิม มีปุ่มย้อนกลับไปหน้าเลือกโซน Esc ระหว่างสแกนก็แค่ถอยกลับ ไม่ปิดทั้งกล่อง
-  const scanning = state.scannerOpen;
-
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent
-        className="flex max-h-[92dvh] flex-col gap-4 sm:max-w-2xl"
-        onEscapeKeyDown={(e) => {
-          if (!scanning) return;
-          e.preventDefault();
-          state.setScannerOpen(false);
-        }}
-      >
-        {scanning ? (
-          <>
-            <DialogHeader className="flex-row items-center gap-2">
-              <Button
-                variant="ghost"
-                size="icon"
-                aria-label="กลับไปเลือกโซน"
-                className="-ml-2 shrink-0"
-                onClick={() => state.setScannerOpen(false)}
-              >
-                <ArrowLeftIcon />
-              </Button>
-              <div className="space-y-1 text-left">
-                <DialogTitle>สแกนบาร์โค้ด</DialogTitle>
-                <DialogDescription>
-                  ส่องป้ายสินค้าให้กล้องของเครื่อง เล็งกรอบให้ตรงบาร์โค้ด
-                </DialogDescription>
-              </div>
-            </DialogHeader>
-            <div className="min-h-0 flex-1 overflow-y-auto">
-              <ScannerBody
-                state={state}
-                viewfinderClassName="h-[min(48dvh,400px)] rounded-lg"
-                panelClassName="pt-4"
-              />
-            </div>
-          </>
-        ) : (
-          <>
-            <DialogHeader>
-              <DialogTitle>เลือกโซนรับเข้า</DialogTitle>
-              <DialogDescription>
-                เลือกโซนแล้วสแกนเลขที่ติดบนสินค้าหรือเลือกจากรายการ
-              </DialogDescription>
-            </DialogHeader>
-
-            <div className="min-h-0 flex-1 overflow-y-auto">
-              <ZoneAssignFields state={state} scannerInDialog={false} />
-            </div>
-
-            {/* นอกกรอบที่เลื่อน — ผลสแกนต้องอยู่ในสายตาตลอด ไม่ใช่ต้องเลื่อนลงไปหา */}
-            <ZoneScanResult state={state} />
-
-            <DialogFooter className="grid grid-cols-2 gap-3">
-              <Button variant="outline-primary" onClick={() => onOpenChange(false)}>
-                ย้อนกลับ
-              </Button>
-              <Button disabled={!state.canSubmit} onClick={submit}>
-                บันทึก
-              </Button>
-            </DialogFooter>
-          </>
-        )}
-      </DialogContent>
-    </Dialog>
   );
 }
 
@@ -1237,9 +1116,12 @@ function ActionChip({
 function ZoneTag({ zone }: { zone?: string }) {
   if (!zone)
     return (
-      <span className="shrink-0 text-xs whitespace-nowrap text-muted-foreground">
+      <Badge
+        appearance="outline"
+        className="shrink-0 bg-card whitespace-nowrap"
+      >
         ยังไม่มีโซน
-      </span>
+      </Badge>
     );
   return (
     <Badge appearance="soft" className="shrink-0 whitespace-nowrap">
@@ -1256,7 +1138,7 @@ function PieceRow({
 }: {
   piece: InboundPiece;
   checked: boolean;
-  /** เพิ่งได้มาจากสแกน/สแกนจากรูป — เลื่อนมาให้เห็นแล้วกะพริบกรอบ */
+  /** เพิ่งได้มาจากสแกน — เลื่อนมาให้เห็นแล้วกะพริบกรอบ */
   flash?: boolean;
   onToggle: () => void;
 }) {
@@ -1284,9 +1166,14 @@ function PieceRow({
             {!p.correct && " · ไม่ถูกต้อง"}
           </span>
         </span>
-        {/* ชิ้นที่มีโซนแล้วยังเลือกได้ แต่ต้องเห็นก่อนว่ากำลังย้ายของที่เก็บไปแล้ว
-            ไม่ใช่เพิ่งลงโซนครั้งแรก */}
-        <ZoneTag zone={p.zone} />
+        {/* ชิ้นที่มีโซนแล้วยังเลือกได้ แต่ต้องเห็นก่อนว่ากำลังย้ายของที่เก็บไปแล้ว */}
+        {p.zone ? (
+          <ZoneTag zone={p.zone} />
+        ) : (
+          <span className="shrink-0 text-xs whitespace-nowrap text-muted-foreground">
+            ยังไม่มีโซน
+          </span>
+        )}
       </label>
     </li>
   );
