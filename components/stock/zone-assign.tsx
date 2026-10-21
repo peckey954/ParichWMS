@@ -7,7 +7,6 @@ import {
   KeyboardIcon,
   RotateCcwIcon,
   ScanBarcodeIcon,
-  UploadIcon,
   XIcon,
 } from "lucide-react";
 import { Badge } from "@peckey954/ui/components/ui/badge";
@@ -56,14 +55,19 @@ import { ZONES, formatQty, type InboundPiece } from "@/lib/general-stock";
    ทั้งสองทางใช้ useZoneAssign + ZoneAssignFields ตัวเดียวกัน ต่างกันแค่กรอบ
    ที่ห่ออยู่ข้างนอกกับที่วางแถบผลสแกน
 
-   ---------- สแกนกับอัปโหลดรูปเป็นคนละปุ่ม ----------
+   ---------- สแกนกล้องกับสแกนจากรูปเป็นคนละปุ่ม ----------
 
    เดิมเป็นปุ่มเดียวที่ส่งต่อให้เครื่องเด้งเมนูเลือกเองว่าถ่ายหรือหยิบรูป คนใช้จริง
    ไม่รู้ว่ากดแล้วจะได้อะไร จึงแยกเป็นสองทางที่หน้าตาต่างกันชัด
 
-     สแกนบาร์โค้ด   กรอบส่องกล้อง อ่านติดแล้วติ๊กให้ทันที สแกนต่อชิ้นถัดไปได้เลย
-     อัปโหลดรูป     ป้ายที่ถ่ายเก็บไว้ตอนลงของ (ตอนนั้นมือไม่ว่าง) — บนมือถือ
-                    หยิบจากรูปในเครื่อง บนคอมเลือกไฟล์หรือลากรูปมาวาง
+     สแกนเลขที่สินค้า  กล้องเต็มจอ อ่านติดแล้วติ๊กให้ทันที สแกนต่อชิ้นถัดไปได้เลย
+     สแกนจากรูปภาพ    ป้ายที่ถ่ายเก็บไว้ตอนลงของ (ตอนนั้นมือไม่ว่าง) — บนมือถือ
+                       หยิบจากรูปในเครื่อง บนคอมเลือกไฟล์หรือลากรูปมาวาง
+                       อ่านเลขแล้วจบ ไม่เก็บรูป เพราะของที่ต้องการคือเลข ไม่ใช่รูป
+
+   การส่องกล้องอยู่ในหน้าของมันเองเต็มจอ ไม่ฝังในหน้านี้ กรอบในหน้านี้สูงได้ไม่ถึง
+   สองร้อยพิกเซลถ้าจะยังเห็นรายการ เล็งบาร์โค้ดในกรอบเท่านั้นยาก และกล้องจะเปิด
+   ค้างอยู่ตลอดเวลาที่เลื่อนดูรายการ กรอบในหน้านี้จึงเป็นแค่ทางเข้า
 
    ทั้งสองทางลงเอยที่เดียวกัน: เจอชิ้นที่ตรงก็ติ๊กในรายการพร้อมบอก "เลือกสินค้าแล้ว"
    ไม่เจอก็บอกตรง ๆ ว่าไม่พบ แล้วให้ลองใหม่หรือกรอกเลขเองได้จากตรงนั้นเลย
@@ -77,9 +81,9 @@ import { ZONES, formatQty, type InboundPiece } from "@/lib/general-stock";
 ------------------------------------------------------------------ */
 
 /** มาจากทางไหน — ปุ่มลองใหม่ต้องพากลับทางเดิม */
-type Via = "scan" | "upload" | "manual";
+type Via = "scan" | "photo" | "manual";
 
-/** ผลของการสแกน/อัปโหลด/พิมพ์เลขครั้งล่าสุด — piece มีเมื่อเจอชิ้นจริง */
+/** ผลของการสแกน/สแกนจากรูป/พิมพ์เลขครั้งล่าสุด — piece มีเมื่อเจอชิ้นจริง */
 type ScanResult = {
   ok: boolean;
   text: string;
@@ -94,15 +98,8 @@ type Simulate = "found" | "notfound";
 
 type Outcome = "found" | "already" | "notfound" | "empty";
 
-/** รูปหนึ่งใบที่อัปโหลดเข้ามา */
-type Upload = {
-  id: string;
-  name: string;
-  url: string;
-  status: "reading" | Outcome;
-  code?: string;
-  piece?: InboundPiece;
-};
+/** กำลังอ่านรูปอยู่ — done คืออ่านไปแล้วกี่รูปจากทั้งหมด */
+type Reading = { done: number; total: number } | null;
 
 /** เวลาอ่านต่อหนึ่งรูป ถอดบาร์โค้ดจริงในเครื่องก็อยู่ราวนี้ */
 const READ_MS = 900;
@@ -114,9 +111,9 @@ const AIM_MS = 1800;
  * แทนการส่ง ref ไปกับ state เพราะกล่องกับหน้าเต็มไม่เคยเปิดพร้อมกัน
  */
 const CODE_INPUT_ID = "zone-code";
-const UPLOAD_INPUT_ID = "zone-upload";
+const PHOTO_INPUT_ID = "zone-photo";
 
-/** จอแคบ = ถือมือถืออยู่ อัปโหลดคือหยิบจากรูปในเครื่อง ไม่ใช่เลือกไฟล์จากคอม */
+/** จอแคบ = ถือมือถืออยู่ สแกนจากรูปคือหยิบจากรูปในเครื่อง ไม่ใช่เลือกไฟล์จากคอม */
 function useIsPhone() {
   return React.useSyncExternalStore(
     (cb) => {
@@ -136,21 +133,20 @@ export function useZoneAssign(pieces: InboundPiece[]) {
   const [result, setResult] = React.useState<ScanResult>(null);
   const [simulate, setSimulateState] = React.useState<Simulate>("found");
   const [scannerOpen, setScannerOpen] = React.useState(false);
-  const [uploads, setUploads] = React.useState<Upload[]>([]);
+  /** รูปที่กำลังอ่านอยู่ตอนนี้ — null คือว่าง */
+  const [reading, setReading] = React.useState<Reading>(null);
   /** ชิ้นที่เพิ่งได้มา — กะพริบในรายการให้ตาตามทัน */
   const [flashId, setFlashId] = React.useState<string>();
 
   // อ่านค่าล่าสุดจากในตัวจับเวลาโดยไม่ต้องผูกมันไว้กับ state ทุกตัว
   const pickedRef = React.useRef(picked);
   const simulateRef = React.useRef(simulate);
-  const uploadsRef = React.useRef(uploads);
   const timersRef = React.useRef<ReturnType<typeof setTimeout>[]>([]);
   const flashTimer = React.useRef<ReturnType<typeof setTimeout>>(undefined);
 
   React.useEffect(() => {
     pickedRef.current = picked;
-    uploadsRef.current = uploads;
-  }, [picked, uploads]);
+  }, [picked]);
 
   // เซ็ต ref ทันทีตอนสลับ — กล่องสแกนเริ่มรอบใหม่ใน effect ของมันเอง
   // ซึ่งวิ่งก่อน effect ของ hook นี้ ถ้ารอ effect มันจะอ่านค่าเก่า
@@ -160,12 +156,11 @@ export function useZoneAssign(pieces: InboundPiece[]) {
   };
 
   // ออกจากหน้า/ปิดกล่องกลางคันแล้วตัวจับเวลาต้องตายตาม ไม่งั้นมันไปเซ็ต state
-  // ของสิ่งที่ถอดไปแล้ว รูปที่สร้างลิงก์ไว้ก็ต้องคืนหน่วยความจำ
+  // ของสิ่งที่ถอดไปแล้ว
   React.useEffect(() => {
     return () => {
       for (const t of timersRef.current) clearTimeout(t);
       clearTimeout(flashTimer.current);
-      for (const u of uploadsRef.current) URL.revokeObjectURL(u.url);
     };
   }, []);
 
@@ -176,7 +171,6 @@ export function useZoneAssign(pieces: InboundPiece[]) {
     : pieces;
   /** ชิ้นที่ยังไม่มีโซนในรายการที่เห็นอยู่ตอนนี้ — ปุ่มเลือกรวดเดียวทำแค่เท่าที่เห็น */
   const waiting = visible.filter((p) => !p.zone);
-  const reading = uploads.some((u) => u.status === "reading");
 
   const isAllPicked = (list: InboundPiece[]) =>
     list.length > 0 && list.every((p) => picked.has(p.id));
@@ -206,17 +200,12 @@ export function useZoneAssign(pieces: InboundPiece[]) {
     });
   };
 
-  const clearUploads = () => {
-    for (const t of timersRef.current) clearTimeout(t);
-    for (const u of uploadsRef.current) URL.revokeObjectURL(u.url);
-    setUploads([]);
-  };
-
   const clearAll = () => {
+    for (const t of timersRef.current) clearTimeout(t);
+    setReading(null);
     setPicked(new Set());
     setResult(null);
     setQuery("");
-    clearUploads();
   };
 
   /**
@@ -284,57 +273,67 @@ export function useZoneAssign(pieces: InboundPiece[]) {
   /**
    * อ่านรูปทีละใบ ติ๊กไปทีละชิ้น ไม่ใช่รอครบแล้วค่อยติ๊กรวดเดียว
    *
-   * เลือกมาห้ารูปแล้วเงียบไปสี่วินาทีครึ่ง คนจะนึกว่าค้าง เห็นแต่ละรูปเปลี่ยน
-   * สถานะไล่ลงมาบอกได้ทั้งว่ายังทำงานอยู่และรูปไหนได้ชิ้นไหน
+   * เลือกมาห้ารูปแล้วเงียบไปสี่วินาทีครึ่ง คนจะนึกว่าค้าง เห็นรายการติ๊กไล่ลงมา
+   * ทีละบรรทัดบอกได้ทั้งว่ายังทำงานอยู่และได้ชิ้นไหนไปแล้วบ้าง
+   * หลายรูปจบแล้วสรุปรวมในแถบผลครั้งเดียว ว่าได้กี่ชิ้น รูปไหนไม่พบ
    */
-  const readUpload = (ids: string[], index: number) => {
-    if (index >= ids.length) return;
+  const readPhoto = (
+    total: number,
+    index: number,
+    tally: { found: number; missing: string[] }
+  ) => {
     timersRef.current = [
       setTimeout(() => {
         const code = mockRead();
-        const { outcome, piece } = applyCode(code, "upload");
-        setUploads((list) =>
-          list.map((u) =>
-            u.id === ids[index]
-              ? { ...u, status: outcome, piece, code: code ?? undefined }
-              : u
-          )
+        const { outcome } = applyCode(code, "photo");
+        if (outcome === "found") tally.found += 1;
+        if (outcome === "notfound" && code) tally.missing.push(code);
+
+        if (index + 1 < total && outcome !== "empty") {
+          setReading({ done: index + 1, total });
+          readPhoto(total, index + 1, tally);
+          return;
+        }
+        setReading(null);
+        if (total === 1 || outcome === "empty") return;
+        setResult(
+          tally.missing.length > 0
+            ? {
+                ok: false,
+                text: `ไม่พบสินค้าที่ตรงกับบาร์โค้ด ${tally.missing.length} จาก ${total} รูป`,
+                code: tally.missing.join(", "),
+                via: "photo",
+              }
+            : {
+                ok: true,
+                text: `เลือกสินค้าแล้ว ${tally.found} รายการ จาก ${total} รูป`,
+                via: "photo",
+              }
         );
-        readUpload(ids, index + 1);
       }, READ_MS),
     ];
   };
 
   /**
-   * ได้รูปมาจากคลังรูปในโทรศัพท์หรือไฟล์ในคอม
+   * สแกนจากรูปที่ถ่ายไว้ — อ่านเลขแล้วทิ้งรูป ไม่เก็บไว้ที่ไหน
    *
    * กรองเอาเฉพาะรูปก่อน หยิบ pdf มาแล้วปล่อยให้เดินจังหวะต่อคือหลอกว่าอ่านได้
-   * ทั้งที่อ่านไม่ได้ อัปโหลดชุดใหม่ทับชุดเก่า รายการรูปจะได้ไม่ยาวสะสม
+   * ทั้งที่อ่านไม่ได้
    */
-  const uploadPhotos = (files: File[]) => {
+  const scanPhotos = (files: File[]) => {
     if (reading) return;
     const photos = files.filter((f) => f.type.startsWith("image/"));
     if (photos.length === 0) {
       setResult({
         ok: false,
         text: "ไฟล์นี้ไม่ใช่รูป อ่านบาร์โค้ดไม่ได้",
-        via: "upload",
+        via: "photo",
       });
       return;
     }
-    clearUploads();
     setResult(null);
-    const list: Upload[] = photos.map((f, i) => ({
-      id: `${Date.now()}-${i}`,
-      name: f.name,
-      url: URL.createObjectURL(f),
-      status: "reading",
-    }));
-    setUploads(list);
-    readUpload(
-      list.map((u) => u.id),
-      0
-    );
+    setReading({ done: 0, total: photos.length });
+    readPhoto(photos.length, 0, { found: 0, missing: [] });
   };
 
   /**
@@ -365,7 +364,7 @@ export function useZoneAssign(pieces: InboundPiece[]) {
     }, 50);
   };
 
-  const pickUpload = () => document.getElementById(UPLOAD_INPUT_ID)?.click();
+  const pickPhotos = () => document.getElementById(PHOTO_INPUT_ID)?.click();
 
   return {
     pieces,
@@ -376,7 +375,6 @@ export function useZoneAssign(pieces: InboundPiece[]) {
     setQuery,
     result,
     reading,
-    uploads,
     simulate,
     setSimulate,
     scannerOpen,
@@ -388,11 +386,10 @@ export function useZoneAssign(pieces: InboundPiece[]) {
     toggle,
     toggleAll,
     clearAll,
-    clearUploads,
     mockRead,
     applyCode,
-    uploadPhotos,
-    pickUpload,
+    scanPhotos,
+    pickPhotos,
     focusManual,
     acceptOnlyMatch,
     canSubmit: Boolean(zone) && picked.size > 0,
@@ -434,7 +431,6 @@ export function ZoneAssignFields({
       </div>
 
       <CaptureTiles state={state} />
-      <UploadList state={state} />
 
       {/* คั่นให้เห็นว่าข้างล่างคืออีกทางหนึ่งของงานเดียวกัน ไม่ใช่ขั้นถัดไป */}
       <div className="flex items-center gap-3 text-sm text-muted-foreground">
@@ -500,8 +496,7 @@ export function ZoneAssignFields({
             className="text-primary hover:text-primary"
             disabled={
               picked.size === 0 &&
-              state.query === "" &&
-              state.uploads.length === 0
+              state.query === ""
             }
             onClick={state.clearAll}
           >
@@ -547,12 +542,12 @@ export function ZoneAssignFields({
 }
 
 /* ------------------------------------------------------------------
-   สองทางเข้า — สแกนกับอัปโหลด
+   สองทางเข้า — สแกนกล้องกับสแกนจากรูป
 
    กรอบเส้นประเดียวตามดีไซน์ Parich แต่สองปุ่มแยกกัน ชื่อบอกตรง ๆ ว่ากดแล้วได้อะไร
-   สแกนเปิดกล่องกล้อง อัปโหลดหยิบรูปที่ถ่ายเก็บไว้
+   สแกนเปิดกล้องเต็มจอ สแกนจากรูปหยิบรูปที่ถ่ายเก็บไว้
 
-   อัปโหลดบนมือถือคือหยิบจากคลังรูป บนคอมคือเลือกไฟล์หรือลากรูปมาวางในกรอบ
+   บนมือถือหยิบจากคลังรูป บนคอมเลือกไฟล์หรือลากรูปมาวางในกรอบ
    ไม่ใส่ capture ในช่องไฟล์ — ทางถ่ายใหม่มีปุ่มสแกนแล้ว ปุ่มนี้มีไว้หยิบรูปเก่า
 
    ล้างค่าในช่องทุกครั้งหลังหยิบ ไม่งั้นเลือก "รูปเดิม" ซ้ำรอบสองจะไม่เกิด change
@@ -574,7 +569,7 @@ function CaptureTiles({ state }: { state: ZoneAssign }) {
         if (isPhone) return;
         e.preventDefault();
         setDragging(false);
-        state.uploadPhotos([...e.dataTransfer.files]);
+        state.scanPhotos([...e.dataTransfer.files]);
       }}
       className={cn(
         "flex flex-col items-center gap-3 rounded-xl border border-dashed border-primary bg-brand px-4 py-6 text-center transition-colors",
@@ -584,11 +579,15 @@ function CaptureTiles({ state }: { state: ZoneAssign }) {
       {state.reading ? (
         <Spinner className="size-7 text-primary" />
       ) : (
-        <UploadIcon className="size-7 text-muted-foreground" />
+        <ScanBarcodeIcon className="size-7 text-muted-foreground" />
       )}
       <div>
         <p className="font-medium">
-          {state.reading ? "กำลังอ่านบาร์โค้ดจากรูป..." : "สแกน/อัปโหลดบาร์โค้ด"}
+          {!state.reading
+            ? "สแกนเลขที่เพื่อเลือกโซนรับสินค้าเข้าคลัง"
+            : state.reading.total > 1
+              ? `กำลังอ่านรูปที่ ${state.reading.done + 1} จาก ${state.reading.total}...`
+              : "กำลังอ่านบาร์โค้ดจากรูป..."}
         </p>
         {!isPhone && !state.reading && (
           <p className="mt-0.5 text-xs text-muted-foreground">
@@ -610,17 +609,17 @@ function CaptureTiles({ state }: { state: ZoneAssign }) {
           variant="outline-primary"
           size="sm"
           className="bg-card"
-          disabled={state.reading}
-          onClick={state.pickUpload}
+          disabled={Boolean(state.reading)}
+          onClick={state.pickPhotos}
         >
-          อัปโหลดรูปภาพ
+          สแกนจากรูปภาพ
         </Button>
       </div>
 
       <SimulateToggle state={state} />
 
       <input
-        id={UPLOAD_INPUT_ID}
+        id={PHOTO_INPUT_ID}
         type="file"
         accept="image/*"
         multiple
@@ -628,7 +627,7 @@ function CaptureTiles({ state }: { state: ZoneAssign }) {
         onChange={(e) => {
           const files = [...(e.target.files ?? [])];
           e.target.value = "";
-          if (files.length > 0) state.uploadPhotos(files);
+          if (files.length > 0) state.scanPhotos(files);
         }}
       />
     </div>
@@ -686,108 +685,6 @@ function SimulateToggle({
         ))}
       </div>
     </div>
-  );
-}
-
-/**
- * รูปที่อัปโหลด — ทีละรูปเห็นว่าได้ชิ้นไหน หรือรูปไหนอ่านไม่เจอ
- * รูปที่ไม่พบต้องเห็นรูปตัวเองข้าง ๆ ไม่งั้นเลือกมาห้ารูปไม่รู้ว่ารูปไหนพัง
- */
-function UploadList({ state }: { state: ZoneAssign }) {
-  const isPhone = useIsPhone();
-  if (state.uploads.length === 0) return null;
-  const done = state.uploads.filter((u) => u.status !== "reading").length;
-
-  return (
-    <div className="rounded-lg border border-border">
-      <div className="flex items-center justify-between gap-2 border-b border-border px-3 py-2">
-        <p className="text-sm font-medium">
-          รูปที่อัปโหลด{" "}
-          <span className="font-normal text-muted-foreground tabular-nums">
-            ({done}/{state.uploads.length})
-          </span>
-        </p>
-        <Button
-          variant="ghost"
-          size="sm"
-          disabled={state.reading}
-          onClick={state.clearUploads}
-        >
-          <XIcon />
-          ล้างรูป
-        </Button>
-      </div>
-      <ul>
-        {state.uploads.map((u) => (
-          <li
-            key={u.id}
-            className="flex items-center gap-3 border-b border-border px-3 py-2.5 last:border-b-0"
-          >
-            {/* eslint-disable-next-line @next/next/no-img-element -- รูปจาก blob ในเครื่อง */}
-            <img
-              src={u.url}
-              alt=""
-              className="size-12 shrink-0 rounded-md border border-border object-cover"
-            />
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-xs text-muted-foreground">{u.name}</p>
-              <UploadStatus upload={u} />
-            </div>
-            {u.status === "notfound" && (
-              <div className="flex shrink-0 flex-col gap-1 sm:flex-row">
-                <Button
-                  size="sm"
-                  variant="outline-primary"
-                  onClick={state.pickUpload}
-                  disabled={state.reading}
-                >
-                  {isPhone ? "เลือกรูปใหม่" : "อัปโหลดใหม่"}
-                </Button>
-                <Button size="sm" variant="ghost" onClick={state.focusManual}>
-                  กรอกเลขเอง
-                </Button>
-              </div>
-            )}
-          </li>
-        ))}
-      </ul>
-    </div>
-  );
-}
-
-function UploadStatus({ upload: u }: { upload: Upload }) {
-  if (u.status === "reading")
-    return (
-      <p className="mt-0.5 flex items-center gap-1.5 text-sm text-muted-foreground">
-        <Spinner className="size-3.5" />
-        กำลังอ่านบาร์โค้ด...
-      </p>
-    );
-  if (u.status === "notfound")
-    return (
-      <p className="mt-0.5 text-sm font-medium text-danger-strong">
-        ไม่พบสินค้าที่ตรงกับบาร์โค้ดนี้
-        <span className="block truncate text-xs font-normal text-muted-foreground">
-          อ่านได้ {u.code}
-        </span>
-      </p>
-    );
-  if (u.status === "empty")
-    return (
-      <p className="mt-0.5 text-sm text-muted-foreground">
-        เลือกครบทุกชิ้นในใบนี้แล้ว
-      </p>
-    );
-  return (
-    <p className="mt-0.5 text-sm">
-      <span className="flex items-center gap-1 font-medium text-primary">
-        <CircleCheckIcon className="size-3.5" />
-        {u.status === "already" ? "เลือกไว้แล้ว" : "เลือกสินค้าแล้ว"}
-      </span>
-      <span className="block truncate text-xs text-muted-foreground">
-        {u.piece?.receiptCode}
-      </span>
-    </p>
   );
 }
 
@@ -1112,10 +1009,9 @@ function Barcode({ value, className }: { value: string; className?: string }) {
  * โซนอยู่ก่อนแล้วหรือเปล่า ก่อนกดบันทึก สแกนรัว ๆ หลายชิ้น toast จะซ้อนกัน
  * จนอ่านไม่ทัน แถบนี้ทับของเดิมเสมอจึงเหลือให้อ่านทีละอันเดียว
  *
- * ไม่พบสินค้า: มีปุ่มพากลับทางเดิม (สแกนใหม่/อัปโหลดใหม่) กับกรอกเลขเองติดมาด้วย
+ * ไม่พบสินค้า: มีปุ่มพากลับทางเดิม (สแกนใหม่/เลือกรูปใหม่) กับกรอกเลขเองติดมาด้วย
  */
 export function ZoneScanResult({ state }: { state: ZoneAssign }) {
-  const isPhone = useIsPhone();
   const { result } = state;
   if (!result) return null;
   const p = result.piece;
@@ -1174,14 +1070,10 @@ export function ZoneScanResult({ state }: { state: ZoneAssign }) {
             onClick={() =>
               result.via === "scan"
                 ? state.setScannerOpen(true)
-                : state.pickUpload()
+                : state.pickPhotos()
             }
           >
-            {result.via === "scan"
-              ? "สแกนใหม่"
-              : isPhone
-                ? "เลือกรูปใหม่"
-                : "อัปโหลดใหม่"}
+            {result.via === "scan" ? "สแกนใหม่" : "เลือกรูปใหม่"}
           </Button>
         </div>
       )}
@@ -1296,7 +1188,7 @@ function PieceRow({
 }: {
   piece: InboundPiece;
   checked: boolean;
-  /** เพิ่งได้มาจากสแกน/อัปโหลด — เลื่อนมาให้เห็นแล้วกะพริบกรอบ */
+  /** เพิ่งได้มาจากสแกน/สแกนจากรูป — เลื่อนมาให้เห็นแล้วกะพริบกรอบ */
   flash?: boolean;
   onToggle: () => void;
 }) {
