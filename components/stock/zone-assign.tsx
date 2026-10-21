@@ -64,8 +64,8 @@ import { ZONES, formatQty, type InboundPiece } from "@/lib/general-stock";
    ทั้งจอคอมและมือถือ ทำเหมือนกัน — จำนวนครั้งที่กดเท่ากับค้างหน้ากล้องไว้แล้วกด
    "สแกน" ต่อ แต่เห็นรายการที่ติ๊กให้ทันทีหลังทุกชิ้น และมีแบบเดียวให้จำ
 
-   ที่ต่างกันคือที่บอกผล: จอคอมเป็น toast มุมล่างขวา มือถือเป็นแถบเหนือปุ่มบันทึก
-   (toast บนมือถือจะทับปุ่มบันทึกพอดี)
+   ผลบอกด้วย toast ด้านบน ใต้แถบหัว อยู่ 3 วินาทีแล้วหายเอง ไม่ทับปุ่มบันทึก/ย้อนกลับ
+   ที่ติดขอบล่าง และไม่ค้างบังรายการ
 
    ทั้งสองแบบไม่มีไอคอนสถานะทับบนบาร์โค้ด — ผลอยู่ที่ข้อความ ไม่ใช่ที่ภาพกล้อง
 
@@ -122,8 +122,6 @@ export function useZoneAssign(pieces: InboundPiece[]) {
   const [picked, setPicked] = React.useState<Set<string>>(new Set());
   const [zone, setZone] = React.useState<string>();
   const [query, setQuery] = React.useState("");
-  /** ผลรอบล่าสุดที่โชว์เป็นแถบบนมือถือ — จอคอมใช้ toast แทน จึงว่างตลอด */
-  const [report, setReport] = React.useState<Report | null>(null);
   const [simulate, setSimulateState] = React.useState<Simulate>("found");
   const [scannerOpen, setScannerOpenState] = React.useState(false);
   const [reading, setReading] = React.useState<Reading>(null);
@@ -195,7 +193,6 @@ export function useZoneAssign(pieces: InboundPiece[]) {
     setReading(null);
     setPicked(new Set());
     pickedRef.current = new Set();
-    setReport(null);
     setQuery("");
   };
 
@@ -221,22 +218,17 @@ export function useZoneAssign(pieces: InboundPiece[]) {
 
   const startSession = (via: Via) => {
     sessionRef.current = { via, found: [], missing: [] };
-    setReport(null);
   };
 
   /**
-   * จบรอบ — จอคอมบอกด้วย toast มุมล่างขวา มือถือค้างเป็นแถบเหนือปุ่มบันทึก
-   * ทั้งสองแบบแยก "เจอ" กับ "ไม่พบ" เป็นคนละก้อน เพราะสแกนหลายรูปได้ทั้งสองอย่าง
-   * พร้อมกัน ไม่ควรให้อันหนึ่งกลบอีกอัน
+   * จบรอบ — บอกผลด้วย toast ด้านบน (ตำแหน่ง/เวลาตั้งไว้ที่ Toaster ใน layout)
+   * แยก "เจอ" กับ "ไม่พบ" เป็นคนละก้อน เพราะสแกนหลายรูปได้ทั้งสองอย่างพร้อมกัน
+   * ไม่ควรให้อันหนึ่งกลบอีกอัน
    */
   const endSession = () => {
     const rep = sessionRef.current;
     sessionRef.current = null;
     if (!rep || (rep.found.length === 0 && rep.missing.length === 0)) return;
-    if (isPhone) {
-      setReport(rep);
-      return;
-    }
     if (rep.found.length > 0) {
       const one = rep.found.length === 1 ? rep.found[0] : undefined;
       toast.custom(() => (
@@ -392,7 +384,6 @@ export function useZoneAssign(pieces: InboundPiece[]) {
     changeZone,
     query,
     setQuery,
-    report,
     reading,
     simulate,
     setSimulate,
@@ -806,7 +797,7 @@ function ScannerDialog({ state }: { state: ZoneAssign }) {
 }
 
 /**
- * การ์ดผล — ใช้ร่วมกันทั้ง toast (จอคอม) และแถบเหนือปุ่มบันทึก (มือถือ)
+ * การ์ดผลใน toast
  * ไม่พบสินค้ามีปุ่ม "ระบุเลข" ติดมาเสมอ
  */
 function ResultCard({
@@ -971,41 +962,6 @@ function Barcode({ value, className }: { value: string; className?: string }) {
         <rect key={i} x={b.x} y={0} width={b.w} height={40} fill="currentColor" />
       ))}
     </svg>
-  );
-}
-
-/**
- * แถบผลบนมือถือ — สรุปทั้งรอบเหนือปุ่มบันทึก (จอคอมใช้ toast จึงไม่ขึ้นแถบนี้)
- * เจอกับไม่พบแยกเป็นคนละการ์ด สแกนหลายรูปได้ทั้งสองอย่างพร้อมกัน
- */
-export function ZoneScanResult({ state }: { state: ZoneAssign }) {
-  const rep = state.report;
-  if (!rep) return null;
-  const one = rep.found.length === 1 ? rep.found[0] : undefined;
-
-  return (
-    <div className="space-y-2">
-      {rep.found.length > 0 && (
-        <ResultCard
-          tone="ok"
-          title="เลือกสินค้าแล้ว"
-          detail={one ? pieceLine(one) : `${rep.found.length} รายการ`}
-          zone={one ? (one.zone ?? null) : undefined}
-        />
-      )}
-      {rep.missing.length > 0 && (
-        <ResultCard
-          tone="error"
-          title="ไม่พบสินค้าที่ตรงกับบาร์โค้ด"
-          detail={
-            rep.missing.length === 1
-              ? rep.missing[0]
-              : `${rep.missing.length} รายการ`
-          }
-          onManual={state.focusManual}
-        />
-      )}
-    </div>
   );
 }
 

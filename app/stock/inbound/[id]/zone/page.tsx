@@ -15,7 +15,6 @@ import { Button } from "@peckey954/ui/components/ui/button";
 import { toast } from "sonner";
 import {
   ZoneAssignFields,
-  ZoneScanResult,
   useZoneAssign,
 } from "@/components/stock/zone-assign";
 import {
@@ -84,12 +83,11 @@ function ZoneSheet({ receipt }: { receipt: InboundReceipt }) {
       </main>
 
       {/* ---------- แถบล่าง ----------
-           มือถือ: ผลสแกนทั้งรอบอยู่เหนือปุ่มบันทึก (จอคอมบอกผลด้วย toast แทน)
+           ผลสแกนไม่มาอยู่ตรงนี้ — ขึ้นเป็น toast ด้านบนแล้วหายเอง ปุ่มจึงไม่ถูกดันหรือบัง
            จอคอม: ย้อนกลับชิดซ้าย บันทึกชิดขวา ตามแถบล่างของหน้าอื่น ๆ */}
       <div className="sticky bottom-0 z-30 border-t border-border bg-surface">
         <div className="mx-auto w-full max-w-6xl px-4 py-3 sm:px-6">
-          <ZoneScanResult state={state} />
-          <div className="mt-3 grid grid-cols-2 gap-3 first:mt-0 sm:flex sm:justify-between">
+          <div className="grid grid-cols-2 gap-3 sm:flex sm:justify-between">
             <Button variant="outline-primary" onClick={() => router.back()}>
               ย้อนกลับ
             </Button>

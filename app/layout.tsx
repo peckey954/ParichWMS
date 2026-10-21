@@ -44,10 +44,15 @@ export default function RootLayout({
               เพราะ prop style ที่ส่งจากตรงนี้แทนที่ style เดิมของ DS ทั้งก้อน
               ไม่ได้ merge ทีละตัวแปร
 
-              ตำแหน่ง — ไม่ระบุ position/offset เอง ปล่อยเป็นค่าเริ่มต้นของ
-              sonner (มุมล่างขวา) ตามที่ขอกลับมาใช้แบบเดิม */}
+              ตำแหน่ง — บนกลาง ใต้แถบหัว (สูง 56px) ไม่ใช่มุมล่างขวาแบบเดิม
+              เพราะมุมล่างทับปุ่มบันทึก/ย้อนกลับที่ติดขอบล่างแทบทุกหน้า
+              อยู่ 3 วินาทีแล้วหายเอง ไม่ค้างบังงานที่ทำต่อ */}
           <Toaster
             richColors
+            position="top-center"
+            offset={72}
+            mobileOffset={{ top: 64 }}
+            duration={3000}
             style={
               {
                 "--normal-bg": "var(--popover)",
