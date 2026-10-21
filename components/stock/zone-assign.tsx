@@ -58,12 +58,14 @@ import { ZONES, formatQty, type InboundPiece } from "@/lib/general-stock";
      สแกนจากรูปภาพ    หยิบรูปป้ายที่ถ่ายไว้ (มือถือ = คลังรูป, คอม = เลือกไฟล์/ลากมาวาง)
                        เลือกได้หลายรูป อ่านเลขแล้วจบ ไม่เก็บรูป
 
-   ---------- ผลสแกน: จอคอมกับมือถือบอกคนละแบบ ----------
+   ---------- ผลสแกน ----------
 
-   จอคอม    กล้องเป็นกล่อง มีแค่ "กำลังค้นหาบาร์โค้ด..." อ่านติดแล้วกล่องปิดเอง
-            ติ๊กในรายการ แล้วบอกผลด้วย toast มุมล่างขวา ("สแกนสำเร็จ" / ไม่พบ)
-   มือถือ   กล้องเต็มจอ อ่านติดแล้วค้างหน้ากล้องไว้ บอกผลในแผงล่าง ให้กด "สแกน"
-            ชิ้นต่อไปได้ทันที กด "เสร็จสิ้น" แล้วสรุปผลทั้งรอบเป็นแถบเหนือปุ่มบันทึก
+   กล้องมีแค่ "กำลังค้นหาบาร์โค้ด..." อ่านติดแล้วปิดเอง ติ๊กในรายการให้ทันที
+   ทั้งจอคอมและมือถือ ทำเหมือนกัน — จำนวนครั้งที่กดเท่ากับค้างหน้ากล้องไว้แล้วกด
+   "สแกน" ต่อ แต่เห็นรายการที่ติ๊กให้ทันทีหลังทุกชิ้น และมีแบบเดียวให้จำ
+
+   ที่ต่างกันคือที่บอกผล: จอคอมเป็น toast มุมล่างขวา มือถือเป็นแถบเหนือปุ่มบันทึก
+   (toast บนมือถือจะทับปุ่มบันทึกพอดี)
 
    ทั้งสองแบบไม่มีไอคอนสถานะทับบนบาร์โค้ด — ผลอยู่ที่ข้อความ ไม่ใช่ที่ภาพกล้อง
 
@@ -725,9 +727,8 @@ function SimulateToggle({
 /* ------------------------------------------------------------------
    กล่องสแกน — ภาพจำลองของกล้อง
 
-   จอคอม   กล่องกลางจอ มีแค่ "กำลังค้นหาบาร์โค้ด..." อ่านติดแล้วปิดเอง ผลไปที่ toast
-   มือถือ  เต็มจอ อ่านติดแล้วค้างไว้ บอกผลในแผงล่าง กด "สแกน" ชิ้นถัดไป
-           หรือ "เสร็จสิ้น" กลับไปหน้าเลือกโซน
+   จอคอมเป็นกล่องกลางจอ มือถือเต็มจอ ทั้งสองแบบมีแค่ "กำลังค้นหาบาร์โค้ด..."
+   อ่านติดแล้วปิดเอง ผลไปบอกที่หน้าเลือกโซน
 ------------------------------------------------------------------ */
 
 type ScanPhase =
@@ -741,13 +742,12 @@ function ScannerDialog({ state }: { state: ZoneAssign }) {
     kind: "aiming",
     code: null,
   });
-  const [round, setRound] = React.useState(0);
 
-  // เริ่มรอบส่องใหม่ทุกครั้งที่เปิด กดสแกนต่อ หรือสลับผลจำลองระหว่างส่อง
+  // เริ่มรอบส่องใหม่ทุกครั้งที่เปิด หรือสลับผลจำลองระหว่างส่อง
   const { mockRead, applyCode, setScannerOpen } = state;
-  const live = React.useRef({ mockRead, applyCode, setScannerOpen, isPhone });
+  const live = React.useRef({ mockRead, applyCode, setScannerOpen });
   React.useEffect(() => {
-    live.current = { mockRead, applyCode, setScannerOpen, isPhone };
+    live.current = { mockRead, applyCode, setScannerOpen };
   });
 
   React.useEffect(() => {
@@ -757,16 +757,13 @@ function ScannerDialog({ state }: { state: ZoneAssign }) {
     const t = setTimeout(() => {
       const { outcome, piece } = live.current.applyCode(code);
       setPhase({ kind: outcome, code, piece });
-      // จอคอมไม่ค้างหน้ากล้อง อ่านติดแล้วปิดเอง ผลไปบอกที่ toast
-      if (!live.current.isPhone) {
-        if (outcome === "empty") toast.info("เลือกครบทุกชิ้นในใบนี้แล้ว");
-        live.current.setScannerOpen(false);
-      }
+      // ไม่ค้างหน้ากล้อง อ่านติดแล้วปิดเอง ผลไปบอกที่หน้าเลือกโซน
+      if (outcome === "empty") toast.info("เลือกครบทุกชิ้นในใบนี้แล้ว");
+      live.current.setScannerOpen(false);
     }, AIM_MS);
     return () => clearTimeout(t);
-  }, [open, round, state.simulate]);
+  }, [open, state.simulate]);
 
-  const again = () => setRound((r) => r + 1);
   const close = () => state.setScannerOpen(false);
 
   return (
@@ -799,83 +796,17 @@ function ScannerDialog({ state }: { state: ZoneAssign }) {
           {phase.kind === "aiming" && <SimulateToggle state={state} dark />}
         </Viewfinder>
 
-        <div className="space-y-3 p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
-          {phase.kind === "aiming" || !isPhone ? (
-            <div className="flex min-h-14 items-center justify-center gap-2 text-sm text-muted-foreground">
-              <Spinner className="size-4" />
-              กำลังค้นหาบาร์โค้ด...
-            </div>
-          ) : (
-            <>
-              <ScanPanel
-                phase={phase}
-                picked={state.picked.size}
-                total={state.pieces.length}
-                onManual={state.focusManual}
-              />
-              {phase.kind === "empty" ? (
-                <Button className="w-full" onClick={close}>
-                  เสร็จสิ้น
-                </Button>
-              ) : (
-                <div className="grid grid-cols-2 gap-3">
-                  <Button variant="outline-primary" onClick={close}>
-                    เสร็จสิ้น
-                  </Button>
-                  <Button onClick={again}>
-                    <ScanBarcodeIcon />
-                    สแกน
-                  </Button>
-                </div>
-              )}
-            </>
-          )}
+        <div className="flex min-h-14 items-center justify-center gap-2 p-4 pb-[max(1rem,env(safe-area-inset-bottom))] text-sm text-muted-foreground">
+          <Spinner className="size-4" />
+          กำลังค้นหาบาร์โค้ด...
         </div>
       </DialogContent>
     </Dialog>
   );
 }
 
-/** ผลของการส่องครั้งล่าสุดในหน้ากล้องบนมือถือ */
-function ScanPanel({
-  phase,
-  picked,
-  total,
-  onManual,
-}: {
-  phase: ScanPhase;
-  picked: number;
-  total: number;
-  onManual: () => void;
-}) {
-  if (phase.kind === "notfound")
-    return (
-      <ResultCard
-        tone="error"
-        title="ไม่พบสินค้าที่ตรงกับบาร์โค้ด"
-        detail={phase.code ?? ""}
-        onManual={onManual}
-      />
-    );
-  if (phase.kind === "empty")
-    return <ResultCard tone="ok" title="เลือกครบทุกชิ้นในใบนี้แล้ว" />;
-  const p = "piece" in phase ? phase.piece : undefined;
-  return (
-    <ResultCard
-      tone="ok"
-      title={phase.kind === "already" ? "สินค้านี้เลือกไว้แล้ว" : "เลือกสินค้าแล้ว"}
-      detail={p ? `${p.receiptCode} · ${p.packing} · ${formatQty(p.qty)} ตัน` : undefined}
-      aside={
-        <span className="text-xs text-muted-foreground tabular-nums">
-          {picked}/{total}
-        </span>
-      }
-    />
-  );
-}
-
 /**
- * การ์ดผล — ใช้ร่วมกันทั้ง toast (จอคอม) แถบเหนือปุ่มบันทึก (มือถือ) และแผงหน้ากล้อง
+ * การ์ดผล — ใช้ร่วมกันทั้ง toast (จอคอม) และแถบเหนือปุ่มบันทึก (มือถือ)
  * ไม่พบสินค้ามีปุ่ม "ระบุเลข" ติดมาเสมอ
  */
 function ResultCard({
