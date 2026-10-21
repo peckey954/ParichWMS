@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import {
+  ArrowLeftIcon,
   CircleAlertIcon,
   CircleCheckIcon,
   KeyboardIcon,
@@ -402,10 +403,13 @@ export type ZoneAssign = ReturnType<typeof useZoneAssign>;
 export function ZoneAssignFields({
   state,
   listClassName,
+  scannerInDialog = true,
 }: {
   state: ZoneAssign;
   /** ความสูงกรอบรายการ กล่องกับหน้าเต็มมีที่ว่างให้ไม่เท่ากัน */
   listClassName?: string;
+  /** false เมื่อคนห่อเอากล้องไปวางเอง (กล่องบนจอคอม) ไม่ต้องเปิดกล่องซ้อน */
+  scannerInDialog?: boolean;
 }) {
   const { pieces, picked, visible, waiting } = state;
 
@@ -536,7 +540,7 @@ export function ZoneAssignFields({
         )}
       </div>
 
-      <ScannerDialog state={state} />
+      {scannerInDialog && <ScannerDialog state={state} />}
     </div>
   );
 }
@@ -707,6 +711,53 @@ type ScanPhase =
 
 function ScannerDialog({ state }: { state: ZoneAssign }) {
   const isPhone = useIsPhone();
+  const close = () => state.setScannerOpen(false);
+
+  return (
+    <Dialog open={state.scannerOpen} onOpenChange={state.setScannerOpen}>
+      <DialogContent
+        showCloseButton={false}
+        className={cn(
+          "flex flex-col gap-0 overflow-hidden p-0",
+          isPhone
+            ? "inset-0 h-dvh max-w-none translate-x-0 translate-y-0 rounded-none border-0"
+            : "sm:max-w-md"
+        )}
+      >
+        <div className="flex items-center justify-between gap-2 border-b border-border px-4 py-3">
+          <div>
+            <DialogTitle className="text-base">สแกนบาร์โค้ด</DialogTitle>
+            <DialogDescription className="mt-0.5 text-xs">
+              เล็งกรอบให้ตรงบาร์โค้ดบนป้ายสินค้า
+            </DialogDescription>
+          </div>
+          <Button variant="ghost" size="icon" aria-label="ปิด" onClick={close}>
+            <XIcon />
+          </Button>
+        </div>
+        <ScannerBody
+          state={state}
+          viewfinderClassName={isPhone ? "min-h-0 flex-1" : "aspect-[4/3]"}
+          panelClassName="p-4 pb-[max(1rem,env(safe-area-inset-bottom))]"
+        />
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+/**
+ * ตัวกล้องกับแผงผล — ใช้ได้ทั้งในกล่องของตัวเอง (มือถือ) และฝังในกล่องเลือกโซน
+ * (จอคอม) ซึ่งสลับเนื้อหาในกล่องเดิมแทนการเปิดกล่องซ้อนกล่อง
+ */
+function ScannerBody({
+  state,
+  viewfinderClassName,
+  panelClassName,
+}: {
+  state: ZoneAssign;
+  viewfinderClassName?: string;
+  panelClassName?: string;
+}) {
   const open = state.scannerOpen;
   const [phase, setPhase] = React.useState<ScanPhase>({
     kind: "aiming",
@@ -736,80 +787,55 @@ function ScannerDialog({ state }: { state: ZoneAssign }) {
   const close = () => state.setScannerOpen(false);
 
   return (
-    <Dialog open={open} onOpenChange={state.setScannerOpen}>
-      <DialogContent
-        showCloseButton={false}
-        className={cn(
-          "flex flex-col gap-0 overflow-hidden p-0",
-          isPhone
-            ? "inset-0 h-dvh max-w-none translate-x-0 translate-y-0 rounded-none border-0"
-            : "sm:max-w-md"
-        )}
-      >
-        <div className="flex items-center justify-between gap-2 border-b border-border px-4 py-3">
-          <div>
-            <DialogTitle className="text-base">สแกนบาร์โค้ด</DialogTitle>
-            <DialogDescription className="mt-0.5 text-xs">
-              เล็งกรอบให้ตรงบาร์โค้ดบนป้ายสินค้า
-            </DialogDescription>
-          </div>
-          <Button variant="ghost" size="icon" aria-label="ปิด" onClick={close}>
-            <XIcon />
-          </Button>
-        </div>
+    <>
+      <Viewfinder phase={phase} className={viewfinderClassName}>
+        {phase.kind === "aiming" && <SimulateToggle state={state} dark />}
+      </Viewfinder>
 
-        <Viewfinder
+      <div className={cn("space-y-3", panelClassName)}>
+        <ScanPanel
           phase={phase}
-          className={isPhone ? "min-h-0 flex-1" : "aspect-[4/3]"}
-        >
-          {phase.kind === "aiming" && <SimulateToggle state={state} dark />}
-        </Viewfinder>
+          picked={state.picked.size}
+          total={state.pieces.length}
+        />
 
-        <div className="space-y-3 p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
-          <ScanPanel
-            phase={phase}
-            picked={state.picked.size}
-            total={state.pieces.length}
-          />
-
-          {phase.kind === "aiming" ? (
-            <Button
-              variant="outline-primary"
-              className="w-full"
-              onClick={state.focusManual}
-            >
+        {phase.kind === "aiming" ? (
+          <Button
+            variant="outline-primary"
+            className="w-full"
+            onClick={state.focusManual}
+          >
+            <KeyboardIcon />
+            กรอกเลขเอง
+          </Button>
+        ) : phase.kind === "notfound" ? (
+          <div className="grid grid-cols-2 gap-3">
+            <Button variant="outline-primary" onClick={state.focusManual}>
               <KeyboardIcon />
               กรอกเลขเอง
             </Button>
-          ) : phase.kind === "notfound" ? (
-            <div className="grid grid-cols-2 gap-3">
-              <Button variant="outline-primary" onClick={state.focusManual}>
-                <KeyboardIcon />
-                กรอกเลขเอง
-              </Button>
-              <Button onClick={again}>
-                <RotateCcwIcon />
-                สแกนใหม่
-              </Button>
-            </div>
-          ) : phase.kind === "empty" ? (
-            <Button className="w-full" onClick={close}>
+            <Button onClick={again}>
+              <RotateCcwIcon />
+              สแกนใหม่
+            </Button>
+          </div>
+        ) : phase.kind === "empty" ? (
+          <Button className="w-full" onClick={close}>
+            เสร็จสิ้น
+          </Button>
+        ) : (
+          <div className="grid grid-cols-2 gap-3">
+            <Button variant="outline-primary" onClick={close}>
               เสร็จสิ้น
             </Button>
-          ) : (
-            <div className="grid grid-cols-2 gap-3">
-              <Button variant="outline-primary" onClick={close}>
-                เสร็จสิ้น
-              </Button>
-              <Button onClick={again}>
-                <ScanBarcodeIcon />
-                สแกนชิ้นถัดไป
-              </Button>
-            </div>
-          )}
-        </div>
-      </DialogContent>
-    </Dialog>
+            <Button onClick={again}>
+              <ScanBarcodeIcon />
+              สแกนชิ้นถัดไป
+            </Button>
+          </div>
+        )}
+      </div>
+    </>
   );
 }
 
@@ -1101,31 +1127,73 @@ export function ZoneAssignDialog({
     onOpenChange(false);
   };
 
+  // กล่องซ้อนกล่องบนจอคอมดูเหมือนสองหน้าต่างทับกัน — สแกนจึงสลับเนื้อหา
+  // ในกล่องเดิม มีปุ่มย้อนกลับไปหน้าเลือกโซน Esc ระหว่างสแกนก็แค่ถอยกลับ ไม่ปิดทั้งกล่อง
+  const scanning = state.scannerOpen;
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="flex max-h-[92dvh] flex-col gap-4 sm:max-w-2xl">
-        <DialogHeader>
-          <DialogTitle>เลือกโซนรับเข้า</DialogTitle>
-          <DialogDescription>
-            เลือกโซนแล้วสแกนเลขที่ติดบนสินค้าหรือเลือกจากรายการ
-          </DialogDescription>
-        </DialogHeader>
+      <DialogContent
+        className="flex max-h-[92dvh] flex-col gap-4 sm:max-w-2xl"
+        onEscapeKeyDown={(e) => {
+          if (!scanning) return;
+          e.preventDefault();
+          state.setScannerOpen(false);
+        }}
+      >
+        {scanning ? (
+          <>
+            <DialogHeader className="flex-row items-center gap-2">
+              <Button
+                variant="ghost"
+                size="icon"
+                aria-label="กลับไปเลือกโซน"
+                className="-ml-2 shrink-0"
+                onClick={() => state.setScannerOpen(false)}
+              >
+                <ArrowLeftIcon />
+              </Button>
+              <div className="space-y-1 text-left">
+                <DialogTitle>สแกนบาร์โค้ด</DialogTitle>
+                <DialogDescription>
+                  ส่องป้ายสินค้าให้กล้องของเครื่อง เล็งกรอบให้ตรงบาร์โค้ด
+                </DialogDescription>
+              </div>
+            </DialogHeader>
+            <div className="min-h-0 flex-1 overflow-y-auto">
+              <ScannerBody
+                state={state}
+                viewfinderClassName="h-[min(48dvh,400px)] rounded-lg"
+                panelClassName="pt-4"
+              />
+            </div>
+          </>
+        ) : (
+          <>
+            <DialogHeader>
+              <DialogTitle>เลือกโซนรับเข้า</DialogTitle>
+              <DialogDescription>
+                เลือกโซนแล้วสแกนเลขที่ติดบนสินค้าหรือเลือกจากรายการ
+              </DialogDescription>
+            </DialogHeader>
 
-        <div className="min-h-0 flex-1 overflow-y-auto">
-          <ZoneAssignFields state={state} />
-        </div>
+            <div className="min-h-0 flex-1 overflow-y-auto">
+              <ZoneAssignFields state={state} scannerInDialog={false} />
+            </div>
 
-        {/* นอกกรอบที่เลื่อน — ผลสแกนต้องอยู่ในสายตาตลอด ไม่ใช่ต้องเลื่อนลงไปหา */}
-        <ZoneScanResult state={state} />
+            {/* นอกกรอบที่เลื่อน — ผลสแกนต้องอยู่ในสายตาตลอด ไม่ใช่ต้องเลื่อนลงไปหา */}
+            <ZoneScanResult state={state} />
 
-        <DialogFooter className="grid grid-cols-2 gap-3">
-          <Button variant="outline-primary" onClick={() => onOpenChange(false)}>
-            ย้อนกลับ
-          </Button>
-          <Button disabled={!state.canSubmit} onClick={submit}>
-            บันทึก
-          </Button>
-        </DialogFooter>
+            <DialogFooter className="grid grid-cols-2 gap-3">
+              <Button variant="outline-primary" onClick={() => onOpenChange(false)}>
+                ย้อนกลับ
+              </Button>
+              <Button disabled={!state.canSubmit} onClick={submit}>
+                บันทึก
+              </Button>
+            </DialogFooter>
+          </>
+        )}
       </DialogContent>
     </Dialog>
   );
