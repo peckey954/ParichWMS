@@ -9,7 +9,8 @@ import {
 } from "@peckey954/ui/components/ui/collapsible";
 import { cn } from "@peckey954/ui/lib/utils";
 import { AdjustLotDialog, MoveLotDialog } from "./lot-dialogs";
-import { RankChip, useSafetyStock } from "./safety-stock-provider";
+import { RankMark, useSafetyStock } from "./safety-stock-provider";
+import { canSeeGrade, useRole } from "@/components/role-provider";
 import { productSafety } from "@/lib/safety-stock";
 import {
   CATEGORY_LABEL,
@@ -261,14 +262,21 @@ export function ProductCard({
   showLots,
   showChips,
   showActions,
+  showGrade = true,
 }: {
   product: Product;
   /** เปิด/ปิดรายการล็อตพร้อมกันทั้งหน้า สั่งจากตัวกรอง ไม่มีปุ่มแยกรายใบ */
   showLots: boolean;
   showChips: boolean;
   showActions: boolean;
+  /** หน้าสต็อกสินค้าไม่มีเกรด — ปิดได้ทั้งหน้า */
+  showGrade?: boolean;
 }) {
   const total = productTotal(product);
+  const { role } = useRole();
+  // เกรดเป็นข้อมูลของฝ่ายจัดซื้อ: ขึ้นเฉพาะ Admin/Procurement และเฉพาะจอคอม
+  // (มือถือคือคนหน้าคลัง ไม่ได้ใช้เกรดตัดสินใจ)
+  const gradeVisible = showGrade && canSeeGrade(role);
   const pending = rollupPending(product);
   // เกรดมาจากเกณฑ์ที่ตั้งไว้ในหน้า /stock/safety-stock — ปรับเกณฑ์ที่นั่นแล้ว
   // ชิปตรงนี้เปลี่ยนตามทันที null = หน่วยนับนี้ยังไม่ได้ตั้งเกณฑ์ไว้ ไม่เดาให้
@@ -301,7 +309,7 @@ export function ProductCard({
                 "ปริมาณ" (ใช้เยอะแค่ไหน) จึงควรอ่านคู่กับจำนวนคงเหลือ ส่วนชิป
                 ข้างชื่อเป็นคุณสมบัติของตัวสินค้า (ประเภท/บรรจุ) คนละเรื่องกัน */}
             <div className="flex shrink-0 items-center gap-2">
-              {safety && <RankChip rank={safety.rank} />}
+              {safety && gradeVisible && <RankMark rank={safety.rank} className="max-sm:hidden" />}
               <p className="text-right tabular-nums">
                 <span
                   className={cn(

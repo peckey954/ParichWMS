@@ -362,6 +362,7 @@ function GoodsStockView() {
                     showLots={view.showLots}
                     showChips={view.showChips}
                     showActions={view.showActions}
+                    showGrade={false}
                   />
                 ))}
 

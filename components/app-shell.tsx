@@ -5,7 +5,6 @@ import Link from "next/link";
 import Image from "next/image";
 import { useRouter, usePathname } from "next/navigation";
 import { CheckIcon, MenuIcon, XIcon } from "lucide-react";
-import { Avatar, AvatarFallback } from "@peckey954/ui/components/ui/avatar";
 import { Button } from "@peckey954/ui/components/ui/button";
 import {
   Popover,
@@ -31,6 +30,8 @@ import {
 import { FileViewerProvider } from "@/components/file-viewer-provider";
 import { LightTooltip } from "@/components/light-tooltip";
 import { NotificationBell } from "@/components/notification-bell";
+import { ProfileMenu } from "@/components/profile-menu";
+import { RoleProvider } from "@/components/role-provider";
 import { NotificationsProvider, useNotifications } from "@/components/notifications-provider";
 import { AddedRoundsProvider } from "@/components/po/added-rounds-provider";
 import { PrSetupProvider } from "@/components/pr/pr-setup-provider";
@@ -60,6 +61,8 @@ function ToastNotificationIcon({ n }: { n: AppNotification }) {
 export function AppShell({ children }: { children: React.ReactNode }) {
   return (
     <DevicePreviewProvider>
+      {/* บทบาทผู้ใช้ (สลับได้จากเมนูโปรไฟล์) — หลายหน้าซ่อน/แสดงของตามบทบาท */}
+      <RoleProvider>
       {/* สถานะการคำนวณสูตรอยู่ที่นี่ เพราะต้องข้ามหน้าได้
           หน้าตั้งค่าแก้ข้อมูล แล้วหน้าผลลัพธ์ต้องรู้ว่าผลที่แสดงอยู่เก่าไปแล้ว */}
       <RecipeRunProvider>
@@ -84,6 +87,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </AddedRoundsProvider>
         </NotificationsProvider>
       </RecipeRunProvider>
+      </RoleProvider>
     </DevicePreviewProvider>
   );
 }
@@ -227,9 +231,7 @@ function Shell({ children }: { children: React.ReactNode }) {
             <DevicePreviewToggle className="mr-1 hidden md:flex" />
             <ThemeToggle />
             <NotificationBell />
-            <Avatar className="ml-1 size-8">
-              <AvatarFallback className="text-xs">CN</AvatarFallback>
-            </Avatar>
+            <ProfileMenu />
           </div>
         </div>
       </header>
