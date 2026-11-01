@@ -184,7 +184,9 @@ function IssueCard({ doc }: { doc: GoodsIssueDoc }) {
 
       <Separator className="mt-3" />
 
+      {/* แบบเดียวกับการ์ดสต็อกทั่วไป: ป้ายซ้าย ชิปสถานะชิดขวา */}
       <div className="mt-3 flex items-center justify-between gap-3 text-sm">
+        <span className="text-muted-foreground">สถานะ:</span>
         <StatusChip status={doc.status} label={GOODS_ISSUE_STATUS_LABEL[doc.status]} />
       </div>
     </div>

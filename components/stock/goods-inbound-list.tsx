@@ -95,12 +95,8 @@ export function GoodsInboundList({
               </dl>
               <Separator className="mt-3" />
               <div className="mt-3 flex items-center justify-between gap-3 text-sm">
-                <span>
-                  รอรับเข้า{" "}
-                  <span className="font-semibold tabular-nums">
-                    {qty(d)} {d.unit}
-                  </span>
-                </span>
+                <span className="text-muted-foreground">รอรับเข้า ({d.unit}):</span>
+                <span className="font-semibold tabular-nums">{qty(d)}</span>
               </div>
             </div>
           ))}
