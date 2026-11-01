@@ -73,18 +73,18 @@ export const STOCK_SORTS: SortOption<StockSort>[] = [
 const asOptions = (values: string[]) =>
   values.map((v) => ({ value: v, label: v }));
 
-const CATEGORY_OPTIONS = CATEGORIES.map((c) => ({
-  value: c.id as string,
-  label: c.label,
-}));
-
 export function StockFilter({
   view,
   onApply,
+  categories = CATEGORIES,
+  productNames = STOCK_PRODUCT_NAMES,
 }: {
   view: StockView;
   /** เอาค่าที่แก้ไว้ไปใช้แล้วปิดกล่อง — ยกเลิกใช้กากบาทหรือ Esc */
   onApply: (next: StockView) => void;
+  /** ประเภทที่เลือกได้ — สต็อกสินค้ามีแค่สามประเภท ไม่ใช่ทั้งสิบเอ็ดของสต็อกทั่วไป */
+  categories?: { id: CategoryId; label: string }[];
+  productNames?: string[];
 }) {
   // ค่าที่กำลังแก้อยู่ในกล่อง ยังไม่มีผลกับรายการจนกว่าจะกดตกลง
   const [draft, setDraft] = React.useState(view);
@@ -148,7 +148,7 @@ export function StockFilter({
         <Section title="ประเภทสินค้า" htmlFor="stock-kinds">
           <MultiSelectChips
             id="stock-kinds"
-            options={CATEGORY_OPTIONS}
+            options={categories.map((c) => ({ value: c.id as string, label: c.label }))}
             value={draft.kinds}
             onValueChange={(v) => set({ kinds: v as CategoryId[] })}
             placeholder="เลือกประเภท"
@@ -161,7 +161,7 @@ export function StockFilter({
         <Section title="สินค้า" htmlFor="stock-products">
           <MultiSelectChips
             id="stock-products"
-            options={asOptions(STOCK_PRODUCT_NAMES)}
+            options={asOptions(productNames)}
             value={draft.products}
             onValueChange={(products) => set({ products })}
             placeholder="เลือกสินค้า"

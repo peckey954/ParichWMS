@@ -107,6 +107,9 @@ const STATUS_CHIP: Record<string, string> = {
   // เพิ่มสำหรับหน้าประวัติ ใช้จานสีชุดเดียวกันจะได้เป็นชุดเดียว
   inbound:
     "[--bdg-surface:var(--chip-green)] [--bdg-text:var(--chip-green-foreground)]",
+  // รับเข้าจากไลน์ผลิต (สต็อกสินค้า) — เขียวอมเหลือง แยกจากรับเข้าภายนอก
+  inboundProduction:
+    "[--bdg-surface:var(--chip-lime)] [--bdg-text:var(--chip-lime-foreground)]",
   // ย้าย = ม่วง ปรับปรุง = ชมพู ตามแบบ
   move: "[--bdg-surface:var(--chip-purple)] [--bdg-text:var(--chip-purple-foreground)]",
   adjust:

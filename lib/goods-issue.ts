@@ -316,3 +316,13 @@ export const formatTons = (v: number) =>
   v.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 export const formatCount = (v: number) => v.toLocaleString("en-US");
+
+/** บันทึกจ่ายแล้วกลับมาที่แท็บรอจ่าย/คืน ให้เห็นว่าใบหายไปจริง (ใช้ครั้งเดียว) */
+let ISSUE_TAB_REQUEST = false;
+export function requestIssueTab() {
+  ISSUE_TAB_REQUEST = true;
+}
+export const issueTabRequested = () => ISSUE_TAB_REQUEST;
+export function clearIssueTabRequest() {
+  ISSUE_TAB_REQUEST = false;
+}

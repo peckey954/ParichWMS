@@ -30,8 +30,15 @@ function stamp() {
   return `${d.getMonth() + 1}/${d.getDate()}/${d.getFullYear()} | ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
 }
 
-export function StockLogProvider({ children }: { children: React.ReactNode }) {
-  const [rows, setRows] = React.useState<HistoryRow[]>(HISTORY_ROWS);
+export function StockLogProvider({
+  children,
+  initial = HISTORY_ROWS,
+}: {
+  children: React.ReactNode;
+  /** ประวัติตั้งต้น — สต็อกสินค้าใช้ชุดของตัวเอง ไม่ปนกับสต็อกทั่วไป */
+  initial?: HistoryRow[];
+}) {
+  const [rows, setRows] = React.useState<HistoryRow[]>(initial);
   const seq = React.useRef(0);
 
   const addLog = React.useCallback(

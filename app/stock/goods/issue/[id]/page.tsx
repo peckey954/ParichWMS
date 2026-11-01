@@ -18,6 +18,7 @@ import {
   closeGoodsIssue,
   formatTons,
   goodsIssueOf,
+  requestIssueTab,
   requestTons,
   type GoodsIssueDoc,
 } from "@/lib/goods-issue";
@@ -47,6 +48,7 @@ function IssueSheet({ doc }: { doc: GoodsIssueDoc }) {
   const save = () => {
     if (!state.canSubmit) return;
     closeGoodsIssue(doc.id);
+    requestIssueTab();
     toast.success("จ่ายสินค้าสำเร็จ", {
       description: `${doc.code} · ${state.rows.length} Lot · ${formatTons(state.totalTons)} ตัน`,
     });
