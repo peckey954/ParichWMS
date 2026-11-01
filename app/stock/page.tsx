@@ -10,11 +10,11 @@ import { Switch } from "@peckey954/ui/components/ui/switch";
 import {
   Breadcrumb,
   BreadcrumbItem,
-  BreadcrumbLink,
   BreadcrumbList,
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from "@peckey954/ui/components/ui/breadcrumb";
+import { HomeCrumb } from "@/components/home-crumb";
 import { Button } from "@peckey954/ui/components/ui/button";
 import {
   Dialog,
@@ -39,6 +39,7 @@ import { InboundList } from "@/components/stock/inbound-list";
 import { IssueList } from "@/components/stock/issue-list";
 import { ProductCard } from "@/components/stock/stock-parts";
 import { FifoList, ZoneGroups } from "@/components/stock/lot-list";
+import { useRememberedState } from "@/components/remembered-state";
 import { SortControl } from "@/components/sort-control";
 import {
   STOCK_SORTS,
@@ -113,20 +114,21 @@ function GeneralStockView() {
   // ชิปจึงเป็นการนำทาง (เลือกอยู่เสมอหนึ่งอัน) ไม่ใช่ตัวกรองที่ปิดได้
   // "history" เป็นมุมมองพิเศษ ไม่ใช่ประเภทสินค้า แต่อยู่แถวชิปเดียวกัน
   // เพราะผู้ใช้คิดว่ามันคือ "อีกอย่างที่เลือกดูได้" เหมือนกัน
-  const [cat, setCat] = React.useState<CategoryId | "history">("sack");
+  // จำไว้ข้ามหน้า — เปิดเอกสารแล้วย้อนกลับ ต้องกลับมาที่แท็บ/ชิปเดิม
+  const [cat, setCat] = useRememberedState<CategoryId | "history">("stock.cat", "sack");
   const isHistory = cat === "history";
   const [query, setQuery] = React.useState("");
   // ทุกอย่างที่ตัวกรองเป็นเจ้าของอยู่ในก้อนเดียว แก้ในกล่องแล้วกดตกลงทีเดียวจบ
   const [view, setView] = React.useState<StockView>(STOCK_VIEW_DEFAULT);
   const [filterOpen, setFilterOpen] = React.useState(false);
   // กลับมาจากบันทึกใบรับเข้า ต้องเปิดแท็บรอรับเข้าค้างไว้ให้เห็นผล
-  const [tab, setTab] = React.useState<"stock" | "inbound" | "issue">(() =>
-    inboundTabRequested() ? "inbound" : "stock"
+  const [tab, setTab] = useRememberedState<"stock" | "inbound" | "issue">("stock.tab", "stock", () =>
+    inboundTabRequested() ? "inbound" : undefined
   );
   React.useEffect(() => clearInboundTabRequest(), []);
   const [inboundQuery, setInboundQuery] = React.useState("");
   const [issueQuery, setIssueQuery] = React.useState("");
-  const [issueKind, setIssueKind] = React.useState<IssueKind>("all");
+  const [issueKind, setIssueKind] = useRememberedState<IssueKind>("stock.issueKind", "all");
 
   // จุดบนปุ่มขึ้นเมื่อมีอะไรต่างจากค่าเริ่มต้น ไม่ว่าจะเป็นติ๊ก การเรียง หรือดรอปดาวน์
   const filterActive = !isStockDefault(view);
@@ -257,7 +259,7 @@ function GeneralStockView() {
           <Breadcrumb>
             <BreadcrumbList>
               <BreadcrumbItem>
-                <BreadcrumbLink href="/">ระบบ</BreadcrumbLink>
+                <HomeCrumb />
               </BreadcrumbItem>
               <BreadcrumbSeparator />
               <BreadcrumbItem>

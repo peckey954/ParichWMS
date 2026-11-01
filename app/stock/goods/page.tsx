@@ -21,6 +21,7 @@ import { cn } from "@peckey954/ui/lib/utils";
 import { toast } from "sonner";
 import { useDevicePreview, useScrollState } from "@/components/device-preview";
 import { Crumbs } from "@/components/receiving/parts";
+import { useRememberedState } from "@/components/remembered-state";
 import { SortControl } from "@/components/sort-control";
 import { BackToTop, StickyToolbar } from "@/components/sticky-toolbar";
 import { EmptyDocs } from "@/components/stock/doc-parts";
@@ -124,8 +125,10 @@ function GoodsStockView() {
   const { config: safetyConfig } = useSafetyStock();
   const { rows: logRows } = useStockLog();
 
-  const [tab, setTab] = React.useState<"stock" | "inbound" | "issue">(() =>
-    issueTabRequested() ? "issue" : goodsInboundTabRequested() ? "inbound" : "stock"
+  // แท็บกับชิปจำไว้ข้ามหน้า — เปิดเอกสารแล้วย้อนกลับ ต้องกลับมาที่เดิม
+  // บันทึกเสร็จแล้วสั่งเปิดแท็บไหน ค่านั้นชนะค่าที่จำไว้
+  const [tab, setTab] = useRememberedState<"stock" | "inbound" | "issue">("goods.tab", "stock", () =>
+    issueTabRequested() ? "issue" : goodsInboundTabRequested() ? "inbound" : undefined
   );
   React.useEffect(() => {
     clearIssueTabRequest();
@@ -133,7 +136,7 @@ function GoodsStockView() {
   }, []);
 
   // ---------- แท็บสต็อก ----------
-  const [cat, setCat] = React.useState<Chip>("produced");
+  const [cat, setCat] = useRememberedState<Chip>("goods.cat", "produced");
   const isHistory = cat === "history";
   const [query, setQuery] = React.useState("");
   const [view, setView] = React.useState<StockView>(STOCK_VIEW_DEFAULT);
@@ -156,7 +159,7 @@ function GoodsStockView() {
 
   // ---------- แท็บรอรับเข้า ----------
   const [inboundQuery, setInboundQuery] = React.useState("");
-  const [source, setSource] = React.useState<GoodsInboundSource>("production");
+  const [source, setSource] = useRememberedState<GoodsInboundSource>("goods.source", "production");
   const inboundOpen = GOODS_INBOUND_DOCS.filter(isGoodsInboundOpen);
   const inboundCounts: Record<GoodsInboundSource, number> = {
     production: inboundOpen.filter((d) => d.source === "production").length,
@@ -168,7 +171,7 @@ function GoodsStockView() {
 
   // ---------- แท็บรอจ่าย/คืน ----------
   const [issueQuery, setIssueQuery] = React.useState("");
-  const [kind, setKind] = React.useState<IssueKind>("all");
+  const [kind, setKind] = useRememberedState<IssueKind>("goods.issueKind", "all");
   const open = GOODS_ISSUE_DOCS.filter(isGoodsIssueOpen);
   const issueCounts = {
     all: open.length,
