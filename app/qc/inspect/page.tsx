@@ -20,6 +20,7 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from "@peckey954/ui/components/ui/breadcrumb";
+import { HomeCrumb } from "@/components/home-crumb";
 import { Button } from "@peckey954/ui/components/ui/button";
 import { Input } from "@peckey954/ui/components/ui/input";
 import { Label } from "@peckey954/ui/components/ui/label";
@@ -219,7 +220,7 @@ export default function QcInspectPage() {
       <Breadcrumb>
         <BreadcrumbList>
           <BreadcrumbItem>
-            <BreadcrumbLink href="/">ระบบ</BreadcrumbLink>
+            <HomeCrumb />
           </BreadcrumbItem>
           <BreadcrumbSeparator />
           <BreadcrumbItem>

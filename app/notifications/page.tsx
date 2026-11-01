@@ -5,11 +5,11 @@ import { ChevronLeftIcon } from "lucide-react";
 import {
   Breadcrumb,
   BreadcrumbItem,
-  BreadcrumbLink,
   BreadcrumbList,
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from "@peckey954/ui/components/ui/breadcrumb";
+import { HomeCrumb } from "@/components/home-crumb";
 import { NotificationList } from "@/components/notification-list";
 import { useNotifications } from "@/components/notifications-provider";
 
@@ -51,7 +51,7 @@ export default function NotificationsPage() {
           <Breadcrumb>
             <BreadcrumbList>
               <BreadcrumbItem>
-                <BreadcrumbLink href="/">ระบบ</BreadcrumbLink>
+                <HomeCrumb />
               </BreadcrumbItem>
               <BreadcrumbSeparator />
               <BreadcrumbItem>

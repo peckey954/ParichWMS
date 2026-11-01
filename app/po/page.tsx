@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ListFilterIcon, RotateCcwIcon, SearchIcon, XIcon } from "lucide-react";
+import { DownloadIcon, ListFilterIcon, RotateCcwIcon, SearchIcon, XIcon } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -16,11 +16,11 @@ import {
 import {
   Breadcrumb,
   BreadcrumbItem,
-  BreadcrumbLink,
   BreadcrumbList,
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from "@peckey954/ui/components/ui/breadcrumb";
+import { HomeCrumb } from "@/components/home-crumb";
 import { Button } from "@peckey954/ui/components/ui/button";
 import {
   Dialog,
@@ -41,7 +41,6 @@ import { cn } from "@peckey954/ui/lib/utils";
 import { toast } from "sonner";
 import { DateRangeSelect, DateSelect, parseDateSlash, type DateRange } from "@/components/date-select";
 import { useDevicePreview, useScrollState } from "@/components/device-preview";
-import { EmptyDocs } from "@/components/stock/doc-parts";
 import { BackToTop, StickyToolbar } from "@/components/sticky-toolbar";
 import { PrFilter, PR_VIEW_DEFAULT, isPrViewDefault, type PrView } from "@/components/pr/pr-filter";
 import { PoList } from "@/components/po/po-list";
@@ -49,19 +48,22 @@ import { PoOrderList } from "@/components/po/po-order-list";
 import { matchesPr, PR_PRODUCTS, type PrCategoryId, type PrDoc } from "@/lib/pr";
 import {
   matchesPoOrder,
+  matchesPoOrderChip,
   matchesPoQueueChip,
+  PO_ORDER_CHIP_LABEL,
   PO_ORDER_DOCS,
   PO_QUEUE_CHIP_LABEL,
   PO_QUEUE_DOCS,
-  PO_STATUS_LABEL,
+  poIsDone,
+  type PoDoc,
+  type PoOrderChip,
   type PoQueueChip,
-  type PoStatus,
 } from "@/lib/po";
 
 /* ------------------------------------------------------------------
    สั่งซื้อ PO — หน้ารวมงานจัดซื้อ สามช่วง
 
-   แท็บใหญ่ (ขอซื้อ/สั่งซื้อ/ซื้อแล้ว) เป็นสามกองงานคนละแบบ ไม่ใช่ตัวกรอง
+   แท็บใหญ่ (สั่งซื้อ/ขอซื้อ/เข้าคลัง) เป็นสามกองงานคนละแบบ ไม่ใช่ตัวกรอง
    ของกองเดียวกัน จึงไม่ล็อกอยู่ในแถบติดบนเหมือนชิป — ตามมาตรฐานเดียวกับ
    หน้าสต็อกทั่วไป มีแค่แท็บ "ขอซื้อ" เท่านั้นที่เปิดใช้งานตามไฟล์ออกแบบ
 
@@ -70,6 +72,17 @@ import {
 ------------------------------------------------------------------ */
 
 const CHIPS: PoQueueChip[] = ["all", "urgent", "cancelled"];
+const PO_CHIPS: PoOrderChip[] = ["all", "urgent", "cancelled"];
+
+/** แท็บ "สั่งซื้อ" = ใบที่ยังไม่จบ ส่วนใบที่รับครบ/ปิดใบแล้วย้ายไปแท็บ "เข้าคลัง" */
+const ORDER_DOCS = PO_ORDER_DOCS.filter((d) => !poIsDone(d));
+const DONE_DOCS = PO_ORDER_DOCS.filter(poIsDone);
+
+/** วันที่เอกสาร "1/16/2026 | 10:42:52" (เดือน/วัน/ปี) → Date ระดับวัน */
+function parseDocDate(stamp: string): Date | undefined {
+  const m = stamp.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+  return m ? new Date(+m[3], +m[1] - 1, +m[2]) : undefined;
+}
 
 export default function PoPage() {
   return (
@@ -112,19 +125,28 @@ function PoPageContent() {
   const [cancelReason, setCancelReason] = React.useState("");
 
   // ---------- แท็บ "สั่งซื้อ" ----------
-  const [poChip, setPoChip] = React.useState<PoStatus>("pending");
+  const [poChip, setPoChip] = React.useState<PoOrderChip>("all");
   const [poQuery, setPoQuery] = React.useState("");
+  const [poDocDate, setPoDocDate] = React.useState<Date>();
   const [poDateRange, setPoDateRange] = React.useState<DateRange>();
   const [poFilterOpen, setPoFilterOpen] = React.useState(false);
   const poFilterActive = !!poDateRange?.from;
   const poCounts = React.useMemo(() => {
-    const c: Record<PoStatus, number> = { pending: 0, cancelled: 0 };
-    for (const d of PO_ORDER_DOCS) c[d.status] += 1;
+    const c: Record<PoOrderChip, number> = { all: 0, urgent: 0, cancelled: 0 };
+    for (const d of ORDER_DOCS) {
+      for (const k of PO_CHIPS) if (matchesPoOrderChip(d, k)) c[k] += 1;
+    }
     return c;
   }, []);
-  const poVisible = PO_ORDER_DOCS.filter((d) => {
-    if (d.status !== poChip) return false;
+  const poVisible = ORDER_DOCS.filter((d) => {
+    if (!matchesPoOrderChip(d, poChip)) return false;
     if (!matchesPoOrder(d, poQuery)) return false;
+
+    // ช่องวันที่บนแถบเครื่องมือ — วันที่เอกสาร (วันที่สร้างใบ) ตรงกับวันที่เลือก
+    if (poDocDate) {
+      const docDate = parseDocDate(d.createdAt);
+      if (!docDate || docDate.getTime() !== poDocDate.getTime()) return false;
+    }
 
     // ช่วงวันที่คาดว่าสินค้าจะเข้าของใบนั้น "ทับซ้อน" กับช่วงที่เลือกกรองไว้ไหม
     if (poDateRange?.from || poDateRange?.to) {
@@ -137,6 +159,34 @@ function PoPageContent() {
 
     return true;
   });
+
+  // ---------- แท็บ "เข้าคลัง" ----------
+  const [doneQuery, setDoneQuery] = React.useState("");
+  const [doneDate, setDoneDate] = React.useState<Date>();
+  const [doneSelected, setDoneSelected] = React.useState<Set<string>>(new Set());
+  const doneVisible = DONE_DOCS.filter((d) => {
+    if (!matchesPoOrder(d, doneQuery)) return false;
+    if (doneDate) {
+      const docDate = parseDocDate(d.createdAt);
+      if (!docDate || docDate.getTime() !== doneDate.getTime()) return false;
+    }
+    return true;
+  });
+  const toggleDone = (id: string, checked: boolean) =>
+    setDoneSelected((prev) => {
+      const next = new Set(prev);
+      if (checked) next.add(id);
+      else next.delete(id);
+      return next;
+    });
+  // ไม่มี backend — แค่ยืนยันด้วย toast ว่าส่งออกใบไหนบ้าง
+  const exportDocs = (list: PoDoc[]) => {
+    if (list.length === 0) return;
+    toast.success("ส่งออกรายงานสำเร็จ", {
+      description:
+        list.length === 1 ? `ใบสั่งซื้อ ${list[0].code}` : `ใบสั่งซื้อ ${list.length} ใบ`,
+    });
+  };
 
   // รวมหลายใบเป็นใบสั่งซื้อเดียวกันได้เฉพาะประเภทสินค้าเดียวกัน — ใบแรกที่ติ๊ก
   // ล็อกประเภทไว้ ใบอื่นที่คนละประเภทจะกดเลือก/สร้างไม่ได้จนกว่าจะล้างการเลือก
@@ -208,7 +258,7 @@ function PoPageContent() {
     scrollIntoTop(list, bar + (framed ? 0 : 56));
   };
 
-  const changePoChip = (next: PoStatus) => {
+  const changePoChip = (next: PoOrderChip) => {
     setPoChip(next);
     const list = listRef.current;
     if (!list) return;
@@ -270,7 +320,7 @@ function PoPageContent() {
           <Breadcrumb>
             <BreadcrumbList>
               <BreadcrumbItem>
-                <BreadcrumbLink href="/">ระบบ</BreadcrumbLink>
+                <HomeCrumb />
               </BreadcrumbItem>
               <BreadcrumbSeparator />
               <BreadcrumbItem>
@@ -291,13 +341,13 @@ function PoPageContent() {
           >
             <TabsList className="w-full">
               <TabsTrigger value="po" className="flex-1">
-                สั่งซื้อ ({PO_ORDER_DOCS.length})
+                สั่งซื้อ ({ORDER_DOCS.length})
               </TabsTrigger>
               <TabsTrigger value="queue" className="flex-1">
                 ขอซื้อ ({counts.all})
               </TabsTrigger>
               <TabsTrigger value="done" className="flex-1">
-                ซื้อแล้ว (99+)
+                เข้าคลัง ({DONE_DOCS.length})
               </TabsTrigger>
             </TabsList>
           </Tabs>
@@ -456,8 +506,14 @@ function PoPageContent() {
                       onChange={(e) => setPoQuery(e.target.value)}
                     />
                   </InputGroup>
-                  {/* วันที่ย้ายเข้าไปอยู่ในกล่องตัวกรองแล้ว ไม่ใช่ช่องลอยอยู่บนแถบเครื่องมือ
-                      เหมือนหน้าขอซื้อ PR — กรองตามช่วงวันที่คาดว่าสินค้าจะเข้าของใบนั้น */}
+                  {/* ช่องวันที่เอกสารบนแถบเครื่องมือ (ตามแบบ) ส่วนช่วงวันที่คาดว่า
+                      สินค้าจะเข้าอยู่ในกล่องตัวกรอง ซ่อนช่องนี้บนจอแคบเหมือนแท็บขอซื้อ */}
+                  <DateSelect
+                    value={poDocDate}
+                    onValueChange={setPoDocDate}
+                    placeholder="วันที่"
+                    className="hidden w-44 shrink-0 sm:flex"
+                  />
                   <Dialog open={poFilterOpen} onOpenChange={setPoFilterOpen}>
                     <DialogTrigger asChild>
                       <Button
@@ -499,7 +555,7 @@ function PoPageContent() {
                     )}
                   >
                     <div role="tablist" aria-label="สถานะใบสั่งซื้อ" className="flex shrink-0 items-center gap-2">
-                      {(["pending", "cancelled"] as PoStatus[]).map((s) => {
+                      {PO_CHIPS.map((s) => {
                         const on = poChip === s;
                         return (
                           <button
@@ -515,7 +571,7 @@ function PoPageContent() {
                                 : "border-border text-foreground hover:bg-accent-hover"
                             )}
                           >
-                            {PO_STATUS_LABEL[s]} ({poCounts[s]})
+                            {PO_ORDER_CHIP_LABEL[s]} ({poCounts[s]})
                           </button>
                         );
                       })}
@@ -534,9 +590,56 @@ function PoPageContent() {
           )}
 
           {tab === "done" && (
-            <div className="mt-4">
-              <EmptyDocs title="แท็บซื้อแล้วยังไม่เปิดใช้งาน" hint="อยู่ระหว่างออกแบบหน้านี้ กลับมาดูใหม่อีกครั้ง" />
-            </div>
+            <>
+              <StickyToolbar hidden={hidden} barRef={stickyRef}>
+                <div className="flex items-center gap-2 pt-2">
+                  <InputGroup className="min-w-0 flex-1 bg-card">
+                    <InputGroupAddon align="inline-start">
+                      <SearchIcon />
+                    </InputGroupAddon>
+                    <InputGroupInput
+                      placeholder="ค้นหา..."
+                      value={doneQuery}
+                      onChange={(e) => setDoneQuery(e.target.value)}
+                    />
+                  </InputGroup>
+                  <DateSelect
+                    value={doneDate}
+                    onValueChange={setDoneDate}
+                    placeholder="วันที่"
+                    className="hidden w-44 shrink-0 sm:flex"
+                  />
+                  {/* ติ๊กเลือกไว้ = ส่งออกเฉพาะที่เลือก ไม่ได้เลือก = ส่งออกทั้งหมดที่เห็น */}
+                  <Button
+                    variant="outline-primary"
+                    className="shrink-0"
+                    disabled={doneVisible.length === 0}
+                    onClick={() =>
+                      exportDocs(
+                        doneSelected.size > 0
+                          ? DONE_DOCS.filter((d) => doneSelected.has(d.id))
+                          : doneVisible
+                      )
+                    }
+                  >
+                    <DownloadIcon />
+                    <span className="hidden sm:inline">
+                      ส่งออกรายงาน{doneSelected.size > 0 && ` (${doneSelected.size})`}
+                    </span>
+                  </Button>
+                </div>
+              </StickyToolbar>
+
+              <div className="mt-4">
+                <PoOrderList
+                  docs={doneVisible}
+                  variant="done"
+                  selected={doneSelected}
+                  onToggleSelect={toggleDone}
+                  onExport={exportDocs}
+                />
+              </div>
+            </>
           )}
 
           <BackToTop show={showTop} onClick={scrollToTop} />

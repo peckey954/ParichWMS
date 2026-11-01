@@ -10,11 +10,11 @@ import {
 import {
   Breadcrumb,
   BreadcrumbItem,
-  BreadcrumbLink,
   BreadcrumbList,
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from "@peckey954/ui/components/ui/breadcrumb";
+import { HomeCrumb } from "@/components/home-crumb";
 import { Tabs, TabsList, TabsTrigger } from "@peckey954/ui/components/ui/tabs";
 import { toast } from "sonner";
 import {
@@ -223,7 +223,7 @@ export default function PackingListPage() {
       <Breadcrumb>
         <BreadcrumbList>
           <BreadcrumbItem>
-            <BreadcrumbLink href="/">ระบบ</BreadcrumbLink>
+            <HomeCrumb />
           </BreadcrumbItem>
           <BreadcrumbSeparator />
           <BreadcrumbItem>

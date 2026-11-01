@@ -13,6 +13,7 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from "@peckey954/ui/components/ui/breadcrumb";
+import { HomeCrumb } from "@/components/home-crumb";
 import { Button } from "@peckey954/ui/components/ui/button";
 import {
   InputGroup,
@@ -173,7 +174,7 @@ function AddWeighingRoundForm() {
         <Breadcrumb>
           <BreadcrumbList>
             <BreadcrumbItem>
-              <BreadcrumbLink href="/">ระบบ</BreadcrumbLink>
+              <HomeCrumb />
             </BreadcrumbItem>
             <BreadcrumbSeparator />
             <BreadcrumbItem>
@@ -254,7 +255,7 @@ function AddWeighingRoundForm() {
         <Breadcrumb>
           <BreadcrumbList>
             <BreadcrumbItem>
-              <BreadcrumbLink href="/">ระบบ</BreadcrumbLink>
+              <HomeCrumb />
             </BreadcrumbItem>
             <BreadcrumbSeparator />
             {/* จอแคบยุบชั้นนี้เหลือ ⋯ และตัดเลขที่ใบออกจากชั้นถัดไป — ไม่งั้น

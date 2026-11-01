@@ -22,6 +22,7 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from "@peckey954/ui/components/ui/breadcrumb";
+import { HomeCrumb } from "@/components/home-crumb";
 import { Button } from "@peckey954/ui/components/ui/button";
 import {
   InputGroup,
@@ -35,7 +36,7 @@ import { toast } from "sonner";
 import { DateSelect, formatDateSlash, parseDateSlash } from "@/components/date-select";
 import { useNumberField } from "@/components/number-field";
 import { applyRoundEdits, useAddedRounds } from "@/components/po/added-rounds-provider";
-import { formatPoQty, getPoLineItem, roundIdFromCode, type PoRound } from "@/lib/po";
+import { formatPoQty, getPoLineItem, poCanAddRound, roundIdFromCode, type PoRound } from "@/lib/po";
 
 /* ------------------------------------------------------------------
    เพิ่ม/แก้ไขรอบรับเข้า — หน้าเดียวกันสองโหมด แยกกันด้วย query param
@@ -126,6 +127,25 @@ function AddPoRoundForm() {
         <div className="mt-10 rounded-xl border border-dashed border-border px-6 py-14 text-center">
           <p className="font-medium">ไม่พบรอบรับเข้านี้</p>
           <p className="mt-1 text-sm text-muted-foreground">เอกสารอาจถูกลบหรือลิงก์ไม่ถูกต้อง</p>
+          <Button asChild variant="outline-primary" className="mt-4">
+            <Link href={`/po/${params.id}`}>กลับไปหน้าใบสั่งซื้อ</Link>
+          </Button>
+        </div>
+      </main>
+    );
+  }
+
+  // ปิดใบ/ยกเลิก/ยังไม่อนุมัติ — เพิ่มหรือแก้รอบไม่ได้ (ตามแบบ เอาปุ่มออกหมด
+  // เช็คซ้ำไว้เผื่อมีคนพิมพ์ลิงก์เอง)
+  if (!poCanAddRound(found.po)) {
+    return (
+      <main className="mx-auto w-full max-w-4xl px-4 pt-6 pb-24 sm:px-6">
+        <Crumbs poId={params.id} />
+        <div className="mt-10 rounded-xl border border-dashed border-border px-6 py-14 text-center">
+          <p className="font-medium">ใบสั่งซื้อนี้เพิ่มหรือแก้ไขรอบรับเข้าไม่ได้</p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            ใบสั่งซื้อปิดแล้ว ถูกยกเลิก หรือยังไม่ผ่านการอนุมัติ
+          </p>
           <Button asChild variant="outline-primary" className="mt-4">
             <Link href={`/po/${params.id}`}>กลับไปหน้าใบสั่งซื้อ</Link>
           </Button>
@@ -228,7 +248,7 @@ function AddPoRoundForm() {
               แล้ว — ดู roundHref ใน app/po/[id]/page.tsx) */}
           {isEdit && (
             <Button
-              variant="ghost"
+              variant="outline"
               size="icon"
               aria-label="ลบรอบรับเข้านี้"
               className="shrink-0"
@@ -351,14 +371,17 @@ function AddPoRoundForm() {
         <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
           <AlertDialogContent>
             <AlertDialogHeader>
-              <AlertDialogTitle>ลบรอบรับเข้านี้ใช่ไหม?</AlertDialogTitle>
-              <AlertDialogDescription>
-                {code} จะหายไปจากตาราง &quot;รอบการรับสินค้า&quot; การดำเนินการนี้แก้ไขกลับไม่ได้
+              <AlertDialogTitle>คุณต้องการลบการรับเข้าสินค้าใช่ไหม?</AlertDialogTitle>
+              <AlertDialogDescription asChild>
+                <span>
+                  <span className="block">เลขที่รับสินค้า {code}</span>
+                  หากลบแล้วจะไม่สามารถกู้คืนข้อมูลได้อีก
+                </span>
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
-              <AlertDialogCancel>ยกเลิก</AlertDialogCancel>
-              <AlertDialogAction onClick={handleDelete}>ยืนยันลบ</AlertDialogAction>
+              <AlertDialogCancel>ย้อนกลับ</AlertDialogCancel>
+              <AlertDialogAction onClick={handleDelete}>ลบ</AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
@@ -372,7 +395,7 @@ function Crumbs({ poId }: { poId?: string }) {
     <Breadcrumb>
       <BreadcrumbList>
         <BreadcrumbItem>
-          <BreadcrumbLink href="/">ระบบ</BreadcrumbLink>
+          <HomeCrumb />
         </BreadcrumbItem>
         <BreadcrumbSeparator />
         <BreadcrumbItem>

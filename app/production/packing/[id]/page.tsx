@@ -19,6 +19,7 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from "@peckey954/ui/components/ui/breadcrumb";
+import { HomeCrumb } from "@/components/home-crumb";
 import { Button } from "@peckey954/ui/components/ui/button";
 import {
   Collapsible,
@@ -108,7 +109,7 @@ export default function ProductionOrderPage() {
         <Breadcrumb>
           <BreadcrumbList>
             <BreadcrumbItem>
-              <BreadcrumbLink href="/">ระบบ</BreadcrumbLink>
+              <HomeCrumb />
             </BreadcrumbItem>
             <BreadcrumbSeparator />
             <BreadcrumbItem>

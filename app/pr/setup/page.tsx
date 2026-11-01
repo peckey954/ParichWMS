@@ -18,6 +18,7 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from "@peckey954/ui/components/ui/breadcrumb";
+import { HomeCrumb } from "@/components/home-crumb";
 import { usePrSetup } from "@/components/pr/pr-setup-provider";
 import { categoriesWithoutWarehouse } from "@/lib/pr-setup";
 
@@ -108,7 +109,7 @@ export default function PrSetupHubPage() {
       <Breadcrumb>
         <BreadcrumbList>
           <BreadcrumbItem>
-            <BreadcrumbLink href="/">ระบบ</BreadcrumbLink>
+            <HomeCrumb />
           </BreadcrumbItem>
           <BreadcrumbSeparator />
           <BreadcrumbItem>

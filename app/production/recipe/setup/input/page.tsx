@@ -22,6 +22,7 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from "@peckey954/ui/components/ui/breadcrumb";
+import { HomeCrumb } from "@/components/home-crumb";
 import { Button } from "@peckey954/ui/components/ui/button";
 import { useRecipeRun } from "@/components/production/recipe-run";
 import { InputSetup } from "@/components/production/input-setup";
@@ -55,7 +56,7 @@ export default function RecipeInputSetupPage() {
         <Breadcrumb>
           <BreadcrumbList>
             <BreadcrumbItem>
-              <BreadcrumbLink href="/">ระบบ</BreadcrumbLink>
+              <HomeCrumb />
             </BreadcrumbItem>
             <BreadcrumbSeparator />
             <BreadcrumbItem>

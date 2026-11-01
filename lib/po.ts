@@ -66,6 +66,22 @@ export const PO_STATUS_LABEL: Record<PoStatus, string> = {
 };
 
 /**
+ * ผลอนุมัติของใบสั่งซื้อ — คนละมิติกับ PoStatus (ยังอยู่/ยกเลิก) ใบที่ยัง
+ * "รออนุมัติ" หรือ "ไม่อนุมัติ" ยังเพิ่มรอบรับสินค้าไม่ได้ (ปุ่มเพิ่มรอบ disable)
+ * แต่แก้ไข/ยกเลิกเอกสารได้ — ใบไม่อนุมัติที่ยกเลิกจะคืนกลับไปที่คำขอ PR
+ */
+export type PoApproval = "waiting" | "approved" | "rejected";
+
+/** ชิปกรองของแท็บ "สั่งซื้อ" — ชุดเดียวกับแท็บ "ขอซื้อ" และหน้าอนุมัติ */
+export type PoOrderChip = "all" | "urgent" | "cancelled";
+
+export const PO_ORDER_CHIP_LABEL: Record<PoOrderChip, string> = {
+  all: "รอดำเนินการ",
+  urgent: "เร่งด่วน",
+  cancelled: "ยกเลิก",
+};
+
+/**
  * สถานะของแต่ละ "รอบรับเข้า" — รถคันหนึ่งมาส่งสินค้าตัวหนึ่งครั้งหนึ่ง
  * รอรถ → มีแต่นัดหมาย ยังไม่มีตัวเลข → รอตรวจสอบ QC → เข้าคลังแล้ว/ส่งคืน
  */
@@ -148,6 +164,9 @@ export type PoLineItem = {
   /** เหตุผลตอนแก้ไขข้อมูลสั่งซื้อภายหลัง — มีค่าเฉพาะรายการที่เคยถูกแก้ไข */
   changeReason?: string;
   rounds: PoRound[];
+  /** ตัดขายส่ง — ขายต่อให้ลูกค้าก่อนเข้าโรงงาน (ดึงจาก ERP) นับรวมกับยอดรับเข้า
+   *  ตอนคิดค้างรับ มีเฉพาะบางรายการ */
+  wholesaleQty?: number;
 
   /** น้ำหนักชั่งตรวจสอบ (กก.) เทียบกับน้ำหนักตามใบชั่งของผู้ขาย — มีค่าเฉพาะ
    *  รายการที่เริ่มรับเข้าไปแล้วอย่างน้อยหนึ่งรอบ (ดู lineItemStarted) ยังไม่
@@ -163,7 +182,10 @@ export type PoDoc = {
   company: string;
   poType: "po" | "poi";
   status: PoStatus;
+  approval: PoApproval;
   cancelReason?: string;
+  /** ผู้ยกเลิกเอกสาร — มีค่าเฉพาะใบที่ยกเลิกแล้ว */
+  cancelledBy?: string;
   /** ผู้สั่งซื้อ — คนที่กดสร้างใบนี้ */
   requester: string;
   /** มีค่าเฉพาะใบที่เคยถูกแก้ไขหลังสร้าง ไม่ใช่ทุกใบจะมี */
@@ -175,7 +197,29 @@ export type PoDoc = {
   expectedFrom: string;
   expectedTo: string;
   lineItems: PoLineItem[];
+  /** รายการตัดขายส่ง (ดึงจาก ERP) — มีเฉพาะบางใบ */
+  wholesale: PoWholesale[];
+  /** ปิดใบสั่งซื้อไปแล้วกี่วัน — ไม่มีค่า = ยังเปิดรับสินค้าอยู่ ปิดแล้วเปิดกลับได้
+   *  ภายใน PO_REOPEN_DAYS วัน (เผื่อกดผิด) พ้นจากนั้นล็อกถาวร */
+  closedDaysAgo?: number;
 };
+
+/** หนึ่งแถวในตาราง "รายการตัดขายส่ง" ของใบสั่งซื้อ */
+export type PoWholesale = {
+  id: string;
+  /** เลขที่ใบสั่งซื้อ (ขายส่ง) จาก ERP */
+  code: string;
+  createdAt: string;
+  lineItemId: string;
+  plate: string;
+  arriveDate: string;
+  containerNo: string;
+  customer: string;
+  qty: number;
+};
+
+/** ปิดใบแล้วยังเปิดกลับได้กี่วัน */
+export const PO_REOPEN_DAYS = 3;
 
 /** รับเข้าแล้วกี่หน่วย — รวมทุกรอบของรายการนี้ (นับ "รับเข้า" ไม่ใช่ "เข้าคลัง"
  *  เพราะของที่รับแล้วแต่ยังรอผล QC ก็ถือว่ารับเข้ามาแล้ว ไม่ใช่ยังไม่มา) */
@@ -199,9 +243,9 @@ export function lineItemFailedQty(item: PoLineItem): number {
   return item.rounds.reduce((sum, r) => sum + (r.failedTon ?? 0), 0);
 }
 
-/** ค้างรับ = สั่งซื้อ − รับเข้าแล้ว ไม่ต่ำกว่า 0 (รับเกินไม่ให้ติดลบดูแปลกตา) */
+/** ค้างรับ = สั่งซื้อ − รับเข้าแล้ว − ตัดขายส่ง ไม่ต่ำกว่า 0 */
 export function lineItemPendingQty(item: PoLineItem): number {
-  return Math.max(0, item.orderedQty - lineItemReceivedQty(item));
+  return Math.max(0, item.orderedQty - lineItemReceivedQty(item) - (item.wholesaleQty ?? 0));
 }
 
 /** ราคารวมต่อหน่วย = ราคาสั่งต่อหน่วย + ค่าจัดการต่อหน่วย */
@@ -217,8 +261,9 @@ export function poOrderedTotal(doc: PoDoc): number {
   return doc.lineItems.reduce((sum, i) => sum + i.orderedQty, 0);
 }
 
+/** รับเข้าแล้วรวมทั้งใบ — นับตัดขายส่งด้วย (ส่งถึงลูกค้าแทนเข้าโรงงาน) */
 export function poReceivedTotal(doc: PoDoc): number {
-  return doc.lineItems.reduce((sum, i) => sum + lineItemReceivedQty(i), 0);
+  return doc.lineItems.reduce((sum, i) => sum + lineItemReceivedQty(i) + (i.wholesaleQty ?? 0), 0);
 }
 
 /** ราคารวมทั้งใบ — รวมราคาต่อหน่วย x จำนวนสั่งซื้อของทุกรายการ */
@@ -235,6 +280,46 @@ export const PO_PROGRESS_LABEL: Record<PoProgress, string> = {
   partial: "ทยอยรับสินค้า",
   complete: "รับสินค้าครบแล้ว",
 };
+
+/** สถานะที่โชว์บนชิปของใบ (หน้ารายการ + หัวหน้ารายละเอียด) — ยกเลิก >
+ *  ผลอนุมัติ (รอ/ไม่อนุมัติ) > ความคืบหน้าการรับเข้า */
+export type PoDisplayStatus = "cancelled" | "waiting" | "rejected" | PoProgress;
+
+export const PO_DISPLAY_STATUS_LABEL: Record<PoDisplayStatus, string> = {
+  cancelled: "ยกเลิก",
+  waiting: "รออนุมัติ",
+  rejected: "ไม่อนุมัติ",
+  ...PO_PROGRESS_LABEL,
+};
+
+/** ปิดใบแล้วโชว์ "รับสินค้าครบแล้ว" ตามแบบ แม้ยอดจะยังไม่ครบก็ตาม */
+export function poDisplayStatus(doc: PoDoc, closed = doc.closedDaysAgo != null): PoDisplayStatus {
+  if (doc.status === "cancelled") return "cancelled";
+  if (doc.approval !== "approved") return doc.approval;
+  if (closed) return "complete";
+  return poProgress(doc);
+}
+
+/** เพิ่ม/แก้รอบรับสินค้าได้เฉพาะใบที่อนุมัติแล้ว ยังไม่ยกเลิก และยังไม่ปิดใบ */
+export function poCanAddRound(doc: PoDoc): boolean {
+  return doc.status !== "cancelled" && doc.approval === "approved" && doc.closedDaysAgo == null;
+}
+
+/** แท็บ "เข้าคลัง" — ใบที่รับสินค้าครบแล้ว หรือปิดใบไปแล้ว */
+export function poIsDone(doc: PoDoc): boolean {
+  return (
+    doc.status !== "cancelled" &&
+    doc.approval === "approved" &&
+    (doc.closedDaysAgo != null || poProgress(doc) === "complete")
+  );
+}
+
+export function matchesPoOrderChip(d: PoDoc, chip: PoOrderChip): boolean {
+  if (chip === "cancelled") return d.status === "cancelled";
+  if (d.status === "cancelled") return false;
+  if (chip === "urgent") return d.lineItems.some((i) => i.urgent);
+  return true;
+}
 
 export function poProgress(doc: PoDoc): PoProgress {
   const received = poReceivedTotal(doc);
@@ -423,6 +508,32 @@ function buildRounds(
   return rounds;
 }
 
+/** รอบที่รับครบตามยอดสั่ง (ใบที่ไปอยู่แท็บ "เข้าคลัง") — สองรอบ รอบหลังอาจมี
+ *  ส่วนที่ไม่ผ่าน QC (ส่งคืน) บ้าง */
+function buildCompleteRounds(lineCode: string, orderedQty: number, rnd: () => number): PoRound[] {
+  const first = Math.round(orderedQty / 2);
+  return [first, orderedQty - first].map((receivedTon, i) => {
+    const code = `${lineCode}-${pad(i + 1)}`;
+    const failedTon = i === 1 && rnd() < 0.4 ? Math.round(receivedTon * 0.3) : 0;
+    return {
+      id: roundIdFromCode(code),
+      code,
+      batchId: `IN-${hex(rnd, 4)}-${hex(rnd, 4)}`,
+      plate: randomPlate(rnd),
+      containerNo: randomContainerNo(rnd),
+      arriveDate: `${pad(10 + i)}/06/2026`,
+      receivedTon,
+      failedTon: failedTon || undefined,
+      qcResult: failedTon ? "รับสภาพ" : "ผ่าน",
+      stockedTon: receivedTon - failedTon,
+      status: "stocked",
+      ...buildWeighingMeta(receivedTon, rnd),
+    } satisfies PoRound;
+  });
+}
+
+const WHOLESALE_CUSTOMERS = ["วาทิศการเกษตร", "สหกรณ์การเกษตรบ้านโป่ง", "ร้านเจริญพืชผล"];
+
 function docStamp(seq: number, rnd: () => number) {
   const day = 18 - (seq % 14);
   return `1/${day}/2026 | ${pad(8 + (seq % 9))}:${pad(Math.floor(rnd() * 60))}:${pad(Math.floor(rnd() * 60))}`;
@@ -432,7 +543,20 @@ const CANCEL_REASON_POOL = ["เอกสารไม่ถูกต้อง", 
 const NOTE_POOL = ["โทรแจ้งซัพพลายเออร์ก่อนส่งของทุกครั้ง", "แยกส่งเป็นล็อตตามรอบผลิต"];
 const CHANGE_REASON_POOL = ["ปรับจำนวนตามสต๊อกคงเหลือ", "ซัพพลายเออร์แจ้งราคาใหม่"];
 
-function buildPoDoc(seq: number, status: PoStatus): PoDoc {
+type BuildOpts = {
+  /** รับครบตามยอดสั่งแล้ว (แท็บ "เข้าคลัง") */
+  complete?: boolean;
+  closedDaysAgo?: number;
+  /** มีรายการตัดขายส่งจาก ERP (รายการสุดท้ายของใบ) */
+  wholesale?: boolean;
+};
+
+function buildPoDoc(
+  seq: number,
+  status: PoStatus,
+  approval: PoApproval = "approved",
+  opts: BuildOpts = {}
+): PoDoc {
   const rnd = seeded(500 + seq);
   const day = 18 - (seq % 14);
   const code = `PO2601${pad(day)}/${pad((seq % 9) + 1)}`;
@@ -445,7 +569,16 @@ function buildPoDoc(seq: number, status: PoStatus): PoDoc {
     const orderedQty = Math.round((150 + rnd() * 700) / 10) * 10;
     const lineCode = `${code}/${pad(i + 1)}`;
     const editedBy = rnd() < 0.4 ? pick(PR_REQUESTERS, rnd) : undefined;
-    const rounds = status === "cancelled" ? [] : buildRounds(lineCode, orderedQty, rnd);
+    // ยังไม่อนุมัติ (หรือยกเลิก) ก็ยังไม่มีรถมาส่ง — ไม่มีรอบรับเข้าเลย
+    // ตัดขายส่งเฉพาะรายการสุดท้ายของใบ (ใบรายการเดียวก็มีได้)
+    const wholesaleQty =
+      opts.wholesale && i === lineCount - 1 ? Math.round(orderedQty * 0.1) : undefined;
+    const rounds =
+      status === "cancelled" || approval !== "approved"
+        ? []
+        : opts.complete
+          ? buildCompleteRounds(lineCode, orderedQty - (wholesaleQty ?? 0), rnd)
+          : buildRounds(lineCode, orderedQty, rnd);
     // เริ่มรับเข้าไปแล้วอย่างน้อยหนึ่งรอบไหม (มีรอบไหนที่ไม่ใช่แค่ "รอรถขนส่ง"
     // บ้าง) — ยังไม่เริ่มเลยไม่มีน้ำหนักชั่ง/น้ำหนักตามผู้ขายให้โชว์
     const started = rounds.some((r) => r.status !== "waitingTruck");
@@ -474,10 +607,25 @@ function buildPoDoc(seq: number, status: PoStatus): PoDoc {
       reason: pick<PrReason>(PR_REASONS, rnd),
       changeReason: editedBy ? pick(CHANGE_REASON_POOL, rnd) : undefined,
       rounds,
+      wholesaleQty,
       weighedKg,
       sellerWeightKg,
     } satisfies PoLineItem;
   });
+
+  const wholesale: PoWholesale[] = lineItems
+    .filter((li) => li.wholesaleQty)
+    .map((li, i) => ({
+      id: `${li.id}-ws`,
+      code: `PRS2601${pad(day)}/${pad((seq % 9) + 1)}${String.fromCharCode(66 + i)}`,
+      createdAt: docStamp(seq, rnd),
+      lineItemId: li.id,
+      plate: randomPlate(rnd),
+      arriveDate: `${pad(12 + i)}/06/2026`,
+      containerNo: randomContainerNo(rnd),
+      customer: pick(WHOLESALE_CUSTOMERS, rnd),
+      qty: li.wholesaleQty!,
+    }));
 
   const fromMonth = 1 + (seq % 12);
   const toMonth = 1 + ((seq + 1) % 12);
@@ -489,21 +637,32 @@ function buildPoDoc(seq: number, status: PoStatus): PoDoc {
     company,
     poType: rnd() < 0.85 ? "po" : "poi",
     status,
+    approval,
     cancelReason: status === "cancelled" ? pick(CANCEL_REASON_POOL, rnd) : undefined,
+    cancelledBy: status === "cancelled" ? pick(PR_REQUESTERS, rnd) : undefined,
     requester: pick(PR_REQUESTERS, rnd),
     editedBy: rnd() < 0.6 ? pick(PR_REQUESTERS, rnd) : undefined,
-    approver: status === "cancelled" ? undefined : rnd() < 0.8 ? pick(PR_REQUESTERS, rnd) : undefined,
+    approver:
+      status === "cancelled" || approval === "waiting"
+        ? undefined
+        : rnd() < 0.8
+          ? pick(PR_REQUESTERS, rnd)
+          : undefined,
     note: rnd() < 0.25 ? pick(NOTE_POOL, rnd) : undefined,
     expectedFrom: `01/${pad(fromMonth)}/2026`,
     expectedTo: `01/${pad(toMonth)}/2026`,
     lineItems,
+    wholesale,
+    closedDaysAgo: opts.closedDaysAgo,
   } satisfies PoDoc;
 }
 
-/** แปดใบรอดำเนินการ สองใบยกเลิก — mock ให้พอมีให้เลื่อนดูหลายหน้า */
+/** แปดใบรอดำเนินการ (สองใบรออนุมัติ หนึ่งใบไม่อนุมัติ) สองใบยกเลิก */
 export const PO_ORDER_DOCS: PoDoc[] = [
-  buildPoDoc(1, "pending"),
-  buildPoDoc(2, "pending"),
+  buildPoDoc(11, "pending", "waiting"),
+  buildPoDoc(12, "pending", "rejected"),
+  buildPoDoc(1, "pending", "approved", { wholesale: true }),
+  buildPoDoc(2, "pending", "waiting"),
   buildPoDoc(3, "pending"),
   buildPoDoc(4, "pending"),
   buildPoDoc(5, "cancelled"),
@@ -512,6 +671,12 @@ export const PO_ORDER_DOCS: PoDoc[] = [
   buildPoDoc(8, "pending"),
   buildPoDoc(9, "pending"),
   buildPoDoc(10, "cancelled"),
+  // แท็บ "เข้าคลัง" — รับครบแล้ว / ปิดใบแล้ว (ยังเปิดกลับได้ / พ้น 3 วันล็อกแล้ว)
+  buildPoDoc(13, "pending", "approved", { complete: true }),
+  buildPoDoc(14, "pending", "approved", { complete: true, wholesale: true }),
+  buildPoDoc(15, "pending", "approved", { closedDaysAgo: 1 }),
+  buildPoDoc(16, "pending", "approved", { complete: true, closedDaysAgo: 5 }),
+  buildPoDoc(17, "pending", "approved", { complete: true }),
 ];
 
 export function getPoOrder(id: string): PoDoc | undefined {

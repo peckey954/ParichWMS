@@ -5,9 +5,9 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import {
   ChevronDownIcon,
+  CircleXIcon,
   DownloadIcon,
   EllipsisVerticalIcon,
-  PencilIcon,
   Trash2Icon,
 } from "lucide-react";
 import {
@@ -29,6 +29,7 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from "@peckey954/ui/components/ui/breadcrumb";
+import { HomeCrumb } from "@/components/home-crumb";
 import { Button } from "@peckey954/ui/components/ui/button";
 import {
   Collapsible,
@@ -62,6 +63,9 @@ import { cn } from "@peckey954/ui/lib/utils";
 import { toast } from "sonner";
 import { applyRoundEdits, useAddedRounds } from "@/components/po/added-rounds-provider";
 import { PoLineItemDetailDialog } from "@/components/po/line-item-detail-dialog";
+import { PoStatusChip } from "@/components/po/po-order-list";
+import { PoStatusTimeline } from "@/components/po/po-status-timeline";
+import { Textarea } from "@peckey954/ui/components/ui/textarea";
 import {
   CardRow,
   COL_FIRST,
@@ -75,6 +79,7 @@ import {
 } from "@/components/stock/doc-parts";
 import {
   formatPoBaht,
+  poDisplayStatus,
   formatPoQty,
   getPoOrder,
   lineItemFailedQty,
@@ -84,9 +89,9 @@ import {
   lineItemStockedQty,
   lineItemTotalPrice,
   lineItemUnitPrice,
-  PO_PROGRESS_LABEL,
+  PO_REOPEN_DAYS,
   PO_ROUND_STATUS_LABEL,
-  PO_STATUS_LABEL,
+  type PoWholesale,
   poProgress,
   poTotalPrice,
   type PoDoc,
@@ -139,11 +144,11 @@ function RoundStatusChip({ status }: { status: PoRoundStatus }) {
   );
 }
 
-type SubTab = "rounds" | "edits" | "status";
+type SubTab = "rounds" | "wholesale" | "status";
 
 const SUB_TABS: { id: SubTab; label: string }[] = [
   { id: "rounds", label: "รอบการรับสินค้า" },
-  { id: "edits", label: "แก้ไขข้อมูลสั่งซื้อ" },
+  { id: "wholesale", label: "ตัดขายส่ง" },
   { id: "status", label: "ติดตามสถานะ" },
 ];
 
@@ -154,11 +159,15 @@ export default function PoOrderDetailPage() {
   const [subTab, setSubTab] = React.useState<SubTab>("rounds");
   const [productFilter, setProductFilter] = React.useState<string>("all");
   const [cancelOpen, setCancelOpen] = React.useState(false);
-  // ปิดใบสั่งซื้อเองก่อนรับสินค้าครบ — ใช้ได้เฉพาะตอน "ทยอยรับสินค้า" เท่านั้น
-  // (ยังไม่เริ่มรับก็ไม่มีอะไรให้ปิดก่อนกำหนด รับครบแล้วก็ปิดไปเองอยู่แล้วโดย
-  // ปริยาย ไม่ต้องมีปุ่มซ้ำ) ไม่มี backend จริง เก็บแค่ state หน้านี้ รีเฟรช/
-  // ออกจากหน้าแล้วกลับมาก็รีเซ็ตเป็น "เปิดรับสินค้าอยู่" เหมือนของเดิม
-  const [closed, setClosed] = React.useState(false);
+  const [cancelReason, setCancelReason] = React.useState("");
+  // ยกเลิกระหว่างเซสชันนี้ — อยู่หน้าเดิม ขึ้นกล่องแดง "เอกสารถูกยกเลิก" ค้างไว้
+  // ให้เห็นชัด (ตามแบบ) ไม่ใช่เด้งกลับหน้ารายการ
+  const [cancelledNow, setCancelledNow] = React.useState<{ reason: string } | null>(null);
+  // ปิดใบสั่งซื้อ — ตั้งต้นจากข้อมูล (closedDaysAgo) ปิด/เปิดในหน้านี้เก็บแค่
+  // state หน้านี้ (ไม่มี backend) ปิดแล้วเปิดกลับได้ภายใน PO_REOPEN_DAYS วัน
+  // (เผื่อกดผิด) พ้นจากนั้นตัวเลือก "เปิดรับสินค้าอยู่" กดไม่ได้
+  const [closed, setClosed] = React.useState(() => po?.closedDaysAgo != null);
+  const reopenLocked = (po?.closedDaysAgo ?? 0) > PO_REOPEN_DAYS;
   // ค่าที่กำลังรอยืนยัน — RadioGroup ไม่อัปเดต `closed` ทันทีที่กด แค่เปิด
   // dialog ถามก่อน ค่า radio ที่โชว์ยังผูกกับ `closed` เดิมอยู่ ถ้ากดยกเลิกใน
   // dialog ก็เท่ากับไม่เกิดอะไรขึ้น ตัวเลือกจะเด้งกลับไปที่เดิมเองโดยอัตโนมัติ
@@ -181,7 +190,17 @@ export default function PoOrderDetailPage() {
     );
   }
 
-  const cancelled = po.status === "cancelled";
+  const cancelled = po.status === "cancelled" || cancelledNow !== null;
+  const shownCancelReason = cancelledNow?.reason ?? po.cancelReason;
+  const shownCancelledBy = cancelledNow ? po.requester : po.cancelledBy;
+  // ยังไม่อนุมัติ/ไม่อนุมัติ/ยกเลิก — ยังไม่มีรอบรับสินค้าให้ดู เหลือแค่ติดตามสถานะ
+  // ปิดใบแล้วเพิ่ม/แก้รอบไม่ได้อีก (เอาปุ่มออก) ตามแบบ
+  const canAddRound = !cancelled && !closed && po.approval === "approved";
+  const showRounds = !cancelled && po.approval === "approved";
+  const subTabs = showRounds
+    ? SUB_TABS.filter((t) => t.id !== "wholesale" || po.wholesale.length > 0)
+    : SUB_TABS.filter((t) => t.id === "status");
+  const activeSubTab: SubTab = showRounds ? subTab : "status";
   // รอบที่เพิ่งเพิ่มระหว่างเซสชันนี้ (มาจากหน้า "เพิ่มรอบ" คนละหน้ากัน ดู
   // AddedRoundsProvider) ต้องขึ้นเป็นแถวบนสุดของตารางเสมอ — ก่อนรอบจากข้อมูล
   // ตัวอย่าง (item.rounds) ทั้งหมด ไม่ว่าจะเป็นรายการสินค้าไหนในใบนี้ก็ตาม
@@ -207,9 +226,12 @@ export default function PoOrderDetailPage() {
     productFilter === "all" ? allRounds : allRounds.filter((r) => r.item.id === productFilter);
 
   function handleCancel() {
+    const reason = cancelReason.trim();
+    if (!reason) return;
     setCancelOpen(false);
-    toast.success(`ยกเลิกใบสั่งซื้อ ${po!.code} แล้ว`);
-    router.push("/po");
+    setCancelReason("");
+    setCancelledNow({ reason });
+    toast.success("ยกเลิกเอกสารสำเร็จ", { description: `ใบสั่งซื้อ ${po!.code}` });
   }
 
   // เลือกที่ RadioGroup แค่เปิด dialog ถามยืนยันก่อน ยังไม่เปลี่ยนสถานะจริง —
@@ -221,26 +243,26 @@ export default function PoOrderDetailPage() {
   function handleConfirmToggleClosed() {
     if (pendingClosed === null) return;
     setClosed(pendingClosed);
-    toast.success(
-      pendingClosed
-        ? `ปิดใบสั่งซื้อ ${po!.code} แล้ว`
-        : `เปิดรับสินค้าใบสั่งซื้อ ${po!.code} อีกครั้ง`
-    );
+    toast.success(pendingClosed ? "ปิดใบสั่งซื้อสำเร็จ" : "เปิดรับสินค้าอีกครั้งแล้ว", {
+      description: `เลขที่ใบสั่งซื้อ: ${po!.code}`,
+    });
     setPendingClosed(null);
   }
 
   function handleDownloadReport() {
-    // ไม่มี backend จริง — ไม่มีไฟล์ให้ดาวน์โหลดจริง แค่ขึ้น toast ยืนยัน
-    // เหมือนปุ่มอื่นๆ ทั้งแอปนี้
-    toast.success(`ดาวน์โหลดรายงานใบสั่งซื้อ ${po!.code} แล้ว`, {
-      description: "รวมเอกสารทุกรอบการรับสินค้าของใบนี้ไว้ในไฟล์เดียว",
+    // ไม่มี backend จริง — แค่ยืนยันด้วย toast ยังรับไม่ครบก็ส่งออกได้ แต่จะมี
+    // เฉพาะรอบที่รับแล้ว
+    toast.success("ส่งออกรายงานสำเร็จ", {
+      description: `ใบสั่งซื้อ ${po!.code} — PDF ใบสั่งซื้อ ใบชั่ง และสำเนาคนขับทุกรอบที่รับแล้ว`,
     });
   }
 
   const progress = poProgress(po);
-  // ปิดใบก่อนกำหนดได้เฉพาะตอน "ทยอยรับสินค้า" — ยังไม่เริ่มรับก็ไม่มีอะไรให้
-  // ปิดก่อนกำหนด รับครบแล้วก็ถือว่าจบไปเองอยู่แล้วโดยปริยาย
-  const canCloseEarly = !cancelled && progress === "partial";
+  // สถานะเปิด/ปิดใบ + ส่งออกรายงาน — ตั้งแต่เริ่มทยอยรับสินค้าเป็นต้นไป
+  const canCloseEarly = !cancelled && (closed || progress !== "notStarted");
+  // เมนู ⋮ — ยกเลิกได้จนถึง "รอรับสินค้า" เริ่มรับสินค้าแล้วไม่มีเมนู
+  // (เมนู "แก้ไข" ตามแบบยังไม่มีหน้าแก้ไขใบสั่งซื้อรองรับ)
+  const canCancel = !cancelled && !closed && (po.approval !== "approved" || progress === "notStarted");
 
   return (
     <div className="flex min-h-[calc(100vh-3.5rem)] flex-col">
@@ -252,17 +274,7 @@ export default function PoOrderDetailPage() {
             <h1 className="text-2xl font-semibold tracking-tight">ใบสั่งซื้อ {po.code}</h1>
             <p className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted-foreground">
               {po.createdAt}
-              <Badge
-                tone={cancelled ? "danger" : "neutral"}
-                appearance="soft"
-                className="font-semibold"
-              >
-                {cancelled
-                  ? PO_STATUS_LABEL.cancelled
-                  : closed
-                    ? "ปิดใบสั่งซื้อแล้ว"
-                    : PO_PROGRESS_LABEL[progress]}
-              </Badge>
+              <PoStatusChip doc={po} status={cancelled ? "cancelled" : poDisplayStatus(po, closed)} />
             </p>
           </div>
 
@@ -278,7 +290,7 @@ export default function PoOrderDetailPage() {
                   onValueChange={(v) => handleRadioChange(v === "closed")}
                   className="flex flex-wrap items-center gap-3"
                 >
-                  <RadioOption id="po-status-open" value="open">
+                  <RadioOption id="po-status-open" value="open" disabled={closed && reopenLocked}>
                     เปิดรับสินค้าอยู่
                   </RadioOption>
                   <RadioOption id="po-status-closed" value="closed">
@@ -288,13 +300,13 @@ export default function PoOrderDetailPage() {
               </div>
             )}
             {canCloseEarly && (
-              <Button size="sm" className="shrink-0" onClick={handleDownloadReport}>
+              <Button variant="outline-primary" className="shrink-0" onClick={handleDownloadReport}>
                 <DownloadIcon />
-                ดาวน์โหลดรายงาน
+                ส่งออกรายงาน
               </Button>
             )}
 
-          {!cancelled && (
+          {canCancel && (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button
@@ -307,14 +319,12 @@ export default function PoOrderDetailPage() {
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="min-w-40">
-                <DropdownMenuItem onSelect={() => setSubTab("edits")}>
-                  <PencilIcon />
-                  แก้ไขข้อมูลสั่งซื้อ
-                </DropdownMenuItem>
-                <DropdownMenuItem onSelect={() => setCancelOpen(true)}>
-                  <Trash2Icon />
-                  ยกเลิกใบสั่งซื้อ
-                </DropdownMenuItem>
+                {canCancel && (
+                  <DropdownMenuItem onSelect={() => setCancelOpen(true)}>
+                    <Trash2Icon />
+                    ยกเลิกเอกสาร
+                  </DropdownMenuItem>
+                )}
               </DropdownMenuContent>
             </DropdownMenu>
           )}
@@ -322,9 +332,16 @@ export default function PoOrderDetailPage() {
         </div>
 
         {cancelled && (
-          <div className="mt-4 rounded-xl border border-danger-border bg-danger px-4 py-3 text-sm">
-            <span className="text-muted-foreground">เหตุผลที่ยกเลิก: </span>
-            <span className="font-medium">{po.cancelReason}</span>
+          <div
+            role="status"
+            className="mt-4 flex gap-3 rounded-xl border border-danger-border bg-danger px-4 py-3 text-sm text-danger-strong"
+          >
+            <CircleXIcon className="mt-0.5 size-5 shrink-0" />
+            <div>
+              <p className="font-semibold">เอกสารถูกยกเลิก</p>
+              <p className="mt-0.5">เหตุผล: {shownCancelReason ?? "-"}</p>
+              <p>ผู้ยกเลิก: {shownCancelledBy ?? "-"}</p>
+            </div>
           </div>
         )}
 
@@ -373,14 +390,14 @@ export default function PoOrderDetailPage() {
         <div className="mt-6">
           <h2 className="text-base font-semibold">รายการสินค้า ({po.lineItems.length} รายการ)</h2>
           <div className="mt-3">
-            <LineItemsTable po={po} />
+            <LineItemsTable po={po} canAddRound={canAddRound} />
           </div>
         </div>
 
         {/* ---------- ชิปสลับมุมมองย่อย ---------- */}
         <div role="tablist" aria-label="มุมมองใบสั่งซื้อ" className="mt-8 flex flex-wrap items-center gap-2">
-          {SUB_TABS.map((t) => {
-            const on = subTab === t.id;
+          {subTabs.map((t) => {
+            const on = activeSubTab === t.id;
             return (
               <button
                 key={t.id}
@@ -397,12 +414,13 @@ export default function PoOrderDetailPage() {
               >
                 {t.label}
                 {t.id === "rounds" && ` (${allRounds.length})`}
+                {t.id === "wholesale" && ` (${po.wholesale.length})`}
               </button>
             );
           })}
         </div>
 
-        {subTab === "rounds" ? (
+        {activeSubTab === "rounds" ? (
           <div className="mt-4">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <h2 className="text-base font-semibold">รอบการรับสินค้า</h2>
@@ -424,13 +442,29 @@ export default function PoOrderDetailPage() {
               </Select>
             </div>
             <div className="mt-3">
-              <RoundsTable rows={visibleRounds} />
+              <RoundsTable rows={visibleRounds} locked={!canAddRound} />
             </div>
+          </div>
+        ) : activeSubTab === "wholesale" ? (
+          <div className="mt-4">
+            <h2 className="text-base font-semibold">รายการตัดขายส่ง</h2>
+            <div className="mt-3">
+              <WholesaleTable po={po} rows={po.wholesale} />
+            </div>
+          </div>
+        ) : activeSubTab === "status" ? (
+          <div className="mt-5">
+            <PoStatusTimeline
+              doc={po}
+              cancelled={cancelled}
+              cancelReason={shownCancelReason}
+              cancelledBy={shownCancelledBy}
+            />
           </div>
         ) : (
           <div className="mt-4">
             <EmptyDocs
-              title={`แท็บ${SUB_TABS.find((t) => t.id === subTab)?.label}ยังไม่เปิดใช้งาน`}
+              title={`แท็บ${SUB_TABS.find((t) => t.id === activeSubTab)?.label}ยังไม่เปิดใช้งาน`}
               hint="อยู่ระหว่างออกแบบหน้านี้ กลับมาดูใหม่อีกครั้ง"
             />
           </div>
@@ -445,17 +479,41 @@ export default function PoOrderDetailPage() {
         </div>
       </div>
 
-      <AlertDialog open={cancelOpen} onOpenChange={setCancelOpen}>
+      <AlertDialog
+        open={cancelOpen}
+        onOpenChange={(open) => {
+          setCancelOpen(open);
+          if (!open) setCancelReason("");
+        }}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>ยกเลิกใบสั่งซื้อนี้ใช่ไหม?</AlertDialogTitle>
-            <AlertDialogDescription>
-              เอกสารจะเปลี่ยนเป็นสถานะยกเลิก แก้ไขกลับไม่ได้
+            <AlertDialogTitle>คุณต้องยกเลิกเอกสารใช่ไหม?</AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <span>
+                <span className="block font-medium text-primary">ใบสั่งซื้อ {po.code}</span>
+                {po.approval === "rejected"
+                  ? "ยกเลิกแล้วรายการสินค้าจะคืนกลับไปที่คำขอ PR"
+                  : "หากยกเลิกแล้วจะไม่สามารถกู้คืนข้อมูลได้อีก"}
+              </span>
             </AlertDialogDescription>
           </AlertDialogHeader>
+          <div className="space-y-1.5 text-left">
+            <Label htmlFor="po-cancel-reason">เหตุผลการยกเลิก</Label>
+            <Textarea
+              id="po-cancel-reason"
+              className="bg-card"
+              placeholder="เหตุผล..."
+              rows={3}
+              value={cancelReason}
+              onChange={(e) => setCancelReason(e.target.value)}
+            />
+          </div>
           <AlertDialogFooter>
-            <AlertDialogCancel>ไม่ยกเลิก</AlertDialogCancel>
-            <AlertDialogAction onClick={handleCancel}>ยืนยันยกเลิก</AlertDialogAction>
+            <AlertDialogCancel>ย้อนกลับ</AlertDialogCancel>
+            <AlertDialogAction disabled={!cancelReason.trim()} onClick={handleCancel}>
+              ยกเลิกเอกสาร
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
@@ -498,7 +556,7 @@ function Crumbs({ code }: { code?: string }) {
     <Breadcrumb>
       <BreadcrumbList>
         <BreadcrumbItem>
-          <BreadcrumbLink href="/">ระบบ</BreadcrumbLink>
+          <HomeCrumb />
         </BreadcrumbItem>
         <BreadcrumbSeparator />
         <BreadcrumbItem>
@@ -543,10 +601,12 @@ function MetaField({ label, value }: { label: string; value: string }) {
 function RadioOption({
   id,
   value,
+  disabled,
   children,
 }: {
   id: string;
   value: string;
+  disabled?: boolean;
   children: React.ReactNode;
 }) {
   return (
@@ -554,10 +614,11 @@ function RadioOption({
       htmlFor={id}
       className={cn(
         "flex cursor-pointer items-center gap-2.5 rounded-lg border border-border bg-card px-4 py-2.5 text-sm font-medium",
-        "has-[[data-state=checked]]:border-primary has-[[data-state=checked]]:bg-brand"
+        "has-[[data-state=checked]]:border-primary has-[[data-state=checked]]:bg-brand",
+        disabled && "cursor-not-allowed text-muted-foreground opacity-60"
       )}
     >
-      <RadioGroupItem id={id} value={value} />
+      <RadioGroupItem id={id} value={value} disabled={disabled} />
       {children}
     </Label>
   );
@@ -572,7 +633,7 @@ function lineItemCode(po: PoDoc, index: number): string {
   return `${po.code}${String.fromCharCode(65 + index)}`;
 }
 
-function LineItemsTable({ po }: { po: PoDoc }) {
+function LineItemsTable({ po, canAddRound }: { po: PoDoc; canAddRound: boolean }) {
   const cancelled = po.status === "cancelled";
   // กดที่แถว/การ์ดรายการไหนก็ได้เพื่อดูรายละเอียดเต็มของสินค้านั้น — ยกเว้น
   // ปุ่ม "เพิ่มรอบ" ที่กันคลิกลอยไว้ (พาไปคนละหน้า ไม่ใช่เปิด modal)
@@ -614,7 +675,7 @@ function LineItemsTable({ po }: { po: PoDoc }) {
                 {item.urgent && <UrgentChip />}
               </p>
             </div>
-            {!cancelled && (
+            {canAddRound && (
               <div onClick={(e) => e.stopPropagation()} className="shrink-0">
                 <Button asChild variant="outline-primary" size="sm">
                   <Link href={`/po/${po.id}/receive/${item.id}/add`}>เพิ่มรอบ</Link>
@@ -634,6 +695,7 @@ function LineItemsTable({ po }: { po: PoDoc }) {
                 <TableHead className={HEAD_FIRST}>สินค้า</TableHead>
                 <TableHead>เลขที่ใบสั่งซื้อ</TableHead>
                 <TableHead className="text-right">สั่งซื้อ</TableHead>
+                <TableHead className="text-right">ตัดขายส่ง</TableHead>
                 <TableHead className="text-right">รับเข้า</TableHead>
                 <TableHead className="text-right">ไม่ผ่าน</TableHead>
                 <TableHead className="text-right">เข้าคลัง</TableHead>
@@ -685,6 +747,13 @@ function LineItemsTable({ po }: { po: PoDoc }) {
                     </TableCell>
                     <TableCell className="text-right whitespace-nowrap tabular-nums">
                       {formatPoQty(item.orderedQty)} {item.unit}
+                    </TableCell>
+                    <TableCell className="text-right whitespace-nowrap tabular-nums">
+                      {item.wholesaleQty ? (
+                        `${formatPoQty(item.wholesaleQty)} ${item.unit}`
+                      ) : (
+                        <span className="text-muted-foreground">-</span>
+                      )}
                     </TableCell>
                     <TableCell className="text-right whitespace-nowrap tabular-nums">
                       {started ? (
@@ -757,7 +826,7 @@ function LineItemsTable({ po }: { po: PoDoc }) {
                       {formatPoBaht(lineItemTotalPrice(item))}
                     </TableCell>
                     <TableCell className={COL_LAST} onClick={(e) => e.stopPropagation()}>
-                      {!cancelled && (
+                      {canAddRound && (
                         <Button asChild variant="outline-primary" size="sm">
                           <Link href={`/po/${po.id}/receive/${item.id}/add`}>
                             เพิ่มรอบ
@@ -790,19 +859,26 @@ function LineItemsTable({ po }: { po: PoDoc }) {
  *  "เพิ่มรอบ" แค่เปิดโหมดแก้ไข — ดู app/po/[id]/receive/[itemId]/add/page.tsx)
  *  สถานะอื่น (รอตรวจสอบ QC/เข้าคลังแล้ว/ส่งคืน) มีข้อมูลจริงให้ดูแล้ว พาไปหน้า
  *  รายละเอียดรอบ (ดูอย่างเดียว) แทน */
-function roundHref(item: PoLineItem, round: PoRound) {
+function roundHref(item: PoLineItem, round: PoRound, locked = false) {
   // round.id มาจากเลขที่รับสินค้า (code) ซึ่งมี "/" ปนอยู่เสมอ (เช่น
   // "PO260116/03/01-01-r") ต้อง encodeURIComponent ก่อนใส่เป็นส่วนหนึ่งของ
   // URL เสมอ ไม่งั้น "/" จะถูกตีความเป็นตัวแบ่ง path เพิ่ม ทำให้จำนวน segment
   // ไม่ตรงกับ [roundId] แล้ว 404 — query string ก็เข้ารหัสไว้ด้วยเผื่อ browser
   // ตัวไหนตีความ "/" ในนั้นแปลกๆ แม้ปกติจะปลอดภัยกว่า path segment ก็ตาม
   const encodedId = encodeURIComponent(round.id);
-  return round.status === "waitingTruck"
+  // ปิดใบ/ยกเลิกแล้ว — แก้รอบ "รอรถขนส่ง" ไม่ได้อีก ไปหน้าดูรายละเอียดแทน
+  return round.status === "waitingTruck" && !locked
     ? `/po/${item.poId}/receive/${item.id}/add?roundId=${encodedId}`
     : `/po/${item.poId}/receive/${item.id}/${encodedId}`;
 }
 
-function RoundsTable({ rows }: { rows: { round: PoRound; item: PoLineItem }[] }) {
+function RoundsTable({
+  rows,
+  locked,
+}: {
+  rows: { round: PoRound; item: PoLineItem }[];
+  locked: boolean;
+}) {
   const router = useRouter();
 
   if (rows.length === 0) {
@@ -819,7 +895,7 @@ function RoundsTable({ rows }: { rows: { round: PoRound; item: PoLineItem }[] })
         {rows.map(({ round: r, item }) => (
           <div
             key={r.id}
-            onClick={() => router.push(roundHref(item, r))}
+            onClick={() => router.push(roundHref(item, r, locked))}
             className="cursor-pointer rounded-xl border border-border bg-card p-4"
           >
             <div className="flex flex-wrap items-baseline justify-between gap-2">
@@ -880,7 +956,7 @@ function RoundsTable({ rows }: { rows: { round: PoRound; item: PoLineItem }[] })
               {rows.map(({ round: r, item }) => (
                 <TableRow
                   key={r.id}
-                  onClick={() => router.push(roundHref(item, r))}
+                  onClick={() => router.push(roundHref(item, r, locked))}
                   className={cn("cursor-pointer", ROW_HOVER_NAV)}
                 >
                   <TableCell className={COL_FIRST}>
@@ -934,5 +1010,59 @@ function RoundsTable({ rows }: { rows: { round: PoRound; item: PoLineItem }[] })
         </TableFrame>
       </div>
     </>
+  );
+}
+
+/** รายการตัดขายส่ง — ดึงจาก ERP (ขายให้ลูกค้าก่อนเข้าโรงงาน) ดูอย่างเดียว */
+function WholesaleTable({ po, rows }: { po: PoDoc; rows: PoWholesale[] }) {
+  const itemById = new Map(po.lineItems.map((i) => [i.id, i]));
+  return (
+    <TableFrame>
+      <Table>
+        <TableHeader className={STICKY_HEAD}>
+          <TableRow>
+            <TableHead className={HEAD_FIRST}>เลขที่ใบสั่งซื้อ (ขายส่ง)</TableHead>
+            <TableHead>สินค้า</TableHead>
+            <TableHead>ประเภทสินค้า</TableHead>
+            <TableHead>หมวด</TableHead>
+            <TableHead className="text-right">บรรจุภัณฑ์</TableHead>
+            <TableHead>ทะเบียนรถ</TableHead>
+            <TableHead>วันที่รถเข้า</TableHead>
+            <TableHead>เบอร์ตู้คอนเทนเนอร์</TableHead>
+            <TableHead>ชื่อลูกค้า</TableHead>
+            <TableHead className="text-right">ปริมาณตัดขาย</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {rows.map((w) => {
+            const item = itemById.get(w.lineItemId);
+            return (
+              <TableRow key={w.id}>
+                <TableCell className={cn(COL_FIRST, "whitespace-nowrap")}>
+                  <span className="block font-medium">{w.code}</span>
+                  <span className="block text-sm text-muted-foreground">{w.createdAt}</span>
+                </TableCell>
+                <TableCell className="whitespace-nowrap">
+                  {item?.productName}
+                  {item?.productSub && (
+                    <span className="block text-sm text-muted-foreground">{item.productSub}</span>
+                  )}
+                </TableCell>
+                <TableCell className="whitespace-nowrap">{item?.categoryLabel}</TableCell>
+                <TableCell className="whitespace-nowrap">{item?.group}</TableCell>
+                <TableCell className="text-right whitespace-nowrap">{item?.packing ?? "-"}</TableCell>
+                <TableCell className="whitespace-nowrap">{w.plate}</TableCell>
+                <TableCell className="whitespace-nowrap">{w.arriveDate}</TableCell>
+                <TableCell className="whitespace-nowrap">{w.containerNo}</TableCell>
+                <TableCell className="whitespace-nowrap">{w.customer}</TableCell>
+                <TableCell className="text-right font-medium whitespace-nowrap tabular-nums">
+                  {formatPoQty(w.qty)} {item?.unit}
+                </TableCell>
+              </TableRow>
+            );
+          })}
+        </TableBody>
+      </Table>
+    </TableFrame>
   );
 }

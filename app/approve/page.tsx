@@ -5,11 +5,11 @@ import { ListFilterIcon, RotateCcwIcon, SearchIcon } from "lucide-react";
 import {
   Breadcrumb,
   BreadcrumbItem,
-  BreadcrumbLink,
   BreadcrumbList,
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from "@peckey954/ui/components/ui/breadcrumb";
+import { HomeCrumb } from "@/components/home-crumb";
 import { Button } from "@peckey954/ui/components/ui/button";
 import {
   Dialog,
@@ -116,7 +116,7 @@ export default function ApprovePage() {
           <Breadcrumb>
             <BreadcrumbList>
               <BreadcrumbItem>
-                <BreadcrumbLink href="/">ระบบ</BreadcrumbLink>
+                <HomeCrumb />
               </BreadcrumbItem>
               <BreadcrumbSeparator />
               <BreadcrumbItem>

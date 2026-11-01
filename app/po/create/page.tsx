@@ -12,6 +12,7 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from "@peckey954/ui/components/ui/breadcrumb";
+import { HomeCrumb } from "@/components/home-crumb";
 import { Button } from "@peckey954/ui/components/ui/button";
 import {
   Collapsible,
@@ -128,7 +129,7 @@ const lineTotalPrice = (line: DraftLine) => lineUnitPrice(line) * line.orderedQt
  *
  *  เบรกพอยต์เป็นค่ากำหนดเอง @[820px] ไม่ใช่ขนาดมาตรฐานของ Tailwind (@3xl=768
  *  เตี้ยไป โดนกรอบพรีวิวแท็บเล็ตด้วย, @4xl=896 สูงไป — เนื้อที่จริงในนี้ไม่มี
- *  ทางถึง เพราะ <main> ล็อก max-w-4xl (896px) ไว้แล้วลบ padding ออกอีกเสมอ)
+ *  ทางถึง เพราะ <main> ล็อกความกว้างไว้ ไว้แล้วลบ padding ออกอีกเสมอ)
  *  วัดจริงจากเบราว์เซอร์แล้ว: กรอบพรีวิวแท็บเล็ต (834px) เหลือพื้นที่ในสุด
  *  786px จอเว็บจริง (ไม่ถูกล็อกความกว้าง) เหลือ 848px — 820px อยู่กึ่งกลาง
  *  ระหว่างสองค่านี้พอดี */
@@ -234,16 +235,15 @@ function CreatePoForm() {
 
   return (
     <>
-      <main className="@container mx-auto w-full max-w-4xl px-4 pt-6 pb-24 sm:px-6">
+      <main className="@container mx-auto w-full max-w-7xl px-4 pt-6 pb-24 sm:px-6">
         <Crumbs />
 
         <h1 className="mt-2 text-2xl font-semibold tracking-tight">สร้างใบสั่งซื้อ</h1>
 
         {/* ---------- หัวใบ ----------
-             ประเภทการสั่งซื้อแยกเป็นแถวของตัวเองเสมอ ไม่ได้อยู่ในกริด 3 คอลัมน์กับอีกสองช่อง
-             เพราะช่อง PO/POI มีสองปุ่มซ้อนกันอยู่แล้ว ถ้าไปแบ่งพื้นที่กับบริษัท+วันที่อีก
-             จะเหลือที่ต่อปุ่มไม่พอให้ตัวหนังสือ "POI - ต่างประเทศ" ขึ้นเต็มคำ */}
-        <div className="mt-4 space-y-4">
+             จอกว้าง (@4xl) สามช่องแถวเดียวตามแบบ: ประเภท | บริษัท | วันที่สินค้าจะเข้า
+             จอแคบกว่านั้นเรียงลงทีละช่อง */}
+        <div className="mt-4 grid gap-4 @4xl:grid-cols-3">
           <div className="space-y-1.5">
             <Label>ประเภทการสั่งซื้อ</Label>
             <RadioGroup
@@ -252,15 +252,14 @@ function CreatePoForm() {
               className="grid grid-cols-2 gap-3"
             >
               <RadioBox id="po-type-po" value="po">
-                PO - ในประเทศ
+                PO ในประเทศ
               </RadioBox>
               <RadioBox id="po-type-poi" value="poi">
-                POI - ต่างประเทศ
+                POI ต่างประเทศ
               </RadioBox>
             </RadioGroup>
           </div>
 
-          <div className="grid gap-4 @lg:grid-cols-2">
             <div className="space-y-1.5">
               <Label htmlFor="po-company">บริษัทที่ทำการสั่งซื้อ</Label>
               <Select value={company} onValueChange={setCompany}>
@@ -286,17 +285,18 @@ function CreatePoForm() {
                 id="po-expected"
                 value={expectedRange}
                 onValueChange={setExpectedRange}
-                placeholder="เลือกช่วงวันที่"
+                placeholder="เลือกวันที่สินค้าจะเข้า"
                 className="bg-card"
               />
             </div>
-          </div>
         </div>
 
         {/* ---------- หัวข้อสินค้า + ปุ่มเพิ่ม ---------- */}
         <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
-          <h2 className="font-semibold">สินค้า ({lines.length} รายการ)</h2>
-          <Button asChild variant="outline-primary">
+          <h2 className="font-semibold">
+            รายการสินค้า <span className="font-normal">({lines.length} รายการ)</span>
+          </h2>
+          <Button asChild>
             <Link href={addItemsHref}>
               <PlusIcon />
               เพิ่มสินค้า
@@ -352,7 +352,7 @@ function CreatePoForm() {
 
       {/* ---------- แถบปุ่มล่าง ---------- */}
       <div className="sticky bottom-0 z-30 border-t border-border bg-surface">
-        <div className="mx-auto flex w-full max-w-4xl items-center justify-between gap-3 px-8 py-3">
+        <div className="mx-auto flex w-full max-w-7xl items-center justify-between gap-3 px-8 py-3">
           <Button variant="outline-primary" onClick={() => router.back()}>
             ย้อนกลับ
           </Button>
@@ -368,7 +368,7 @@ function Crumbs() {
     <Breadcrumb>
       <BreadcrumbList>
         <BreadcrumbItem>
-          <BreadcrumbLink href="/">ระบบ</BreadcrumbLink>
+          <HomeCrumb />
         </BreadcrumbItem>
         <BreadcrumbSeparator />
         <BreadcrumbItem>

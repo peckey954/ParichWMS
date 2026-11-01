@@ -9,6 +9,7 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from "@peckey954/ui/components/ui/breadcrumb";
+import { HomeCrumb } from "@/components/home-crumb";
 import { Button } from "@peckey954/ui/components/ui/button";
 import { toast } from "sonner";
 import { CostSetup } from "@/components/production/cost-setup";
@@ -34,7 +35,7 @@ export default function RecipeCostSetupPage() {
         <Breadcrumb>
           <BreadcrumbList>
             <BreadcrumbItem>
-              <BreadcrumbLink href="/">ระบบ</BreadcrumbLink>
+              <HomeCrumb />
             </BreadcrumbItem>
             <BreadcrumbSeparator />
             <BreadcrumbItem>

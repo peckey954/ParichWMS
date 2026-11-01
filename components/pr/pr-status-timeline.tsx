@@ -101,7 +101,7 @@ export function PrStatusTimeline({ doc }: { doc: PrDoc }) {
 // ยกเลิกเกิดขึ้นได้เฉพาะตอนยังไม่สั่งซื้อ ซึ่งเป็นงานฝั่งจัดซื้อเสมอ
 const PURCHASE_DEPT_LABEL = "จัดซื้อ";
 
-function DetailLine({
+export function DetailLine({
   actor,
   at,
   department,
@@ -121,7 +121,7 @@ function DetailLine({
   );
 }
 
-function StepRow({
+export function StepRow({
   icon: Icon,
   chipClass,
   label,

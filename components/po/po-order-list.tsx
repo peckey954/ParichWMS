@@ -3,9 +3,10 @@
 import * as React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ChevronDownIcon } from "lucide-react";
+import { ChevronDownIcon, DownloadIcon, PlusIcon } from "lucide-react";
 import { Badge } from "@peckey954/ui/components/ui/badge";
 import { Button } from "@peckey954/ui/components/ui/button";
+import { Checkbox } from "@peckey954/ui/components/ui/checkbox";
 import {
   Table,
   TableBody,
@@ -17,10 +18,15 @@ import {
 import { cn } from "@peckey954/ui/lib/utils";
 import {
   formatPoQty,
+  lineItemFailedQty,
   lineItemPendingQty,
+  lineItemStockedQty,
   lineItemReceivedQty,
-  PO_PROGRESS_LABEL,
-  poProgress,
+  lineItemStarted,
+  PO_DISPLAY_STATUS_LABEL,
+  poCanAddRound,
+  poDisplayStatus,
+  type PoDisplayStatus,
   type PoDoc,
   type PoLineItem,
 } from "@/lib/po";
@@ -45,14 +51,15 @@ import { PR_CATEGORY_LABEL } from "@/lib/pr";
 const PAGE_SIZE = 15;
 
 // เขียนคลาสเต็มทุกตัว ห้ามประกอบชื่อด้วย template string
-const PROGRESS_CHIP: Record<ReturnType<typeof poProgress>, string> = {
-  notStarted:
-    "[--bdg-surface:var(--chip-yellow)] [--bdg-text:var(--chip-yellow-foreground)]",
+// สีตามแบบ: รออนุมัติ เหลือง · รอรับสินค้า ส้ม · ทยอยรับ เขียวอ่อน · ไม่อนุมัติ ชมพู
+export const PO_STATUS_CHIP: Record<PoDisplayStatus, string> = {
+  waiting: "[--bdg-surface:var(--chip-yellow)] [--bdg-text:var(--chip-yellow-foreground)]",
+  rejected: "[--bdg-surface:var(--chip-pink)] [--bdg-text:var(--chip-pink-foreground)]",
+  cancelled: "[--bdg-surface:var(--chip-red)] [--bdg-text:var(--chip-red-foreground)]",
+  notStarted: "[--bdg-surface:var(--chip-orange)] [--bdg-text:var(--chip-orange-foreground)]",
   partial: "[--bdg-surface:var(--chip-lime)] [--bdg-text:var(--chip-lime-foreground)]",
   complete: "[--bdg-surface:var(--chip-green)] [--bdg-text:var(--chip-green-foreground)]",
 };
-const CANCELLED_CHIP =
-  "[--bdg-surface:var(--chip-red)] [--bdg-text:var(--chip-red-foreground)]";
 const URGENT_CHIP =
   "[--bdg-surface:var(--chip-orange)] [--bdg-text:var(--chip-orange-foreground)]";
 
@@ -64,23 +71,52 @@ function UrgentChip() {
   );
 }
 
-function StatusChip({ doc }: { doc: PoDoc }) {
-  if (doc.status === "cancelled") {
-    return (
-      <Badge appearance="soft" className={cn("[--bdg-border:transparent] font-semibold", CANCELLED_CHIP)}>
-        ยกเลิก
-      </Badge>
-    );
-  }
-  const p = poProgress(doc);
+export function PoStatusChip({ doc, status }: { doc: PoDoc; status?: PoDisplayStatus }) {
+  const s = status ?? poDisplayStatus(doc);
   return (
-    <Badge appearance="soft" className={cn("[--bdg-border:transparent] font-semibold", PROGRESS_CHIP[p])}>
-      {PO_PROGRESS_LABEL[p]}
+    <Badge appearance="soft" className={cn("[--bdg-border:transparent] font-semibold", PO_STATUS_CHIP[s])}>
+      {PO_DISPLAY_STATUS_LABEL[s]}
     </Badge>
   );
 }
 
-export function PoOrderList({ docs }: { docs: PoDoc[] }) {
+/** ปุ่มเพิ่มรอบของรายการสินค้า — ใบที่ยังรออนุมัติ/ไม่อนุมัติ ยังโชว์ปุ่มไว้
+ *  แต่กดไม่ได้ (ตามแบบ) ใบยกเลิกไม่มีปุ่มเลย */
+function AddRoundButton({ po, item }: { po: PoDoc; item: PoLineItem }) {
+  if (po.status === "cancelled") return null;
+  if (!poCanAddRound(po)) {
+    return (
+      <Button variant="outline-primary" size="sm" disabled>
+        <PlusIcon />
+        เพิ่มรอบ
+      </Button>
+    );
+  }
+  return (
+    <Button asChild variant="outline-primary" size="sm">
+      <Link href={`/po/${po.id}/receive/${item.id}/add`}>
+        <PlusIcon />
+        เพิ่มรอบ
+      </Link>
+    </Button>
+  );
+}
+
+/** "order" = แท็บสั่งซื้อ (สั่งซื้อ/รับเข้า + ปุ่มเพิ่มรอบ)
+ *  "done"  = แท็บเข้าคลัง (ติ๊กเลือกส่งออกได้ คอลัมน์สั่งซื้อ/ไม่ผ่าน/เข้าคลัง) */
+type Variant = "order" | "done";
+
+type DoneProps = {
+  selected?: Set<string>;
+  onToggleSelect?: (id: string, checked: boolean) => void;
+  onExport?: (docs: PoDoc[]) => void;
+};
+
+export function PoOrderList({
+  docs,
+  variant = "order",
+  ...done
+}: { docs: PoDoc[]; variant?: Variant } & DoneProps) {
   const [page, setPage] = React.useState(1);
   const { pages, safe, slice } = paginate(docs, page, PAGE_SIZE);
 
@@ -106,7 +142,14 @@ export function PoOrderList({ docs }: { docs: PoDoc[] }) {
     <>
       <div className="space-y-3">
         {slice.map((d) => (
-          <PoOrderPanel key={d.id} doc={d} open={!collapsed.has(d.id)} onToggle={() => toggle(d.id)} />
+          <PoOrderPanel
+            key={d.id}
+            doc={d}
+            open={!collapsed.has(d.id)}
+            onToggle={() => toggle(d.id)}
+            variant={variant}
+            {...done}
+          />
         ))}
       </div>
       <TablePager page={safe} pages={pages} onChange={setPage} />
@@ -118,11 +161,17 @@ function PoOrderPanel({
   doc: d,
   open,
   onToggle,
+  variant,
+  selected,
+  onToggleSelect,
+  onExport,
 }: {
   doc: PoDoc;
   open: boolean;
   onToggle: () => void;
-}) {
+  variant: Variant;
+} & DoneProps) {
+  const isDone = variant === "done";
   const router = useRouter();
   const goToDoc = () => router.push(`/po/${d.id}`);
 
@@ -136,6 +185,15 @@ function PoOrderPanel({
       <div className="flex items-start justify-between gap-3 px-4 pt-3.5 @3xl:pb-3.5">
         {/* วันที่แยกบรรทัดของตัวเองบนจอแคบ (ไม่พอที่จะอยู่แถวเดียวกับเลขที่ใบ)
             แต่จอกว้างยังอยู่แถวเดียวกันได้สบายๆ */}
+        {isDone && (
+          <div onClick={(e) => e.stopPropagation()} className="-m-2 shrink-0 p-2">
+            <Checkbox
+              checked={selected?.has(d.id) ?? false}
+              onCheckedChange={(v) => onToggleSelect?.(d.id, v === true)}
+              aria-label={`เลือก ${d.code}`}
+            />
+          </div>
+        )}
         <div className="min-w-0 flex-1">
           <span className="block">
             <span className="font-semibold hover:underline">{d.code}</span>
@@ -159,8 +217,14 @@ function PoOrderPanel({
             {d.lineItems.length} รายการ
           </span>
           <span className="hidden @3xl:inline-flex">
-            <StatusChip doc={d} />
+            <PoStatusChip doc={d} />
           </span>
+          {isDone && (
+            <Button variant="outline-primary" size="sm" onClick={() => onExport?.([d])}>
+              <DownloadIcon />
+              ส่งออก
+            </Button>
+          )}
           <button
             type="button"
             onClick={onToggle}
@@ -204,10 +268,14 @@ function PoOrderPanel({
       {open && (
         <>
           <div className="hidden border-t border-border @3xl:block">
-            <ProductTable po={d} onNavigate={goToDoc} />
+            {isDone ? (
+              <DoneProductTable po={d} onNavigate={goToDoc} />
+            ) : (
+              <ProductTable po={d} onNavigate={goToDoc} />
+            )}
           </div>
           <div className="@3xl:hidden">
-            <ProductListSimple po={d} onNavigate={goToDoc} />
+            <ProductListSimple po={d} onNavigate={goToDoc} showButton={!isDone} />
           </div>
         </>
       )}
@@ -219,7 +287,7 @@ function PoOrderPanel({
           padding ข้างใน ต้องใช้ margin เส้นถึงจะสั้นกว่าตัวกล่องจริง ไม่ใช่
           เส้นเต็มขอบ */}
       <div className="mx-4 flex justify-end border-t border-border py-3 @3xl:hidden">
-        <StatusChip doc={d} />
+        <PoStatusChip doc={d} />
       </div>
     </div>
   );
@@ -285,9 +353,11 @@ function ProductLabel({
 
   return (
     <>
-      <span className="text-base font-semibold">{item.productName}</span>
-      {item.productSub && <span className="text-muted-foreground"> {item.productSub}</span>}
-      <span className="text-muted-foreground"> · {meta}</span>
+      <span className="text-base font-semibold">
+        {item.productName}
+        {item.productSub && ` ${item.productSub}`}
+      </span>
+      <span className="ml-2 text-sm text-foreground">{meta}</span>
       <span className="mt-4 block text-sm font-medium">
         {code}
         {item.urgent && <UrgentChip />}
@@ -300,15 +370,13 @@ function ProductLabel({
     คั่นด้วยเส้นบางๆ ของแถวเอง ไม่ใช้กล่อง/พื้นหลังแยกซ้อนอีกชั้น แถวกดได้
     เหมือนแผงข้างนอก พาไปหน้าใบสั่งซื้อเดียวกัน ยกเว้นปุ่มเพิ่มรอบที่กันคลิกลอยไว้ */
 function ProductTable({ po, onNavigate }: { po: PoDoc; onNavigate: () => void }) {
-  const cancelled = po.status === "cancelled";
   return (
     <Table className={cn("table-fixed", COL_HEAD, COL_BODY, COL_LAST_PAD)}>
       <TableHeader>
         <TableRow className="hover:bg-transparent">
           <TableHead>สินค้า</TableHead>
-          <TableHead className="w-32 text-right">สั่งซื้อ</TableHead>
-          <TableHead className="w-32 text-right">รับเข้า</TableHead>
-          <TableHead className="w-32 text-right">ค้างรับ</TableHead>
+          <TableHead className="w-36 text-right">สั่งซื้อ</TableHead>
+          <TableHead className="w-44 text-right">รับเข้า</TableHead>
           <TableHead className="w-36" />
         </TableRow>
       </TableHeader>
@@ -321,29 +389,73 @@ function ProductTable({ po, onNavigate }: { po: PoDoc; onNavigate: () => void })
               <TableCell className="truncate">
                 <ProductLabel item={item} code={lineItemCode(po, index)} />
               </TableCell>
-              <TableCell className="text-right whitespace-nowrap tabular-nums">
+              <TableCell className="text-right font-medium whitespace-nowrap tabular-nums">
                 {formatPoQty(item.orderedQty)} {item.unit}
               </TableCell>
+              {/* รับเข้า + ค้างรับ (แดง) ซ้อนในช่องเดียวตามแบบ — ยังไม่เริ่มรับเลย
+                  เป็น "-" ไม่ใช่ 0.00 ที่อ่านเหมือนรับมาแล้วได้ศูนย์ */}
               <TableCell className="text-right whitespace-nowrap tabular-nums">
-                {formatPoQty(received)} {item.unit}
-              </TableCell>
-              <TableCell className="text-right whitespace-nowrap tabular-nums">
-                {!cancelled && pending > 0 ? (
-                  <span className="font-medium text-danger-strong">
-                    {formatPoQty(pending)} {item.unit}
-                  </span>
+                {lineItemStarted(item) ? (
+                  <>
+                    <span className="block font-medium">
+                      {formatPoQty(received)} {item.unit}
+                    </span>
+                    {pending > 0 && (
+                      <span className="block text-sm text-danger-strong">
+                        ค้างรับ: {formatPoQty(pending)}
+                      </span>
+                    )}
+                  </>
                 ) : (
                   <span className="text-muted-foreground">-</span>
                 )}
               </TableCell>
               <TableCell className="whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
-                {!cancelled && (
-                  <Button asChild variant="outline-primary" size="sm">
-                    <Link href={`/po/${po.id}/receive/${item.id}/add`}>
-                      เพิ่มรอบ
-                    </Link>
-                  </Button>
+                <AddRoundButton po={po} item={item} />
+              </TableCell>
+            </TableRow>
+          );
+        })}
+      </TableBody>
+    </Table>
+  );
+}
+
+/** แท็บเข้าคลัง — สั่งซื้อ / ไม่ผ่าน (แดง ติดลบ) / เข้าคลัง ไม่มีปุ่มเพิ่มรอบ
+    เพราะใบจบแล้ว */
+function DoneProductTable({ po, onNavigate }: { po: PoDoc; onNavigate: () => void }) {
+  return (
+    <Table className={cn("table-fixed", COL_HEAD, COL_BODY, COL_LAST_PAD)}>
+      <TableHeader>
+        <TableRow className="hover:bg-transparent">
+          <TableHead>สินค้า</TableHead>
+          <TableHead className="w-36 text-right">สั่งซื้อ</TableHead>
+          <TableHead className="w-36 text-right">ไม่ผ่าน</TableHead>
+          <TableHead className="w-36 text-right">เข้าคลัง</TableHead>
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {po.lineItems.map((item, index) => {
+          const failed = lineItemFailedQty(item);
+          return (
+            <TableRow key={item.id} onClick={onNavigate} className="cursor-pointer hover:bg-transparent">
+              <TableCell className="truncate">
+                <ProductLabel item={item} code={lineItemCode(po, index)} />
+              </TableCell>
+              <TableCell className="text-right font-medium whitespace-nowrap tabular-nums">
+                {formatPoQty(item.orderedQty)} {item.unit}
+              </TableCell>
+              <TableCell className="text-right whitespace-nowrap tabular-nums">
+                {failed > 0 ? (
+                  <span className="text-danger-strong">
+                    -{formatPoQty(failed)} {item.unit}
+                  </span>
+                ) : (
+                  <span className="text-muted-foreground">-</span>
                 )}
+              </TableCell>
+              <TableCell className="text-right font-medium whitespace-nowrap tabular-nums">
+                {formatPoQty(lineItemStockedQty(item))} {item.unit}
               </TableCell>
             </TableRow>
           );
@@ -360,8 +472,16 @@ function ProductTable({ po, onNavigate }: { po: PoDoc; onNavigate: () => void })
     เส้นคั่นระหว่างรายการเว้นระยะจากขอบการ์ดซ้าย/ขวา ~16px ไม่ใช่เส้นเต็มขอบ —
     ย้าย padding แนวนอนไปไว้ที่กล่องนอก (px-4) แล้วให้ divide-y ตีเส้นบนตัว
     "แถว" เอง (ความกว้างเท่าพื้นที่ในกรอบ padding พอดี ไม่ใช่เต็มความกว้างการ์ด) */
-function ProductListSimple({ po, onNavigate }: { po: PoDoc; onNavigate: () => void }) {
-  const cancelled = po.status === "cancelled";
+function ProductListSimple({
+  po,
+  onNavigate,
+  showButton,
+}: {
+  po: PoDoc;
+  onNavigate: () => void;
+  showButton: boolean;
+}) {
+  const cancelled = po.status === "cancelled" || !showButton;
   return (
     <div className="divide-y divide-border px-4">
       {po.lineItems.map((item, index) => (
@@ -376,11 +496,7 @@ function ProductListSimple({ po, onNavigate }: { po: PoDoc; onNavigate: () => vo
           </div>
           {!cancelled && (
             <div onClick={(e) => e.stopPropagation()} className="shrink-0">
-              <Button asChild variant="outline-primary" size="sm">
-                <Link href={`/po/${po.id}/receive/${item.id}/add`}>
-                  เพิ่มรอบ
-                </Link>
-              </Button>
+              <AddRoundButton po={po} item={item} />
             </div>
           )}
         </div>

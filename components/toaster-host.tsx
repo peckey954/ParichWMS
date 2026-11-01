@@ -7,13 +7,13 @@ import { Toaster } from "@peckey954/ui/components/ui/sonner";
 /* ------------------------------------------------------------------
    ที่อยู่ของ toast ทั้งแอป
 
-   จอกว้าง — บนกลาง ใต้แถบหัว (สูง 56px) มุมล่างทับปุ่มบันทึก/ย้อนกลับ
-   ที่ติดขอบล่างแทบทุกหน้า
+   จอกว้าง — มุมขวาล่าง เหนือปุ่มบันทึก (ปุ่มบันทึกอยู่ขวาสุดของแถบล่าง)
+   มือถือ — ล่างกลาง เต็มความกว้าง เหนือแถบปุ่มล่างพอดี
 
-   มือถือ — ขึ้นจากด้านล่าง เหนือแถบปุ่มล่างพอดี นิ้วกับสายตาอยู่ที่ปุ่ม
-   บันทึกอยู่แล้ว ผลของการกดจึงโผล่ตรงนั้น และอยู่ที่เดียวกันทุกหน้า
-   ความสูงของแถบล่างต่างกันไปแต่ละหน้า (บางหน้าไม่มีเลย) จึงวัดจากของจริง
-   แล้วส่งเป็นตัวแปร --toast-bottom ให้ toast ลอยเหนือแถบเสมอ ไม่ทับปุ่ม
+   ทั้งสองแบบ: นิ้วกับสายตาอยู่ที่ปุ่มบันทึกอยู่แล้ว ผลของการกดจึงโผล่ตรงนั้น
+   และอยู่ที่เดียวกันทุกหน้า ความสูงของแถบล่างต่างกันไปแต่ละหน้า (บางหน้า
+   ไม่มีเลย) จึงวัดจากของจริงแล้วส่งเป็นตัวแปร --toast-bottom ให้ toast
+   ลอยเหนือแถบเสมอ ไม่ทับปุ่ม
 
    ทั้งสองแบบอยู่ 3 วินาทีแล้วหายเอง ไม่ค้างบังงานที่ทำต่อ
 ------------------------------------------------------------------ */
@@ -36,32 +36,29 @@ function useIsMobile() {
 }
 
 /**
- * ความสูงของแถบที่ติดขอบล่างจออยู่ตอนนี้ (0 ถ้าไม่มี)
- * นับเฉพาะแถบที่ก้นแตะขอบล่างจอจริง ๆ — แถบ sticky ที่ยังไม่ถึงขอบ
- * (หน้าสั้น) ไม่ได้บังอะไร ไม่ต้องหลบ
+ * ระยะจากขอบล่างจอถึงขอบบนของแถบปุ่มล่าง (0 ถ้าไม่มี)
+ * นับแถบที่มองเห็นอยู่ในจอ ไม่ว่าจะติดขอบล่างแล้วหรือยัง — หน้าสั้นที่แถบ
+ * sticky ลอยอยู่กลางจอ toast ก็ยังขึ้นเหนือปุ่มบันทึกพอดี ไม่ไปอยู่มุมจอ
  */
 function bottomBarHeight() {
   let h = 0;
+  const vh = window.innerHeight;
   const bars = document.querySelectorAll<HTMLElement>(
     ".sticky.bottom-0, .fixed.bottom-0"
   );
   for (const el of bars) {
     if (el.closest("[data-sonner-toaster]")) continue;
     const r = el.getBoundingClientRect();
-    if (r.height > 0 && r.height < 240 && Math.abs(r.bottom - window.innerHeight) < 2) {
-      h = Math.max(h, r.height);
+    if (r.height > 0 && r.height < 240 && r.top < vh && r.bottom > 0) {
+      h = Math.max(h, vh - r.top);
     }
   }
   return h;
 }
 
-function useBottomBarVar(enabled: boolean) {
+function useBottomBarVar() {
   React.useEffect(() => {
     const root = document.documentElement;
-    if (!enabled) {
-      root.style.removeProperty("--toast-bottom");
-      return;
-    }
     let frame = 0;
     const update = () => {
       cancelAnimationFrame(frame);
@@ -81,12 +78,12 @@ function useBottomBarVar(enabled: boolean) {
       window.removeEventListener("resize", update);
       window.removeEventListener("scroll", update);
     };
-  }, [enabled]);
+  }, []);
 }
 
 export function ToasterHost() {
   const mobile = useIsMobile();
-  useBottomBarVar(mobile);
+  useBottomBarVar();
 
   return (
     // toast สำเร็จ (success) ทั้งแอปใช้สีแบรนด์ส้มอ่อนแทนเขียว semantic
@@ -96,8 +93,11 @@ export function ToasterHost() {
     // ไม่ได้ merge ทีละตัวแปร
     <Toaster
       richColors
-      position={mobile ? "bottom-center" : "top-center"}
-      offset={72}
+      position={mobile ? "bottom-center" : "bottom-right"}
+      offset={{
+        bottom: "calc(var(--toast-bottom, 0px) + 12px)",
+        right: 24,
+      }}
       mobileOffset={{
         bottom: "calc(var(--toast-bottom, 0px) + 12px)",
         left: 16,

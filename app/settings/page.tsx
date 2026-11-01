@@ -3,11 +3,11 @@ import { ChevronRightIcon } from "lucide-react";
 import {
   Breadcrumb,
   BreadcrumbItem,
-  BreadcrumbLink,
   BreadcrumbList,
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from "@peckey954/ui/components/ui/breadcrumb";
+import { HomeCrumb } from "@/components/home-crumb";
 import { ModuleIcon } from "@/components/modules/module-icon";
 import { SETTINGS_ITEMS } from "@/lib/modules";
 
@@ -17,7 +17,7 @@ export default function SettingsPage() {
       <Breadcrumb>
         <BreadcrumbList>
           <BreadcrumbItem>
-            <BreadcrumbLink href="/">ระบบ</BreadcrumbLink>
+            <HomeCrumb />
           </BreadcrumbItem>
           <BreadcrumbSeparator />
           <BreadcrumbItem>

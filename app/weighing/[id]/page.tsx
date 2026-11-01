@@ -13,6 +13,7 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from "@peckey954/ui/components/ui/breadcrumb";
+import { HomeCrumb } from "@/components/home-crumb";
 import { Button } from "@peckey954/ui/components/ui/button";
 import {
   Collapsible,
@@ -288,7 +289,7 @@ function Crumbs({ code }: { code?: string }) {
     <Breadcrumb>
       <BreadcrumbList>
         <BreadcrumbItem>
-          <BreadcrumbLink href="/">ระบบ</BreadcrumbLink>
+          <HomeCrumb />
         </BreadcrumbItem>
         <BreadcrumbSeparator />
         <BreadcrumbItem>

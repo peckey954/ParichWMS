@@ -10,11 +10,11 @@ import { Switch } from "@peckey954/ui/components/ui/switch";
 import {
   Breadcrumb,
   BreadcrumbItem,
-  BreadcrumbLink,
   BreadcrumbList,
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from "@peckey954/ui/components/ui/breadcrumb";
+import { HomeCrumb } from "@/components/home-crumb";
 import { Button } from "@peckey954/ui/components/ui/button";
 import {
   Dialog,
@@ -259,7 +259,7 @@ function GeneralStockView() {
           <Breadcrumb>
             <BreadcrumbList>
               <BreadcrumbItem>
-                <BreadcrumbLink href="/">ระบบ</BreadcrumbLink>
+                <HomeCrumb />
               </BreadcrumbItem>
               <BreadcrumbSeparator />
               <BreadcrumbItem>
