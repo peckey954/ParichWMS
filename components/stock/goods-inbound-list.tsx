@@ -3,7 +3,6 @@
 import * as React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ChevronRightIcon } from "lucide-react";
 import { Separator } from "@peckey954/ui/components/ui/separator";
 import {
   Table,
@@ -102,7 +101,6 @@ export function GoodsInboundList({
                     {qty(d)} {d.unit}
                   </span>
                 </span>
-                <ChevronRightIcon className="size-5 shrink-0 text-muted-foreground" aria-hidden />
               </div>
             </div>
           ))}

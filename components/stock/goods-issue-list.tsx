@@ -3,7 +3,6 @@
 import * as React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ChevronRightIcon } from "lucide-react";
 import { Separator } from "@peckey954/ui/components/ui/separator";
 import {
   Table,
@@ -187,9 +186,6 @@ function IssueCard({ doc }: { doc: GoodsIssueDoc }) {
 
       <div className="mt-3 flex items-center justify-between gap-3 text-sm">
         <StatusChip status={doc.status} label={GOODS_ISSUE_STATUS_LABEL[doc.status]} />
-        {href && (
-          <ChevronRightIcon className="size-5 shrink-0 text-muted-foreground" aria-hidden />
-        )}
       </div>
     </div>
   );
