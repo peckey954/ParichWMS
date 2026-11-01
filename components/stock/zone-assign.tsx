@@ -114,10 +114,14 @@ export function useIsPhone() {
   );
 }
 
-const pieceLine = (p: InboundPiece) =>
-  `${p.receiptCode} ${p.packing} · ${formatQty(p.qty)} ตัน`;
+/** บรรทัดรองใต้เลขที่ — ค่าตั้งต้นของสต็อกทั่วไป หน้าอื่นส่งของตัวเองมาได้ */
+const defaultDetail = (p: InboundPiece) => `${p.packing} · ${formatQty(p.qty)} ตัน`;
 
-export function useZoneAssign(pieces: InboundPiece[]) {
+export function useZoneAssign(
+  pieces: InboundPiece[],
+  describe: (p: InboundPiece) => string = defaultDetail
+) {
+  const pieceLine = (p: InboundPiece) => `${p.receiptCode} ${describe(p)}`;
   const isPhone = useIsPhone();
   const [picked, setPicked] = React.useState<Set<string>>(new Set());
   const [zone, setZone] = React.useState<string>();
@@ -403,6 +407,7 @@ export function useZoneAssign(pieces: InboundPiece[]) {
     focusManual,
     acceptOnlyMatch,
     canSubmit: Boolean(zone) && picked.size > 0,
+    describe,
   };
 }
 
@@ -538,6 +543,7 @@ export function ZoneAssignFields({
               <PieceRow
                 key={p.id}
                 piece={p}
+                detail={state.describe(p)}
                 checked={picked.has(p.id)}
                 flash={state.flashId === p.id}
                 onToggle={() => state.toggle(p.id)}
@@ -1020,11 +1026,13 @@ function ZoneTag({ zone }: { zone?: string }) {
 
 function PieceRow({
   piece: p,
+  detail,
   checked,
   flash,
   onToggle,
 }: {
   piece: InboundPiece;
+  detail: string;
   checked: boolean;
   /** เพิ่งได้มาจากสแกน — เลื่อนมาให้เห็นแล้วกะพริบกรอบ */
   flash?: boolean;
@@ -1050,7 +1058,7 @@ function PieceRow({
             {p.receiptCode}
           </span>
           <span className="block truncate text-xs text-muted-foreground">
-            {p.packing} · {formatQty(p.qty)} ตัน
+            {detail}
             {!p.correct && " · ไม่ถูกต้อง"}
           </span>
         </span>

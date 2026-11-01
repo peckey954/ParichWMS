@@ -25,6 +25,7 @@ import { SortControl } from "@/components/sort-control";
 import { BackToTop, StickyToolbar } from "@/components/sticky-toolbar";
 import { EmptyDocs } from "@/components/stock/doc-parts";
 import { GoodsHistoryList } from "@/components/stock/goods-history-list";
+import { GoodsInboundList } from "@/components/stock/goods-inbound-list";
 import { GoodsIssueList } from "@/components/stock/goods-issue-list";
 import { FifoList, ZoneGroups } from "@/components/stock/lot-list";
 import { useSafetyStock } from "@/components/stock/safety-stock-provider";
@@ -44,6 +45,15 @@ import {
   sortProducts,
   type CategoryId,
 } from "@/lib/general-stock";
+import {
+  GOODS_INBOUND_DOCS,
+  GOODS_INBOUND_SOURCE_LABEL,
+  clearGoodsInboundTabRequest,
+  goodsInboundTabRequested,
+  isGoodsInboundOpen,
+  matchesGoodsInbound,
+  type GoodsInboundSource,
+} from "@/lib/goods-inbound";
 import {
   GOODS_ISSUE_DOCS,
   isGoodsIssueOpen,
@@ -115,9 +125,12 @@ function GoodsStockView() {
   const { rows: logRows } = useStockLog();
 
   const [tab, setTab] = React.useState<"stock" | "inbound" | "issue">(() =>
-    issueTabRequested() ? "issue" : "stock"
+    issueTabRequested() ? "issue" : goodsInboundTabRequested() ? "inbound" : "stock"
   );
-  React.useEffect(() => clearIssueTabRequest(), []);
+  React.useEffect(() => {
+    clearIssueTabRequest();
+    clearGoodsInboundTabRequest();
+  }, []);
 
   // ---------- แท็บสต็อก ----------
   const [cat, setCat] = React.useState<Chip>("produced");
@@ -140,6 +153,18 @@ function GoodsStockView() {
       );
   const historyRows = logRows as GoodsHistoryRow[];
   const historyVisible = historyRows.filter((r) => matchesGoodsHistory(r, query));
+
+  // ---------- แท็บรอรับเข้า ----------
+  const [inboundQuery, setInboundQuery] = React.useState("");
+  const [source, setSource] = React.useState<GoodsInboundSource>("production");
+  const inboundOpen = GOODS_INBOUND_DOCS.filter(isGoodsInboundOpen);
+  const inboundCounts: Record<GoodsInboundSource, number> = {
+    production: inboundOpen.filter((d) => d.source === "production").length,
+    external: inboundOpen.filter((d) => d.source === "external").length,
+  };
+  const inboundVisible = inboundOpen.filter(
+    (d) => d.source === source && matchesGoodsInbound(d, inboundQuery)
+  );
 
   // ---------- แท็บรอจ่าย/คืน ----------
   const [issueQuery, setIssueQuery] = React.useState("");
@@ -207,7 +232,7 @@ function GoodsStockView() {
               <span className="hidden @3xl:inline">สต็อกสินค้า</span> ({GOODS_PRODUCTS.length})
             </TabsTrigger>
             <TabsTrigger value="inbound" className="flex-1">
-              รอรับเข้า
+              รอรับเข้า ({inboundOpen.length})
             </TabsTrigger>
             <TabsTrigger value="issue" className="flex-1">
               รอจ่าย/คืน ({open.length})
@@ -398,9 +423,55 @@ function GoodsStockView() {
 
         {/* ================= แท็บรอรับเข้า ================= */}
         {tab === "inbound" && (
-          <div className="mt-4">
-            <EmptyDocs title="แท็บนี้ยังไม่มีแบบ" hint="ตอนนี้ทำแท็บสต็อกกับรอจ่าย/คืนไว้แล้ว" />
-          </div>
+          <>
+            <StickyToolbar hidden={hidden} barRef={stickyRef}>
+              <div className="flex items-center gap-2 pt-2">
+                <InputGroup className="min-w-0 flex-1 bg-card">
+                  <InputGroupAddon align="inline-start">
+                    <SearchIcon />
+                  </InputGroupAddon>
+                  <InputGroupInput
+                    placeholder="ค้นหา..."
+                    value={inboundQuery}
+                    onChange={(e) => setInboundQuery(e.target.value)}
+                  />
+                </InputGroup>
+              </div>
+
+              <div
+                role="tablist"
+                aria-label="แหล่งที่มา"
+                className={cn(
+                  "mt-3 flex items-center gap-2 overflow-x-auto",
+                  "flex-nowrap [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+                )}
+              >
+                {(["production", "external"] as const).map((k) => (
+                  <button
+                    key={k}
+                    type="button"
+                    role="tab"
+                    aria-selected={source === k}
+                    onClick={() => {
+                      setSource(k);
+                      scrollListToTop();
+                    }}
+                    className={CHIP_CLASS(source === k)}
+                  >
+                    {GOODS_INBOUND_SOURCE_LABEL[k]} ({inboundCounts[k]})
+                  </button>
+                ))}
+              </div>
+            </StickyToolbar>
+
+            <div
+              ref={listRef}
+              key={source}
+              className="mt-4 animate-in slide-in-from-bottom-3 fade-in duration-300"
+            >
+              <GoodsInboundList docs={inboundVisible} source={source} />
+            </div>
+          </>
         )}
 
         {/* ================= แท็บรอจ่าย/คืน ================= */}
