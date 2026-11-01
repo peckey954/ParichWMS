@@ -188,10 +188,7 @@ function IssueCard({ doc }: { doc: GoodsIssueDoc }) {
       <div className="mt-3 flex items-center justify-between gap-3 text-sm">
         <StatusChip status={doc.status} label={GOODS_ISSUE_STATUS_LABEL[doc.status]} />
         {href && (
-          <span className="flex items-center gap-0.5 font-medium text-primary">
-            {plus ? "รับคืนสินค้า" : "จ่ายสินค้า"}
-            <ChevronRightIcon className="size-4" />
-          </span>
+          <ChevronRightIcon className="size-5 shrink-0 text-muted-foreground" aria-hidden />
         )}
       </div>
     </div>

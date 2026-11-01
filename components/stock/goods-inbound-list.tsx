@@ -102,10 +102,7 @@ export function GoodsInboundList({
                     {qty(d)} {d.unit}
                   </span>
                 </span>
-                <span className="flex items-center gap-0.5 font-medium text-primary">
-                  รับเข้า
-                  <ChevronRightIcon className="size-4" />
-                </span>
+                <ChevronRightIcon className="size-5 shrink-0 text-muted-foreground" aria-hidden />
               </div>
             </div>
           ))}
