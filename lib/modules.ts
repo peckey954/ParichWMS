@@ -145,7 +145,16 @@ export const MODULES: ModuleItem[] = [
 
   // ---------- การคลังสินค้า ----------
   { id: "stock-raw", group: "warehouse", label: "สต็อกวัตถุดิบ", code: "FM-PD-01-03", icon: "warehouse" },
-  { id: "stock-fg", group: "warehouse", label: "สต็อกสินค้า", code: "FM-ST-01-05", icon: "package" },
+  {
+    id: "stock-fg",
+    group: "warehouse",
+    label: "สต็อกสินค้า",
+    code: "FM-ST-01-05",
+    icon: "package",
+    href: "/stock/goods",
+    // เท่ากับใบรอจ่ายออกในแท็บรอจ่าย/คืน (lib/goods-issue)
+    pending: 4,
+  },
   {
     id: "stock-general",
     group: "warehouse",

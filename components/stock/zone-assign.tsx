@@ -665,11 +665,11 @@ function CaptureTiles({ state }: { state: ZoneAssign }) {
  * ชิปสลับผลจำลอง — มีไว้ให้เดินดู flow ไม่พบสินค้าได้
  * ตัวถอดบาร์โค้ดจริงมาเมื่อไรชิปนี้ถอดทิ้ง
  */
-function SimulateToggle({
+export function SimulateToggle({
   state,
   dark,
 }: {
-  state: ZoneAssign;
+  state: Pick<ZoneAssign, "simulate" | "setSimulate">;
   dark?: boolean;
 }) {
   const options: { value: Simulate; label: string }[] = [
@@ -800,7 +800,7 @@ function ScannerDialog({ state }: { state: ZoneAssign }) {
  * การ์ดผลใน toast
  * ไม่พบสินค้ามีปุ่ม "ระบุเลข" ติดมาเสมอ
  */
-function ResultCard({
+export function ResultCard({
   tone,
   title,
   detail,
@@ -870,13 +870,14 @@ function ResultCard({
   );
 }
 
-/** ภาพกล้องจำลอง — ส่องหาอยู่มีกรอบกับเลเซอร์ อ่านติดแล้วเหลือแค่ป้าย */
-function Viewfinder({
+/** ภาพกล้องจำลอง — ส่องหาอยู่มีกรอบกับเลเซอร์ อ่านติดแล้วเหลือแค่ป้าย
+    หน้าจ่ายสินค้าใช้ตัวเดียวกัน จึงรับแค่ส่วนที่ภาพต้องใช้ */
+export function Viewfinder({
   phase,
   className,
   children,
 }: {
-  phase: ScanPhase;
+  phase: Pick<ScanPhase, "kind" | "code">;
   className?: string;
   children?: React.ReactNode;
 }) {
