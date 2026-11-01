@@ -4,8 +4,14 @@
 // ใบขอเบิก (จ่ายออก) กับใบขอคืน (รับคืน) อยู่ตารางเดียวกันเหมือนสต็อกทั่วไป
 // จ่ายออกเก็บเป็นเลขติดลบ รับคืนเป็นบวก ตัวเลขบอกทิศทางเองด้วยสี
 //
-// หน้าจ่ายสินค้าเปิดได้เฉพาะใบจ่ายออก — เลือก Lot ที่จะหยิบของออก (สแกนป้าย
+// ใบจ่ายออกเปิดหน้าจ่ายสินค้า — เลือก Lot ที่จะหยิบของออก (สแกนป้าย
 // หรือเลือกจากรายการ) กรอกจำนวนชิ้นต่อ Lot แล้วบันทึก ใบหลุดจากแท็บรอจ่าย
+// ใบจ่ายภายในมีสถานะการจ่ายเพิ่ม (จ่ายสำเร็จ / ไม่สามารถจ่ายได้)
+//
+// ใบรับคืนเปิดหน้ารับคืนสินค้า — Lot มากับใบแล้ว (ของที่เคยจ่ายออกไป)
+// กรอกที่คืนจริงแล้วเลือกโซนที่จะเก็บกลับ ใบกวาดพื้นไม่มี Lot มีแค่ปริมาณกับโซน
+//
+// สินค้าที่นับเป็นชิ้นหรือขวดไม่มีเรื่องตัน ทุกช่องใช้จำนวนแทน
 //
 // ยังเป็นข้อมูลจำลองล้วน ทุกค่าอิง seeded() ไม่มี Math.random
 // ฝั่งเซิร์ฟเวอร์กับเบราว์เซอร์จะได้ค่าเดียวกัน hydration ไม่พัง
@@ -55,7 +61,12 @@ export type GoodsIssueDoc = {
   truck?: string;
   arriveDate?: string;
   requesterNote?: string;
+  /** ผู้แก้ไขใบล่าสุด — แสดงในหัวใบภายใน/รับคืน */
+  lastEditor?: string;
 };
+
+/** สินค้าที่นับเป็นหน่วย (ชิ้น/ขวด) — ไม่มีตัน ไม่มีทศนิยม */
+export const isCountUnit = (unit: string) => unit === "ชิ้น" || unit === "ขวด";
 
 const pad = (n: number) => String(n).padStart(2, "0");
 
@@ -225,6 +236,34 @@ const SEED: GoodsIssueDoc[] = [
     requester: "พิมพ์ชนก วงศ์อารีย์",
     status: "returnExternal",
   },
+  {
+    id: "gi-11",
+    code: "REQ260117/03",
+    createdAt: "1/17/2026 | 13:30:45",
+    productName: "สารจับใบ ซิลิโคน",
+    productType: "สินค้า OEM",
+    group: "Bulk",
+    count: -300,
+    qty: -300,
+    unit: "ชิ้น",
+    requester: ACTOR,
+    status: "issueInternal",
+  },
+  {
+    id: "gi-12",
+    code: "REQ260117/04",
+    createdAt: "1/17/2026 | 15:02:18",
+    productName: "ฮอร์โมนพืช สูตรเร่งดอก",
+    productType: "สินค้า OEM",
+    group: "Bulk",
+    packing: "12 ขวด",
+    count: 120,
+    qty: 120,
+    unit: "ขวด",
+    note: "เหลือคืนจากการขาย",
+    requester: ACTOR,
+    status: "returnExternal",
+  },
 ];
 
 export const GOODS_ISSUE_DOCS = SEED;
@@ -241,6 +280,17 @@ export const isGoodsIssueOpen = (d: GoodsIssueDoc) => !CLOSED.has(d.id);
 /** เปิดหน้าจ่ายสินค้าได้เฉพาะใบจ่ายออกที่ยังไม่ได้จ่าย */
 export const canIssue = (d: GoodsIssueDoc) =>
   !isGoodsReturn(d.status) && isGoodsIssueOpen(d);
+
+/** ใบรับคืนที่ยังไม่ได้รับ เปิดหน้ารับคืนสินค้า */
+export const canReturn = (d: GoodsIssueDoc) =>
+  isGoodsReturn(d.status) && isGoodsIssueOpen(d);
+
+/** หน้าที่ใบนี้เปิดไป — ใบที่ปิดแล้วไม่มีที่ไป */
+export function goodsDocHref(d: GoodsIssueDoc): string | undefined {
+  if (canIssue(d)) return `/stock/goods/issue/${d.id}`;
+  if (canReturn(d)) return `/stock/goods/return/${d.id}`;
+  return undefined;
+}
 
 export function goodsIssueOf(id: string) {
   return GOODS_ISSUE_DOCS.find((d) => d.id === id);
@@ -312,10 +362,58 @@ export function lotsFor(doc: GoodsIssueDoc): GoodsLot[] {
 /** ปริมาณที่ขอเบิกเป็นตัน — เก็บติดลบไว้ในใบ */
 export const requestTons = (d: GoodsIssueDoc) => Math.abs(d.qty);
 
+/** จำนวนที่ขอ (ชิ้น/ขวด) ไม่สนเครื่องหมาย */
+export const requestCount = (d: GoodsIssueDoc) => Math.abs(d.count ?? d.qty);
+
+// ---------------------------------------------------------------
+// Lot ที่ขอคืน — ของที่เคยจ่ายออกไปจาก Lot ไหน ก็คืนกลับตาม Lot นั้น
+// ---------------------------------------------------------------
+
+export type ReturnLot = {
+  id: string;
+  code: string;
+  receivedAt: string;
+  ageDays: number;
+  /** ปริมาณขอคืน (หน่วยของใบ) */
+  qty: number;
+  /** จำนวนขอคืน (ชิ้น/ขวด) — ใบที่ไม่มีจำนวนเป็น undefined */
+  count?: number;
+};
+
+/** แบ่งยอดเป็นส่วน ๆ ให้รวมกลับได้ยอดเดิมพอดี */
+function splitTotal(total: number, parts: number, digits: number) {
+  const f = 10 ** digits;
+  const base = Math.floor((total * f) / parts) / f;
+  const out = Array.from({ length: parts }, () => base);
+  out[parts - 1] = Math.round((total - base * (parts - 1)) * f) / f;
+  return out;
+}
+
+/** ใบกวาดพื้นไม่มี Lot ใบอื่นมาสอง Lot แบ่งยอดกัน */
+export function returnLotsFor(doc: GoodsIssueDoc): ReturnLot[] {
+  if (doc.status === "returnSweep") return [];
+  const n = Number(doc.id.replace(/\D/g, ""));
+  const parts = Math.abs(doc.qty) >= 2 ? 2 : 1;
+  const qtys = splitTotal(Math.abs(doc.qty), parts, isCountUnit(doc.unit) ? 0 : 2);
+  const counts = doc.count !== undefined ? splitTotal(Math.abs(doc.count), parts, 0) : undefined;
+  return qtys.map((q, i) => ({
+    id: `${doc.id}-r${i + 1}`,
+    code: `PD2605${pad(12 - i * 3)}/${pad(n + i)}`,
+    receivedAt: `5/${pad(14 - i * 3)}/2026`,
+    ageDays: 44 + i * 3,
+    qty: q,
+    count: counts?.[i],
+  }));
+}
+
 export const formatTons = (v: number) =>
   v.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 export const formatCount = (v: number) => v.toLocaleString("en-US");
+
+/** ปริมาณตามหน่วยของใบ — ชิ้น/ขวดไม่มี .00 */
+export const formatQty = (v: number, unit: string) =>
+  isCountUnit(unit) ? formatCount(v) : formatTons(v);
 
 /** บันทึกจ่ายแล้วกลับมาที่แท็บรอจ่าย/คืน ให้เห็นว่าใบหายไปจริง (ใช้ครั้งเดียว) */
 let ISSUE_TAB_REQUEST = false;

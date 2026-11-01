@@ -16,9 +16,9 @@ import {
 import { cn } from "@peckey954/ui/lib/utils";
 import {
   GOODS_ISSUE_STATUS_LABEL,
-  canIssue,
   formatCount,
-  formatTons,
+  formatQty,
+  goodsDocHref,
   isGoodsReturn,
   type GoodsIssueDoc,
 } from "@/lib/goods-issue";
@@ -44,12 +44,12 @@ import {
  * ใบขอเบิก / ขอคืน ของสต็อกสินค้า
  * จอกว้าง — ตาราง จอแคบ — การ์ด เหมือนแท็บเดียวกันของสต็อกทั่วไป
  *
- * กดได้เฉพาะใบจ่ายออก — เปิดหน้าจ่ายสินค้า ใบรับคืนยังไม่มีหน้าของตัวเอง
- * จึงไม่ทำให้ดูเหมือนกดได้ (ไม่มี hover ไม่มีลูกศร)
+ * ใบจ่ายออก (ภายใน/ภายนอก) เปิดหน้าจ่ายสินค้า ใบรับคืนเปิดหน้ารับคืนสินค้า
+ * ใบที่ทำไปแล้วหลุดจากแท็บนี้ จึงไม่มีแถวที่กดไม่ได้ค้างอยู่
  */
 const PAGE_SIZE = 15;
 
-const hrefOf = (d: GoodsIssueDoc) => (canIssue(d) ? `/stock/goods/issue/${d.id}` : undefined);
+const hrefOf = goodsDocHref;
 
 export function GoodsIssueList({ docs }: { docs: GoodsIssueDoc[] }) {
   const router = useRouter();
@@ -125,7 +125,7 @@ export function GoodsIssueList({ docs }: { docs: GoodsIssueDoc[] }) {
                       )}
                     </TableCell>
                     <TableCell className="text-right whitespace-nowrap">
-                      <SignedNumber value={formatTons(d.qty)} suffix={d.unit} positive={plus} />
+                      <SignedNumber value={formatQty(d.qty, d.unit)} suffix={d.unit} positive={plus} />
                     </TableCell>
                     <TableCell className="max-w-40 truncate" title={d.note}>
                       {d.note ?? "-"}
@@ -176,7 +176,7 @@ function IssueCard({ doc }: { doc: GoodsIssueDoc }) {
           </CardRow>
         )}
         <CardRow label={`ปริมาณ${word} (${doc.unit})`}>
-          <SignedNumber value={formatTons(doc.qty)} positive={plus} />
+          <SignedNumber value={formatQty(doc.qty, doc.unit)} positive={plus} />
         </CardRow>
         <CardRow label="ผู้ขอทำรายการ">{doc.requester}</CardRow>
         {doc.editedBy && <CardRow label="ผู้แก้ไขล่าสุด">{doc.editedBy}</CardRow>}
@@ -189,7 +189,7 @@ function IssueCard({ doc }: { doc: GoodsIssueDoc }) {
         <StatusChip status={doc.status} label={GOODS_ISSUE_STATUS_LABEL[doc.status]} />
         {href && (
           <span className="flex items-center gap-0.5 font-medium text-primary">
-            จ่ายสินค้า
+            {plus ? "รับคืนสินค้า" : "จ่ายสินค้า"}
             <ChevronRightIcon className="size-4" />
           </span>
         )}

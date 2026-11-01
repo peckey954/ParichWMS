@@ -16,10 +16,9 @@ import { LotPickFields, useLotPick } from "@/components/stock/lot-pick";
 import {
   canIssue,
   closeGoodsIssue,
-  formatTons,
+  formatQty,
   goodsIssueOf,
   requestIssueTab,
-  requestTons,
   type GoodsIssueDoc,
 } from "@/lib/goods-issue";
 
@@ -31,6 +30,9 @@ import {
 
    ตัวเลขในกล่องส้มเปลี่ยนตาม Lot ที่เลือก เทียบกับยอดขอเบิกได้ทันที
    ว่าจ่ายครบหรือยัง โดยไม่ต้องบวกเลขในตารางเอง
+
+   ใบภายนอกมีผู้รับ ทะเบียนรถ วันรถเข้า ใบภายใน (ส่งไลน์ผลิต) ไม่มี
+   แต่มีสถานะการจ่าย ให้บันทึกได้ว่าจ่ายไม่ได้พร้อมเหตุผล
 ------------------------------------------------------------------ */
 
 export default function GoodsIssuePage() {
@@ -45,13 +47,20 @@ function IssueSheet({ doc }: { doc: GoodsIssueDoc }) {
   const state = useLotPick(doc);
   const picked = state.rows.length > 0;
 
+  const internal = state.withOutcome;
+  const u = state.byCount ? doc.unit : "ตัน";
+  const fmt = (v: number) => formatQty(v, u);
+
   const save = () => {
     if (!state.canSubmit) return;
     closeGoodsIssue(doc.id);
     requestIssueTab();
-    toast.success("จ่ายสินค้าสำเร็จ", {
-      description: `${doc.code} · ${state.rows.length} Lot · ${formatTons(state.totalTons)} ตัน`,
-    });
+    if (state.failed)
+      toast.success("บันทึกไม่สามารถจ่ายได้", { description: `${doc.code} · ${state.note.trim()}` });
+    else
+      toast.success("จ่ายสินค้าสำเร็จ", {
+        description: `${doc.code} · ${state.rows.length} Lot · ${fmt(state.totalOut)} ${u}`,
+      });
     router.push("/stock/goods");
   };
 
@@ -79,9 +88,11 @@ function IssueSheet({ doc }: { doc: GoodsIssueDoc }) {
                   </React.Fragment>
                 ))}
               </p>
-              <p className="text-sm font-semibold @3xl:hidden">{doc.customer}</p>
+              {doc.customer && !internal && <p className="text-sm font-semibold @3xl:hidden">{doc.customer}</p>}
             </div>
-            <span className="hidden shrink-0 text-sm font-semibold @3xl:inline">{doc.customer}</span>
+            {doc.customer && !internal && (
+              <span className="hidden shrink-0 text-sm font-semibold @3xl:inline">{doc.customer}</span>
+            )}
             <CollapsibleTrigger asChild>
               <Button variant="ghost" size="icon" aria-label="แสดง/ซ่อนรายละเอียด" className="group -mt-1 -mr-2 @3xl:hidden">
                 <ChevronDownIcon className="size-5 text-muted-foreground transition-transform group-data-[state=open]:rotate-180" />
@@ -90,18 +101,28 @@ function IssueSheet({ doc }: { doc: GoodsIssueDoc }) {
           </div>
 
           <div className="mt-4 grid grid-cols-2 gap-4 rounded-xl border border-brand-hover bg-brand px-4 py-5 @3xl:grid-cols-3">
-            <Stat label="ปริมาณขอเบิก (ตัน)" value={formatTons(requestTons(doc))} />
-            <Stat label="คงเหลือในคลัง (ตัน)" value={picked ? formatTons(state.stockTons) : "-"} />
-            <Stat label="รวมจ่ายออก (ตัน)" value={picked ? formatTons(state.totalTons) : "-"} />
+            <Stat label={`${internal ? "ขอเบิก" : "ปริมาณขอเบิก"} (${u})`} value={fmt(state.requested)} />
+            <Stat label={`คงเหลือในคลัง (${u})`} value={picked ? fmt(state.stockOut) : "-"} />
+            <Stat
+              label={`รวมจ่ายออก (${u})`}
+              value={picked && !state.failed ? fmt(state.totalOut) : "-"}
+            />
           </div>
 
           <CollapsibleContent>
-            <div className="mt-4 grid grid-cols-2 gap-x-4 gap-y-3 @3xl:grid-cols-4">
-              <Meta label="ทะเบียนรถ" value={doc.truck} />
-              <Meta label="วันที่รถจะเข้า" value={doc.arriveDate} />
-              <Meta label="ผู้ขอเบิก" value={doc.requester} />
-              <Meta label="หมายเหตุจากผู้ขอเบิก" value={doc.requesterNote ?? doc.note} />
-            </div>
+            {internal ? (
+              <div className="mt-4 grid grid-cols-2 gap-x-4 gap-y-3">
+                <Meta label="ผู้ขอเบิก" value={doc.requester} />
+                <Meta label="ผู้แก้ไขขอเบิกล่าสุด" value={doc.lastEditor ?? doc.editedBy} />
+              </div>
+            ) : (
+              <div className="mt-4 grid grid-cols-2 gap-x-4 gap-y-3 @3xl:grid-cols-4">
+                <Meta label="ทะเบียนรถ" value={doc.truck} />
+                <Meta label="วันที่รถจะเข้า" value={doc.arriveDate} />
+                <Meta label="ผู้ขอเบิก" value={doc.requester} />
+                <Meta label="หมายเหตุจากผู้ขอเบิก" value={doc.requesterNote ?? doc.note} />
+              </div>
+            )}
           </CollapsibleContent>
         </Collapsible>
 
