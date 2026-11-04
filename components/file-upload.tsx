@@ -188,6 +188,35 @@ export function FileUpload({
   );
 }
 
+/**
+ * การ์ดไฟล์แบบอ่านอย่างเดียว — หน้าดูเอกสารที่บันทึกแล้ว (ไม่มีช่องลากไฟล์
+ * ไม่มีปุ่มลบ) ใช้การ์ดเดียวกับตอนแนบ จะได้หน้าตาเหมือนกันทั้งตอนกรอกและตอนดู
+ */
+export function FileCards({
+  title,
+  files,
+  onOpen,
+}: {
+  title: string;
+  files: DocFile[];
+  onOpen?: (id: string) => void;
+}) {
+  return (
+    <section className="space-y-2">
+      <p className="font-medium">{title}</p>
+      {files.length === 0 ? (
+        <p className="text-sm text-muted-foreground">-</p>
+      ) : (
+        <div className="flex flex-wrap items-start gap-3">
+          {files.map((f) => (
+            <DocCard key={f.id} file={f} onOpen={onOpen && (() => onOpen(f.id))} />
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
 function DocCard({
   file: f,
   onRemove,
@@ -195,8 +224,9 @@ function DocCard({
   onOpen,
 }: {
   file: DocFile;
-  onRemove: () => void;
-  onRetry: () => void;
+  /** ไม่ส่งมา = อ่านอย่างเดียว ไม่มีปุ่มลบ/แถบความคืบหน้า */
+  onRemove?: () => void;
+  onRetry?: () => void;
   onOpen?: () => void;
 }) {
   const bad = f.status === "tooLarge" || f.status === "failed";
@@ -283,7 +313,7 @@ function DocCard({
 
         {/* แถบความคืบหน้าอยู่ขอบล่างของการ์ด บอกว่ายังไปอยู่ไหม
             เต็มแถบค้างไว้ตอนเสร็จ เป็นเครื่องหมายว่าไฟล์นี้ขึ้นครบแล้ว */}
-        {(f.status === "uploading" || f.status === "done") && (
+        {onRemove && (f.status === "uploading" || f.status === "done") && (
           <span className="absolute inset-x-0 bottom-0 h-1 bg-secondary">
             <span
               className="block h-full bg-primary transition-[width] duration-200"
@@ -294,6 +324,7 @@ function DocCard({
       </div>
 
       {/* ปุ่มลบอยู่นอกกรอบ จะได้ไม่บังชื่อไฟล์ */}
+      {onRemove && (
       <button
         type="button"
         onClick={onRemove}
@@ -307,6 +338,7 @@ function DocCard({
       >
         <XIcon className="size-3.5" />
       </button>
+      )}
     </div>
   );
 }

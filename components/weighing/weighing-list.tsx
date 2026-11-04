@@ -3,8 +3,6 @@
 import * as React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Button } from "@peckey954/ui/components/ui/button";
-import { Separator } from "@peckey954/ui/components/ui/separator";
 import {
   Table,
   TableBody,
@@ -14,16 +12,14 @@ import {
   TableRow,
 } from "@peckey954/ui/components/ui/table";
 import { cn } from "@peckey954/ui/lib/utils";
-import { formatTon, weighedTonSoFar, type WeighingDoc } from "@/lib/weighing";
+import { formatTon, weighingNetTon, type WeighingDoc } from "@/lib/weighing";
 import {
   CardBox,
   CardHead,
   CardRow,
   COL_FIRST,
-  COL_LAST,
   EmptyDocs,
   HEAD_FIRST,
-  HEAD_LAST,
   ROW_HOVER_NAV,
   STICKY_HEAD,
   TableFrame,
@@ -33,14 +29,14 @@ import {
 
 /**
  * รายการใบชั่งน้ำหนัก — จอกว้างเป็นตาราง จอแคบเป็นการ์ด ใช้ชิ้นส่วนร่วมชุด
- * เดียวกับแท็บรอรับเข้า (components/stock/doc-parts) เพราะเป็นเลย์เอาต์
- * เอกสารทั่วไป ไม่ใช่ตรรกะเฉพาะสต็อก
+ * เดียวกับแท็บรอรับเข้า (components/stock/doc-parts)
  *
- * ทั้งแถว/การ์ดกดแล้วไปหน้า "ใบชั่งน้ำหนัก" (ดีเทลรวม รวมทุกรอบที่เคยชั่งของ
- * PO นั้น) เสมอทั้งสองแท็บ — ต้องเห็นก่อนว่า PO นี้เคยชั่งไปกี่รอบแล้วก่อนเพิ่ม
- * รอบใหม่ ส่วนปุ่ม "ชั่งน้ำหนัก" ท้ายแถว/การ์ด (โผล่เฉพาะแท็บ variant="pending"
- * ที่มี action ให้กดต่อทันที) เป็นทางลัดข้ามไปหน้า "เพิ่มการชั่งน้ำหนัก" ตรงๆ
- * แยกปลายทางจากตัวแถวโดยตั้งใจ — กดตารางไปดูภาพรวม กดปุ่มไปกรอกชั่งเลย
+ * หนึ่งแถว = ใบชั่งหนึ่งใบ (รถหนึ่งคัน สินค้าหนึ่งรายการ) กดทั้งแถว/การ์ดแล้ว
+ * ไปหน้าใบชั่งน้ำหนักเลย — รอชั่งคือฟอร์มกรอกทันที ชั่งแล้วคือหน้าดู (ตามแบบ
+ * ไม่มีชั้นกลางและไม่มีปุ่มท้ายแถวแล้ว)
+ *
+ * คอลัมน์สุดท้าย: แท็บรอชั่ง = ยอดที่รอชั่ง ("-" = ยังไม่ระบุ)
+ * แท็บชั่งแล้ว = น้ำหนักที่ชั่งได้จริง
  */
 const PAGE_SIZE = 15;
 
@@ -59,8 +55,11 @@ export function WeighingList({
     return <EmptyDocs title="ไม่พบใบชั่งน้ำหนัก" hint="ลองใช้คำค้นสั้นลง" />;
   }
 
-  const detailHref = (id: string) => `/weighing/${id}`;
-  const addHref = (id: string) => `/weighing/${id}/add`;
+  const href = (id: string) => `/weighing/${id}`;
+  const valueOf = (d: WeighingDoc) => {
+    const ton = variant === "pending" ? d.expectedTon : weighingNetTon(d);
+    return ton ? `${formatTon(ton)} ตัน` : "-";
+  };
 
   return (
     <>
@@ -68,13 +67,7 @@ export function WeighingList({
       <div className="@3xl:hidden">
         <div className="space-y-4">
           {slice.map((d) => (
-            <WeighingCard
-              key={d.id}
-              doc={d}
-              detailHref={detailHref(d.id)}
-              addHref={addHref(d.id)}
-              variant={variant}
-            />
+            <WeighingCard key={d.id} doc={d} href={href(d.id)} value={valueOf(d)} variant={variant} />
           ))}
         </div>
         <TablePager page={safe} pages={pages} onChange={setPage} />
@@ -88,106 +81,50 @@ export function WeighingList({
               <TableRow>
                 <TableHead className={HEAD_FIRST}>เลขที่ใบชั่งน้ำหนัก</TableHead>
                 <TableHead>สินค้า</TableHead>
-                {/* ประเภท | หมวด | บรรจุภัณฑ์ — สามชั้นชุดเดียวกับที่ใช้ทั้งแอป
-                    (ดูใบขอซื้อ/ใบสั่งซื้อ) ไม่ใช่ยุบรวมเป็นช่องเดียว */}
                 <TableHead>ประเภท</TableHead>
                 <TableHead>หมวด</TableHead>
-                <TableHead>บรรจุภัณฑ์</TableHead>
+                <TableHead className="text-right">บรรจุภัณฑ์</TableHead>
                 <TableHead>บริษัท</TableHead>
-                <TableHead>วันที่รถจะเข้าล่าสุด</TableHead>
-                <TableHead>ทะเบียนรถที่จะเข้าล่าสุด</TableHead>
-                <TableHead className="text-right">สั่งซื้อ</TableHead>
-                <TableHead
-                  className={cn("text-right", variant === "weighed" && HEAD_LAST)}
-                >
-                  น้ำหนักสินค้า
+                <TableHead>วันที่รถจะเข้า</TableHead>
+                <TableHead>ทะเบียนรถ</TableHead>
+                <TableHead className="text-right">
+                  {variant === "pending" ? "รอชั่งน้ำหนัก" : "ชั่งน้ำหนัก"}
                 </TableHead>
-                {variant === "pending" && (
-                  <TableHead className={cn(HEAD_LAST, "text-right")}>
-                    ชั่งน้ำหนัก
-                  </TableHead>
-                )}
               </TableRow>
             </TableHeader>
             <TableBody>
-              {slice.map((d) => {
-                const weighed = weighedTonSoFar(d);
-                const href = detailHref(d.id);
-                return (
-                  <TableRow
-                    key={d.id}
-                    // ทั้งแถวกดได้ ไม่ใช่เฉพาะตัวอักษรเลขที่ใบ — เป้าเล็กแค่คำเดียว
-                    // ในแถวสูง 65px คือกดพลาดตลอด ยังเป็น <a> จริงในเซลล์แรกด้วย
-                    // ไปหน้าดีเทลรวมเสมอ ไม่ใช่หน้ากรอกชั่ง (ดูปุ่ม "ชั่งน้ำหนัก"
-                    // ท้ายแถวสำหรับทางลัดไปหน้ากรอกชั่งตรงๆ)
-                    onClick={() => router.push(href)}
-                    className={cn("cursor-pointer", ROW_HOVER_NAV)}
-                  >
-                    <TableCell className={COL_FIRST}>
-                      <Link
-                        href={href}
-                        className="block font-medium whitespace-nowrap hover:underline"
-                      >
-                        {d.code}
-                      </Link>
-                      <span className="block text-sm text-muted-foreground">
-                        {d.createdAt}
-                      </span>
-                    </TableCell>
-                    <TableCell>
-                      <span className="block font-medium">{d.productName}</span>
-                      {d.productSub && (
-                        <span className="block text-sm text-muted-foreground">
-                          {d.productSub}
-                        </span>
-                      )}
-                    </TableCell>
-                    <TableCell className="whitespace-nowrap text-muted-foreground">
-                      {d.category}
-                    </TableCell>
-                    <TableCell className="whitespace-nowrap text-muted-foreground">
-                      {d.group}
-                    </TableCell>
-                    <TableCell className="whitespace-nowrap text-muted-foreground">
-                      {d.packing}
-                    </TableCell>
-                    <TableCell className="max-w-56 truncate" title={d.supplier}>
-                      {d.supplier}
-                    </TableCell>
-                    <TableCell className="whitespace-nowrap">{d.arriveDate}</TableCell>
-                    <TableCell
-                      className="max-w-40 truncate text-muted-foreground"
-                      title={d.truck}
-                    >
-                      {d.truck}
-                    </TableCell>
-                    <TableCell className="text-right whitespace-nowrap tabular-nums">
-                      {formatTon(d.orderTon)} ตัน
-                    </TableCell>
-                    <TableCell
-                      className={cn(
-                        "text-right whitespace-nowrap tabular-nums",
-                        variant === "weighed" && COL_LAST
-                      )}
-                    >
-                      {weighed === null ? "-" : `${formatTon(weighed)} ตัน`}
-                    </TableCell>
-                    {/* ทางลัดข้ามไปหน้ากรอกชั่งตรงๆ — ต่างจากแถวที่ไปหน้าดีเทลรวม
-                        โผล่เฉพาะแท็บรอชั่งเท่านั้น แท็บชั่งแล้วไม่มี action
-                        ให้กดต่อจากตารางนี้ทันที */}
-                    {variant === "pending" && (
-                      <TableCell
-                        className={cn(COL_LAST, "text-right")}
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        <Button asChild variant="outline-primary" size="sm">
-                          <Link href={addHref(d.id)}>ชั่งน้ำหนัก</Link>
-                        </Button>
-                      </TableCell>
+              {slice.map((d) => (
+                <TableRow
+                  key={d.id}
+                  // ทั้งแถวกดได้ ยังมี <a> จริงในเซลล์แรกไว้ให้คีย์บอร์ด/เปิดแท็บใหม่
+                  onClick={() => router.push(href(d.id))}
+                  className={cn("cursor-pointer", ROW_HOVER_NAV)}
+                >
+                  <TableCell className={COL_FIRST}>
+                    <Link href={href(d.id)} className="block font-medium whitespace-nowrap hover:underline">
+                      {d.code}
+                    </Link>
+                    <span className="block text-sm whitespace-nowrap text-muted-foreground">
+                      {d.createdAt}
+                    </span>
+                  </TableCell>
+                  <TableCell>
+                    <span className="block font-medium">{d.productName}</span>
+                    {d.productSub && (
+                      <span className="block text-sm text-muted-foreground">{d.productSub}</span>
                     )}
-                  </TableRow>
-                );
-              })}
+                  </TableCell>
+                  <TableCell className="whitespace-nowrap">{d.category}</TableCell>
+                  <TableCell className="whitespace-nowrap">{d.group}</TableCell>
+                  <TableCell className="text-right whitespace-nowrap">{d.packing ?? "-"}</TableCell>
+                  <TableCell className="max-w-64 truncate" title={d.supplier}>
+                    {d.supplier}
+                  </TableCell>
+                  <TableCell className="whitespace-nowrap">{d.arriveDate}</TableCell>
+                  <TableCell className="whitespace-nowrap">{d.plate}</TableCell>
+                  <TableCell className="text-right whitespace-nowrap tabular-nums">{valueOf(d)}</TableCell>
+                </TableRow>
+              ))}
             </TableBody>
           </Table>
 
@@ -200,53 +137,34 @@ export function WeighingList({
 
 function WeighingCard({
   doc,
-  detailHref,
-  addHref,
+  href,
+  value,
   variant,
 }: {
   doc: WeighingDoc;
-  detailHref: string;
-  addHref: string;
+  href: string;
+  value: string;
   variant: "pending" | "weighed";
 }) {
-  const weighed = weighedTonSoFar(doc);
   return (
-    // ลิงก์คลุมทั้งใบด้วย after:inset-0 แทนที่จะเอา <a> ครอบเนื้อหา
-    // เพราะในการ์ดมีปุ่มอยู่ด้วย ปุ่มซ้อนในลิงก์เป็น HTML ที่ผิด
-    // ทั้งการ์ดไปหน้าดีเทลรวม ปุ่ม "ชั่งน้ำหนัก" ท้ายการ์ดต่างหากที่ลัดไปกรอกชั่ง
+    // ลิงก์คลุมทั้งใบด้วย after:inset-0 (ใน CardHead) — ทั้งการ์ดไปหน้าใบชั่ง
     <div className="relative rounded-xl border border-border bg-card p-4">
-      <CardHead code={doc.code} at={doc.createdAt} href={detailHref} />
+      <CardHead code={doc.code} at={doc.createdAt} href={href} />
 
-      {/* สองกล่องส้ม แยกกันตามคำถามคนละข้อ — กล่องแรกตอบ "ของอะไร ของใคร"
-          กล่องสองตอบ "รถคันไหน เข้าเมื่อไหร่" เอาไปกองรวมเป็นรายการเดียวแล้ว
-          ต้องไล่อ่านทีละบรรทัดว่าอันไหนเรื่องของอันไหนเรื่องรถ */}
       <CardBox className="mt-3">
         <p className="font-medium">
           {doc.productName}
           {doc.productSub && ` ${doc.productSub}`}
         </p>
-        {/* ประเภท | หมวด | บรรจุภัณฑ์ — ชุดเดียวกับคอลัมน์ในตารางจอกว้าง */}
-        <p className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-sm text-muted-foreground">
-          <span>{doc.category}</span>
-          <span className="text-border" aria-hidden>
-            |
-          </span>
-          <span>{doc.group}</span>
-          {doc.packing && (
-            <>
-              <span className="text-border" aria-hidden>
-                |
-              </span>
-              <span>{doc.packing}</span>
-            </>
-          )}
+        <p className="mt-0.5 text-sm text-muted-foreground">
+          {[doc.category, doc.group, doc.packing].filter(Boolean).join(" | ")}
         </p>
         <p className="mt-1 text-sm font-medium">{doc.supplier}</p>
       </CardBox>
 
       <CardBox className="mt-2">
         <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 text-sm">
-          <span className="font-medium">{doc.truck}</span>
+          <span className="font-medium">{doc.plate}</span>
           <span>
             <span className="text-muted-foreground">วันที่รถจะเข้า: </span>
             <span className="font-medium">{doc.arriveDate}</span>
@@ -255,23 +173,8 @@ function WeighingCard({
       </CardBox>
 
       <dl className="mt-3 space-y-1.5 text-sm">
-        <CardRow label="สั่งซื้อ (ตัน)">{formatTon(doc.orderTon)}</CardRow>
-        <CardRow label="น้ำหนักสินค้า (ตัน)">
-          {weighed === null ? "-" : formatTon(weighed)}
-        </CardRow>
+        <CardRow label={variant === "pending" ? "รอชั่งน้ำหนัก" : "ชั่งน้ำหนัก"}>{value}</CardRow>
       </dl>
-
-      {variant === "pending" && (
-        <>
-          <Separator className="mt-3" />
-          {/* z-10 ให้ปุ่มลอยเหนือลิงก์ที่คลุมทั้งใบ ไม่งั้นกดไม่โดน */}
-          <div className="relative z-10 mt-3 flex justify-end">
-            <Button asChild variant="outline-primary" size="sm">
-              <Link href={addHref}>ชั่งน้ำหนัก</Link>
-            </Button>
-          </div>
-        </>
-      )}
     </div>
   );
 }
