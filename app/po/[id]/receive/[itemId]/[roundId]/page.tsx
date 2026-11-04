@@ -382,7 +382,9 @@ function Crumbs({ poId, code }: { poId?: string; code?: string }) {
         </BreadcrumbItem>
         <BreadcrumbSeparator />
         <BreadcrumbItem>
-          <BreadcrumbLink href="/po">สั่งซื้อ PO</BreadcrumbLink>
+          <BreadcrumbLink asChild>
+            <Link href="/po">สั่งซื้อ PO</Link>
+          </BreadcrumbLink>
         </BreadcrumbItem>
         <BreadcrumbSeparator />
         {poId ? (

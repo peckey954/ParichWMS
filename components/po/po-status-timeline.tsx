@@ -54,18 +54,40 @@ export function PoStatusTimeline({
   const progress = poProgress(doc);
   const stamp = (actor?: string) => <DetailLine actor={actor ?? doc.requester} at={at} department={DEPT} />;
 
-  const approvalRow: Row =
+  const waitingRow: Row = { key: "waitingApproval", icon: CircleCheckIcon, chip: CHIP.yellow, label: "รออนุมัติ", reached: true, detail: stamp() };
+  // ไม่อนุมัติ — ซ้อนเหนือ "รออนุมัติ" พร้อมเหตุผล (ตามแบบ) แก้แล้วบันทึกใบกลับเป็น
+  // รออนุมัติ เหลือแถวเดียวเหมือนเริ่มใหม่
+  const approvalRows: Row[] =
     doc.approval === "rejected"
-      ? { key: "approval", icon: CircleXIcon, chip: CHIP.red, label: "ไม่อนุมัติ", reached: true, detail: stamp(doc.approver) }
+      ? [
+          {
+            key: "approval",
+            icon: CircleXIcon,
+            chip: CHIP.red,
+            label: "ไม่อนุมัติ",
+            reached: true,
+            detail: (
+              <>
+                {stamp(doc.approver)}
+                {doc.rejectReason && (
+                  <p className="text-sm text-muted-foreground">
+                    เหตุผล: <span className="font-medium text-foreground">{doc.rejectReason}</span>
+                  </p>
+                )}
+              </>
+            ),
+          },
+          waitingRow,
+        ]
       : approved
-        ? { key: "approval", icon: CircleCheckIcon, chip: CHIP.yellow, label: "อนุมัติ", reached: true, detail: stamp(doc.approver) }
-        : { key: "approval", icon: CircleCheckIcon, chip: CHIP.yellow, label: "รออนุมัติ", reached: true, detail: stamp() };
+        ? [{ key: "approval", icon: CircleCheckIcon, chip: CHIP.yellow, label: "อนุมัติ", reached: true, detail: stamp(doc.approver) }]
+        : [waitingRow];
 
   const rows: Row[] = [
     { key: "complete", icon: PackageCheckIcon, chip: CHIP.green, label: "รับสินค้าครบแล้ว", reached: approved && progress === "complete" },
     { key: "partial", icon: PackagePlusIcon, chip: CHIP.lime, label: "ทยอยรับสินค้า", reached: approved && progress !== "notStarted" },
     { key: "waiting", icon: TruckIcon, chip: CHIP.orange, label: "รอรับสินค้า", reached: approved, detail: approved ? stamp() : undefined },
-    approvalRow,
+    ...approvalRows,
   ];
 
   if (cancelled) {

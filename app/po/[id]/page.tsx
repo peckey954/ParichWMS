@@ -5,9 +5,11 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import {
   ChevronDownIcon,
+  CircleAlertIcon,
   CircleXIcon,
   DownloadIcon,
   EllipsisVerticalIcon,
+  PencilIcon,
   Trash2Icon,
 } from "lucide-react";
 import {
@@ -81,7 +83,6 @@ import {
   formatPoBaht,
   poDisplayStatus,
   formatPoQty,
-  getPoOrder,
   lineItemFailedQty,
   lineItemPendingQty,
   lineItemReceivedQty,
@@ -99,6 +100,7 @@ import {
   type PoRound,
   type PoRoundStatus,
 } from "@/lib/po";
+import { usePoOrder } from "@/lib/po-edits";
 
 /* ------------------------------------------------------------------
    ใบสั่งซื้อ — โครงตามไฟล์ออกแบบ: กล่อง "ข้อมูลใบสั่งซื้อ" พับ/กางได้ (ราคารวม
@@ -155,7 +157,8 @@ const SUB_TABS: { id: SubTab; label: string }[] = [
 export default function PoOrderDetailPage() {
   const router = useRouter();
   const params = useParams<{ id: string }>();
-  const po = React.useMemo(() => getPoOrder(params.id), [params.id]);
+  // ผ่าน usePoOrder — ใบที่เพิ่งแก้ไขแล้วบันทึก (กลับไปรออนุมัติ) เห็นค่าใหม่ทันที
+  const po = usePoOrder(params.id);
   const [subTab, setSubTab] = React.useState<SubTab>("rounds");
   const [productFilter, setProductFilter] = React.useState<string>("all");
   const [cancelOpen, setCancelOpen] = React.useState(false);
@@ -260,9 +263,11 @@ export default function PoOrderDetailPage() {
   const progress = poProgress(po);
   // สถานะเปิด/ปิดใบ + ส่งออกรายงาน — ตั้งแต่เริ่มทยอยรับสินค้าเป็นต้นไป
   const canCloseEarly = !cancelled && (closed || progress !== "notStarted");
-  // เมนู ⋮ — ยกเลิกได้จนถึง "รอรับสินค้า" เริ่มรับสินค้าแล้วไม่มีเมนู
-  // (เมนู "แก้ไข" ตามแบบยังไม่มีหน้าแก้ไขใบสั่งซื้อรองรับ)
+  // เมนู ⋮ — แก้ไขได้ตอนรออนุมัติ/ไม่อนุมัติ (ส่งกลับแก้ไข) อนุมัติแล้วแก้ไม่ได้
+  // ยกเลิกได้จนถึง "รอรับสินค้า" เริ่มรับสินค้าแล้วไม่มีเมนู
+  const canEdit = !cancelled && po.approval !== "approved";
   const canCancel = !cancelled && !closed && (po.approval !== "approved" || progress === "notStarted");
+  const editHref = `/po/${po.id}/edit`;
 
   return (
     <div className="flex min-h-[calc(100vh-3.5rem)] flex-col">
@@ -306,7 +311,7 @@ export default function PoOrderDetailPage() {
               </Button>
             )}
 
-          {canCancel && (
+          {(canEdit || canCancel) && (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button
@@ -319,6 +324,14 @@ export default function PoOrderDetailPage() {
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="min-w-40">
+                {canEdit && (
+                  <DropdownMenuItem asChild>
+                    <Link href={editHref}>
+                      <PencilIcon />
+                      แก้ไข
+                    </Link>
+                  </DropdownMenuItem>
+                )}
                 {canCancel && (
                   <DropdownMenuItem onSelect={() => setCancelOpen(true)}>
                     <Trash2Icon />
@@ -330,6 +343,25 @@ export default function PoOrderDetailPage() {
           )}
           </div>
         </div>
+
+        {/* ไม่อนุมัติ — ส่งกลับมาให้แก้ กดลิงก์ในกล่องนี้หรือเมนู ⋮ > แก้ไข ก็ได้ */}
+        {!cancelled && po.approval === "rejected" && (
+          <div
+            role="status"
+            className="mt-4 flex gap-3 rounded-xl border border-danger-border bg-danger px-4 py-3 text-sm text-danger-strong"
+          >
+            <CircleAlertIcon className="mt-0.5 size-5 shrink-0" />
+            <div>
+              <p className="font-semibold">ส่งกลับแก้ไข</p>
+              <p className="mt-0.5">
+                ไม่อนุมัติเนื่องจาก{po.rejectReason ?? "ข้อมูลไม่ถูกต้อง"} หากต้องการแก้ไข กรุณากด{" "}
+                <Link href={editHref} className="font-medium underline underline-offset-2">
+                  แก้ไขใบสั่งซื้อ
+                </Link>
+              </p>
+            </div>
+          </div>
+        )}
 
         {cancelled && (
           <div
@@ -560,7 +592,9 @@ function Crumbs({ code }: { code?: string }) {
         </BreadcrumbItem>
         <BreadcrumbSeparator />
         <BreadcrumbItem>
-          <BreadcrumbLink href="/po">สั่งซื้อ PO</BreadcrumbLink>
+          <BreadcrumbLink asChild>
+            <Link href="/po">สั่งซื้อ PO</Link>
+          </BreadcrumbLink>
         </BreadcrumbItem>
         <BreadcrumbSeparator />
         <BreadcrumbItem>

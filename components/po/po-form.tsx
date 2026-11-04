@@ -1,0 +1,596 @@
+"use client";
+
+import * as React from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { ChevronDownIcon, MinusIcon, PlusIcon, Trash2Icon } from "lucide-react";
+import {
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbList,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+} from "@peckey954/ui/components/ui/breadcrumb";
+import { HomeCrumb } from "@/components/home-crumb";
+import { Button } from "@peckey954/ui/components/ui/button";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@peckey954/ui/components/ui/collapsible";
+import {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupButton,
+  InputGroupInput,
+} from "@peckey954/ui/components/ui/input-group";
+import { Label } from "@peckey954/ui/components/ui/label";
+import { RadioGroup, RadioGroupItem } from "@peckey954/ui/components/ui/radio-group";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@peckey954/ui/components/ui/select";
+import { Textarea } from "@peckey954/ui/components/ui/textarea";
+import { cn } from "@peckey954/ui/lib/utils";
+import { DateRangeSelect, type DateRange } from "@/components/date-select";
+import { useNumberField } from "@/components/number-field";
+import { PR_PRODUCTS, type PrCategoryId, type PrDoc } from "@/lib/pr";
+import { COMPANY_POOL, formatPoBaht, formatPoQty } from "@/lib/po";
+
+/* ------------------------------------------------------------------
+   ฟอร์มใบสั่งซื้อ — ใช้ร่วมกันระหว่าง "สร้างใบสั่งซื้อ" (/po/create) กับ
+   "แก้ไขใบสั่งซื้อ" (/po/[id]/edit — ใบที่รออนุมัติ/ไม่อนุมัติ ส่งกลับมาแก้)
+   หน้าที่เรียกเป็นเจ้าของ state ทั้งหมด ฟอร์มนี้แค่วาด + ส่ง onChange กลับ
+------------------------------------------------------------------ */
+
+export type DraftLine = {
+  key: string;
+  productId?: string;
+  categoryId: PrCategoryId;
+  /** ชื่อประเภทที่ใบขอซื้อต้นทางปักไว้ — ส่งต่อมาทั้งอย่างนั้น ไม่อ่านใหม่
+   *  ใบสั่งซื้อจึงพูดชื่อเดียวกับใบขอซื้อที่มันมา แม้ตั้งค่าจะเปลี่ยนไปแล้ว */
+  categoryLabel: string;
+  group: string;
+  productName: string;
+  productSub?: string;
+  packing?: string;
+  packingOptions: string[];
+  unit: string;
+  neededDate: string;
+  urgent: boolean;
+  orderedQty: number;
+  pricePerUnit: number;
+  handlingPerUnit: number;
+  /** เหตุผลตอนแก้บรรจุภัณฑ์/จำนวนสั่งซื้อไปจากที่ขอไว้เดิม — กรอกได้เสมอ แต่
+   *  ช่องนี้โผล่ให้เห็นเฉพาะตอนค่าจริงต่างจากที่ขอไว้เท่านั้น (ดู ProductCard) */
+  changeReason: string;
+  /** ย้อนไปดูใบขอซื้อต้นทางได้ — มีเฉพาะแถวที่มาจากใบขอซื้อจริง
+   *  แถวที่กด "เพิ่มสินค้า" เองในหน้านี้ไม่มีใบขอซื้อรองรับ จึงไม่มีข้อมูลชุดนี้ */
+  prRef?: {
+    code: string;
+    requestedQty: number;
+    /** บรรจุภัณฑ์ตอนเริ่มต้น (ตามที่ขอไว้) — เก็บแยกจาก line.packing ที่แก้ได้
+     *  เพื่อเทียบว่าค่าปัจจุบันเปลี่ยนไปจากที่ขอไว้หรือยัง */
+    originalPacking?: string;
+    requester: string;
+    editedBy?: string;
+  };
+};
+
+export function toDraftLine(pr: PrDoc): DraftLine {
+  const product = PR_PRODUCTS.find(
+    (p) => p.category === pr.categoryId && p.name === pr.productName && p.sub === pr.productSub
+  );
+  const packing = pr.packing ?? product?.packingOptions[0];
+  return {
+    key: pr.id,
+    productId: product?.id,
+    categoryId: pr.categoryId,
+    categoryLabel: pr.categoryLabel,
+    group: pr.group,
+    productName: pr.productName,
+    productSub: pr.productSub,
+    packing,
+    packingOptions: product?.packingOptions ?? (pr.packing ? [pr.packing] : []),
+    unit: pr.unit,
+    neededDate: pr.neededDate,
+    urgent: !!pr.urgent,
+    orderedQty: pr.qty,
+    pricePerUnit: 0,
+    handlingPerUnit: 0,
+    changeReason: "",
+    prRef: {
+      code: pr.code,
+      requestedQty: pr.qty,
+      originalPacking: packing,
+      requester: pr.requester,
+      editedBy: pr.editedBy,
+    },
+  };
+}
+
+export const lineUnitPrice = (line: DraftLine) => line.pricePerUnit + line.handlingPerUnit;
+export const lineTotalPrice = (line: DraftLine) => lineUnitPrice(line) * line.orderedQty;
+
+/** ป้ายราคาในกล่องพื้นสีแบรนด์ — จอมือถือ/แท็บเล็ต label กับค่าคนละบรรทัดเหมือน
+ *  เดิม (ยังแคบอยู่ วางแนวตั้งอ่านง่ายกว่า) จอเว็บเท่านั้นที่ยุบมาบรรทัดเดียว
+ *  แบบ "label: ค่า" ตามแบบ — มี ":" เฉพาะตอนอยู่บรรทัดเดียวกัน (ไม่ใส่ตอนวาง
+ *  ซ้อนกันสองบรรทัด)
+ *
+ *  เบรกพอยต์เป็นค่ากำหนดเอง @[820px] ไม่ใช่ขนาดมาตรฐานของ Tailwind (@3xl=768
+ *  เตี้ยไป โดนกรอบพรีวิวแท็บเล็ตด้วย, @4xl=896 สูงไป — เนื้อที่จริงในนี้ไม่มี
+ *  ทางถึง เพราะ <main> ล็อกความกว้างไว้ ไว้แล้วลบ padding ออกอีกเสมอ)
+ *  วัดจริงจากเบราว์เซอร์แล้ว: กรอบพรีวิวแท็บเล็ต (834px) เหลือพื้นที่ในสุด
+ *  786px จอเว็บจริง (ไม่ถูกล็อกความกว้าง) เหลือ 848px — 820px อยู่กึ่งกลาง
+ *  ระหว่างสองค่านี้พอดี */
+function PriceStat({ label, value, lg }: { label: string; value: string; lg?: boolean }) {
+  return (
+    <div className="flex flex-col @[820px]:flex-row @[820px]:items-baseline @[820px]:gap-1.5">
+      <p className="text-sm text-muted-foreground">
+        {label}
+        <span className="hidden @[820px]:inline">:</span>
+      </p>
+      <p
+        className={cn(
+          "mt-1 font-semibold tabular-nums @[820px]:mt-0",
+          lg && "text-lg"
+        )}
+      >
+        {value}
+      </p>
+    </div>
+  );
+}
+
+export type PoFormState = {
+  poType: "po" | "poi";
+  company: string | undefined;
+  expectedRange: DateRange | undefined;
+  lines: DraftLine[];
+  note: string;
+};
+
+export function PoForm({
+  title,
+  value,
+  onChange,
+  addItemsHref,
+  onBeforeAddItems,
+  onSave,
+}: {
+  /** หัวข้อหน้า — ใช้เป็นชื่อหน้าสุดท้ายใน breadcrumb ด้วย */
+  title: string;
+  value: PoFormState;
+  onChange: (next: PoFormState) => void;
+  /** ปุ่ม "+ เพิ่มสินค้า" พาไปหน้าเลือกใบขอซื้อ */
+  addItemsHref: string;
+  /** เรียกก่อนออกไปหน้าเพิ่มสินค้า — หน้าแก้ไขใช้เก็บร่างที่กรอกค้างไว้ */
+  onBeforeAddItems?: () => void;
+  onSave: () => void;
+}) {
+  const router = useRouter();
+  const { poType, company, expectedRange, lines, note } = value;
+  const set = (patch: Partial<PoFormState>) => onChange({ ...value, ...patch });
+  const setPoType = (v: "po" | "poi") => set({ poType: v });
+  const setCompany = (v: string) => set({ company: v });
+  const setExpectedRange = (v: DateRange | undefined) => set({ expectedRange: v });
+  const setNote = (v: string) => set({ note: v });
+
+  const totalPrice = React.useMemo(
+    () => lines.reduce((sum, l) => sum + lineTotalPrice(l), 0),
+    [lines]
+  );
+
+  function updateLine(key: string, patch: Partial<DraftLine>) {
+    set({ lines: lines.map((l) => (l.key === key ? { ...l, ...patch } : l)) });
+  }
+
+  function removeLine(key: string) {
+    set({ lines: lines.filter((l) => l.key !== key) });
+  }
+
+  return (
+    <>
+      <main className="@container mx-auto w-full max-w-7xl px-4 pt-6 pb-24 sm:px-6">
+        <Crumbs title={title} />
+
+        <h1 className="mt-2 text-2xl font-semibold tracking-tight">{title}</h1>
+
+        {/* ---------- หัวใบ ----------
+             จอกว้าง (@4xl) สามช่องแถวเดียวตามแบบ: ประเภท | บริษัท | วันที่สินค้าจะเข้า
+             จอแคบกว่านั้นเรียงลงทีละช่อง */}
+        <div className="mt-4 grid gap-4 @4xl:grid-cols-3">
+          <div className="space-y-1.5">
+            <Label>ประเภทการสั่งซื้อ</Label>
+            <RadioGroup
+              value={poType}
+              onValueChange={(v) => setPoType(v as "po" | "poi")}
+              className="grid grid-cols-2 gap-3"
+            >
+              <RadioBox id="po-type-po" value="po">
+                PO ในประเทศ
+              </RadioBox>
+              <RadioBox id="po-type-poi" value="poi">
+                POI ต่างประเทศ
+              </RadioBox>
+            </RadioGroup>
+          </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="po-company">บริษัทที่ทำการสั่งซื้อ</Label>
+              <Select value={company} onValueChange={setCompany}>
+                <SelectTrigger id="po-company" className="w-full bg-card">
+                  <SelectValue placeholder="เลือกบริษัท" />
+                </SelectTrigger>
+                <SelectContent>
+                  {COMPANY_POOL.map((c) => (
+                    <SelectItem key={c} value={c}>
+                      {c}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="po-expected">
+                คาดการณ์ช่วงวันที่สินค้าจะเข้า{" "}
+                <span className="font-normal text-muted-foreground">(ไม่บังคับ)</span>
+              </Label>
+              <DateRangeSelect
+                id="po-expected"
+                value={expectedRange}
+                onValueChange={setExpectedRange}
+                placeholder="เลือกวันที่สินค้าจะเข้า"
+                className="bg-card"
+              />
+            </div>
+        </div>
+
+        {/* ---------- หัวข้อสินค้า + ปุ่มเพิ่ม ---------- */}
+        <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
+          <h2 className="font-semibold">
+            รายการสินค้า <span className="font-normal">({lines.length} รายการ)</span>
+          </h2>
+          <Button asChild>
+            <Link href={addItemsHref} onClick={onBeforeAddItems}>
+              <PlusIcon />
+              เพิ่มสินค้า
+            </Link>
+          </Button>
+        </div>
+
+        {/* ---------- สรุปราคารวม ---------- */}
+        <div className="mt-3 rounded-lg border border-border bg-brand px-4 py-3.5">
+          <PriceStat
+            label="ราคารวมทั้งหมด (บาท)"
+            value={lines.length > 0 ? formatPoBaht(totalPrice) : "-"}
+            lg
+          />
+        </div>
+
+        {/* ---------- การ์ดสินค้า ---------- */}
+        <div className="mt-4 space-y-4">
+          {lines.length === 0 ? (
+            <div className="rounded-xl border border-dashed border-border px-6 py-14 text-center">
+              <p className="font-medium">ยังไม่มีสินค้าในใบนี้</p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                กด &quot;เพิ่มสินค้า&quot; ด้านบนเพื่อเริ่มเพิ่มรายการ
+              </p>
+            </div>
+          ) : (
+            lines.map((line) => (
+              <ProductCard
+                key={line.key}
+                line={line}
+                onChange={(patch) => updateLine(line.key, patch)}
+                onRemove={() => removeLine(line.key)}
+              />
+            ))
+          )}
+        </div>
+
+        {/* ---------- หมายเหตุ ---------- */}
+        <div className="mt-6 space-y-1.5">
+          <Label htmlFor="po-note">
+            หมายเหตุ <span className="font-normal text-muted-foreground">(ไม่บังคับ)</span>
+          </Label>
+          <Textarea
+            id="po-note"
+            className="bg-card"
+            rows={3}
+            placeholder="ระบุหมายเหตุ"
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+          />
+        </div>
+      </main>
+
+      {/* ---------- แถบปุ่มล่าง ---------- */}
+      <div className="sticky bottom-0 z-30 border-t border-border bg-surface">
+        <div className="mx-auto flex w-full max-w-7xl items-center justify-between gap-3 px-8 py-3">
+          <Button variant="outline-primary" onClick={() => router.back()}>
+            ย้อนกลับ
+          </Button>
+          <Button onClick={onSave}>บันทึก</Button>
+        </div>
+      </div>
+    </>
+  );
+}
+
+function Crumbs({ title }: { title: string }) {
+  return (
+    <Breadcrumb>
+      <BreadcrumbList>
+        <BreadcrumbItem>
+          <HomeCrumb />
+        </BreadcrumbItem>
+        <BreadcrumbSeparator />
+        <BreadcrumbItem>
+          <BreadcrumbLink asChild>
+            <Link href="/po">สั่งซื้อ PO</Link>
+          </BreadcrumbLink>
+        </BreadcrumbItem>
+        <BreadcrumbSeparator />
+        <BreadcrumbItem>
+          <BreadcrumbPage className="text-primary">{title}</BreadcrumbPage>
+        </BreadcrumbItem>
+      </BreadcrumbList>
+    </Breadcrumb>
+  );
+}
+
+/** ตัวเลือกแบบกล่อง — ไฮไลต์กรอบ/พื้นตอนถูกเลือก อิง data-state ของ RadioGroupItem เอง */
+function RadioBox({
+  id,
+  value,
+  children,
+}: {
+  id: string;
+  value: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <Label
+      htmlFor={id}
+      className={cn(
+        "flex cursor-pointer items-center gap-2.5 rounded-lg border border-border bg-card px-4 py-3 text-sm font-medium",
+        "has-[[data-state=checked]]:border-primary has-[[data-state=checked]]:bg-brand"
+      )}
+    >
+      <RadioGroupItem id={id} value={value} />
+      {children}
+    </Label>
+  );
+}
+
+function ProductCard({
+  line,
+  onChange,
+  onRemove,
+}: {
+  line: DraftLine;
+  onChange: (patch: Partial<DraftLine>) => void;
+  onRemove: () => void;
+}) {
+  // ค่าจริงต่างจากที่ขอไว้เดิมไหม (บรรจุภัณฑ์ หรือ จำนวนสั่งซื้อ) — ใช้ตัดสิน
+  // ว่าจะโชว์ช่อง "เหตุผลเปลี่ยนข้อมูล" ไหม แถวที่ไม่มี prRef (เพิ่มสินค้าเอง
+  // ในหน้านี้) ไม่มีของเดิมให้เทียบ เลยไม่มีทางเข้าเงื่อนไขนี้ได้เลย
+  const changedFromRequest =
+    !!line.prRef &&
+    (line.orderedQty !== line.prRef.requestedQty || line.packing !== line.prRef.originalPacking);
+
+  return (
+    // ไม่ defaultOpen — การ์ดสินค้าเริ่มต้นหุบไว้เสมอ กางเมื่อกดดูข้อมูลอ้างอิง
+    // ใบขอซื้อเท่านั้น (ช่องกรอกจำนวน/ราคาด้านล่างไม่ได้อยู่ใน Collapsible เลย
+    // เห็นได้ตลอดไม่ว่าหุบ/กาง)
+    <Collapsible className="rounded-xl border border-border bg-card">
+      <div className="p-4 pb-0">
+        {/* บรรทัดชื่อสินค้า — ปุ่มลบ/หุบกางอยู่มุมขวาบนแถวเดียวกับชื่อเสมอ
+            ไม่ปล่อยให้ตกไปแถวใหม่ตอนจอแคบเหมือนก่อนหน้านี้ (ตอนนั้นอยู่รวมกับ
+            วันที่/ชิปเร่งด่วนในกลุ่มเดียวกัน พอ flex-wrap แล้วหลุดไปบรรทัดถัดไป) */}
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <p className="text-base font-semibold">
+              {line.productName}
+              {line.productSub && ` ${line.productSub}`}
+            </p>
+            <p className="mt-2 text-sm whitespace-nowrap text-muted-foreground">
+              {line.categoryLabel} · {line.group}
+              {line.packing && ` · ${line.packing}`}
+            </p>
+          </div>
+
+          <div className="flex shrink-0 items-center gap-2">
+            <Button variant="ghost" size="icon" aria-label="ลบสินค้านี้" onClick={onRemove}>
+              <Trash2Icon />
+            </Button>
+            {/* ไม่มี prRef (สินค้าที่กดเพิ่มเองในหน้านี้ ไม่ได้มาจากใบขอซื้อ) ก็ไม่มี
+                อะไรให้กางดู เลยไม่ต้องมีปุ่มหุบ/กางเลย */}
+            {line.prRef && (
+              <CollapsibleTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  aria-label="แสดง/ซ่อนข้อมูลอ้างอิงใบขอซื้อ"
+                  className="group"
+                >
+                  <ChevronDownIcon className="transition-transform group-data-[state=open]:rotate-180" />
+                </Button>
+              </CollapsibleTrigger>
+            )}
+          </div>
+        </div>
+
+        {/* วันที่มาจากใบขอซื้อที่คนขอกรอกไว้แล้ว — ดูอย่างเดียว แก้ไม่ได้ในหน้านี้
+            แยกลงมาเป็นบรรทัดของตัวเอง (ไม่ใช่แถวเดียวกับปุ่มลบ/หุบกางแบบเดิม)
+            ปล่อยให้ wrap ร่วมกับชิปเร่งด่วนได้อิสระโดยไม่กระทบตำแหน่งปุ่มด้านบน */}
+        {(line.neededDate || line.urgent) && (
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            <span className="text-sm whitespace-nowrap text-muted-foreground">
+              วันที่ต้องการสินค้า:{" "}
+              <span className="font-medium text-foreground tabular-nums">
+                {line.neededDate || "-"}
+              </span>
+            </span>
+            {line.urgent && (
+              <span className="inline-flex shrink-0 items-center rounded-full border border-transparent px-3 py-1 text-xs font-semibold whitespace-nowrap [--bdg-surface:var(--chip-orange)] [--bdg-text:var(--chip-orange-foreground)] bg-(--bdg-surface) text-(--bdg-text)">
+                เร่งด่วน
+              </span>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* ราคารวมของรายการนี้ — กล่องพื้นสีแบรนด์ (ตามแบบ) เหมือนกล่องราคารวม
+          ทั้งใบด้านบน ไม่ใช่แค่บรรทัดตัวหนังสือเปล่าๆ แบบเดิม ไม่มีเส้นคั่นด้าน
+          ล่างอีกต่อไป — ตัวกล่องเองทำหน้าที่แบ่งส่วนหัวการ์ดกับช่องกรอกด้านล่าง
+          อยู่แล้ว ไม่ต้องมีเส้น border-t ซ้ำ */}
+      <div className="px-4 pt-3">
+        <div className="grid gap-4 rounded-lg bg-brand p-4 @sm:grid-cols-2">
+          <PriceStat
+            label={`ราคารวมต่อ${line.unit} (บาท)`}
+            value={lineUnitPrice(line) > 0 ? formatPoBaht(lineUnitPrice(line)) : "-"}
+          />
+          <PriceStat
+            label="ราคารวมทั้งหมด (บาท)"
+            value={lineTotalPrice(line) > 0 ? formatPoBaht(lineTotalPrice(line)) : "-"}
+          />
+        </div>
+      </div>
+
+      {/* ช่องกรอกจำนวน/ราคา — เห็นตลอดไม่ว่าการ์ดจะหุบหรือกางอยู่ ไม่ได้ซ่อนใน
+          Collapsible เพราะเป็นข้อมูลที่ต้องกรอกก่อนบันทึกใบ ไม่ใช่แค่ดูอ้างอิง */}
+      <div className="grid gap-4 px-4 pt-4 pb-4 @lg:grid-cols-4">
+        <div className="space-y-1.5">
+          <Label>บรรจุภัณฑ์</Label>
+          {line.packingOptions.length > 0 ? (
+            <Select value={line.packing} onValueChange={(v) => onChange({ packing: v })}>
+              <SelectTrigger className="w-full bg-card">
+                <SelectValue placeholder="เลือกบรรจุภัณฑ์" />
+              </SelectTrigger>
+              <SelectContent>
+                {line.packingOptions.map((p) => (
+                  <SelectItem key={p} value={p}>
+                    {p}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          ) : (
+            <p className="flex h-9 items-center rounded-md border border-border bg-card px-3 text-sm text-muted-foreground">
+              {line.packing ?? "-"}
+            </p>
+          )}
+        </div>
+        <div className="space-y-1.5">
+          <Label>สั่งซื้อ ({line.unit})</Label>
+          <NumberStepper
+            value={line.orderedQty}
+            onValueChange={(v) => onChange({ orderedQty: v })}
+          />
+        </div>
+        <div className="space-y-1.5">
+          <Label>ราคาสั่งต่อ{line.unit} (บาท)</Label>
+          <NumberStepper
+            value={line.pricePerUnit}
+            onValueChange={(v) => onChange({ pricePerUnit: v })}
+            step={10}
+          />
+        </div>
+        <div className="space-y-1.5">
+          <Label>ค่าการจัดการต่อ{line.unit} (บาท)</Label>
+          <NumberStepper
+            value={line.handlingPerUnit}
+            onValueChange={(v) => onChange({ handlingPerUnit: v })}
+            step={10}
+          />
+        </div>
+      </div>
+
+      {/* ---------- เหตุผลเปลี่ยนข้อมูล ----------
+           โผล่เฉพาะตอนบรรจุภัณฑ์หรือจำนวนสั่งซื้อจริงต่างจากที่ขอไว้เดิม —
+           ไม่ใช่ช่องตายตัวที่ต้องเห็นทุกครั้ง (แถวที่ยังไม่ได้แก้อะไรเลยไม่ต้อง
+           อธิบายอะไร) เห็นตลอดไม่ว่าการ์ดจะหุบหรือกางอยู่ เพราะเป็นข้อมูลที่ต้อง
+           กรอกก่อนบันทึกใบเหมือนช่องด้านบน ไม่ใช่แค่ดูอ้างอิงเฉยๆ */}
+      {changedFromRequest && (
+        <div className="space-y-1.5 px-4 pb-4">
+          <Label>เหตุผลเปลี่ยนข้อมูลการสั่งซื้อ/บรรจุภัณฑ์</Label>
+          <Textarea
+            className="bg-card"
+            rows={2}
+            placeholder="ระบุเหตุผล"
+            value={line.changeReason}
+            onChange={(e) => onChange({ changeReason: e.target.value })}
+          />
+        </div>
+      )}
+
+      {/* ---------- อ้างอิงใบขอซื้อต้นทาง ----------
+           ดูอย่างเดียว ไม่มีปุ่มแก้ ไม่ใช่ข้อมูลที่ต้องตัดสินใจอะไรตรงนี้ต่อ
+           แค่เผื่อต้องย้อนไปดูว่าใบขอซื้อใบไหนขอมา ขอไว้เท่าไหร่ ใครขอ ใครแก้ล่าสุด
+           ส่วนเดียวที่อยู่ใน Collapsible จริงๆ — การ์ดเริ่มต้นหุบไว้ กดกางถึงจะ
+           เห็น ไม่ต้องรกตาตั้งแต่แรกเข้าหน้า มีเฉพาะรายการที่มาจากใบขอซื้อจริง
+           (prRef) เท่านั้น กดเพิ่มสินค้าเองไม่มีใบขอซื้อรองรับ */}
+      {line.prRef && (
+        <CollapsibleContent className="border-t border-border px-4 pt-4 pb-4">
+          <div className="grid gap-4 @lg:grid-cols-4">
+            <div className="space-y-1.5">
+              <p className="text-sm text-muted-foreground">เลขที่ใบขอซื้อ</p>
+              <p className="text-sm font-medium">{line.prRef.code}</p>
+            </div>
+            <div className="space-y-1.5">
+              <p className="text-sm text-muted-foreground">ขอซื้อ ({line.unit})</p>
+              <p className="text-sm font-medium tabular-nums">
+                {formatPoQty(line.prRef.requestedQty)}
+              </p>
+            </div>
+            <div className="space-y-1.5">
+              <p className="text-sm text-muted-foreground">ผู้ขอซื้อ</p>
+              <p className="text-sm font-medium">{line.prRef.requester}</p>
+            </div>
+            <div className="space-y-1.5">
+              <p className="text-sm text-muted-foreground">ผู้แก้ไขขอซื้อล่าสุด</p>
+              <p className="text-sm font-medium">{line.prRef.editedBy ?? "-"}</p>
+            </div>
+          </div>
+        </CollapsibleContent>
+      )}
+    </Collapsible>
+  );
+}
+
+function NumberStepper({
+  value,
+  onValueChange,
+  step = 1,
+}: {
+  value: number;
+  onValueChange: (next: number) => void;
+  step?: number;
+}) {
+  const field = useNumberField(value, onValueChange, 2);
+  const bump = (delta: number) =>
+    onValueChange(Math.max(0, Number((value + delta).toFixed(2))));
+
+  return (
+    <InputGroup className="bg-card">
+      <InputGroupAddon align="inline-start">
+        <InputGroupButton size="icon-xs" aria-label="ลดจำนวน" onClick={() => bump(-step)}>
+          <MinusIcon />
+        </InputGroupButton>
+      </InputGroupAddon>
+      <InputGroupInput {...field} className="text-center" />
+      <InputGroupAddon align="inline-end">
+        <InputGroupButton size="icon-xs" aria-label="เพิ่มจำนวน" onClick={() => bump(step)}>
+          <PlusIcon />
+        </InputGroupButton>
+      </InputGroupAddon>
+    </InputGroup>
+  );
+}

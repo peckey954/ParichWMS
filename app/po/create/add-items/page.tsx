@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ListFilterIcon, SearchIcon } from "lucide-react";
 import {
@@ -109,11 +110,15 @@ function AddItemsContent() {
   );
 
   // ประเภทสินค้าที่ล็อกไว้แล้วจากของที่มีอยู่ในใบร่าง — ใบว่างเปล่ายังไม่ล็อก
+  // มาจากหน้าแก้ไขใบสั่งซื้อ (edit=<poId>) — รายการเดิมในใบไม่อยู่ในคิวใบขอซื้อ
+  // หน้าแก้ไขจึงส่งประเภทมาให้ตรงๆ ทาง "category"
+  const editPoId = searchParams.get("edit");
+  const categoryParam = searchParams.get("category") as PrCategoryId | null;
   const lockedCategory: PrCategoryId | null = React.useMemo(() => {
     if (existingIds.size === 0) return null;
     const first = PO_QUEUE_DOCS.find((d) => existingIds.has(d.id));
-    return first?.categoryId ?? null;
-  }, [existingIds]);
+    return first?.categoryId ?? categoryParam;
+  }, [existingIds, categoryParam]);
 
   // ตัวเลือกในหน้านี้ — เอาที่มีอยู่แล้วในใบร่างออก กับใบที่ยกเลิกไปแล้วออก
   // ล็อกประเภทไว้แล้ว (มีสินค้าอยู่ในใบร่างแล้วอย่างน้อยหนึ่งรายการ) กรองให้
@@ -192,6 +197,11 @@ function AddItemsContent() {
   }
 
   function handleConfirm() {
+    if (editPoId) {
+      // หน้าแก้ไขเก็บร่างไว้เองแล้ว ส่งกลับไปแค่ใบที่เพิ่งเลือก
+      router.push(`/po/${editPoId}/edit?add=${[...selected].join(",")}`);
+      return;
+    }
     const sp = new URLSearchParams();
     sp.set("ids", [...existingIds, ...selected].join(","));
     for (const key of ["poType", "company", "from", "to", "note"]) {
@@ -211,7 +221,9 @@ function AddItemsContent() {
             </BreadcrumbItem>
             <BreadcrumbSeparator />
             <BreadcrumbItem>
-              <BreadcrumbLink href="/po">สั่งซื้อ PO</BreadcrumbLink>
+              <BreadcrumbLink asChild>
+            <Link href="/po">สั่งซื้อ PO</Link>
+          </BreadcrumbLink>
             </BreadcrumbItem>
             <BreadcrumbSeparator />
             <BreadcrumbItem>

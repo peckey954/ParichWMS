@@ -51,7 +51,6 @@ import {
   matchesPoOrderChip,
   matchesPoQueueChip,
   PO_ORDER_CHIP_LABEL,
-  PO_ORDER_DOCS,
   PO_QUEUE_CHIP_LABEL,
   PO_QUEUE_DOCS,
   poIsDone,
@@ -59,6 +58,7 @@ import {
   type PoOrderChip,
   type PoQueueChip,
 } from "@/lib/po";
+import { usePoOrders } from "@/lib/po-edits";
 
 /* ------------------------------------------------------------------
    สั่งซื้อ PO — หน้ารวมงานจัดซื้อ สามช่วง
@@ -73,10 +73,6 @@ import {
 
 const CHIPS: PoQueueChip[] = ["all", "urgent", "cancelled"];
 const PO_CHIPS: PoOrderChip[] = ["all", "urgent", "cancelled"];
-
-/** แท็บ "สั่งซื้อ" = ใบที่ยังไม่จบ ส่วนใบที่รับครบ/ปิดใบแล้วย้ายไปแท็บ "เข้าคลัง" */
-const ORDER_DOCS = PO_ORDER_DOCS.filter((d) => !poIsDone(d));
-const DONE_DOCS = PO_ORDER_DOCS.filter(poIsDone);
 
 /** วันที่เอกสาร "1/16/2026 | 10:42:52" (เดือน/วัน/ปี) → Date ระดับวัน */
 function parseDocDate(stamp: string): Date | undefined {
@@ -97,6 +93,12 @@ function PoPageContent() {
   const searchParams = useSearchParams();
   const { framed } = useDevicePreview();
   const { hidden, showTop, scrollToTop, scrollIntoTop } = useScrollState();
+
+  // แท็บ "สั่งซื้อ" = ใบที่ยังไม่จบ ส่วนใบที่รับครบ/ปิดใบแล้วย้ายไปแท็บ "เข้าคลัง"
+  // อ่านผ่าน usePoOrders — ใบที่เพิ่งแก้ไขแล้วบันทึกขึ้นสถานะ "รออนุมัติ" ทันที
+  const orderDocsAll = usePoOrders();
+  const ORDER_DOCS = React.useMemo(() => orderDocsAll.filter((d) => !poIsDone(d)), [orderDocsAll]);
+  const DONE_DOCS = React.useMemo(() => orderDocsAll.filter(poIsDone), [orderDocsAll]);
 
   // เปิดแท็บตามที่ query param "tab" ระบุไว้ถ้ามี (เช่น กลับจากสร้างใบสั่งซื้อ
   // ในแท็บ "ขอซื้อ" สำเร็จแล้ว ควรกลับมาที่แท็บ "ขอซื้อ" ต่อ ไม่ใช่รีเซ็ตไปแท็บ
@@ -137,7 +139,7 @@ function PoPageContent() {
       for (const k of PO_CHIPS) if (matchesPoOrderChip(d, k)) c[k] += 1;
     }
     return c;
-  }, []);
+  }, [ORDER_DOCS]);
   const poVisible = ORDER_DOCS.filter((d) => {
     if (!matchesPoOrderChip(d, poChip)) return false;
     if (!matchesPoOrder(d, poQuery)) return false;

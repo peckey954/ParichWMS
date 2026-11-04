@@ -190,8 +190,10 @@ export type PoDoc = {
   requester: string;
   /** มีค่าเฉพาะใบที่เคยถูกแก้ไขหลังสร้าง ไม่ใช่ทุกใบจะมี */
   editedBy?: string;
-  /** มีค่าเฉพาะใบที่ผ่านการอนุมัติแล้ว */
+  /** มีค่าเฉพาะใบที่ผ่านการอนุมัติแล้ว (หรือคนที่กดไม่อนุมัติ) */
   approver?: string;
+  /** เหตุผลไม่อนุมัติ — มีเฉพาะใบที่ถูกส่งกลับแก้ไข (approval = "rejected") */
+  rejectReason?: string;
   note?: string;
   /** ช่วงวันที่คาดว่าสินค้าจะเข้าครบ — คร่าวๆ ระดับทั้งใบ ไม่ใช่ต่อรายการ */
   expectedFrom: string;
@@ -654,6 +656,7 @@ function buildPoDoc(
     lineItems,
     wholesale,
     closedDaysAgo: opts.closedDaysAgo,
+    rejectReason: approval === "rejected" ? "ข้อมูลไม่ถูกต้อง" : undefined,
   } satisfies PoDoc;
 }
 
