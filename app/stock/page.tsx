@@ -35,8 +35,8 @@ import { useDevicePreview, useScrollState } from "@/components/device-preview";
 import { BackToTop, StickyToolbar } from "@/components/sticky-toolbar";
 import { HistoryList } from "@/components/stock/history-list";
 import { StockLogProvider, useStockLog } from "@/components/stock/stock-log";
-import { InboundList } from "@/components/stock/inbound-list";
-import { IssueList } from "@/components/stock/issue-list";
+import { GoodsWaitingList } from "@/components/stock/goods-waiting-list";
+import { DateRangeSelect, type DateRange } from "@/components/date-select";
 import { ProductCard } from "@/components/stock/stock-parts";
 import { FifoList, ZoneGroups } from "@/components/stock/lot-list";
 import { useRememberedState } from "@/components/remembered-state";
@@ -51,23 +51,19 @@ import {
 import {
   CATEGORIES,
   CATEGORY_LABEL,
-  INBOUND_DOCS,
-  isInboundOpen,
   inboundTabRequested,
   clearInboundTabRequest,
-  ISSUE_DOCS,
   PRODUCTS,
   countByCategory,
   groupByZone,
-  isReturn,
   matchesHistory,
-  matchesInbound,
-  matchesIssue,
   matchesQuery,
   sortFifo,
   sortProducts,
   type CategoryId,
 } from "@/lib/general-stock";
+import { GENERAL_WAIT_KINDS, generalWaitingDocs } from "@/lib/general-waiting";
+import { stampOf, type WaitKind } from "@/lib/goods-waiting";
 
 /** ชิปแถวบน — ประเภทสินค้าทั้งหมด บวกมุมมองประวัติต่อท้าย */
 const CHIPS: { id: CategoryId | "history"; label: string }[] = [
@@ -75,13 +71,16 @@ const CHIPS: { id: CategoryId | "history"; label: string }[] = [
   { id: "history", label: "ประวัติ" },
 ];
 
-type IssueKind = "all" | "issue" | "return";
+type WaitChip = WaitKind | "all";
 
-const ISSUE_KINDS: { id: IssueKind; label: string }[] = [
-  { id: "all", label: "ทั้งหมด" },
-  { id: "issue", label: "รอจ่ายออก" },
-  { id: "return", label: "รอรับคืน" },
-];
+/** ช่วงวันที่ — เทียบแค่วัน ไม่สนเวลา ถึงวันสุดท้ายรวมทั้งวัน */
+function inRange(createdAt: string, range?: DateRange) {
+  if (!range?.from) return true;
+  const t = stampOf(createdAt);
+  const from = new Date(range.from).setHours(0, 0, 0, 0);
+  const to = new Date(range.to ?? range.from).setHours(23, 59, 59, 999);
+  return t >= from && t <= to;
+}
 
 export default function GeneralStockPage() {
   // ห่อไว้ที่นี่เพราะทั้งกล่องย้าย/ปรับปรุง และแท็บประวัติ อยู่ใต้หน้านี้ทั้งคู่
@@ -121,14 +120,15 @@ function GeneralStockView() {
   // ทุกอย่างที่ตัวกรองเป็นเจ้าของอยู่ในก้อนเดียว แก้ในกล่องแล้วกดตกลงทีเดียวจบ
   const [view, setView] = React.useState<StockView>(STOCK_VIEW_DEFAULT);
   const [filterOpen, setFilterOpen] = React.useState(false);
-  // กลับมาจากบันทึกใบรับเข้า ต้องเปิดแท็บรอรับเข้าค้างไว้ให้เห็นผล
-  const [tab, setTab] = useRememberedState<"stock" | "inbound" | "issue">("stock.tab", "stock", () =>
-    inboundTabRequested() ? "inbound" : undefined
+  // กลับมาจากบันทึกใบรับเข้า ต้องเปิดแท็บรอค้างไว้ให้เห็นผล
+  // รอรับเข้า รอจ่าย รอคืน อยู่แท็บเดียวกัน แยกด้วยชิป (แบบเดียวกับสต็อกสินค้า)
+  const [tab, setTab] = useRememberedState<"stock" | "waiting">("stock.tab", "stock", () =>
+    inboundTabRequested() ? "waiting" : undefined
   );
   React.useEffect(() => clearInboundTabRequest(), []);
-  const [inboundQuery, setInboundQuery] = React.useState("");
-  const [issueQuery, setIssueQuery] = React.useState("");
-  const [issueKind, setIssueKind] = useRememberedState<IssueKind>("stock.issueKind", "all");
+  const [waitQuery, setWaitQuery] = React.useState("");
+  const [range, setRange] = React.useState<DateRange | undefined>();
+  const [waitKind, setWaitKind] = useRememberedState<WaitChip>("stock.waitKind", "all");
 
   // จุดบนปุ่มขึ้นเมื่อมีอะไรต่างจากค่าเริ่มต้น ไม่ว่าจะเป็นติ๊ก การเรียง หรือดรอปดาวน์
   const filterActive = !isStockDefault(view);
@@ -183,23 +183,12 @@ function GeneralStockView() {
             )
         );
 
-  const openInbound = INBOUND_DOCS.filter(isInboundOpen);
-  const inboundVisible = openInbound.filter((d) =>
-    matchesInbound(d, inboundQuery)
-  );
-
-  // จำนวนบนชิปนับจากยอดจริงทั้งหมด ไม่เปลี่ยนตามคำค้น เหมือนชิปประเภทสินค้า
-  const issueCounts = {
-    all: ISSUE_DOCS.length,
-    issue: ISSUE_DOCS.filter((d) => !isReturn(d.status)).length,
-    return: ISSUE_DOCS.filter((d) => isReturn(d.status)).length,
-  };
-  const issueVisible = ISSUE_DOCS.filter(
-    (d) =>
-      matchesIssue(d, issueQuery) &&
-      (issueKind === "all" ||
-        (issueKind === "return") === isReturn(d.status))
-  );
+  const waitAll = generalWaitingDocs("");
+  const waitMatched = generalWaitingDocs(waitQuery).filter((d) => inRange(d.createdAt, range));
+  const waitCounts = Object.fromEntries(
+    GENERAL_WAIT_KINDS.map((k) => [k.id, waitMatched.filter((d) => k.id === "all" || d.kind === k.id).length])
+  ) as Record<WaitChip, number>;
+  const waitVisible = waitMatched.filter((d) => waitKind === "all" || d.kind === waitKind);
 
   // ---------- เลื่อนแถวชิปให้เห็นประเภทที่เปิดอยู่ ----------
   const chipRowRef = React.useRef<HTMLDivElement>(null);
@@ -227,12 +216,12 @@ function GeneralStockView() {
     scrollListToTop();
   };
 
-  const changeIssueKind = (next: IssueKind) => {
-    setIssueKind(next);
+  const changeWaitKind = (next: WaitChip) => {
+    setWaitKind(next);
     scrollListToTop();
   };
 
-  // แท็บใหญ่ (สต็อก / รอรับเข้า / รอจ่าย-คืน) ไม่ล็อกอยู่ในแถบติดบน อยู่บนสุด
+  // แท็บใหญ่ (สต็อก / รอรับเข้า-จ่าย-คืน) ไม่ล็อกอยู่ในแถบติดบน อยู่บนสุด
   // ของหน้าอยู่แล้วตามปกติ กดได้ก็ต่อเมื่อเลื่อนอยู่ใกล้บนสุดพออยู่แล้ว
   // จึงแค่สลับข้อมูลเฉย ๆ ไม่ต้องมีพิธีเลื่อน/อนิเมชันแบบชิป
 
@@ -314,11 +303,8 @@ function GeneralStockView() {
               <TabsTrigger value="stock" className="flex-1">
                 สต็อก ({PRODUCTS.length})
               </TabsTrigger>
-              <TabsTrigger value="inbound" className="flex-1">
-                รอรับเข้า ({openInbound.length})
-              </TabsTrigger>
-              <TabsTrigger value="issue" className="flex-1">
-                รอจ่าย/คืน ({ISSUE_DOCS.length})
+              <TabsTrigger value="waiting" className="flex-1">
+                รอรับเข้า/จ่าย/คืน ({waitAll.length})
               </TabsTrigger>
             </TabsList>
           </Tabs>
@@ -585,9 +571,8 @@ function GeneralStockView() {
             </>
           )}
 
-          {/* ---------- แท็บรอรับเข้า — เอกสารสั่งซื้อ คนละชนิดกับสต็อก ----------
-               ไม่มีชิปประเภท ไม่มีเรียงตาม ไม่มีปุ่มส่งออก เพราะไม่เกี่ยวกัน */}
-          {tab === "inbound" && (
+          {/* ---------- แท็บรอรับเข้า/จ่าย/คืน — ใบที่ค้างทุกแบบรวมกัน แยกด้วยชิป ---------- */}
+          {tab !== "stock" && (
             <>
               <StickyToolbar hidden={hidden} barRef={stickyRef}>
                 <div className="flex items-center gap-2 pt-2">
@@ -597,73 +582,42 @@ function GeneralStockView() {
                     </InputGroupAddon>
                     <InputGroupInput
                       placeholder="ค้นหา..."
-                      value={inboundQuery}
-                      onChange={(e) => setInboundQuery(e.target.value)}
+                      value={waitQuery}
+                      onChange={(e) => setWaitQuery(e.target.value)}
                     />
                   </InputGroup>
-                  <Button
-                    variant="outline-primary"
-                    size="icon"
-                    aria-label="ตัวกรองเอกสารรอรับเข้า"
-                    className="shrink-0"
-                  >
-                    <ListFilterIcon />
-                  </Button>
+                  {/* จอแคบช่องวันที่ลงไปอยู่บรรทัดของตัวเอง ช่องค้นหาจะได้ไม่หดจนพิมพ์ไม่ได้ */}
+                  <DateRangeSelect
+                    value={range}
+                    onValueChange={setRange}
+                    placeholder="วันที่"
+                    className="hidden w-64 shrink-0 @3xl:flex"
+                  />
                 </div>
-              </StickyToolbar>
+                <DateRangeSelect
+                  value={range}
+                  onValueChange={setRange}
+                  placeholder="วันที่"
+                  className="mt-2 @3xl:hidden"
+                />
 
-              <div
-                ref={listRef}
-                className="mt-4 animate-in slide-in-from-bottom-3 fade-in duration-300"
-              >
-                <InboundList docs={inboundVisible} />
-              </div>
-            </>
-          )}
-
-          {/* ---------- แท็บรอจ่าย/คืน — ใบขอเบิกกับใบขอคืนอยู่ตารางเดียวกัน ---------- */}
-          {tab === "issue" && (
-            <>
-              <StickyToolbar hidden={hidden} barRef={stickyRef}>
-                <div className="flex items-center gap-2 pt-2">
-                  <InputGroup className="min-w-0 flex-1 bg-card">
-                    <InputGroupAddon align="inline-start">
-                      <SearchIcon />
-                    </InputGroupAddon>
-                    <InputGroupInput
-                      placeholder="ค้นหา..."
-                      value={issueQuery}
-                      onChange={(e) => setIssueQuery(e.target.value)}
-                    />
-                  </InputGroup>
-                  <Button
-                    variant="outline-primary"
-                    size="icon"
-                    aria-label="ตัวกรองใบขอเบิก / ขอคืน"
-                    className="shrink-0"
-                  >
-                    <ListFilterIcon />
-                  </Button>
-                </div>
-
-                {/* ทิศทางของเอกสาร เลือกได้ทีละอัน เลื่อนแนวนอนเอาบนจอแคบ */}
                 <div
                   role="tablist"
-                  aria-label="ประเภทเอกสาร"
+                  aria-label="ประเภทรายการรอ"
                   className={cn(
                     "mt-3 flex items-center gap-2 overflow-x-auto",
                     "flex-nowrap [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
                   )}
                 >
-                  {ISSUE_KINDS.map((k) => {
-                    const on = issueKind === k.id;
+                  {GENERAL_WAIT_KINDS.map((k) => {
+                    const on = waitKind === k.id;
                     return (
                       <button
                         key={k.id}
                         type="button"
                         role="tab"
                         aria-selected={on}
-                        onClick={() => changeIssueKind(k.id)}
+                        onClick={() => changeWaitKind(k.id)}
                         className={cn(
                           "shrink-0 rounded-full border px-3 py-1 text-sm whitespace-nowrap transition-colors",
                           on
@@ -671,7 +625,7 @@ function GeneralStockView() {
                             : "border-border text-foreground hover:bg-accent-hover"
                         )}
                       >
-                        {k.label} ({issueCounts[k.id]})
+                        {k.label} ({waitCounts[k.id]})
                       </button>
                     );
                   })}
@@ -680,10 +634,10 @@ function GeneralStockView() {
 
               <div
                 ref={listRef}
-                key={issueKind}
+                key={waitKind}
                 className="mt-4 animate-in slide-in-from-bottom-3 fade-in duration-300"
               >
-                <IssueList docs={issueVisible} />
+                <GoodsWaitingList docs={waitVisible} />
               </div>
             </>
           )}
