@@ -21,13 +21,13 @@ import { cn } from "@peckey954/ui/lib/utils";
 import { toast } from "sonner";
 import { useDevicePreview, useScrollState } from "@/components/device-preview";
 import { Crumbs } from "@/components/receiving/parts";
+import { DateRangeSelect, type DateRange } from "@/components/date-select";
 import { useRememberedState } from "@/components/remembered-state";
 import { SortControl } from "@/components/sort-control";
 import { BackToTop, StickyToolbar } from "@/components/sticky-toolbar";
 import { EmptyDocs } from "@/components/stock/doc-parts";
 import { GoodsHistoryList } from "@/components/stock/goods-history-list";
-import { GoodsInboundList } from "@/components/stock/goods-inbound-list";
-import { GoodsIssueList } from "@/components/stock/goods-issue-list";
+import { GoodsWaitingList } from "@/components/stock/goods-waiting-list";
 import { FifoList, ZoneGroups } from "@/components/stock/lot-list";
 import { useSafetyStock } from "@/components/stock/safety-stock-provider";
 import { StockLogProvider, useStockLog } from "@/components/stock/stock-log";
@@ -47,22 +47,11 @@ import {
   type CategoryId,
 } from "@/lib/general-stock";
 import {
-  GOODS_INBOUND_DOCS,
-  GOODS_INBOUND_SOURCE_LABEL,
   clearGoodsInboundTabRequest,
   goodsInboundTabRequested,
-  isGoodsInboundOpen,
-  matchesGoodsInbound,
-  type GoodsInboundSource,
 } from "@/lib/goods-inbound";
-import {
-  GOODS_ISSUE_DOCS,
-  isGoodsIssueOpen,
-  isGoodsReturn,
-  matchesGoodsIssue,
-  clearIssueTabRequest,
-  issueTabRequested,
-} from "@/lib/goods-issue";
+import { clearIssueTabRequest, issueTabRequested } from "@/lib/goods-issue";
+import { WAIT_KINDS, stampOf, waitingDocs, type WaitKind } from "@/lib/goods-waiting";
 import {
   GOODS_CATEGORIES,
   GOODS_HISTORY,
@@ -80,8 +69,9 @@ import { isProductLow } from "@/lib/safety-stock";
    เลือกประเภท สินค้าผลิต / สินค้า OEM / ปุ๋ยกระสอบ แล้วต่อท้ายด้วย "ประวัติ"
    ประวัติแต่ละแถวกดเข้าไปดูรายละเอียดของรายการนั้นได้
 
-   แท็บรอจ่าย/คืน: Flow จ่ายออก กดใบจ่ายออกแล้วไปหน้าจ่ายสินค้า
-   แท็บรอรับเข้ายังไม่มีแบบ จึงขึ้นป้ายบอกไว้
+   แท็บรอรับเข้า/จ่าย/คืน: ใบที่ค้างทุกแบบอยู่รวมกัน แยกด้วยชิป
+   (ทั้งหมด / รอรับเข้า / รอรับเข้าผลิต / รอรับคืน / รอจ่ายออก)
+   ปุ่มท้ายแถวพาไปหน้ารับเข้า / จ่ายสินค้า / รับคืน ของใบนั้น
 ------------------------------------------------------------------ */
 
 type Chip = CategoryId | "history";
@@ -93,13 +83,16 @@ const CHIPS: { id: Chip; label: string }[] = [
 
 const PRODUCT_NAMES = GOODS_PRODUCTS.map((p) => p.name);
 
-type IssueKind = "all" | "issue" | "return";
+type WaitChip = WaitKind | "all";
 
-const ISSUE_KINDS: { id: IssueKind; label: string }[] = [
-  { id: "all", label: "ทั้งหมด" },
-  { id: "issue", label: "รอจ่ายออก" },
-  { id: "return", label: "รอรับคืน" },
-];
+/** ช่วงวันที่ — เทียบแค่วัน ไม่สนเวลา ถึงวันสุดท้ายรวมทั้งวัน */
+function inRange(createdAt: string, range?: DateRange) {
+  if (!range?.from) return true;
+  const t = stampOf(createdAt);
+  const from = new Date(range.from).setHours(0, 0, 0, 0);
+  const to = new Date(range.to ?? range.from).setHours(23, 59, 59, 999);
+  return t >= from && t <= to;
+}
 
 const CHIP_CLASS = (on: boolean) =>
   cn(
@@ -127,8 +120,8 @@ function GoodsStockView() {
 
   // แท็บกับชิปจำไว้ข้ามหน้า — เปิดเอกสารแล้วย้อนกลับ ต้องกลับมาที่เดิม
   // บันทึกเสร็จแล้วสั่งเปิดแท็บไหน ค่านั้นชนะค่าที่จำไว้
-  const [tab, setTab] = useRememberedState<"stock" | "inbound" | "issue">("goods.tab", "stock", () =>
-    issueTabRequested() ? "issue" : goodsInboundTabRequested() ? "inbound" : undefined
+  const [tab, setTab] = useRememberedState<"stock" | "waiting">("goods.tab", "stock", () =>
+    issueTabRequested() || goodsInboundTabRequested() ? "waiting" : undefined
   );
   React.useEffect(() => {
     clearIssueTabRequest();
@@ -157,32 +150,16 @@ function GoodsStockView() {
   const historyRows = logRows as GoodsHistoryRow[];
   const historyVisible = historyRows.filter((r) => matchesGoodsHistory(r, query));
 
-  // ---------- แท็บรอรับเข้า ----------
-  const [inboundQuery, setInboundQuery] = React.useState("");
-  const [source, setSource] = useRememberedState<GoodsInboundSource>("goods.source", "production");
-  const inboundOpen = GOODS_INBOUND_DOCS.filter(isGoodsInboundOpen);
-  const inboundCounts: Record<GoodsInboundSource, number> = {
-    production: inboundOpen.filter((d) => d.source === "production").length,
-    external: inboundOpen.filter((d) => d.source === "external").length,
-  };
-  const inboundVisible = inboundOpen.filter(
-    (d) => d.source === source && matchesGoodsInbound(d, inboundQuery)
-  );
-
-  // ---------- แท็บรอจ่าย/คืน ----------
-  const [issueQuery, setIssueQuery] = React.useState("");
-  const [kind, setKind] = useRememberedState<IssueKind>("goods.issueKind", "all");
-  const open = GOODS_ISSUE_DOCS.filter(isGoodsIssueOpen);
-  const issueCounts = {
-    all: open.length,
-    issue: open.filter((d) => !isGoodsReturn(d.status)).length,
-    return: open.filter((d) => isGoodsReturn(d.status)).length,
-  };
-  const issueVisible = open.filter(
-    (d) =>
-      matchesGoodsIssue(d, issueQuery) &&
-      (kind === "all" || (kind === "return") === isGoodsReturn(d.status))
-  );
+  // ---------- แท็บรอรับเข้า/จ่าย/คืน ----------
+  const [waitQuery, setWaitQuery] = React.useState("");
+  const [range, setRange] = React.useState<DateRange | undefined>();
+  const [waitKind, setWaitKind] = useRememberedState<WaitChip>("goods.waitKind", "all");
+  const waitAll = waitingDocs("");
+  const waitMatched = waitingDocs(waitQuery).filter((d) => inRange(d.createdAt, range));
+  const waitCounts = Object.fromEntries(
+    WAIT_KINDS.map((k) => [k.id, waitMatched.filter((d) => k.id === "all" || d.kind === k.id).length])
+  ) as Record<WaitChip, number>;
+  const waitVisible = waitMatched.filter((d) => waitKind === "all" || d.kind === waitKind);
 
   const stickyRef = React.useRef<HTMLDivElement>(null);
   const listRef = React.useRef<HTMLDivElement>(null);
@@ -234,11 +211,8 @@ function GoodsStockView() {
               <span className="@3xl:hidden">สต็อก</span>
               <span className="hidden @3xl:inline">สต็อกสินค้า</span> ({GOODS_PRODUCTS.length})
             </TabsTrigger>
-            <TabsTrigger value="inbound" className="flex-1">
-              รอรับเข้า ({inboundOpen.length})
-            </TabsTrigger>
-            <TabsTrigger value="issue" className="flex-1">
-              รอจ่าย/คืน ({open.length})
+            <TabsTrigger value="waiting" className="flex-1">
+              รอรับเข้า/จ่าย/คืน ({waitAll.length})
             </TabsTrigger>
           </TabsList>
         </Tabs>
@@ -421,8 +395,8 @@ function GoodsStockView() {
           </>
         )}
 
-        {/* ================= แท็บรอรับเข้า ================= */}
-        {tab === "inbound" && (
+        {/* ================= แท็บรอรับเข้า/จ่าย/คืน ================= */}
+        {tab === "waiting" && (
           <>
             <StickyToolbar hidden={hidden} barRef={stickyRef}>
               <div className="flex items-center gap-2 pt-2">
@@ -432,86 +406,46 @@ function GoodsStockView() {
                   </InputGroupAddon>
                   <InputGroupInput
                     placeholder="ค้นหา..."
-                    value={inboundQuery}
-                    onChange={(e) => setInboundQuery(e.target.value)}
+                    value={waitQuery}
+                    onChange={(e) => setWaitQuery(e.target.value)}
                   />
                 </InputGroup>
+                {/* จอแคบช่องวันที่ลงไปอยู่บรรทัดของตัวเอง ช่องค้นหาจะได้ไม่หดจนพิมพ์ไม่ได้ */}
+                <DateRangeSelect
+                  value={range}
+                  onValueChange={setRange}
+                  placeholder="วันที่"
+                  className="hidden w-64 shrink-0 @3xl:flex"
+                />
               </div>
+              <DateRangeSelect
+                value={range}
+                onValueChange={setRange}
+                placeholder="วันที่"
+                className="mt-2 @3xl:hidden"
+              />
 
               <div
                 role="tablist"
-                aria-label="แหล่งที่มา"
+                aria-label="ประเภทรายการรอ"
                 className={cn(
                   "mt-3 flex items-center gap-2 overflow-x-auto",
                   "flex-nowrap [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
                 )}
               >
-                {(["production", "external"] as const).map((k) => (
-                  <button
-                    key={k}
-                    type="button"
-                    role="tab"
-                    aria-selected={source === k}
-                    onClick={() => {
-                      setSource(k);
-                      scrollListToTop();
-                    }}
-                    className={CHIP_CLASS(source === k)}
-                  >
-                    {GOODS_INBOUND_SOURCE_LABEL[k]} ({inboundCounts[k]})
-                  </button>
-                ))}
-              </div>
-            </StickyToolbar>
-
-            <div
-              ref={listRef}
-              key={source}
-              className="mt-4 animate-in slide-in-from-bottom-3 fade-in duration-300"
-            >
-              <GoodsInboundList docs={inboundVisible} source={source} />
-            </div>
-          </>
-        )}
-
-        {/* ================= แท็บรอจ่าย/คืน ================= */}
-        {tab === "issue" && (
-          <>
-            <StickyToolbar hidden={hidden} barRef={stickyRef}>
-              <div className="flex items-center gap-2 pt-2">
-                <InputGroup className="min-w-0 flex-1 bg-card">
-                  <InputGroupAddon align="inline-start">
-                    <SearchIcon />
-                  </InputGroupAddon>
-                  <InputGroupInput
-                    placeholder="ค้นหา..."
-                    value={issueQuery}
-                    onChange={(e) => setIssueQuery(e.target.value)}
-                  />
-                </InputGroup>
-              </div>
-
-              <div
-                role="tablist"
-                aria-label="ประเภทเอกสาร"
-                className={cn(
-                  "mt-3 flex items-center gap-2 overflow-x-auto",
-                  "flex-nowrap [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-                )}
-              >
-                {ISSUE_KINDS.map((k) => (
+                {WAIT_KINDS.map((k) => (
                   <button
                     key={k.id}
                     type="button"
                     role="tab"
-                    aria-selected={kind === k.id}
+                    aria-selected={waitKind === k.id}
                     onClick={() => {
-                      setKind(k.id);
+                      setWaitKind(k.id);
                       scrollListToTop();
                     }}
-                    className={CHIP_CLASS(kind === k.id)}
+                    className={CHIP_CLASS(waitKind === k.id)}
                   >
-                    {k.label} ({issueCounts[k.id]})
+                    {k.label} ({waitCounts[k.id]})
                   </button>
                 ))}
               </div>
@@ -519,10 +453,10 @@ function GoodsStockView() {
 
             <div
               ref={listRef}
-              key={kind}
+              key={waitKind}
               className="mt-4 animate-in slide-in-from-bottom-3 fade-in duration-300"
             >
-              <GoodsIssueList docs={issueVisible} />
+              <GoodsWaitingList docs={waitVisible} />
             </div>
           </>
         )}
