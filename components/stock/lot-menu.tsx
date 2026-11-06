@@ -45,7 +45,7 @@ export function LotMenu({
     <>
       <DropdownMenu modal={false}>
         <DropdownMenuTrigger asChild>
-          <Button variant="outline" size="icon" className="size-9 shrink-0" aria-label={`จัดการ ${lot.code}`}>
+          <Button variant="ghost" size="icon" className="size-8 shrink-0 text-foreground" aria-label={`จัดการ ${lot.code}`}>
             <EllipsisVerticalIcon />
           </Button>
         </DropdownMenuTrigger>
