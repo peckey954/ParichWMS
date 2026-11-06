@@ -2,13 +2,12 @@
 
 import * as React from "react";
 import { Badge } from "@peckey954/ui/components/ui/badge";
-import { Button } from "@peckey954/ui/components/ui/button";
 import {
   Collapsible,
   CollapsibleContent,
 } from "@peckey954/ui/components/ui/collapsible";
 import { cn } from "@peckey954/ui/lib/utils";
-import { AdjustLotDialog, MoveLotDialog } from "./lot-dialogs";
+import { LotMenu } from "./lot-menu";
 import { RankMark, useSafetyStock } from "./safety-stock-provider";
 import { canSeeGrade, useRole } from "@/components/role-provider";
 import { productSafety } from "@/lib/safety-stock";
@@ -145,51 +144,16 @@ function ZoneTag({ zone }: { zone: string }) {
   );
 }
 
-/**
- * ปุ่มโชว์ตลอด แต่ละปุ่มเปิดกล่องของตัวเอง
- * จอแคบ — เรียงเต็มความกว้างสองปุ่ม แบ่งครึ่งเท่ากัน
- * จอกว้าง — อยู่ท้ายแถว กว้างเท่ากันทั้งคู่ (w-24) ไม่ใช่กว้างตามความยาวคำ
- */
-function LotActions({
-  lot,
-  productName,
-  unit,
-}: {
-  lot: Lot;
-  productName: string;
-  unit: string;
-}) {
-  const cls = "flex-1 @3xl:w-24 @3xl:flex-none";
-  // ระยะห่างอยู่ที่ตัวปุ่มเอง ไม่ใช่ที่ gap ของกล่องแม่
-  // ถ้าอยู่ที่แม่ พอปิดปุ่มแล้ว gap ยังเหลือค้างเป็นช่องว่างเปล่า 12px ใต้ข้อความ
-  return (
-    <div className="mt-3 flex w-full gap-2 @3xl:mt-0 @3xl:w-auto">
-      <MoveLotDialog lot={lot} productName={productName} unit={unit}>
-        <Button variant="outline-primary" size="sm" className={cls}>
-          ย้าย
-        </Button>
-      </MoveLotDialog>
-      <AdjustLotDialog lot={lot} productName={productName} unit={unit}>
-        <Button variant="outline-primary" size="sm" className={cls}>
-          ปรับปรุง
-        </Button>
-      </AdjustLotDialog>
-    </div>
-  );
-}
-
 function LotRow({
   lot,
   unit,
   productName,
   showChips,
-  showActions,
 }: {
   lot: Lot;
   unit: string;
   productName: string;
   showChips: boolean;
-  showActions: boolean;
 }) {
   const hasChips =
     lot.condition !== undefined ||
@@ -204,8 +168,8 @@ function LotRow({
 
   return (
     <div className="border-t border-border p-4">
-      {/* จอกว้าง: ข้อมูล | ปุ่ม | ยอด อยู่แถวเดียว จัดกึ่งกลางแนวตั้ง
-          จอแคบ: ยอดขึ้นไปอยู่ขวาของหัวแถว แล้วปุ่มลงมาเต็มความกว้างข้างล่าง */}
+      {/* จอกว้าง: ข้อมูล | ยอด | ⋮ อยู่แถวเดียว จัดกึ่งกลางแนวตั้ง
+          จอแคบ: ยอดขึ้นไปอยู่ขวาของหัวแถว ⋮ อยู่ขวาของบรรทัดวันที่รับ */}
       <div className="flex flex-col @3xl:flex-row @3xl:items-center @3xl:justify-between @3xl:gap-3">
         <div className="min-w-0 flex-1">
           <div className="flex items-start justify-between gap-3">
@@ -231,16 +195,20 @@ function LotRow({
           {/* จอแคบเท่านั้น — แถวชิปกว้างเท่าการ์ด เลื่อนดูได้ */}
           {showChips && hasChips && <ChipScroller>{chips}</ChipScroller>}
 
-          <p className="mt-2 text-sm text-muted-foreground">
-            รับ {lot.receivedAt} ({lot.ageDays} วัน) · {lot.packNote}
-          </p>
+          {/* จอแคบ: ปุ่ม ⋮ อยู่ขวาของบรรทัดวันที่รับ ตามแบบ */}
+          <div className="mt-2 flex items-center justify-between gap-3">
+            <p className="text-sm text-muted-foreground">
+              รับ {lot.receivedAt} ({lot.ageDays} วัน) · {lot.packNote}
+            </p>
+            <div className="@3xl:hidden">
+              <LotMenu lot={lot} productName={productName} unit={unit} />
+            </div>
+          </div>
         </div>
 
-        <div className="flex shrink-0 items-center gap-3">
-          {showActions && (
-            <LotActions lot={lot} productName={productName} unit={unit} />
-          )}
-          <p className="hidden w-28 text-right tabular-nums @3xl:block">
+        {/* จอกว้าง: ยอด แล้วปุ่ม ⋮ ท้ายแถว */}
+        <div className="hidden shrink-0 items-center gap-3 @3xl:flex">
+          <p className="w-28 text-right tabular-nums">
             <span
               className={cn(
                 "text-lg font-semibold",
@@ -251,6 +219,7 @@ function LotRow({
             </span>{" "}
             <span className="text-sm text-muted-foreground">{unit}</span>
           </p>
+          <LotMenu lot={lot} productName={productName} unit={unit} />
         </div>
       </div>
     </div>
@@ -261,14 +230,12 @@ export function ProductCard({
   product,
   showLots,
   showChips,
-  showActions,
   showGrade = true,
 }: {
   product: Product;
   /** เปิด/ปิดรายการล็อตพร้อมกันทั้งหน้า สั่งจากตัวกรอง ไม่มีปุ่มแยกรายใบ */
   showLots: boolean;
   showChips: boolean;
-  showActions: boolean;
   /** หน้าสต็อกสินค้าไม่มีเกรด — ปิดได้ทั้งหน้า */
   showGrade?: boolean;
 }) {
@@ -343,7 +310,6 @@ export function ProductCard({
               unit={product.unit}
               productName={product.name}
               showChips={showChips}
-              showActions={showActions}
             />
           ))}
         </CollapsibleContent>

@@ -25,7 +25,6 @@ import {
 
 export type StockView = {
   showChips: boolean;
-  showActions: boolean;
   showLots: boolean;
   lowOnly: boolean;
   /** ว่าง = เอาทั้งหมด ไม่ใช่ไม่เอาอะไรเลย */
@@ -38,7 +37,6 @@ export type StockView = {
 
 export const STOCK_VIEW_DEFAULT: StockView = {
   showChips: true,
-  showActions: true,
   showLots: true,
   lowOnly: false,
   kinds: [],
@@ -49,7 +47,6 @@ export const STOCK_VIEW_DEFAULT: StockView = {
 
 export const isStockDefault = (v: StockView) =>
   v.showChips === STOCK_VIEW_DEFAULT.showChips &&
-  v.showActions === STOCK_VIEW_DEFAULT.showActions &&
   v.showLots === STOCK_VIEW_DEFAULT.showLots &&
   v.lowOnly === STOCK_VIEW_DEFAULT.lowOnly &&
   v.sort === STOCK_VIEW_DEFAULT.sort &&
@@ -129,12 +126,6 @@ export function StockFilter({
               label="ป้ายข้อมูล"
               checked={draft.showChips}
               onChange={(v) => set({ showChips: v })}
-            />
-            <CheckChip
-              id="stock-actions"
-              label="ย้าย/ปรับปรุง"
-              checked={draft.showActions}
-              onChange={(v) => set({ showActions: v })}
             />
             <CheckChip
               id="stock-lots"

@@ -10,7 +10,6 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@peckey954/ui/components/ui/dialog";
 import { Input } from "@peckey954/ui/components/ui/input";
 import { Label } from "@peckey954/ui/components/ui/label";
@@ -204,30 +203,30 @@ function PiecesValue({ lot }: { lot: Lot }) {
 
 /* ------------------------------ ย้ายสต็อก ------------------------------ */
 
+/**
+ * สองกล่องนี้เปิดจากเมนู ⋮ ของแถวล็อต จึงคุมการเปิด/ปิดจากข้างนอก
+ * ฟอร์มเริ่มใหม่ทุกครั้งเพราะเมนูเปลี่ยน key ทุกรอบที่เปิด
+ */
+type LotDialogProps = {
+  lot: Lot;
+  productName: string;
+  unit: string;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+};
+
 export function MoveLotDialog({
   lot,
   productName,
   unit,
-  children,
-}: {
-  lot: Lot;
-  productName: string;
-  unit: string;
-  children: React.ReactNode;
-}) {
+  open,
+  onOpenChange: setOpen,
+}: LotDialogProps) {
   const { addLog } = useStockLog();
   const max = lotPieces(lot);
-  const [open, setOpen] = React.useState(false);
   const [zone, setZone] = React.useState("");
   const [pieces, setPieces] = React.useState(0);
   const [note, setNote] = React.useState("");
-
-  // key ทำให้ฟอร์มเริ่มใหม่ทุกครั้งที่เปิด ไม่ค้างค่าจากรอบก่อน
-  const reset = () => {
-    setZone("");
-    setPieces(0);
-    setNote("");
-  };
 
   const save = () => {
     addLog({
@@ -252,14 +251,7 @@ export function MoveLotDialog({
   };
 
   return (
-    <Dialog
-      open={open}
-      onOpenChange={(v) => {
-        setOpen(v);
-        if (v) reset();
-      }}
-    >
-      <DialogTrigger asChild>{children}</DialogTrigger>
+    <Dialog open={open} onOpenChange={setOpen}>
       <DialogContent className="@container sm:max-w-lg">
         <LotHeading title="ย้ายสต็อก" lot={lot} productName={productName} />
 
@@ -327,16 +319,11 @@ export function AdjustLotDialog({
   lot,
   productName,
   unit,
-  children,
-}: {
-  lot: Lot;
-  productName: string;
-  unit: string;
-  children: React.ReactNode;
-}) {
+  open,
+  onOpenChange: setOpen,
+}: LotDialogProps) {
   const { addLog } = useStockLog();
   const max = lotPieces(lot) * 2;
-  const [open, setOpen] = React.useState(false);
   const [counted, setCounted] = React.useState(0);
   const [touched, setTouched] = React.useState(false);
   const [note, setNote] = React.useState("");
@@ -365,18 +352,7 @@ export function AdjustLotDialog({
   };
 
   return (
-    <Dialog
-      open={open}
-      onOpenChange={(v) => {
-        setOpen(v);
-        if (v) {
-          setCounted(0);
-          setTouched(false);
-          setNote("");
-        }
-      }}
-    >
-      <DialogTrigger asChild>{children}</DialogTrigger>
+    <Dialog open={open} onOpenChange={setOpen}>
       <DialogContent className="@container sm:max-w-lg">
         <LotHeading title="ปรับปรุงสต็อก" lot={lot} productName={productName} />
 

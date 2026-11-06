@@ -2,9 +2,8 @@
 
 import * as React from "react";
 import { Badge } from "@peckey954/ui/components/ui/badge";
-import { Button } from "@peckey954/ui/components/ui/button";
 import { cn } from "@peckey954/ui/lib/utils";
-import { AdjustLotDialog, MoveLotDialog } from "./lot-dialogs";
+import { LotMenu } from "./lot-menu";
 import { useSafetyStock } from "./safety-stock-provider";
 import { isProductLow } from "@/lib/safety-stock";
 import {
@@ -52,12 +51,10 @@ function LotRow({
   row: { lot, product },
   showZone,
   showChips,
-  showActions,
 }: {
   row: FlatLot;
   showZone: boolean;
   showChips: boolean;
-  showActions: boolean;
 }) {
   // สต็อกต่ำมาจากเกณฑ์ Safety Stock ที่ตั้งไว้ ไม่ใช่ธงที่ติดมากับข้อมูล
   // ต้องใช้ที่มาเดียวกับการ์ดสินค้า ไม่งั้นสองที่บอกไม่ตรงกัน
@@ -112,8 +109,8 @@ function LotRow({
   return (
     <div className="border-t border-border p-4">
       {/* วางแบบเดียวกับแถวล็อตในการ์ดสินค้า
-          จอกว้าง: ข้อมูล | ปุ่ม | ยอด แถวเดียว
-          จอแคบ: ยอดขึ้นไปอยู่ขวาของบรรทัดหัว ปุ่มลงมาเต็มความกว้าง */}
+          จอกว้าง: ข้อมูล | ยอด | ⋮ แถวเดียว
+          จอแคบ: ยอดขึ้นไปอยู่ขวาของบรรทัดหัว ⋮ อยู่ขวาของบรรทัดวันที่รับ */}
       <div className="flex flex-col @3xl:flex-row @3xl:items-center @3xl:justify-between @3xl:gap-3">
         <div className="min-w-0 flex-1">
           <div className="flex items-start justify-between gap-3">
@@ -144,45 +141,22 @@ function LotRow({
 
           <p className="mt-2 text-sm text-muted-foreground">
             <span className="font-medium text-foreground">{lot.code}</span>
-            <span className="block">
-              รับ {lot.receivedAt} ({lot.ageDays} วัน) · {lot.packNote}
-            </span>
           </p>
+          {/* จอแคบ: ปุ่ม ⋮ อยู่ขวาของบรรทัดวันที่รับ ตามแบบ */}
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-sm text-muted-foreground">
+              รับ {lot.receivedAt} ({lot.ageDays} วัน) · {lot.packNote}
+            </p>
+            <div className="@3xl:hidden">
+              <LotMenu lot={lot} productName={product.name} unit={product.unit} />
+            </div>
+          </div>
         </div>
 
-        <div className="flex shrink-0 items-center gap-3">
-          {/* ระยะห่างอยู่ที่ตัวปุ่ม ไม่ใช่ gap ของแม่ ปิดปุ่มแล้วระยะหายไปด้วย */}
-          {showActions && (
-            <div className="mt-3 flex w-full gap-2 @3xl:mt-0 @3xl:w-auto">
-              <MoveLotDialog
-                lot={lot}
-                productName={product.name}
-                unit={product.unit}
-              >
-                <Button
-                  variant="outline-primary"
-                  size="sm"
-                  className="flex-1 @3xl:w-24 @3xl:flex-none"
-                >
-                  ย้าย
-                </Button>
-              </MoveLotDialog>
-              <AdjustLotDialog
-                lot={lot}
-                productName={product.name}
-                unit={product.unit}
-              >
-                <Button
-                  variant="outline-primary"
-                  size="sm"
-                  className="flex-1 @3xl:w-24 @3xl:flex-none"
-                >
-                  ปรับปรุง
-                </Button>
-              </AdjustLotDialog>
-            </div>
-          )}
-          <p className="hidden w-28 text-right tabular-nums @3xl:block">{qty}</p>
+        {/* จอกว้าง: ยอด แล้วปุ่ม ⋮ ท้ายแถว */}
+        <div className="hidden shrink-0 items-center gap-3 @3xl:flex">
+          <p className="w-28 text-right tabular-nums">{qty}</p>
+          <LotMenu lot={lot} productName={product.name} unit={product.unit} />
         </div>
       </div>
     </div>
@@ -193,11 +167,9 @@ function LotRow({
 export function ZoneGroups({
   groups,
   showChips,
-  showActions,
 }: {
   groups: LotGroup[];
   showChips: boolean;
-  showActions: boolean;
 }) {
   return (
     <div className="space-y-4">
@@ -223,7 +195,6 @@ export function ZoneGroups({
               row={row}
               showZone={false}
               showChips={showChips}
-              showActions={showActions}
             />
           ))}
         </section>
@@ -236,11 +207,9 @@ export function ZoneGroups({
 export function FifoList({
   rows,
   showChips,
-  showActions,
 }: {
   rows: FlatLot[];
   showChips: boolean;
-  showActions: boolean;
 }) {
   return (
     <div className="overflow-hidden rounded-xl border border-border bg-card">
@@ -250,7 +219,6 @@ export function FifoList({
           row={row}
           showZone
           showChips={showChips}
-          showActions={showActions}
         />
       ))}
     </div>

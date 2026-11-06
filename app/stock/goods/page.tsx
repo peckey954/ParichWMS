@@ -389,7 +389,6 @@ function GoodsStockView() {
                     product={p}
                     showLots={view.showLots}
                     showChips={view.showChips}
-                    showActions={view.showActions}
                     showGrade={false}
                   />
                 ))}
@@ -398,7 +397,6 @@ function GoodsStockView() {
                 <ZoneGroups
                   groups={groupByZone(visible, view.dir)}
                   showChips={view.showChips}
-                  showActions={view.showActions}
                 />
               )}
 
@@ -406,7 +404,6 @@ function GoodsStockView() {
                 <FifoList
                   rows={sortFifo(visible, view.dir)}
                   showChips={view.showChips}
-                  showActions={view.showActions}
                 />
               )}
 

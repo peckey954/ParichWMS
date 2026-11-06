@@ -517,7 +517,6 @@ function GeneralStockView() {
                   product={p}
                   showLots={view.showLots}
                   showChips={view.showChips}
-                  showActions={view.showActions}
                 />
               ))}
 
@@ -525,7 +524,6 @@ function GeneralStockView() {
               <ZoneGroups
                 groups={zoneGroups}
                 showChips={view.showChips}
-                showActions={view.showActions}
               />
             )}
 
@@ -533,7 +531,6 @@ function GeneralStockView() {
               <FifoList
                 rows={fifoRows}
                 showChips={view.showChips}
-                showActions={view.showActions}
               />
             )}
 
