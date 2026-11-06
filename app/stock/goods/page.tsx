@@ -112,7 +112,7 @@ const CHIP_CLASS = (on: boolean) =>
 export default function GoodsStockPage() {
   // ย้าย/ปรับปรุงในแท็บสต็อกต้องไปโผล่ในประวัติทันที จึงห่อทั้งหน้าไว้
   return (
-    <StockLogProvider initial={GOODS_HISTORY}>
+    <StockLogProvider scope="goods" initial={GOODS_HISTORY}>
       <GoodsStockView />
     </StockLogProvider>
   );

@@ -147,12 +147,10 @@ function ZoneTag({ zone }: { zone: string }) {
 function LotRow({
   lot,
   unit,
-  productName,
   showChips,
 }: {
   lot: Lot;
   unit: string;
-  productName: string;
   showChips: boolean;
 }) {
   const hasChips =
@@ -201,7 +199,7 @@ function LotRow({
               รับ {lot.receivedAt} ({lot.ageDays} วัน) · {lot.packNote}
             </p>
             <div className="@3xl:hidden">
-              <LotMenu lot={lot} productName={productName} unit={unit} />
+              <LotMenu lot={lot} />
             </div>
           </div>
         </div>
@@ -219,7 +217,7 @@ function LotRow({
             </span>{" "}
             <span className="text-sm text-muted-foreground">{unit}</span>
           </p>
-          <LotMenu lot={lot} productName={productName} unit={unit} />
+          <LotMenu lot={lot} />
         </div>
       </div>
     </div>
@@ -308,7 +306,6 @@ export function ProductCard({
               key={lot.id}
               lot={lot}
               unit={product.unit}
-              productName={product.name}
               showChips={showChips}
             />
           ))}

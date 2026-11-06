@@ -148,7 +148,7 @@ function LotRow({
               รับ {lot.receivedAt} ({lot.ageDays} วัน) · {lot.packNote}
             </p>
             <div className="@3xl:hidden">
-              <LotMenu lot={lot} productName={product.name} unit={product.unit} />
+              <LotMenu lot={lot} />
             </div>
           </div>
         </div>
@@ -156,7 +156,7 @@ function LotRow({
         {/* จอกว้าง: ยอด แล้วปุ่ม ⋮ ท้ายแถว */}
         <div className="hidden shrink-0 items-center gap-3 @3xl:flex">
           <p className="w-28 text-right tabular-nums">{qty}</p>
-          <LotMenu lot={lot} productName={product.name} unit={product.unit} />
+          <LotMenu lot={lot} />
         </div>
       </div>
     </div>
