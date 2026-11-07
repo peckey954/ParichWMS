@@ -21,6 +21,8 @@ import {
 } from "@peckey954/ui/components/ui/table";
 import { cn } from "@peckey954/ui/lib/utils";
 import { Crumbs, Meta, Stat } from "@/components/receiving/parts";
+import { LotHistoryPage } from "@/components/stock/history-docs";
+import { stockLogRows } from "@/components/stock/stock-log";
 import {
   CardRow,
   COL_FIRST,
@@ -79,8 +81,10 @@ function titleOf(r: GoodsHistoryRow) {
 
 export default function GoodsHistoryPage() {
   const { id } = useParams<{ id: string }>();
-  const row = goodsHistoryOf(id, GOODS_HISTORY);
-  if (!row || opensAsDialog(row)) return <NotFound />;
+  // รวมรายการที่เพิ่งบันทึกด้วย ไม่งั้นย้าย/ปรับปรุงที่เพิ่งทำจะเปิดไม่เจอ
+  const row = goodsHistoryOf(id, stockLogRows("goods", GOODS_HISTORY) as GoodsHistoryRow[]);
+  if (row && opensAsDialog(row)) return <LotHistoryPage scope="goods" id={id} />;
+  if (!row) return <NotFound />;
   return <HistorySheet row={row} />;
 }
 

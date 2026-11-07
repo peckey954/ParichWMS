@@ -190,7 +190,7 @@ export function goodsRowType(r: GoodsHistoryRow) {
   };
 }
 
-/** ย้าย/ปรับปรุงเปิดเป็นกล่อง ที่เหลือเปิดเป็นหน้า */
+/** ย้าย/ปรับปรุงเปิดหน้าย้าย/ปรับปรุง (history-docs) ที่เหลือเปิดหน้าใบของตัวเอง */
 export const opensAsDialog = (r: HistoryRow) =>
   r.status === "move" || r.status === "adjust";
 

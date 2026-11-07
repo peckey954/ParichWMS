@@ -26,7 +26,7 @@ import { useRememberedState } from "@/components/remembered-state";
 import { SortControl } from "@/components/sort-control";
 import { BackToTop, StickyToolbar } from "@/components/sticky-toolbar";
 import { EmptyDocs } from "@/components/stock/doc-parts";
-import { GoodsHistoryList } from "@/components/stock/goods-history-list";
+import { HistoryDocList } from "@/components/stock/history-docs";
 import { GoodsWaitingList, WaitSearchRow } from "@/components/stock/goods-waiting-list";
 import { FifoList, ZoneGroups } from "@/components/stock/lot-list";
 import { useSafetyStock } from "@/components/stock/safety-stock-provider";
@@ -359,7 +359,7 @@ function GoodsStockView() {
               key={cat}
               className="mt-4 animate-in slide-in-from-bottom-3 fade-in space-y-4 duration-300"
             >
-              {isHistory && <GoodsHistoryList rows={historyVisible} />}
+              {isHistory && <HistoryDocList scope="goods" rows={historyVisible} />}
 
               {!isHistory &&
                 view.sort === "product" &&

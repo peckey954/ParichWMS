@@ -28,6 +28,9 @@ export function appendStockLog(scope: StockScope, row: Omit<HistoryRow, "id" | "
   ADDED[scope].unshift({ ...row, id: `new-${scope}-${seq}`, createdAt: stamp() });
 }
 
+/** ประวัติทั้งหมดของคลังนั้น รวมที่เพิ่งบันทึก — ใช้ในหน้ารายละเอียดที่อยู่นอก provider */
+export const stockLogRows = (scope: StockScope, initial: HistoryRow[]) => [...ADDED[scope], ...initial];
+
 type Ctx = {
   rows: HistoryRow[];
   addLog: (row: Omit<HistoryRow, "id" | "createdAt">) => void;

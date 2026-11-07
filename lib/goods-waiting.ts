@@ -67,6 +67,10 @@ export type WaitItem = {
   unit: string;
   /** ภายนอก: รถคันนี้ชั่งน้ำหนักเสร็จแล้ว (ติ๊ก) หรือยังรอ (นาฬิกา) */
   weighed?: boolean;
+  /** ค่าของคอลัมน์เสริม (WaitDoc.extra) เรียงตามหัวคอลัมน์ */
+  extra?: { value: string; tone?: "pos" | "neg" }[];
+  /** เปิดดูรายละเอียดของแถวนี้ */
+  detailHref?: string;
 };
 
 export type WaitDoc = {
@@ -83,7 +87,12 @@ export type WaitDoc = {
   external: boolean;
   /** หัวคอลัมน์ยอด */
   amountLabel: string;
+  /** ปุ่มท้ายแถว (+ รับเข้า / สั่งจ่าย / รับคืน) — ไม่มีก็ไม่มีปุ่ม เช่น ประวัติ */
   href?: string;
+  /** เลขที่ใบเป็นลิงก์ไปหน้ารายละเอียด (ใช้ในประวัติ) */
+  detailHref?: string;
+  /** คอลัมน์เสริมก่อนคอลัมน์ยอด เช่น "ส่วนต่าง" ของรายการปรับปรุง (หน่วยเดียวกับยอด) */
+  extra?: string[];
   items: WaitItem[];
 };
 

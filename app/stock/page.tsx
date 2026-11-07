@@ -33,7 +33,7 @@ import { cn } from "@peckey954/ui/lib/utils";
 import { toast } from "sonner";
 import { useDevicePreview, useScrollState } from "@/components/device-preview";
 import { BackToTop, StickyToolbar } from "@/components/sticky-toolbar";
-import { HistoryList } from "@/components/stock/history-list";
+import { HistoryDocList } from "@/components/stock/history-docs";
 import { StockLogProvider, useStockLog } from "@/components/stock/stock-log";
 import { GoodsWaitingList, WaitSearchRow } from "@/components/stock/goods-waiting-list";
 import { type DateRange } from "@/components/date-select";
@@ -493,7 +493,7 @@ function GeneralStockView() {
             key={cat}
             className="mt-4 animate-in slide-in-from-bottom-3 fade-in space-y-4 duration-300"
           >
-            {isHistory && <HistoryList rows={historyVisible} />}
+            {isHistory && <HistoryDocList scope="general" rows={historyVisible} />}
 
             {/* หน่วยของรายการเปลี่ยนตามโหมดที่เลือก ไม่ใช่ตารางเดิมสลับลำดับ
                 สินค้า = การ์ดสินค้า ล็อตอยู่ข้างใน

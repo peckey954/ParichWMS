@@ -55,7 +55,13 @@ import { EmptyDocs, StatusChip } from "./doc-parts";
 
 const PAGE_SIZES = [10, 20, 50];
 
-export function GoodsWaitingList({ docs }: { docs: WaitDoc[] }) {
+export function GoodsWaitingList({
+  docs,
+  empty = { title: "ไม่มีรายการรอ", hint: "ใบที่ทำครบแล้วย้ายไปอยู่ในประวัติของแท็บสต็อก" },
+}: {
+  docs: WaitDoc[];
+  empty?: { title: string; hint: string };
+}) {
   const [page, setPage] = React.useState(1);
   const [size, setSize] = React.useState(PAGE_SIZES[0]);
   const pages = Math.max(1, Math.ceil(docs.length / size));
@@ -63,7 +69,7 @@ export function GoodsWaitingList({ docs }: { docs: WaitDoc[] }) {
   const slice = docs.slice((safe - 1) * size, safe * size);
 
   if (docs.length === 0) {
-    return <EmptyDocs title="ไม่มีรายการรอ" hint="ใบที่ทำครบแล้วย้ายไปอยู่ในประวัติของแท็บสต็อก" />;
+    return <EmptyDocs title={empty.title} hint={empty.hint} />;
   }
 
   return (
@@ -86,7 +92,17 @@ export function GoodsWaitingList({ docs }: { docs: WaitDoc[] }) {
 }
 
 /** คอลัมน์/บรรทัดเสริมของใบ — ภายนอกเป็นข้อมูลรถ ใบผลิตเป็นยอดสั่งกับยอดผลิต */
-function extraFields(doc: WaitDoc, it: WaitItem): { label: string; value?: string }[] {
+function extraFields(
+  doc: WaitDoc,
+  it: WaitItem
+): { label: string; value?: string; tone?: "pos" | "neg"; unit?: boolean }[] {
+  if (doc.extra)
+    return doc.extra.map((label, i) => ({
+      label: `${label} (${it.unit})`,
+      value: it.extra?.[i]?.value,
+      tone: it.extra?.[i]?.tone,
+      unit: true,
+    }));
   if (doc.external)
     return [
       { label: "ทะเบียนรถ", value: it.truck },
@@ -94,8 +110,8 @@ function extraFields(doc: WaitDoc, it: WaitItem): { label: string; value?: strin
     ];
   if (doc.kind === "production")
     return [
-      { label: `สั่งผลิต (${it.unit})`, value: it.ordered },
-      { label: `ปริมาณผลิต (${it.unit})`, value: it.produced },
+      { label: `สั่งผลิต (${it.unit})`, value: it.ordered, unit: true },
+      { label: `ปริมาณผลิต (${it.unit})`, value: it.produced, unit: true },
     ];
   return [];
 }
@@ -103,15 +119,22 @@ function extraFields(doc: WaitDoc, it: WaitItem): { label: string; value?: strin
 function DocCard({ doc }: { doc: WaitDoc }) {
   const unit = doc.items[0]?.unit ?? "";
   const heads = extraFields(doc, doc.items[0]).map((f) =>
-    // หัวคอลัมน์บนจอกว้างไม่มีหน่วย หน่วยอยู่ติดตัวเลขในช่องยอดรออยู่แล้ว
-    doc.kind === "production" ? f.label.replace(/ \(.*\)$/, "") : f.label
+    // หัวคอลัมน์บนจอกว้างไม่มีหน่วย หน่วยอยู่ติดตัวเลขในช่องอยู่แล้ว
+    f.unit ? f.label.replace(/ \(.*\)$/, "") : f.label
   );
+  const tone = (t?: "pos" | "neg") => cn(t === "pos" && "text-success-strong", t === "neg" && "text-danger-strong");
   return (
     <Collapsible defaultOpen className="overflow-hidden rounded-xl border border-border bg-card shadow-xs">
       <div className="flex items-start gap-3 px-4 py-4 @3xl:items-center @3xl:px-6">
         <div className="min-w-0 flex-1">
           <p className="flex items-baseline justify-between gap-3 text-sm @3xl:justify-start @3xl:gap-1.5">
-            <span className="font-semibold @3xl:font-medium">{doc.code}</span>
+            {doc.detailHref ? (
+              <Link href={doc.detailHref} className="font-semibold hover:underline @3xl:font-medium">
+                {doc.code}
+              </Link>
+            ) : (
+              <span className="font-semibold @3xl:font-medium">{doc.code}</span>
+            )}
             <span className="text-muted-foreground">{doc.createdAt}</span>
           </p>
           {doc.party && <p className="mt-2 truncate text-sm font-semibold @3xl:mt-1">{doc.party}</p>}
@@ -153,9 +176,12 @@ function DocCard({ doc }: { doc: WaitDoc }) {
                   <ProductCell item={it} />
                 </td>
                 {extraFields(doc, it).map((f) => (
-                  <td key={f.label} className="px-3 py-3 text-right font-semibold whitespace-nowrap tabular-nums">
+                  <td
+                    key={f.label}
+                    className={cn("px-3 py-3 text-right font-semibold whitespace-nowrap tabular-nums", tone(f.tone))}
+                  >
                     {f.value ?? "-"}
-                    {doc.kind === "production" && f.value && <span className="font-normal"> {unit}</span>}
+                    {f.unit && f.value && <span className="font-normal text-foreground"> {unit}</span>}
                   </td>
                 ))}
                 <td className="px-3 py-3 text-right">
@@ -175,7 +201,7 @@ function DocCard({ doc }: { doc: WaitDoc }) {
             <li key={it.key} className="border-t border-border px-4 py-4">
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <p className="font-semibold">{it.productName}</p>
+                  <ItemName item={it} />
                   <Tags tags={it.tags} className="mt-1" />
                 </div>
                 <ActionButton doc={doc} />
@@ -185,7 +211,7 @@ function DocCard({ doc }: { doc: WaitDoc }) {
                 {extraFields(doc, it).map((f) => (
                   <div key={f.label} className="flex justify-between gap-3">
                     <dt className="text-muted-foreground">{f.label}:</dt>
-                    <dd className="font-semibold tabular-nums">{f.value ?? "-"}</dd>
+                    <dd className={cn("font-semibold tabular-nums", tone(f.tone))}>{f.value ?? "-"}</dd>
                   </div>
                 ))}
                 <div className="flex justify-between gap-3">
@@ -211,6 +237,16 @@ function DocCard({ doc }: { doc: WaitDoc }) {
   );
 }
 
+/** ชื่อสินค้า — แถวที่มีหน้ารายละเอียดกดเข้าไปดูได้ */
+function ItemName({ item }: { item: WaitItem }) {
+  if (!item.detailHref) return <span className="block font-semibold @3xl:inline">{item.productName}</span>;
+  return (
+    <Link href={item.detailHref} className="block font-semibold hover:underline @3xl:inline">
+      {item.productName}
+    </Link>
+  );
+}
+
 function Tags({ tags, className }: { tags: string[]; className?: string }) {
   if (tags.length === 0) return null;
   return (
@@ -230,7 +266,7 @@ function ProductCell({ item }: { item: WaitItem }) {
   return (
     <div className="min-w-0">
       <p className="flex flex-wrap items-center gap-x-2 gap-y-1">
-        <span className="font-semibold">{item.productName}</span>
+        <ItemName item={item} />
         {item.tags.map((t) => (
           <React.Fragment key={t}>
             <span className="h-3.5 w-px bg-border" aria-hidden />
@@ -252,7 +288,7 @@ function Amount({ item, withUnit }: { item: WaitItem; withUnit?: boolean }) {
     <span className="inline-flex items-center gap-2 font-semibold whitespace-nowrap tabular-nums">
       <span>
         {item.qty}
-        {withUnit && <span className="font-normal"> {item.unit}</span>}
+        {withUnit && item.qty !== "-" && <span className="font-normal"> {item.unit}</span>}
       </span>
       {item.weighed !== undefined &&
         (item.weighed ? (

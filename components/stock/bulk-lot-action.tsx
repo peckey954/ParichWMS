@@ -204,7 +204,8 @@ function BulkSheet({ scope, action }: { scope: StockScope; action: LotAction }) 
       move ? r.n > 0 && r.n <= lotPieces(r.lot) && r.lot.zone !== zone : r.filled
     );
     if (!product || (move && !zone) || rows.length === 0 || !rowsOk || !note.trim()) return;
-    for (const r of rows) {
+    // ประวัติเพิ่มรายการใหม่ไว้บนสุดทีละแถว วนจากท้ายเพื่อให้ Lot เรียงตามที่เลือก
+    for (const r of [...rows].reverse()) {
       appendStockLog(scope, {
         code: opened.code,
         lotNumber: r.lot.code,
