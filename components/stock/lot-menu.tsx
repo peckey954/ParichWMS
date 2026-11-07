@@ -52,3 +52,33 @@ export function LotMenu({ lot }: { lot: Lot }) {
     </DropdownMenu>
   );
 }
+
+/**
+ * ปุ่ม ⋮ บนหัวหน้าสต็อก — ย้าย/ปรับปรุงหลายรายการในใบเดียว
+ * เป็นงานระดับทั้งหน้า ไม่ผูกกับแท็บ จึงอยู่ข้างชื่อหน้าได้โดยหัวเรื่องไม่กระตุก
+ */
+export function BulkMenu({ base }: { base: "/stock" | "/stock/goods" }) {
+  return (
+    <DropdownMenu modal={false}>
+      <DropdownMenuTrigger asChild>
+        <Button variant="outline" size="icon" className="shrink-0" aria-label="ย้าย/ปรับปรุงหลายรายการ">
+          <EllipsisVerticalIcon />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="min-w-52">
+        <DropdownMenuItem asChild>
+          <Link href={`${base}/bulk/move`}>
+            <ReplaceIcon />
+            ย้ายหลายรายการ
+          </Link>
+        </DropdownMenuItem>
+        <DropdownMenuItem asChild>
+          <Link href={`${base}/bulk/adjust`}>
+            <ArrowUpDownIcon />
+            ปรับปรุงหลายรายการ
+          </Link>
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}

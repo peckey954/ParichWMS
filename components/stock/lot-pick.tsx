@@ -1,19 +1,12 @@
 "use client";
 
 import * as React from "react";
-import { ScanBarcodeIcon, Trash2Icon, XIcon } from "lucide-react";
+import { Trash2Icon } from "lucide-react";
 import { Badge } from "@peckey954/ui/components/ui/badge";
 import { Button } from "@peckey954/ui/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogTitle,
-} from "@peckey954/ui/components/ui/dialog";
 import { Input } from "@peckey954/ui/components/ui/input";
 import { Label } from "@peckey954/ui/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@peckey954/ui/components/ui/radio-group";
-import { Spinner } from "@peckey954/ui/components/ui/spinner";
 import { Textarea } from "@peckey954/ui/components/ui/textarea";
 import {
   Table,
@@ -24,15 +17,9 @@ import {
   TableRow,
 } from "@peckey954/ui/components/ui/table";
 import { cn } from "@peckey954/ui/lib/utils";
-import { toast } from "sonner";
 import { MultiSelectChips } from "@/components/multi-select-chips";
 import { TableFrame } from "@/components/stock/doc-parts";
-import {
-  ResultCard,
-  SimulateToggle,
-  Viewfinder,
-  useIsPhone,
-} from "@/components/stock/zone-assign";
+import { CaptureTile, ScannerDialog, useLotScanner } from "@/components/stock/lot-scan";
 import {
   LOW_LOT_TONS,
   formatCount,
@@ -70,13 +57,6 @@ import {
    ที่ยังไม่ได้เลือก (FIFO) ชิป "ผลจำลอง" สลับไปดูทางไม่พบสินค้าได้
 ------------------------------------------------------------------ */
 
-type Via = "scan" | "photo";
-type Simulate = "found" | "notfound";
-type Outcome = "found" | "already" | "notfound" | "empty";
-type Report = { via: Via; found: GoodsLot[]; missing: string[] };
-
-const READ_MS = 900;
-const AIM_MS = 1800;
 const LOT_SELECT_ID = "issue-lot";
 const PHOTO_INPUT_ID = "issue-photo";
 
@@ -88,7 +68,6 @@ const lotLine = (l: GoodsLot, byCount: boolean) =>
     : `รับ ${l.receivedAt} (${l.ageDays} วัน) · ${formatCount(l.pieces)} ชิ้น (${l.kgPerPiece} กก.)`;
 
 export function useLotPick(doc: GoodsIssueDoc) {
-  const isPhone = useIsPhone();
   const lots = React.useMemo(() => lotsFor(doc), [doc]);
   const byCount = isCountUnit(doc.unit);
   /** ใบภายในต้องเลือกสถานะการจ่าย ใบภายนอกจ่ายได้อย่างเดียว */
@@ -99,35 +78,14 @@ export function useLotPick(doc: GoodsIssueDoc) {
   /** จำนวนจ่าย (ชิ้น) ต่อ Lot เก็บเป็นข้อความตามที่พิมพ์ */
   const [counts, setCounts] = React.useState<Record<string, string>>({});
   const [note, setNote] = React.useState("");
-  const [simulate, setSimulateState] = React.useState<Simulate>("found");
-  const [scannerOpen, setScannerOpenState] = React.useState(false);
-  const [reading, setReading] = React.useState<{ done: number; total: number } | null>(null);
-  const [flashId, setFlashId] = React.useState<string>();
 
   const pickedRef = React.useRef(picked);
   const countsRef = React.useRef(counts);
-  const simulateRef = React.useRef(simulate);
-  const sessionRef = React.useRef<Report | null>(null);
-  const timersRef = React.useRef<ReturnType<typeof setTimeout>[]>([]);
-  const flashTimer = React.useRef<ReturnType<typeof setTimeout>>(undefined);
 
   React.useEffect(() => {
     pickedRef.current = picked;
     countsRef.current = counts;
   }, [picked, counts]);
-
-  React.useEffect(
-    () => () => {
-      for (const t of timersRef.current) clearTimeout(t);
-      clearTimeout(flashTimer.current);
-    },
-    []
-  );
-
-  const setSimulate = (v: Simulate) => {
-    simulateRef.current = v;
-    setSimulateState(v);
-  };
 
   const lotOf = (id: string) => lots.find((l) => l.id === id);
 
@@ -167,124 +125,15 @@ export function useLotPick(doc: GoodsIssueDoc) {
 
   // ---------- สแกน ----------
 
-  const startSession = (via: Via) => {
-    sessionRef.current = { via, found: [], missing: [] };
-  };
-
-  const openLotSelect = () => {
-    setScannerOpen(false);
-    setTimeout(() => {
-      const el = document.getElementById(LOT_SELECT_ID);
-      if (!el) return;
-      el.scrollIntoView({ block: "center", behavior: "smooth" });
-      el.focus({ preventScroll: true });
-      el.click();
-    }, 80);
-  };
-
-  const endSession = () => {
-    const rep = sessionRef.current;
-    sessionRef.current = null;
-    if (!rep || (rep.found.length === 0 && rep.missing.length === 0)) return;
-    if (rep.found.length > 0) {
-      const one = rep.found.length === 1 ? rep.found[0] : undefined;
-      toast.custom(() => (
-        <ResultCard
-          tone="ok"
-          className="w-[min(32rem,calc(100vw-2rem))] shadow-lg"
-          title="สแกนสำเร็จ"
-          detail={
-            one
-              ? `${one.code} · ${byCount ? `${formatCount(one.pieces)} ${doc.unit}` : `${formatTons(lotTons(one))} ตัน`}`
-              : `${rep.found.length} Lot`
-          }
-          zone={one ? one.zone : undefined}
-        />
-      ));
-    }
-    if (rep.missing.length > 0) {
-      toast.custom((id) => (
-        <ResultCard
-          tone="error"
-          className="w-[min(32rem,calc(100vw-2rem))] shadow-lg"
-          title="ไม่พบ Lot ที่ตรงกับบาร์โค้ด"
-          detail={rep.missing.length === 1 ? rep.missing[0] : `${rep.missing.length} รายการ`}
-          aside={
-            <Button
-              size="sm"
-              variant="outline"
-              className="shrink-0 bg-card"
-              onClick={() => {
-                toast.dismiss(id);
-                openLotSelect();
-              }}
-            >
-              เลือก Lot
-            </Button>
-          }
-        />
-      ));
-    }
-  };
-
-  function setScannerOpen(open: boolean) {
-    if (open) startSession("scan");
-    else if (sessionRef.current?.via === "scan") endSession();
-    setScannerOpenState(open);
-  }
-
-  /** ป้ายที่ "กล้อง" จะอ่านได้ — Lot เก่าสุดที่ยังไม่ได้เลือก */
-  const mockRead = (): string | null => {
-    if (simulateRef.current === "notfound") return lots[0].code.replace(/\d+$/, "99");
-    const hit = lots.find((l) => !pickedRef.current.includes(l.id));
-    return hit?.code ?? null;
-  };
-
-  const applyCode = (code: string | null): { outcome: Outcome } => {
-    const session = sessionRef.current;
-    if (code === null) return { outcome: "empty" };
-    const hit = lots.find((l) => l.code.toUpperCase() === code.trim().toUpperCase());
-    if (!hit) {
-      session?.missing.push(code);
-      return { outcome: "notfound" };
-    }
-    clearTimeout(flashTimer.current);
-    setFlashId(hit.id);
-    flashTimer.current = setTimeout(() => setFlashId(undefined), 1600);
-    if (session && !session.found.some((l) => l.id === hit.id)) session.found.push(hit);
-    if (pickedRef.current.includes(hit.id)) return { outcome: "already" };
-    setPicked([...pickedRef.current, hit.id]);
-    return { outcome: "found" };
-  };
-
-  const readPhoto = (total: number, index: number) => {
-    timersRef.current = [
-      setTimeout(() => {
-        const { outcome } = applyCode(mockRead());
-        if (index + 1 < total && outcome !== "empty") {
-          setReading({ done: index + 1, total });
-          readPhoto(total, index + 1);
-          return;
-        }
-        setReading(null);
-        if (outcome === "empty" && sessionRef.current?.found.length === 0)
-          toast.info("เลือกครบทุก Lot ของสินค้านี้แล้ว");
-        endSession();
-      }, READ_MS),
-    ];
-  };
-
-  const scanPhotos = (files: File[]) => {
-    if (reading) return;
-    const photos = files.filter((f) => f.type.startsWith("image/"));
-    if (photos.length === 0) {
-      toast.error("ไฟล์นี้ไม่ใช่รูป อ่านบาร์โค้ดไม่ได้");
-      return;
-    }
-    startSession("photo");
-    setReading({ done: 0, total: photos.length });
-    readPhoto(photos.length, 0);
-  };
+  const scan = useLotScanner({
+    lots,
+    picked,
+    onAdd: (lot) => setPicked([...pickedRef.current, lot.id]),
+    describe: (one) =>
+      `${one.code} · ${byCount ? `${formatCount(one.pieces)} ${doc.unit}` : `${formatTons(lotTons(one))} ตัน`}`,
+    inputId: PHOTO_INPUT_ID,
+    selectId: LOT_SELECT_ID,
+  });
 
   // ---------- ยอดรวม ----------
 
@@ -317,7 +166,6 @@ export function useLotPick(doc: GoodsIssueDoc) {
     : rows.length > 0 && rows.every((r) => !r.error) && (!noteRequired || note.trim() !== "");
 
   return {
-    isPhone,
     doc,
     lots,
     picked,
@@ -326,16 +174,8 @@ export function useLotPick(doc: GoodsIssueDoc) {
     setCount,
     note,
     setNote,
-    simulate,
-    setSimulate,
-    scannerOpen,
-    setScannerOpen,
-    reading,
-    flashId,
-    mockRead,
-    applyCode,
-    scanPhotos,
-    pickPhotos: () => document.getElementById(PHOTO_INPUT_ID)?.click(),
+    scan,
+    flashId: scan.flashId,
     rows,
     totalTons,
     stockTons,
@@ -381,7 +221,7 @@ export function LotPickFields({ state }: { state: LotPick }) {
 
   return (
     <div className="space-y-4">
-      <CaptureTile state={state} />
+      <CaptureTile scan={state.scan} prompt="สแกนเลขที่ติดบนสินค้าเพื่อเลือก Lot ที่จะจ่ายออก" />
 
       <div className="flex items-center gap-3 text-sm text-muted-foreground">
         <span className="h-px flex-1 bg-border" />
@@ -449,7 +289,7 @@ export function LotPickFields({ state }: { state: LotPick }) {
         />
       </div>
 
-      <ScannerDialog state={state} />
+      <ScannerDialog scan={state.scan} />
     </div>
   );
 }
@@ -467,128 +307,6 @@ function RadioBox({ id, value, children }: { id: string; value: string; children
       <RadioGroupItem id={id} value={value} />
       {children}
     </Label>
-  );
-}
-
-function CaptureTile({ state }: { state: LotPick }) {
-  const [dragging, setDragging] = React.useState(false);
-  return (
-    <div
-      onDragOver={(e) => {
-        if (state.isPhone || state.reading) return;
-        e.preventDefault();
-        setDragging(true);
-      }}
-      onDragLeave={() => setDragging(false)}
-      onDrop={(e) => {
-        if (state.isPhone) return;
-        e.preventDefault();
-        setDragging(false);
-        state.scanPhotos([...e.dataTransfer.files]);
-      }}
-      className={cn(
-        "flex flex-col items-center gap-3 rounded-xl border border-dashed border-primary bg-brand px-4 py-8 text-center transition-colors",
-        dragging && "bg-brand-hover ring-[3px] ring-primary/30"
-      )}
-    >
-      {state.reading ? (
-        <Spinner className="size-7 text-muted-foreground" />
-      ) : (
-        <ScanBarcodeIcon className="size-7 text-muted-foreground" />
-      )}
-      <p className="font-medium">
-        {!state.reading
-          ? "สแกนเลขที่ติดบนสินค้าเพื่อเลือก Lot ที่จะจ่ายออก"
-          : state.reading.total > 1
-            ? `กำลังอ่านรูปที่ ${state.reading.done + 1} จาก ${state.reading.total}...`
-            : "กำลังอ่านบาร์โค้ดจากรูป..."}
-      </p>
-      <div className="flex flex-wrap justify-center gap-2">
-        <Button variant="outline-primary" size="sm" className="bg-card" onClick={() => state.setScannerOpen(true)}>
-          สแกนเลขที่สินค้า
-        </Button>
-        <Button
-          variant="outline-primary"
-          size="sm"
-          className="bg-card"
-          disabled={Boolean(state.reading)}
-          onClick={state.pickPhotos}
-        >
-          สแกนจากรูปภาพ
-        </Button>
-      </div>
-      <SimulateToggle state={state} />
-      <input
-        id={PHOTO_INPUT_ID}
-        type="file"
-        accept="image/*"
-        multiple
-        className="hidden"
-        onChange={(e) => {
-          const files = [...(e.target.files ?? [])];
-          e.target.value = "";
-          if (files.length > 0) state.scanPhotos(files);
-        }}
-      />
-    </div>
-  );
-}
-
-type Phase = { kind: "aiming" | Outcome; code: string | null };
-
-function ScannerDialog({ state }: { state: LotPick }) {
-  const { isPhone } = state;
-  const open = state.scannerOpen;
-  const [phase, setPhase] = React.useState<Phase>({ kind: "aiming", code: null });
-
-  const { mockRead, applyCode, setScannerOpen } = state;
-  const live = React.useRef({ mockRead, applyCode, setScannerOpen });
-  React.useEffect(() => {
-    live.current = { mockRead, applyCode, setScannerOpen };
-  });
-
-  React.useEffect(() => {
-    if (!open) return;
-    const code = live.current.mockRead();
-    setPhase({ kind: "aiming", code });
-    const t = setTimeout(() => {
-      const { outcome } = live.current.applyCode(code);
-      setPhase({ kind: outcome, code });
-      if (outcome === "empty") toast.info("เลือกครบทุก Lot ของสินค้านี้แล้ว");
-      live.current.setScannerOpen(false);
-    }, AIM_MS);
-    return () => clearTimeout(t);
-  }, [open, state.simulate]);
-
-  return (
-    <Dialog open={open} onOpenChange={state.setScannerOpen}>
-      <DialogContent
-        showCloseButton={false}
-        className={cn(
-          "flex flex-col gap-0 overflow-hidden p-0",
-          isPhone
-            ? "inset-0 h-dvh max-w-none translate-x-0 translate-y-0 rounded-none border-0"
-            : "sm:max-w-3xl"
-        )}
-      >
-        <div className="flex items-start justify-between gap-2 px-6 pt-5 pb-4 max-sm:px-4">
-          <div>
-            <DialogTitle className="text-lg">สแกนบาร์โค้ด</DialogTitle>
-            <DialogDescription className="mt-1">วางบาร์โค้ดให้อยู่ในตำแหน่งสแกน</DialogDescription>
-          </div>
-          <Button variant="ghost" size="icon" aria-label="ปิด" onClick={() => state.setScannerOpen(false)}>
-            <XIcon />
-          </Button>
-        </div>
-        <Viewfinder phase={phase} className={isPhone ? "min-h-0 flex-1" : "h-[min(58dvh,580px)]"}>
-          {phase.kind === "aiming" && <SimulateToggle state={state} dark />}
-        </Viewfinder>
-        <div className="flex min-h-14 items-center justify-center gap-2 p-4 pb-[max(1rem,env(safe-area-inset-bottom))] text-sm text-muted-foreground">
-          <Spinner className="size-4" />
-          กำลังค้นหาบาร์โค้ด...
-        </div>
-      </DialogContent>
-    </Dialog>
   );
 }
 

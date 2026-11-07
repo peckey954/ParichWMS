@@ -38,6 +38,7 @@ import {
   isStockDefault,
   type StockView,
 } from "@/components/stock/stock-filter";
+import { BulkMenu } from "@/components/stock/lot-menu";
 import { ProductCard } from "@/components/stock/stock-parts";
 import {
   groupByZone,
@@ -194,8 +195,13 @@ function GoodsStockView() {
       <div className="px-4 py-3 sm:px-6 sm:py-5">
         <Crumbs trail={[{ label: "สต็อกสินค้า" }]} />
 
-        <h1 className="mt-2 text-2xl font-semibold tracking-tight sm:mt-3">สต็อกสินค้า</h1>
-        <p className="mt-1 text-sm text-muted-foreground">จัดการสต็อกสินค้า</p>
+        <div className="mt-2 flex items-start justify-between gap-3 sm:mt-3">
+          <div className="min-w-0">
+            <h1 className="text-2xl font-semibold tracking-tight">สต็อกสินค้า</h1>
+            <p className="mt-1 text-sm text-muted-foreground">จัดการสต็อกสินค้า</p>
+          </div>
+          <BulkMenu base="/stock/goods" />
+        </div>
 
         <Tabs
           value={tab}

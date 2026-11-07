@@ -34,7 +34,7 @@ import {
 import { GOODS_PRODUCTS, GOODS_ZONES } from "@/lib/goods-stock";
 
 /** ผู้ทำรายการ — ยังไม่มีระบบผู้ใช้ ใช้ชื่อเดียวกับข้อมูลตัวอย่างไปก่อน */
-const ACTOR = "อลิสา พรสุขสิริ";
+export const ACTOR = "อลิสา พรสุขสิริ";
 
 /* ------------------------------------------------------------------
    หน้าย้ายสต็อก / ปรับปรุงสต็อก ของล็อตหนึ่ง — เปิดจากเมนู ⋮ ของแถวล็อต
@@ -48,7 +48,7 @@ const ACTOR = "อลิสา พรสุขสิริ";
 
 export type LotAction = "move" | "adjust";
 
-const SCOPES: Record<StockScope, { label: string; href: string; products: Product[]; zones: string[] }> = {
+export const SCOPES: Record<StockScope, { label: string; href: string; products: Product[]; zones: string[] }> = {
   general: { label: "สต็อกทั่วไป", href: "/stock", products: PRODUCTS, zones: ZONES },
   goods: { label: "สต็อกสินค้า", href: "/stock/goods", products: GOODS_PRODUCTS, zones: GOODS_ZONES },
 };
@@ -75,7 +75,7 @@ export function LotActionPage({ lotId, action }: { lotId: string; action: string
 }
 
 /** หน่วยที่มีทศนิยม (ตัน ลิตร กก.) นับเป็นชิ้น — หน่วยนับอยู่แล้ว (ชิ้น ขวด) นับตามหน่วยนั้นเลย ไม่มี .00 */
-const DECIMAL_UNITS = new Set(["ตัน", "ลิตร", "กก."]);
+export const DECIMAL_UNITS = new Set(["ตัน", "ลิตร", "กก."]);
 
 function LotSheet({
   scope,
@@ -296,7 +296,7 @@ function LotSheet({
 }
 
 /** ช่องฟอร์ม — มีข้อผิดพลาดแล้วหัวช่องเป็นแดง ข้อความเตือนอยู่ใต้ช่อง */
-function Field({
+export function Field({
   id,
   label,
   error,

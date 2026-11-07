@@ -37,6 +37,7 @@ import { HistoryList } from "@/components/stock/history-list";
 import { StockLogProvider, useStockLog } from "@/components/stock/stock-log";
 import { GoodsWaitingList } from "@/components/stock/goods-waiting-list";
 import { DateRangeSelect, type DateRange } from "@/components/date-select";
+import { BulkMenu } from "@/components/stock/lot-menu";
 import { ProductCard } from "@/components/stock/stock-parts";
 import { FifoList, ZoneGroups } from "@/components/stock/lot-list";
 import { useRememberedState } from "@/components/remembered-state";
@@ -278,13 +279,16 @@ function GeneralStockView() {
               </p>
             </div>
 
-            <Button asChild variant="outline-primary" className="shrink-0">
-              <Link href="/stock/safety-stock">
-                <Settings2Icon className="hidden @3xl:inline" />
-                <span className="@3xl:hidden">Safety Stock</span>
-                <span className="hidden @3xl:inline">ตั้งค่า Safety Stock</span>
-              </Link>
-            </Button>
+            <div className="flex shrink-0 items-center gap-2">
+              <Button asChild variant="outline-primary">
+                <Link href="/stock/safety-stock">
+                  <Settings2Icon className="hidden @3xl:inline" />
+                  <span className="@3xl:hidden">Safety Stock</span>
+                  <span className="hidden @3xl:inline">ตั้งค่า Safety Stock</span>
+                </Link>
+              </Button>
+              <BulkMenu base="/stock" />
+            </div>
           </div>
 
           <Tabs
