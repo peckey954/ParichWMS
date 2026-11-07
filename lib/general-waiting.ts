@@ -12,15 +12,16 @@ import {
   type InboundDoc,
   type IssueDoc,
 } from "./general-stock";
-import { stampOf, type WaitDoc, type WaitKind } from "./goods-waiting";
+import { pad, sampleTruck, stampOf, truckOf, withCompanion, type WaitDoc, type WaitKind } from "./goods-waiting";
 
 /* ------------------------------------------------------------------
    แท็บ "รอรับเข้า/จ่าย/คืน" ของสต็อกทั่วไป — แบบเดียวกับสต็อกสินค้า
    (lib/goods-waiting.ts) ใช้การ์ดชุดเดียวกัน ต่างกันที่ข้อมูล
 
    สต็อกทั่วไปไม่มีรับเข้าจากไลน์ผลิต ชิปจึงเหลือ รอรับเข้า / รอรับคืน / รอจ่ายออก
-   ใบรับเข้าหนึ่งใบคือรถหนึ่งคันอยู่แล้ว ไม่ต้องแตกแถวตามรถ
-   ใบเบิก/คืนเป็นงานภายใน ไม่มีข้อมูลรถ และยังไม่มีหน้าทำรายการ จึงไม่มีปุ่มท้ายแถว
+   หนึ่งใบมีได้หลายสินค้า หนึ่งแถวต่อสินค้าต่อทะเบียนรถ (ข้อมูลตัวอย่างใบละสองสินค้า)
+   ใบจ่าย/คืนภายนอกมีรถ ข้อมูลตัวอย่างไม่ได้ใส่ไว้จึงเติมทะเบียนคงที่ตามเลขใบ
+   ใบเบิก/คืนยังไม่มีหน้าทำรายการ จึงไม่มีปุ่มท้ายแถว
 ------------------------------------------------------------------ */
 
 export const GENERAL_WAIT_KINDS: { id: WaitKind | "all"; label: string }[] = [
@@ -44,22 +45,24 @@ function fromInbound(d: InboundDoc): WaitDoc {
     external: true,
     amountLabel: "รอรับเข้า",
     href: `/stock/inbound/${d.id}/add`,
-    items: [
-      {
-        key: d.id,
-        productName: d.productName,
-        tags: [d.productSub, d.packing].filter(Boolean) as string[],
-        truck: d.truck,
-        arriveDate: d.arriveDate,
-        qty: qtyOf(outstandingQty(d), d.orderUnit),
-        unit: d.orderUnit,
-      },
-    ],
+    items: withCompanion(INBOUND_DOCS, d).map((x, i) => ({
+      key: `${d.id}-${i}`,
+      productName: x.productName,
+      tags: [x.productSub, x.packing].filter(Boolean) as string[],
+      sub: `${d.code}-${pad(i + 1)}`,
+      truck: truckOf(d.truck, i),
+      arriveDate: d.arriveDate,
+      // ใบที่ยืมมาอาจรับครบไปแล้ว ใช้ยอดสั่งแทน แถวจะได้ไม่เป็นศูนย์
+      qty: qtyOf(i === 0 ? outstandingQty(x) : outstandingQty(x) || x.orderQty, x.orderUnit),
+      unit: x.orderUnit,
+    })),
   };
 }
 
 function fromIssue(d: IssueDoc): WaitDoc {
   const ret = isReturn(d.status);
+  const external = d.status === "issueExternal" || d.status === "returnExternal";
+  const arrive = d.createdAt.split("|")[0].trim();
   return {
     id: d.id,
     kind: ret ? "return" : "issue",
@@ -67,18 +70,18 @@ function fromIssue(d: IssueDoc): WaitDoc {
     createdAt: d.createdAt,
     status: d.status,
     statusLabel: ISSUE_STATUS_LABEL[d.status],
-    external: false,
+    external,
     amountLabel: ret ? "รอรับคืน" : "รอจ่ายออก",
-    items: [
-      {
-        key: d.id,
-        productName: d.productName,
-        tags: d.packing ? [d.packing] : [],
-        sub: d.note,
-        qty: qtyOf(Math.abs(d.qty), d.unit),
-        unit: d.unit,
-      },
-    ],
+    items: withCompanion(ISSUE_DOCS, d, (x) => x.status === d.status).map((x, i) => ({
+      key: `${d.id}-${i}`,
+      productName: x.productName,
+      tags: x.packing ? [x.packing] : [],
+      sub: external ? `${d.code}-${pad(i + 1)}` : x.note,
+      truck: external ? truckOf(sampleTruck(d.id), i) : undefined,
+      arriveDate: external ? arrive : undefined,
+      qty: qtyOf(Math.abs(x.qty), x.unit),
+      unit: x.unit,
+    })),
   };
 }
 

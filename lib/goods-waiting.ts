@@ -26,9 +26,10 @@ import {
      รอจ่ายออก      — จ่ายภายใน / ภายนอก
 
    หนึ่งการ์ด = หนึ่งใบ ในการ์ดเป็นรายการสินค้า
-   ภายนอก (รับเข้า จ่ายออก คืนภายนอก) มีทะเบียนรถกับวันที่รถเข้า และแตกเป็น
-   หนึ่งแถวต่อสินค้าต่อทะเบียนรถ — สินค้าเดียวมารถ 3 คันก็เป็น 3 แถว เพราะ
-   แต่ละคันมีใบชั่งของตัวเอง (Note to Dev ในแบบ)
+   หนึ่งใบมีได้หลายสินค้า ภายนอก (รับเข้า จ่ายออก คืนภายนอก) มีทะเบียนรถกับ
+   วันที่รถเข้า และแตกเป็นหนึ่งแถวต่อสินค้าต่อทะเบียนรถ เพราะแต่ละคันมีใบชั่ง
+   ของตัวเอง (Note to Dev ในแบบ) ข้อมูลตัวอย่างทุกใบมีสองสินค้า ยกเว้นใบผลิต
+   ที่หนึ่งใบสั่งผลิตคือสินค้าเดียว
    ภายใน (ผลิต จ่ายภายใน คืนภายใน กวาดพื้น) ไม่มีข้อมูลรถ
 ------------------------------------------------------------------ */
 
@@ -96,28 +97,35 @@ export type WaitDoc = {
   items: WaitItem[];
 };
 
-function seeded(n: number) {
-  let s = n * 9301 + 49297;
-  return () => {
-    s = (s * 9301 + 49297) % 233280;
-    return s / 233280;
-  };
-}
-
 const hash = (s: string) => [...s].reduce((a, c) => (a * 31 + c.charCodeAt(0)) % 100000, 7);
-const pad = (n: number) => String(n).padStart(2, "0");
+export const pad = (n: number) => String(n).padStart(2, "0");
 
 /** ทะเบียนรถคันที่สองขึ้นไป — ต่อจากคันแรกให้ดูเป็นรถชุดเดียวกัน */
-const truckOf = (first: string, i: number) =>
+export const truckOf = (first: string, i: number) =>
   i === 0 ? first : first.replace(/\d+$/, (n) => String(Number(n) + i * 111).padStart(n.length, "0"));
 
-/** แตกยอดตามจำนวนรถ — คันสุดท้ายเก็บเศษ ยอดรวมเท่าเดิมเสมอ */
-function splitByTruck(total: number, trucks: number, decimals: boolean) {
-  const each = decimals ? Math.round((total / trucks) * 100) / 100 : Math.floor(total / trucks);
-  return Array.from({ length: trucks }, (_, i) =>
-    i === trucks - 1 ? Math.round((total - each * (trucks - 1)) * 100) / 100 : each
-  );
+/** ทะเบียนรถตัวอย่างสำหรับใบที่ไม่ได้ใส่รถไว้ — คงที่ตามเลขใบ ไม่สุ่มใหม่ทุกครั้ง */
+export const sampleTruck = (id: string) => `กค - ${String(1000 + (hash(id) % 9000)).padStart(4, "0")}`;
+
+/**
+ * ใบจริงมีได้หลายสินค้า แต่ข้อมูลตัวอย่างหนึ่งใบมีสินค้าเดียว
+ * จึงยืมสินค้าจากใบอื่นในชุดเดียวกันมาเป็นรายการที่สอง — เลือกตามเลขใบ ได้ตัวเดิมทุกครั้ง
+ */
+export function companionOf<T extends { id: string; productName: string }>(
+  list: readonly T[],
+  d: T,
+  ok: (x: T) => boolean = () => true
+) {
+  const pool = list.filter((x) => x.productName !== d.productName && ok(x));
+  return pool.length ? pool[hash(d.id) % pool.length] : undefined;
 }
+
+/** ใบนี้กับสินค้าที่ยืมมา — หนึ่งแถวต่อสินค้า */
+export const withCompanion = <T extends { id: string; productName: string }>(
+  list: readonly T[],
+  d: T,
+  ok?: (x: T) => boolean
+) => [d, companionOf(list, d, ok)].filter(Boolean) as T[];
 
 const tagsOf = (d: { productType: string; group: string; packing?: string }) =>
   [d.productType, d.group, d.packing].filter(Boolean) as string[];
@@ -149,8 +157,7 @@ function fromInbound(d: GoodsInboundDoc): WaitDoc {
       ],
     };
   }
-  const trucks = 1 + Math.floor(seeded(hash(d.id))() * 2);
-  const parts = splitByTruck(d.qty, trucks, d.unit === "ตัน");
+  const lines = withCompanion(GOODS_INBOUND_DOCS, d, (x) => x.source !== "production");
   return {
     id: d.id,
     kind: "inbound",
@@ -162,15 +169,16 @@ function fromInbound(d: GoodsInboundDoc): WaitDoc {
     external: true,
     amountLabel: "รอรับเข้า",
     href,
-    items: parts.map((q, i) => ({
+    // หนึ่งแถวต่อสินค้าต่อทะเบียนรถ — แต่ละคันมีใบชั่งของตัวเอง
+    items: lines.map((x, i) => ({
       key: `${d.id}-${i}`,
-      productName: d.productName,
-      tags: tagsOf(d),
+      productName: x.productName,
+      tags: tagsOf(x),
       sub: `${d.code}-${pad(i + 1)}`,
       truck: truckOf(d.truck ?? "-", i),
       arriveDate: d.arriveDate,
-      qty: formatInboundQty(q, d.unit),
-      unit: d.unit,
+      qty: formatInboundQty(x.qty, x.unit),
+      unit: x.unit,
       weighed: i === 0,
     })),
   };
@@ -179,12 +187,10 @@ function fromInbound(d: GoodsInboundDoc): WaitDoc {
 function fromIssue(d: GoodsIssueDoc): WaitDoc {
   const ret = isGoodsReturn(d.status);
   const external = d.status === "issueExternal" || d.status === "returnExternal";
-  const total = Math.abs(d.qty);
-  const trucks = external ? 1 + Math.floor(seeded(hash(d.id))() * 2) : 1;
-  const parts = splitByTruck(total, trucks, d.unit === "ตัน");
+  // สินค้าตัวที่สองมาจากใบชนิดเดียวกัน หน่วยและประเภทจะได้เข้ากัน
+  const lines = withCompanion(GOODS_ISSUE_DOCS, d, (x) => x.status === d.status);
   // ใบคืนภายนอกในข้อมูลตัวอย่างไม่ได้ใส่รถไว้ — เติมให้คงที่ตามเลขใบ ไม่สุ่มใหม่ทุกครั้ง
-  const firstTruck =
-    d.truck && d.truck !== "-" ? d.truck : `กค - ${String(1000 + (hash(d.id) % 9000)).padStart(4, "0")}`;
+  const firstTruck = d.truck && d.truck !== "-" ? d.truck : sampleTruck(d.id);
   const arrive = d.arriveDate && d.arriveDate !== "-" ? d.arriveDate : d.createdAt.split("|")[0].trim();
   return {
     id: d.id,
@@ -197,15 +203,15 @@ function fromIssue(d: GoodsIssueDoc): WaitDoc {
     external,
     amountLabel: ret ? "รอรับคืน" : "รอจ่ายออก",
     href: goodsDocHref(d),
-    items: parts.map((q, i) => ({
+    items: lines.map((x, i) => ({
       key: `${d.id}-${i}`,
-      productName: d.productName,
-      tags: tagsOf(d),
+      productName: x.productName,
+      tags: tagsOf(x),
       sub: external ? `${d.code}-${pad(i + 1)}` : undefined,
       truck: external ? truckOf(firstTruck, i) : undefined,
       arriveDate: external ? arrive : undefined,
-      qty: formatQty(q, d.unit),
-      unit: d.unit,
+      qty: formatQty(Math.abs(x.qty), x.unit),
+      unit: x.unit,
       weighed: external ? i === 0 : undefined,
     })),
   };

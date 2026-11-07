@@ -39,7 +39,7 @@ import {
   historyLines,
   type GoodsHistoryRow,
 } from "@/lib/goods-stock";
-import type { WaitDoc, WaitKind } from "@/lib/goods-waiting";
+import { pad, sampleTruck, truckOf, withCompanion, type WaitDoc, type WaitKind } from "@/lib/goods-waiting";
 
 /* ------------------------------------------------------------------
    แท็บประวัติ — หนึ่งการ์ดต่อใบ แบบเดียวกับแท็บรอรับเข้า/จ่าย/คืน
@@ -141,10 +141,32 @@ const KIND: Partial<Record<HistoryRow["status"], WaitKind>> = {
   returnSweep: "return",
 };
 
+/** รับเข้าจากภายนอก จ่ายออกภายนอก คืนภายนอก — มีรถ แตกแถวต่อสินค้าต่อทะเบียนรถ */
+function isExternal(scope: StockScope, r: HistoryRow) {
+  if (r.status === "inbound") return !(scope === "goods" && (r as GoodsHistoryRow).source === "production");
+  return r.status === "issueExternal" || r.status === "returnExternal";
+}
+
+/**
+ * ใบรับเข้า/จ่าย/คืนมีได้หลายสินค้า แต่ประวัติตัวอย่างหนึ่งใบมีแถวเดียว
+ * จึงยืมแถวชนิดเดียวกันจากใบอื่นมาเป็นสินค้าตัวที่สอง (ใบผลิตเป็นสินค้าเดียวตามจริง)
+ */
+function withSecondProduct(scope: StockScope, group: HistoryRow[]) {
+  const first = group[0];
+  const production = scope === "goods" && (first as GoodsHistoryRow).source === "production";
+  if (group.length > 1 || isLotAction(first) || production) return group;
+  const source = (r: HistoryRow) => (r as GoodsHistoryRow).source;
+  return withCompanion(INITIAL[scope], first, (x) => x.status === first.status && source(x) === source(first)).map(
+    (r, i) => (i === 0 ? r : { ...r, id: `${first.id}~${i}`, code: first.code, createdAt: first.createdAt })
+  );
+}
+
 /** แปลงประวัติเป็นใบสำหรับรายการการ์ด */
 export function historyDocs(scope: StockScope, rows: HistoryRow[]): WaitDoc[] {
-  return groupRows(rows).map((group) => {
+  return groupRows(rows).map((g) => {
+    const group = withSecondProduct(scope, g);
     const first = group[0];
+    const external = isExternal(scope, first);
     const s = statusOf(scope, first);
     const detailHref = historyDetailHref(scope, first);
     const adjust = first.status === "adjust";
@@ -155,11 +177,11 @@ export function historyDocs(scope: StockScope, rows: HistoryRow[]): WaitDoc[] {
       createdAt: first.createdAt,
       status: s.key,
       statusLabel: s.label,
-      external: false,
+      external,
       amountLabel: AMOUNT_LABEL[first.status],
       detailHref,
       extra: adjust ? ["ส่วนต่าง"] : undefined,
-      items: group.map((r) => {
+      items: group.map((r, i) => {
         const unit = r.unit ?? "ตัน";
         const fmt = fmtOf(unit);
         const diff = r.doneQty ?? 0;
@@ -177,7 +199,9 @@ export function historyDocs(scope: StockScope, rows: HistoryRow[]): WaitDoc[] {
           key: r.id,
           productName: r.productName,
           tags: tagsOf(scope, r),
-          sub: r.lotNumber,
+          sub: external ? `${first.code}-${pad(i + 1)}` : r.lotNumber,
+          truck: external ? truckOf(sampleTruck(first.id), i) : undefined,
+          arriveDate: external ? first.createdAt.split("|")[0].trim() : undefined,
           qty: amount,
           unit: r.doneQty === undefined && r.doneCount !== undefined ? "ชิ้น" : unit,
           detailHref,
