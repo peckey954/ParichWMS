@@ -21,13 +21,13 @@ import { cn } from "@peckey954/ui/lib/utils";
 import { toast } from "sonner";
 import { useDevicePreview, useScrollState } from "@/components/device-preview";
 import { Crumbs } from "@/components/receiving/parts";
-import { DateRangeSelect, type DateRange } from "@/components/date-select";
+import { type DateRange } from "@/components/date-select";
 import { useRememberedState } from "@/components/remembered-state";
 import { SortControl } from "@/components/sort-control";
 import { BackToTop, StickyToolbar } from "@/components/sticky-toolbar";
 import { EmptyDocs } from "@/components/stock/doc-parts";
 import { GoodsHistoryList } from "@/components/stock/goods-history-list";
-import { GoodsWaitingList } from "@/components/stock/goods-waiting-list";
+import { GoodsWaitingList, WaitSearchRow } from "@/components/stock/goods-waiting-list";
 import { FifoList, ZoneGroups } from "@/components/stock/lot-list";
 import { useSafetyStock } from "@/components/stock/safety-stock-provider";
 import { StockLogProvider, useStockLog } from "@/components/stock/stock-log";
@@ -405,31 +405,7 @@ function GoodsStockView() {
         {tab === "waiting" && (
           <>
             <StickyToolbar hidden={hidden} barRef={stickyRef}>
-              <div className="flex items-center gap-2 pt-2">
-                <InputGroup className="min-w-0 flex-1 bg-card">
-                  <InputGroupAddon align="inline-start">
-                    <SearchIcon />
-                  </InputGroupAddon>
-                  <InputGroupInput
-                    placeholder="ค้นหา..."
-                    value={waitQuery}
-                    onChange={(e) => setWaitQuery(e.target.value)}
-                  />
-                </InputGroup>
-                {/* จอแคบช่องวันที่ลงไปอยู่บรรทัดของตัวเอง ช่องค้นหาจะได้ไม่หดจนพิมพ์ไม่ได้ */}
-                <DateRangeSelect
-                  value={range}
-                  onValueChange={setRange}
-                  placeholder="วันที่"
-                  className="hidden w-64 shrink-0 @3xl:flex"
-                />
-              </div>
-              <DateRangeSelect
-                value={range}
-                onValueChange={setRange}
-                placeholder="วันที่"
-                className="mt-2 @3xl:hidden"
-              />
+              <WaitSearchRow query={waitQuery} onQuery={setWaitQuery} range={range} onRange={setRange} />
 
               <div
                 role="tablist"

@@ -30,7 +30,7 @@ export const GENERAL_WAIT_KINDS: { id: WaitKind | "all"; label: string }[] = [
   { id: "issue", label: "รอจ่ายออก" },
 ];
 
-const amountOf = (v: number, unit: string) => `${unit === "ตัน" ? formatAmount(v) : formatQty(v)} ${unit}`;
+const qtyOf = (v: number, unit: string) => (unit === "ตัน" ? formatAmount(v) : formatQty(v));
 
 function fromInbound(d: InboundDoc): WaitDoc {
   return {
@@ -51,7 +51,8 @@ function fromInbound(d: InboundDoc): WaitDoc {
         tags: [d.productSub, d.packing].filter(Boolean) as string[],
         truck: d.truck,
         arriveDate: d.arriveDate,
-        amount: amountOf(outstandingQty(d), d.orderUnit),
+        qty: qtyOf(outstandingQty(d), d.orderUnit),
+        unit: d.orderUnit,
       },
     ],
   };
@@ -74,7 +75,8 @@ function fromIssue(d: IssueDoc): WaitDoc {
         productName: d.productName,
         tags: d.packing ? [d.packing] : [],
         sub: d.note,
-        amount: amountOf(Math.abs(d.qty), d.unit),
+        qty: qtyOf(Math.abs(d.qty), d.unit),
+        unit: d.unit,
       },
     ],
   };

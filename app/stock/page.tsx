@@ -35,8 +35,8 @@ import { useDevicePreview, useScrollState } from "@/components/device-preview";
 import { BackToTop, StickyToolbar } from "@/components/sticky-toolbar";
 import { HistoryList } from "@/components/stock/history-list";
 import { StockLogProvider, useStockLog } from "@/components/stock/stock-log";
-import { GoodsWaitingList } from "@/components/stock/goods-waiting-list";
-import { DateRangeSelect, type DateRange } from "@/components/date-select";
+import { GoodsWaitingList, WaitSearchRow } from "@/components/stock/goods-waiting-list";
+import { type DateRange } from "@/components/date-select";
 import { BulkMenu } from "@/components/stock/lot-menu";
 import { ProductCard } from "@/components/stock/stock-parts";
 import { FifoList, ZoneGroups } from "@/components/stock/lot-list";
@@ -579,31 +579,7 @@ function GeneralStockView() {
           {tab !== "stock" && (
             <>
               <StickyToolbar hidden={hidden} barRef={stickyRef}>
-                <div className="flex items-center gap-2 pt-2">
-                  <InputGroup className="min-w-0 flex-1 bg-card">
-                    <InputGroupAddon align="inline-start">
-                      <SearchIcon />
-                    </InputGroupAddon>
-                    <InputGroupInput
-                      placeholder="ค้นหา..."
-                      value={waitQuery}
-                      onChange={(e) => setWaitQuery(e.target.value)}
-                    />
-                  </InputGroup>
-                  {/* จอแคบช่องวันที่ลงไปอยู่บรรทัดของตัวเอง ช่องค้นหาจะได้ไม่หดจนพิมพ์ไม่ได้ */}
-                  <DateRangeSelect
-                    value={range}
-                    onValueChange={setRange}
-                    placeholder="วันที่"
-                    className="hidden w-64 shrink-0 @3xl:flex"
-                  />
-                </div>
-                <DateRangeSelect
-                  value={range}
-                  onValueChange={setRange}
-                  placeholder="วันที่"
-                  className="mt-2 @3xl:hidden"
-                />
+                <WaitSearchRow query={waitQuery} onQuery={setWaitQuery} range={range} onRange={setRange} />
 
                 <div
                   role="tablist"

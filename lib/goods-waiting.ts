@@ -59,8 +59,12 @@ export type WaitItem = {
   sub?: string;
   truck?: string;
   arriveDate?: string;
-  /** ข้อความยอดพร้อมหน่วย เช่น "800.00 ตัน" */
-  amount: string;
+  /** ใบผลิต: สั่งผลิตกับผลิตได้จริง (ตัวเลขล้วน หน่วยเดียวกับ qty) */
+  ordered?: string;
+  produced?: string;
+  /** ยอดรอ ตัวเลขล้วน เช่น "800.00" — หน่วยแยกไว้ใน unit */
+  qty: string;
+  unit: string;
   /** ภายนอก: รถคันนี้ชั่งน้ำหนักเสร็จแล้ว (ติ๊ก) หรือยังรอ (นาฬิกา) */
   weighed?: boolean;
 };
@@ -126,9 +130,12 @@ function fromInbound(d: GoodsInboundDoc): WaitDoc {
         {
           key: d.id,
           productName: d.productName,
-          tags: tagsOf(d),
-          sub: [d.line, d.round && `รอบ${d.round}`].filter(Boolean).join(" · "),
-          amount: `${formatInboundQty(d.qty, d.unit)} ${d.unit}`,
+          // ใบผลิตขึ้นไลน์แทนประเภท (ตามแบบ: ไลน์ 1 | Bulk | 50 กก.)
+          tags: [d.line, d.group, d.packing].filter(Boolean) as string[],
+          ordered: d.orderQty !== undefined ? formatInboundQty(d.orderQty, d.unit) : undefined,
+          produced: d.producedQty !== undefined ? formatInboundQty(d.producedQty, d.unit) : undefined,
+          qty: formatInboundQty(d.qty, d.unit),
+          unit: d.unit,
         },
       ],
     };
@@ -153,7 +160,8 @@ function fromInbound(d: GoodsInboundDoc): WaitDoc {
       sub: `${d.code}-${pad(i + 1)}`,
       truck: truckOf(d.truck ?? "-", i),
       arriveDate: d.arriveDate,
-      amount: `${formatInboundQty(q, d.unit)} ${d.unit}`,
+      qty: formatInboundQty(q, d.unit),
+      unit: d.unit,
       weighed: i === 0,
     })),
   };
@@ -187,7 +195,8 @@ function fromIssue(d: GoodsIssueDoc): WaitDoc {
       sub: external ? `${d.code}-${pad(i + 1)}` : undefined,
       truck: external ? truckOf(firstTruck, i) : undefined,
       arriveDate: external ? arrive : undefined,
-      amount: `${formatQty(q, d.unit)} ${d.unit}`,
+      qty: formatQty(q, d.unit),
+      unit: d.unit,
       weighed: external ? i === 0 : undefined,
     })),
   };
