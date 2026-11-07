@@ -23,9 +23,9 @@ import {
   ROW_HOVER_NAV,
   STICKY_HEAD,
   TableFrame,
-  TablePager,
   paginate,
 } from "@/components/stock/doc-parts";
+import { PAGE_SIZES, Pager } from "@/components/stock/goods-waiting-list";
 
 /**
  * รายการใบชั่งน้ำหนัก — จอกว้างเป็นตาราง จอแคบเป็นการ์ด ใช้ชิ้นส่วนร่วมชุด
@@ -37,8 +37,9 @@ import {
  *
  * คอลัมน์สุดท้าย: แท็บรอชั่ง = ยอดที่รอชั่ง ("-" = ยังไม่ระบุ)
  * แท็บชั่งแล้ว = น้ำหนักที่ชั่งได้จริง
+ *
+ * แบ่งหน้าแบบเต็ม (แถวต่อหน้า | เลขหน้า | ไปที่หน้า) ตัวเดียวกับแท็บรอรับเข้า
  */
-const PAGE_SIZE = 15;
 
 export function WeighingList({
   docs,
@@ -48,7 +49,8 @@ export function WeighingList({
   variant: "pending" | "weighed";
 }) {
   const [page, setPage] = React.useState(1);
-  const { pages, safe, slice } = paginate(docs, page, PAGE_SIZE);
+  const [size, setSize] = React.useState(PAGE_SIZES[0]);
+  const { pages, safe, slice } = paginate(docs, page, size);
   const router = useRouter();
 
   if (docs.length === 0) {
@@ -56,21 +58,22 @@ export function WeighingList({
   }
 
   const href = (id: string) => `/weighing/${id}`;
-  const valueOf = (d: WeighingDoc) => {
+  const tonOf = (d: WeighingDoc) => {
     const ton = variant === "pending" ? d.expectedTon : weighingNetTon(d);
-    return ton ? `${formatTon(ton)} ตัน` : "-";
+    return ton ? formatTon(ton) : undefined;
+  };
+  const valueOf = (d: WeighingDoc) => {
+    const ton = tonOf(d);
+    return ton ? `${ton} ตัน` : "-";
   };
 
   return (
-    <>
+    <div className="space-y-4">
       {/* ---------- จอแคบ: การ์ด ---------- */}
-      <div className="@3xl:hidden">
-        <div className="space-y-4">
-          {slice.map((d) => (
-            <WeighingCard key={d.id} doc={d} href={href(d.id)} value={valueOf(d)} variant={variant} />
-          ))}
-        </div>
-        <TablePager page={safe} pages={pages} onChange={setPage} />
+      <div className="space-y-4 @3xl:hidden">
+        {slice.map((d) => (
+          <WeighingCard key={d.id} doc={d} href={href(d.id)} ton={tonOf(d)} variant={variant} />
+        ))}
       </div>
 
       {/* ---------- จอกว้าง: ตาราง ---------- */}
@@ -127,53 +130,70 @@ export function WeighingList({
               ))}
             </TableBody>
           </Table>
-
-          <TablePager page={safe} pages={pages} onChange={setPage} />
         </TableFrame>
       </div>
-    </>
+
+      <Pager
+        page={safe}
+        pages={pages}
+        size={size}
+        onPage={setPage}
+        onSize={(n) => {
+          setSize(n);
+          setPage(1);
+        }}
+      />
+    </div>
   );
 }
 
+/**
+ * การ์ดจอแคบตามแบบ (Figma 64:70898)
+ *   เลขที่ใบ ··········· วันเวลา
+ *   กล่องส้ม: ชื่อสินค้า / ประเภท | หมวด | บรรจุภัณฑ์ / บริษัท
+ *   ทะเบียนรถ · วันที่รถจะเข้า · รอชั่ง (ตัน) — หัวข้อซ้าย ค่าชิดขวา หน่วยอยู่ในหัวข้อ
+ */
 function WeighingCard({
   doc,
   href,
-  value,
+  ton,
   variant,
 }: {
   doc: WeighingDoc;
   href: string;
-  value: string;
+  ton?: string;
   variant: "pending" | "weighed";
 }) {
+  const tags = [doc.category, doc.group, doc.packing].filter(Boolean) as string[];
   return (
     // ลิงก์คลุมทั้งใบด้วย after:inset-0 (ใน CardHead) — ทั้งการ์ดไปหน้าใบชั่ง
-    <div className="relative rounded-xl border border-border bg-card p-4">
+    <div className="relative space-y-4 rounded-xl border border-border bg-card p-4 shadow-sm">
       <CardHead code={doc.code} at={doc.createdAt} href={href} />
 
-      <CardBox className="mt-3">
-        <p className="font-medium">
+      <CardBox className="space-y-1 rounded-xl p-2 text-sm">
+        <p className="font-semibold">
           {doc.productName}
           {doc.productSub && ` ${doc.productSub}`}
         </p>
-        <p className="mt-0.5 text-sm text-muted-foreground">
-          {[doc.category, doc.group, doc.packing].filter(Boolean).join(" | ")}
-        </p>
-        <p className="mt-1 text-sm font-medium">{doc.supplier}</p>
+        {tags.length > 0 && (
+          <p className="flex flex-wrap items-center gap-x-2 gap-y-1">
+            {tags.map((t, i) => (
+              <React.Fragment key={t}>
+                {i > 0 && <span className="h-4 w-px bg-border" aria-hidden />}
+                <span>{t}</span>
+              </React.Fragment>
+            ))}
+          </p>
+        )}
+        <p className="truncate font-semibold">{doc.supplier}</p>
       </CardBox>
 
-      <CardBox className="mt-2">
-        <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 text-sm">
-          <span className="font-medium">{doc.plate}</span>
-          <span>
-            <span className="text-muted-foreground">วันที่รถจะเข้า: </span>
-            <span className="font-medium">{doc.arriveDate}</span>
-          </span>
-        </div>
-      </CardBox>
-
-      <dl className="mt-3 space-y-1.5 text-sm">
-        <CardRow label={variant === "pending" ? "รอชั่งน้ำหนัก" : "ชั่งน้ำหนัก"}>{value}</CardRow>
+      <dl className="space-y-2 text-sm">
+        <CardRow label="ทะเบียนรถ">{doc.plate}</CardRow>
+        <CardRow label="วันที่รถจะเข้า">{doc.arriveDate}</CardRow>
+        <CardRow label={`${variant === "pending" ? "รอชั่งน้ำหนัก" : "ชั่งน้ำหนัก"} (ตัน)`}>
+          {ton ?? "-"}
+        </CardRow>
       </dl>
     </div>
   );

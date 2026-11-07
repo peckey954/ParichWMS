@@ -53,7 +53,7 @@ import { EmptyDocs, StatusChip } from "./doc-parts";
      ท้ายการ์ด: N รายการ ··········· ชิปสถานะ
 ------------------------------------------------------------------ */
 
-const PAGE_SIZES = [10, 20, 50];
+export const PAGE_SIZES = [10, 20, 50];
 
 export function GoodsWaitingList({
   docs,
@@ -323,7 +323,7 @@ function ActionButton({ doc, withIcon }: { doc: WaitDoc; withIcon?: boolean }) {
  * แบ่งหน้าตามแบบ — แถวต่อหน้า | ก่อนหน้า 1 2 … ถัดไป | ไปที่หน้า
  * จอแคบเหลือแค่ปุ่มเลขหน้า แถวต่อหน้ากับไปที่หน้าซ่อนไว้ เพราะกว้างไม่พอ
  */
-function Pager({
+export function Pager({
   page,
   pages,
   size,
