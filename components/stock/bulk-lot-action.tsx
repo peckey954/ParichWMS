@@ -67,14 +67,18 @@ const CATEGORY_LABEL = Object.fromEntries(
 
 const pad = (n: number) => String(n).padStart(2, "0");
 
-/** เลขที่ใบกับเวลาเปิด — ใช้เวลาเครื่องผู้ใช้ จึงต่างจากฝั่งเซิร์ฟเวอร์ได้ไม่กี่วินาที */
+/** เลขที่ใบ — ใช้วันที่เครื่องผู้ใช้ */
 function openStamp(action: LotAction) {
   const d = new Date();
   const ymd = `${String(d.getFullYear()).slice(2)}${pad(d.getMonth() + 1)}${pad(d.getDate())}`;
-  return {
-    code: `${PREFIX[action]}${ymd}/01`,
-    at: `${d.getMonth() + 1}/${d.getDate()}/${d.getFullYear()} | ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`,
-  };
+  return { code: `${PREFIX[action]}${ymd}/01` };
+}
+
+/** น้ำหนักต่อชิ้นต่อท้าย ถ้าบรรจุภัณฑ์ยังไม่ได้บอก (Bulk) */
+function productTags(p: Product) {
+  const kg = p.lots.find((l) => l.kgPerPiece)?.kgPerPiece;
+  const weight = kg && !p.packing.includes("กก.") ? `${kg} กก.` : undefined;
+  return [CATEGORY_LABEL[p.category], p.packing, weight].filter((t): t is string => Boolean(t));
 }
 
 const lotLine = (l: Lot) => `รับ ${l.receivedAt} (${l.ageDays} วัน) · ${l.packNote}`;
@@ -245,9 +249,6 @@ function BulkSheet({ scope, action }: { scope: StockScope; action: LotAction }) 
         <h1 className="mt-4 text-2xl font-bold tracking-tight" suppressHydrationWarning>
           {TITLE[action]} {opened.code}
         </h1>
-        <p className="mt-1 text-sm text-muted-foreground" suppressHydrationWarning>
-          {opened.at}
-        </p>
 
         <div className="mt-5 space-y-5">
           {move && (
@@ -276,12 +277,13 @@ function BulkSheet({ scope, action }: { scope: StockScope; action: LotAction }) 
           {/* การ์ดสินค้า — ยอดรวมทั้งสินค้า กับยอดที่ใบนี้จะเปลี่ยน */}
           {product && (
             <section className="rounded-xl border border-border bg-card p-4">
-              <p className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                <span className="font-semibold">{product.name}</span>
-                {[CATEGORY_LABEL[product.category], product.packing].filter(Boolean).map((t) => (
+              <p className="font-semibold">{product.name}</p>
+              {/* ตามแบบ: ประเภท | บรรจุภัณฑ์ | น้ำหนักต่อชิ้น */}
+              <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
+                {productTags(product).map((t, i) => (
                   <React.Fragment key={t}>
-                    <span className="h-3.5 w-px bg-border" aria-hidden />
-                    <span className="text-sm">{t}</span>
+                    {i > 0 && <span className="h-3.5 w-px bg-border" aria-hidden />}
+                    <span>{t}</span>
                   </React.Fragment>
                 ))}
               </p>
@@ -296,11 +298,7 @@ function BulkSheet({ scope, action }: { scope: StockScope; action: LotAction }) 
 
           <CaptureTile
             scan={scan}
-            prompt={
-              product
-                ? `สแกนเลขที่ติดบนสินค้าเพื่อเพิ่ม Lot ของ ${product.name}`
-                : "สแกนเลขที่ติดบนสินค้าเพื่อเพิ่ม Lot"
-            }
+            prompt={move ? "สแกนเลขที่เพื่อเลือก Lot ที่จะย้าย" : "สแกนเลขที่เพื่อเลือก Lot ที่จะปรับปรุง"}
           />
 
           {rows.length === 0 ? (
@@ -414,7 +412,7 @@ function BulkSheet({ scope, action }: { scope: StockScope; action: LotAction }) 
                         </dd>
                       </div>
                     </dl>
-                    <div className="mt-3 flex items-start justify-between gap-3 border-t border-border pt-3">
+                    <div className="mt-3 flex items-start justify-between gap-3">
                       <Label htmlFor={`m-bulk-count-${r.lot.id}`} className="mt-2.5 font-normal text-muted-foreground">
                         {inputLabel}:
                       </Label>

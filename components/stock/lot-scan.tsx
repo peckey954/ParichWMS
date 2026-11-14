@@ -27,7 +27,7 @@ import {
      สแกนเลขที่สินค้า  เปิดกล้อง อ่านป้ายติดแล้วปิดเอง
      สแกนจากรูปภาพ    หยิบรูปป้ายที่ถ่ายไว้ เลือกได้หลายรูป อ่านแล้วทิ้งรูป
    ผลบอกด้วย toast ทีเดียวต่อรอบ (ไม่ใช่ต่อป้าย) — สำเร็จกี่ Lot ไม่พบกี่ป้าย
-   หน้ากล้องมีปุ่ม "เลือกรูปจากเครื่อง" ปิดกล้องแล้วเปิดคลังรูปต่อได้เลย
+   หน้ากล้องมีปุ่มรูปภาพมุมซ้ายล่าง ปิดกล้องแล้วเปิดคลังรูปต่อได้เลย
 
    reject (ถ้าส่งมา) ปัดตก Lot ที่เจอแต่ใช้ในใบนี้ไม่ได้ เช่นคนละสินค้า
    ขึ้นเป็น toast สีแดงแยกจากไม่พบ
@@ -367,7 +367,7 @@ export function ScannerDialog({ scan }: { scan: LotScanner }) {
           "flex flex-col gap-0 overflow-hidden p-0",
           isPhone
             ? "inset-0 h-dvh max-w-none translate-x-0 translate-y-0 rounded-none border-0"
-            : "sm:max-w-3xl"
+            : "h-[min(92dvh,900px)] sm:max-w-3xl"
         )}
       >
         <div className="flex items-start justify-between gap-2 px-6 pt-5 pb-4 max-sm:px-4">
@@ -379,20 +379,23 @@ export function ScannerDialog({ scan }: { scan: LotScanner }) {
             <XIcon />
           </Button>
         </div>
-        <Viewfinder
-          phase={{ kind: phase.kind === "rejected" ? "found" : phase.kind, code: phase.code }}
-          className={isPhone ? "min-h-0 flex-1" : "h-[min(58dvh,580px)]"}
-        >
-          {phase.kind === "aiming" && <SimulateToggle state={scan} options={scan.simulateOptions} dark />}
-        </Viewfinder>
-        <div className="flex flex-col items-center gap-3 p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
-          <p className="flex items-center gap-2 text-sm text-muted-foreground">
-            <Spinner className="size-4" />
-            กำลังค้นหาบาร์โค้ด...
-          </p>
-          <Button variant="outline-primary" className="bg-card" onClick={scan.pickPhotosFromScanner}>
+        {/* ภาพกล้องเต็มที่เหลือ — ทับดำ 40% ให้เห็นภาพกล้องอยู่ข้างใต้ มีแค่ปุ่มรูปภาพมุมซ้ายล่าง */}
+        <div className="relative min-h-0 flex-1">
+          <Viewfinder
+            phase={{ kind: phase.kind === "rejected" ? "found" : phase.kind, code: phase.code }}
+            className="h-full bg-black/40"
+          >
+            {phase.kind === "aiming" && <SimulateToggle state={scan} options={scan.simulateOptions} dark />}
+          </Viewfinder>
+          <Button
+            variant="outline"
+            size="icon"
+            className="absolute bottom-[max(1.5rem,env(safe-area-inset-bottom))] left-6 size-11 rounded-lg border-0 bg-black/60 text-white hover:bg-black/70 hover:text-white max-sm:left-4"
+            aria-label="เลือกรูปจากเครื่อง"
+            title="เลือกรูปจากเครื่อง"
+            onClick={scan.pickPhotosFromScanner}
+          >
             <ImageIcon />
-            เลือกรูปจากเครื่อง
           </Button>
         </div>
       </DialogContent>
