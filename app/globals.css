@@ -253,6 +253,12 @@
   }
 }
 
+/* กล้องสแกนเปิดอยู่ (components/stock/lot-scan.tsx ตั้ง data-scanning บน body)
+   — ซ่อน toast ทั้งหมด ไม่ให้แจ้งเตือนของแอปทับภาพกล้อง ปิดกล้องแล้วกลับมาเห็นตามปกติ */
+body[data-scanning] [data-sonner-toaster] {
+  display: none !important;
+}
+
 /* ไอคอนชิดขอบบนของหัวข้อ ไม่ใช่กึ่งกลางทั้งก้อน — ค่าเดิมของ sonner
    (align-items:center บน [data-sonner-toast]) ทำให้ไอคอนลอยลงมาอยู่กึ่งกลาง
    ระหว่างหัวข้อกับคำอธิบายตอนมีสองบรรทัด ดูเหมือนไอคอนไม่ตรงแถวกับหัวข้อ */

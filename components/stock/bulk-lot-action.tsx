@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { Trash2Icon } from "lucide-react";
+import { ScanBarcodeIcon, Trash2Icon } from "lucide-react";
 import { Badge } from "@peckey954/ui/components/ui/badge";
 import { Button } from "@peckey954/ui/components/ui/button";
 import { Input } from "@peckey954/ui/components/ui/input";
@@ -29,6 +29,7 @@ import { Crumbs } from "@/components/receiving/parts";
 import { TableFrame } from "@/components/stock/doc-parts";
 import { ACTOR, DECIMAL_UNITS, Field, SCOPES, type LotAction } from "./lot-action";
 import { CaptureTile, ScannerDialog, useLotScanner } from "./lot-scan";
+import { SimulateToggle } from "./zone-assign";
 import { appendStockLog, type StockScope } from "./stock-log";
 import {
   CATEGORIES,
@@ -141,12 +142,13 @@ function BulkSheet({ scope, action }: { scope: StockScope; action: LotAction }) 
     reject: (lot) => {
       const owner = ownerOf(lot.id);
       return product && owner && owner.id !== product.id
-        ? `เป็น ${owner.name} ไม่ใช่ ${product.name}`
+        ? `สินค้า ${owner.name}`
         : undefined;
     },
     rejectLabel: "คนละสินค้า",
     describe: (l) => `${l.code} · ${fmt(l.qty)} ${ownerOf(l.id)?.unit ?? unit}`,
     inputId: PHOTO_INPUT_ID,
+    continuous: true,
   });
 
   // สแกนได้เลย — เข้าหน้าแล้วเปิดกล้องทันที
@@ -246,9 +248,16 @@ function BulkSheet({ scope, action }: { scope: StockScope; action: LotAction }) 
       <main className="@container mx-auto w-full max-w-7xl flex-1 px-4 pt-6 pb-6 sm:px-6">
         <Crumbs trail={[{ label: home.label, href: home.href }, { label: TITLE[action] }]} />
 
-        <h1 className="mt-4 text-2xl font-bold tracking-tight" suppressHydrationWarning>
-          {TITLE[action]} {opened.code}
-        </h1>
+        {/* ปุ่มสแกนเดียวข้างหัวข้อ — ทางเพิ่ม Lot ทางเดียวเมื่อมี Lot แล้ว */}
+        <div className="mt-4 flex items-start justify-between gap-3">
+          <h1 className="text-2xl font-bold tracking-tight" suppressHydrationWarning>
+            {TITLE[action]} {opened.code}
+          </h1>
+          <Button variant="outline-primary" className="shrink-0 bg-card" onClick={() => scan.setScannerOpen(true)}>
+            <ScanBarcodeIcon />
+            สแกนสินค้า
+          </Button>
+        </div>
 
         <div className="mt-5 space-y-5">
           {move && (
@@ -296,23 +305,13 @@ function BulkSheet({ scope, action }: { scope: StockScope; action: LotAction }) 
             </section>
           )}
 
-          <CaptureTile
-            scan={scan}
-            prompt={move ? "สแกนเลขที่เพื่อเลือก Lot ที่จะย้าย" : "สแกนเลขที่เพื่อเลือก Lot ที่จะปรับปรุง"}
-          />
-
           {rows.length === 0 ? (
-            <div
-              className={cn(
-                "flex h-40 flex-col items-center justify-center gap-1 rounded-xl border bg-card text-center",
-                errors.lots ? "border-danger-strong" : "border-border"
-              )}
-            >
-              <p className="text-lg font-bold">ไม่มีข้อมูล</p>
-              <p className={errors.lots ? "text-danger-strong" : "text-muted-foreground"}>
-                {errors.lots ?? "สแกน Lot แรกเพื่อเริ่ม — Lot ต่อไปต้องเป็นสินค้าเดียวกัน"}
-              </p>
-            </div>
+            // ยังไม่มี Lot (ปิดกล้องไปก่อนสแกน) — กล่องสแกนแทนหน้าว่าง ลากรูปมาวางได้บนจอกว้าง
+            <CaptureTile
+              scan={scan}
+              prompt={move ? "สแกนเลขที่เพื่อเลือก Lot ที่จะย้าย" : "สแกนเลขที่เพื่อเลือก Lot ที่จะปรับปรุง"}
+              error={errors.lots}
+            />
           ) : (
             <>
               {/* ---------- จอกว้าง: ตาราง ---------- */}
@@ -426,6 +425,10 @@ function BulkSheet({ scope, action }: { scope: StockScope; action: LotAction }) 
                     </div>
                   </div>
                 ))}
+              </div>
+              {/* ของจำลอง — สลับผลของการสแกนครั้งถัดไป (เช่นคนละสินค้า) */}
+              <div className="flex justify-center">
+                <SimulateToggle state={scan} options={scan.simulateOptions} />
               </div>
             </>
           )}
