@@ -8,6 +8,7 @@ import {
   newCategoryId,
   newChangeId,
   newGroupId,
+  newLockId,
   newProductId,
   newWarehouseId,
   removeWarehouse,
@@ -42,7 +43,7 @@ type PrSetupCtx = {
   renameProduct: (id: string, name: string) => void;
   /** เปิด/ปิดใช้งานของชั้นโครง — เหตุผลเดียวกับสินค้า คือลบไม่ได้เพราะมีเอกสารอ้างอยู่ */
   setEntityEnabled: (
-    slice: "warehouses" | "categories" | "groups",
+    slice: "warehouses" | "categories" | "groups" | "locks",
     id: string,
     on: boolean,
   ) => void;
@@ -87,6 +88,12 @@ type PrSetupCtx = {
   addWarehouse: () => void;
   renameWarehouse: (id: string, label: string) => void;
   deleteWarehouse: (id: string) => void;
+  /** เพิ่มล็อคท้ายรายการของคลังนั้น หรือต่อจากล็อค after — คืนไอดีไว้ให้หน้าจอย้าย focus ไป */
+  addLock: (warehouseId: string, label?: string, after?: string) => string;
+  /** เพิ่มทีละหลายล็อค (วางรายชื่อจาก Excel) ต่อจากล็อค after */
+  addLocks: (warehouseId: string, labels: string[], after?: string) => void;
+  renameLock: (id: string, label: string) => void;
+  deleteLock: (id: string) => void;
   /** ไม่ระบุส่วน = คืนค่าเริ่มต้นทั้งหมด */
   reset: (slice?: SetupSlice) => void;
   dirty: Record<SetupSlice, boolean>;
@@ -102,7 +109,23 @@ type PrSetupCtx = {
  * ในตัว operation เองแล้ว การแยกบันทึกยังทำให้เปลี่ยนชื่อคลังหนึ่งอันไม่ต้องส่ง
  * สินค้าเป็นร้อยรายการขึ้นไปทั้งกอง
  */
-export type SetupSlice = "warehouses" | "categories" | "groups" | "products";
+export type SetupSlice =
+  | "warehouses"
+  | "locks"
+  | "categories"
+  | "groups"
+  | "products";
+
+/** แทรกของใหม่ต่อจากแถว after — ไม่มี after (หรือหาไม่เจอ) ต่อท้าย */
+function insertAfter<T extends { id: string }>(
+  list: T[],
+  after: string | undefined,
+  items: T[],
+): T[] {
+  const i = after ? list.findIndex((x) => x.id === after) : -1;
+  if (i === -1) return [...list, ...items];
+  return [...list.slice(0, i + 1), ...items, ...list.slice(i + 1)];
+}
 
 const Ctx = React.createContext<PrSetupCtx | null>(null);
 
@@ -434,10 +457,52 @@ export function PrSetupProvider({ children }: { children: React.ReactNode }) {
         );
         setSetup((s) => removeWarehouse(s, id));
       },
+      addLock: (warehouseId, label = "", after) => {
+        const id = newLockId(++seq.current);
+        setSetup((s) => ({
+          ...s,
+          locks: insertAfter(s.locks, after, [
+            { id, label, warehouseId, builtIn: false, enabled: true },
+          ]),
+        }));
+        return id;
+      },
+      addLocks: (warehouseId, labels, after) => {
+        if (labels.length === 0) return;
+        const added = labels.map((label) => ({
+          id: newLockId(++seq.current),
+          label,
+          warehouseId,
+          builtIn: false,
+          enabled: true,
+        }));
+        setSetup((s) => ({ ...s, locks: insertAfter(s.locks, after, added) }));
+        const wh = setup.warehouses.find((w) => w.id === warehouseId)?.label;
+        log("locks", "add", `${wh ?? ""} ${added.length} ล็อค`);
+      },
+      renameLock: (id, label) => {
+        const before = setup.locks.find((l) => l.id === id)?.label ?? "";
+        setSetup((s) => ({
+          ...s,
+          locks: s.locks.map((l) => (l.id === id ? { ...l, label } : l)),
+        }));
+        // แถวใหม่ที่เพิ่งพิมพ์ชื่อครั้งแรกคือการเพิ่ม ไม่ใช่เปลี่ยนชื่อ แต่ยุบรวม
+        // แบบเดียวกับ rename ได้ — appendChange จัดการให้แล้ว
+        log("locks", "rename", id, { from: before, to: label });
+      },
+      deleteLock: (id) => {
+        const l = setup.locks.find((x) => x.id === id);
+        // แถวว่างที่เพิ่งกดเพิ่มแล้วไม่ได้ใช้ ไม่ต้องรกประวัติ
+        if (l?.label.trim()) log("locks", "delete", l.label);
+        setSetup((s) => ({ ...s, locks: s.locks.filter((x) => x.id !== id) }));
+      },
       reset: (slice) => {
         log(slice ?? "categories", "reset", slice ? SETUP_SLICE_LABEL[slice] : "ทุกส่วน");
         if (!slice || slice === "warehouses") {
           setSetup((s) => ({ ...s, warehouses: DEFAULT_PR_SETUP.warehouses }));
+        }
+        if (!slice || slice === "locks") {
+          setSetup((s) => ({ ...s, locks: DEFAULT_PR_SETUP.locks }));
         }
         if (!slice || slice === "categories") {
           setSetup((s) => ({ ...s, categories: DEFAULT_PR_SETUP.categories }));
@@ -452,6 +517,8 @@ export function PrSetupProvider({ children }: { children: React.ReactNode }) {
         warehouses:
           JSON.stringify(setup.warehouses) !==
           JSON.stringify(DEFAULT_PR_SETUP.warehouses),
+        locks:
+          JSON.stringify(setup.locks) !== JSON.stringify(DEFAULT_PR_SETUP.locks),
         categories:
           JSON.stringify(setup.categories) !==
           JSON.stringify(DEFAULT_PR_SETUP.categories),

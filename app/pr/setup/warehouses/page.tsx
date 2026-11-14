@@ -1,7 +1,13 @@
 "use client";
 
 import * as React from "react";
-import { PlusIcon, Trash2Icon, WarehouseIcon } from "lucide-react";
+import Link from "next/link";
+import {
+  ChevronRightIcon,
+  PlusIcon,
+  Trash2Icon,
+  WarehouseIcon,
+} from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -72,6 +78,9 @@ export default function WarehousesPage() {
                 const used = setup.categories.filter((c) =>
                   c.warehouseIds.includes(w.id),
                 ).length;
+                const locks = setup.locks.filter(
+                  (l) => l.warehouseId === w.id,
+                ).length;
                 return (
                   <div
                     key={w.id}
@@ -86,12 +95,22 @@ export default function WarehousesPage() {
                       />
                     </InputGroup>
 
-                    <p className="flex items-center gap-2 text-sm text-muted-foreground">
-                      <WarehouseIcon className="size-4 shrink-0" />
-                      {used > 0
-                        ? `รับ ${used} ประเภทสินค้า`
-                        : "ยังไม่มีประเภทไหนส่งเข้าคลังนี้"}
-                    </p>
+                    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
+                      <p className="flex items-center gap-2 text-muted-foreground">
+                        <WarehouseIcon className="size-4 shrink-0" />
+                        {used > 0
+                          ? `รับ ${used} ประเภทสินค้า`
+                          : "ยังไม่มีประเภทไหนส่งเข้าคลังนี้"}
+                      </p>
+                      {/* ล็อคจัดการแยกหน้า — คลังหนึ่งมีได้หลายสิบล็อค ใส่ในแถวนี้ไม่พอ */}
+                      <Link
+                        href={`/pr/setup/locks?wh=${w.id}`}
+                        className="flex items-center gap-1 font-medium text-primary hover:underline"
+                      >
+                        {locks > 0 ? `${locks} ล็อค` : "ยังไม่มีล็อค — เพิ่ม"}
+                        <ChevronRightIcon className="size-4" />
+                      </Link>
+                    </div>
 
                     <Button
                       variant="outline"
@@ -130,7 +149,7 @@ export default function WarehousesPage() {
             <AlertDialogTitle>ลบคลังนี้?</AlertDialogTitle>
             <AlertDialogDescription>
               &quot;{confirm?.label || "(ยังไม่ได้ตั้งชื่อ)"}&quot;
-              จะถูกปลดออกจากทุกประเภทที่ส่งของเข้าคลังนี้ สินค้าไม่หาย
+              จะถูกปลดออกจากทุกประเภทที่ส่งของเข้าคลังนี้ และล็อคทั้งหมดในคลังนี้ถูกลบไปด้วย สินค้าไม่หาย
               แต่ประเภทที่เหลือคลังเดียวอาจกลายเป็นไม่มีปลายทาง
             </AlertDialogDescription>
           </AlertDialogHeader>

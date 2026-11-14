@@ -226,7 +226,8 @@ export const MODULES: ModuleItem[] = [
     id: "pr-setup",
     group: "settings",
     label: "ตั้งค่าคลังสินค้า",
-    description: "คลัง ประเภทสินค้าที่ขอซื้อได้ หมวดสินค้า และรายการสินค้าในแต่ละคลัง",
+    description:
+      "คลัง ล็อคในแต่ละคลัง ประเภทสินค้าที่ขอซื้อได้ หมวดสินค้า และรายการสินค้าในแต่ละคลัง",
     code: "FM-ST-01-05",
     icon: "warehouse",
     href: "/pr/setup",

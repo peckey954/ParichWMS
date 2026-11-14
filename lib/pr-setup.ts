@@ -16,6 +16,8 @@ import {
   PR_PRODUCTS,
   type PrStatus,
 } from "@/lib/pr";
+import { ZONES } from "@/lib/general-stock";
+import { GOODS_ZONES } from "@/lib/goods-stock";
 
 export type Warehouse = {
   id: string;
@@ -91,30 +93,89 @@ export const DEFAULT_GROUPS: ProductGroup[] = [
   { id: "grp-label", label: "ฉลากสินค้า", builtIn: true , enabled: true },
 ];
 
+/**
+ * ล็อค — ตำแหน่งเก็บของในคลัง (เดิมเรียกโซน) เช่น A-9M, B-2L
+ *
+ * หนึ่งล็อคอยู่คลังเดียว เพราะเป็นพื้นที่จริงบนพื้นโกดัง ไม่ใช่ป้ายที่แปะได้หลายที่
+ * ต่างจากประเภทที่ไปได้หลายคลัง ชื่อจึงซ้ำกันได้ข้ามคลัง (A-9M ของสต็อกทั่วไป
+ * กับ A-9M ของสต็อกสินค้าคือคนละที่) แต่ห้ามซ้ำในคลังเดียวกัน
+ */
+export type StorageLock = {
+  id: string;
+  label: string;
+  /** คลังที่ล็อคนี้อยู่ อ้าง Warehouse.id */
+  warehouseId: string;
+  /** ล็อคที่มากับระบบ — อาจมีของวางอยู่ ลบแล้วของในล็อคนั้นไม่มีที่อยู่ */
+  builtIn: boolean;
+  /** ปิดใช้งานแทนลบ — ของที่วางอยู่ยังอ่านได้ แต่ย้ายเข้ามาใหม่ไม่ได้ */
+  enabled: boolean;
+};
+
+/** ล็อคตั้งต้น — สต็อกทั่วไปกับสต็อกสินค้าเอาจากรายการที่หน้าสต็อกใช้อยู่จริง
+ *  สต็อกวัตถุดิบยังไม่มีหน้าสต็อก จึงใส่ชุดตัวอย่างไว้ให้เห็นว่าแต่ละคลังมีของตัวเอง */
+const DEFAULT_LOCK_NAMES: Record<string, string[]> = {
+  "stock-general": ZONES,
+  "stock-raw": ["R-1", "R-2", "R-3M", "R-4M"],
+  "stock-fg": GOODS_ZONES,
+};
+
+export const DEFAULT_LOCKS: StorageLock[] = Object.entries(
+  DEFAULT_LOCK_NAMES,
+).flatMap(([warehouseId, names]) =>
+  names.map((label) => ({
+    id: `lock-${warehouseId}-${label}`,
+    label,
+    warehouseId,
+    builtIn: true,
+    enabled: true,
+  })),
+);
+
 export type PrSetup = {
   categories: PrCategorySetting[];
   warehouses: Warehouse[];
   groups: ProductGroup[];
+  locks: StorageLock[];
 };
 
 export const DEFAULT_PR_SETUP: PrSetup = {
   categories: DEFAULT_PR_CATEGORIES,
   warehouses: DEFAULT_WAREHOUSES,
   groups: DEFAULT_GROUPS,
+  locks: DEFAULT_LOCKS,
 };
+
+/** เทียบชื่อล็อคแบบไม่สนตัวพิมพ์/ช่องว่าง — "a-9m" กับ "A-9M " คือล็อคเดียวกัน */
+export const lockKey = (label: string) =>
+  label.trim().toLowerCase().replace(/\s+/g, "");
+
+/** ไอดีของล็อคที่ชื่อซ้ำกับล็อคอื่นในคลังเดียวกัน — ชื่อว่างไม่นับ */
+export function duplicateLockIds(locks: StorageLock[]): Set<string> {
+  const seen = new Map<string, string[]>();
+  for (const l of locks) {
+    const k = lockKey(l.label);
+    if (!k) continue;
+    const key = `${l.warehouseId}|${k}`;
+    seen.set(key, [...(seen.get(key) ?? []), l.id]);
+  }
+  return new Set([...seen.values()].filter((ids) => ids.length > 1).flat());
+}
 
 /** ไอดีใหม่จากตัวนับที่ส่งเข้ามา ไม่ใช่ Date.now/Math.random — สองตัวนั้นทำให้
  *  ฝั่งเซิร์ฟเวอร์กับเบราว์เซอร์ได้คนละค่า แล้ว hydration พัง */
 export const newCategoryId = (seq: number) => `cat-${seq}`;
 export const newWarehouseId = (seq: number) => `wh-${seq}`;
 export const newGroupId = (seq: number) => `grp-${seq}`;
+export const newLockId = (seq: number) => `lock-${seq}`;
 
 /** ลบคลังต้องดึงออกจากทุกประเภทที่อ้างถึงด้วย ไม่งั้นจะเหลือ id ค้างที่ชี้ไป
- *  คลังที่ไม่มีอยู่แล้ว ซึ่งมองจากหน้าจอไม่เห็นเลยว่าพัง */
+ *  คลังที่ไม่มีอยู่แล้ว ซึ่งมองจากหน้าจอไม่เห็นเลยว่าพัง
+ *  ล็อคของคลังนั้นหายไปด้วย — ล็อคอยู่นอกคลังไม่ได้ */
 export function removeWarehouse(setup: PrSetup, warehouseId: string): PrSetup {
   return {
     ...setup,
     warehouses: setup.warehouses.filter((w) => w.id !== warehouseId),
+    locks: setup.locks.filter((l) => l.warehouseId !== warehouseId),
     categories: setup.categories.map((c) => ({
       ...c,
       warehouseIds: c.warehouseIds.filter((id) => id !== warehouseId),
@@ -505,6 +566,7 @@ export const SETUP_ACTION_LABEL: Record<SetupAction, string> = {
 
 export const SETUP_SLICE_LABEL: Record<string, string> = {
   warehouses: "คลัง",
+  locks: "ล็อค",
   categories: "ประเภทสินค้า",
   groups: "หมวดสินค้า",
   products: "สินค้า",

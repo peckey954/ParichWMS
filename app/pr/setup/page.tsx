@@ -6,6 +6,7 @@ import {
   ClipboardPlusIcon,
   HistoryIcon,
   LayersIcon,
+  MapPinIcon,
   PackageIcon,
   TableIcon,
   WarehouseIcon,
@@ -46,6 +47,9 @@ export default function PrSetupHubPage() {
   const orphanCategories = categoriesWithoutWarehouse(setup).length;
   const uncategorized = products.filter((p) => p.categoryId === "").length;
   const ungrouped = products.filter((p) => p.groupId === "").length;
+  const emptyWarehouses = setup.warehouses.filter(
+    (w) => !setup.locks.some((l) => l.warehouseId === w.id),
+  );
 
   const cards = [
     {
@@ -56,6 +60,18 @@ export default function PrSetupHubPage() {
       count: `${setup.warehouses.length} คลัง`,
       warn: null as string | null,
       dirty: dirty.warehouses,
+    },
+    {
+      href: "/pr/setup/locks",
+      icon: MapPinIcon,
+      label: "ล็อค",
+      description: "ตำแหน่งเก็บของในแต่ละคลัง (เดิมเรียกโซน)",
+      count: `${setup.locks.length} ล็อค ใน ${setup.warehouses.length} คลัง`,
+      warn:
+        emptyWarehouses.length > 0
+          ? `${emptyWarehouses.map((w) => w.label || "(ยังไม่ได้ตั้งชื่อ)").join(", ")} ยังไม่มีล็อค`
+          : null,
+      dirty: dirty.locks,
     },
     {
       href: "/pr/setup/categories",
