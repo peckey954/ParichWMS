@@ -60,10 +60,10 @@ import {
 /* ------------------------------------------------------------------
    ใบรับเข้าสินค้า — ภายนอก (PO) หรือ ผลิต (PD) ตาม Figma Tab 2.1 / 2.2
 
-   หัวใบต่างกันตามแหล่ง ส่วนล่างเหมือนกัน: สลิงที่รับมาแล้ว รอเลือกโซน
-   ปุ่ม "เลือกโซนรับเข้า" ไปหน้าเลือกโซน (สแกน/เลือกจากรายการ)
+   หัวใบต่างกันตามแหล่ง ส่วนล่างเหมือนกัน: สลิงที่รับมาแล้ว รอเลือกล็อค
+   ปุ่ม "เลือกล็อครับเข้า" ไปหน้าเลือกล็อค (สแกน/เลือกจากรายการ)
 
-   บันทึก — เลือกโซนครบทุกสลิง = รับเข้าเสร็จ ใบออกจากแท็บรอรับเข้า ไปอยู่ในประวัติ
+   บันทึก — เลือกล็อคครบทุกสลิง = รับเข้าเสร็จ ใบออกจากแท็บรอรับเข้า ไปอยู่ในประวัติ
             ยังไม่ครบ = เตือนก่อน บันทึกได้ แต่ใบยังค้างที่รอรับเข้า
 ------------------------------------------------------------------ */
 
@@ -95,7 +95,7 @@ function ReceiptSheet({ receipt }: { receipt: GoodsInboundReceipt }) {
       closeGoodsInbound(receipt);
       toast.success("รับเข้าสินค้าสำเร็จ", { description: `${production ? "ใบผลิต" : "ใบสั่งซื้อ"}: ${doc.code}` });
     } else {
-      toast.success("บันทึกแล้ว ยังเลือกโซนไม่ครบ", {
+      toast.success("บันทึกแล้ว ยังเลือกล็อคไม่ครบ", {
         description: `เหลือ ${waiting} สลิง ใบยังอยู่ที่รอรับเข้า`,
       });
     }
@@ -237,10 +237,10 @@ function ReceiptSheet({ receipt }: { receipt: GoodsInboundReceipt }) {
             <div className="mt-5 flex flex-wrap items-center justify-between gap-3">
               <h2 className="font-semibold">{tab === "in" ? "รับเข้าสินค้าต่อสลิง" : "สลิงที่ยกเลิก"}</h2>
               {live.length === 0 ? (
-                <Button disabled>เลือกโซนรับเข้า</Button>
+                <Button disabled>เลือกล็อครับเข้า</Button>
               ) : (
                 <Button asChild>
-                  <Link href={`/stock/goods/inbound/${doc.id}/zone`}>เลือกโซนรับเข้า</Link>
+                  <Link href={`/stock/goods/inbound/${doc.id}/zone`}>เลือกล็อครับเข้า</Link>
                 </Button>
               )}
             </div>
@@ -271,13 +271,13 @@ function ReceiptSheet({ receipt }: { receipt: GoodsInboundReceipt }) {
         </div>
       </div>
 
-      {/* บันทึกทั้งที่ยังมีสลิงไม่มีโซน — ทำได้ แต่ต้องรู้ก่อนว่าใบยังค้างที่รอรับเข้า */}
+      {/* บันทึกทั้งที่ยังมีสลิงไม่มีล็อค — ทำได้ แต่ต้องรู้ก่อนว่าใบยังค้างที่รอรับเข้า */}
       <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
         <AlertDialogContent size="sm" className="data-[size=sm]:max-w-[22rem]">
           <AlertDialogHeader>
-            <AlertDialogTitle>พบสินค้าที่ยังไม่ได้เลือกโซน</AlertDialogTitle>
+            <AlertDialogTitle>พบสินค้าที่ยังไม่ได้เลือกล็อค</AlertDialogTitle>
             <AlertDialogDescription>
-              สินค้าบางรายการยังไม่ได้เลือกโซน หากบันทึกรายการจะยังคงอยู่ในสถานะรอรับเข้า
+              สินค้าบางรายการยังไม่ได้เลือกล็อค หากบันทึกรายการจะยังคงอยู่ในสถานะรอรับเข้า
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -314,7 +314,7 @@ function SlipList({ rows, external, unit }: { rows: GoodsSlip[]; external: boole
           <div key={s.id} className="rounded-xl border border-border bg-card p-4">
             <div className="flex items-center justify-between gap-2">
               <span className="font-semibold">{s.receiptCode}</span>
-              {s.zone ? <ZoneCell zone={s.zone} /> : <span className="text-sm text-muted-foreground">ยังไม่มีโซน</span>}
+              {s.zone ? <ZoneCell zone={s.zone} /> : <span className="text-sm text-muted-foreground">ยังไม่มีล็อค</span>}
             </div>
             <p className="mt-1 text-sm text-muted-foreground">{s.createdAt}</p>
             <Separator className="my-3" />
@@ -343,7 +343,7 @@ function SlipList({ rows, external, unit }: { rows: GoodsSlip[]; external: boole
                     คอนเทนเนอร์
                   </TableHead>
                 )}
-                <TableHead>โซน</TableHead>
+                <TableHead>ล็อค</TableHead>
                 {external && <TableHead>บรรจุภัณฑ์</TableHead>}
                 <TableHead className="text-right">
                   ปริมาณรับเข้าต่อสลิง

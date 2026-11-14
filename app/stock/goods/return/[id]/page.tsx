@@ -50,14 +50,14 @@ import { GOODS_ZONES } from "@/lib/goods-stock";
    รับคืนสินค้า — ใบขอคืน (ภายใน/ภายนอก/กวาดพื้น) ตาม Figma Tab 3
 
    ใบขอคืนมากับ Lot แล้ว (ของที่เคยจ่ายออกจาก Lot ไหน ก็คืนเข้า Lot นั้น)
-   คลังกรอกเฉพาะที่คืนจริง กับเลือกโซนที่จะเก็บกลับต่อ Lot
-   ช่องคืนตั้งต้นเท่ายอดขอคืน ส่วนใหญ่แค่เลือกโซนแล้วบันทึก
+   คลังกรอกเฉพาะที่คืนจริง กับเลือกล็อคที่จะเก็บกลับต่อ Lot
+   ช่องคืนตั้งต้นเท่ายอดขอคืน ส่วนใหญ่แค่เลือกล็อคแล้วบันทึก
 
    สินค้าตัน: กรอกทั้งปริมาณ (ตัน) และจำนวน (ชิ้น) แยกกัน เพราะของคืนอาจ
    ไม่เต็มถุง — กล่องส้มบอกค่าเฉลี่ยต่อชิ้นให้เห็นว่าผิดสังเกตไหม
    สินค้าชิ้น/ขวด: มีแต่จำนวน
 
-   กวาดพื้นไม่มี Lot (ของตกหล่นไม่รู้มาจากไหน) — ปริมาณช่องเดียวกับโซนรับเข้า
+   กวาดพื้นไม่มี Lot (ของตกหล่นไม่รู้มาจากไหน) — ปริมาณช่องเดียวกับล็อครับเข้า
 
    คืนน้อยกว่าที่ขอ ต้องใส่เหตุผลในหมายเหตุ (เช่น สูญหาย)
 ------------------------------------------------------------------ */
@@ -120,7 +120,7 @@ function ReturnSheet({ doc }: { doc: GoodsIssueDoc }) {
           : count > lot.count
             ? `เกินที่ขอคืน ${formatCount(lot.count)}`
             : undefined;
-    const zoneError = v.zone ? undefined : "เลือกโซน";
+    const zoneError = v.zone ? undefined : "เลือกล็อค";
     return { lot, v, qty, count, qtyError, countError, zoneError };
   });
 
@@ -219,7 +219,7 @@ function ReturnSheet({ doc }: { doc: GoodsIssueDoc }) {
               />
               <div className="space-y-1.5">
                 <Label htmlFor="sweep-zone" className={cn(tried && !sweepZone && "text-danger-strong")}>
-                  โซนรับเข้า
+                  ล็อครับเข้า
                 </Label>
                 <ZoneSelect
                   id="sweep-zone"
@@ -227,7 +227,7 @@ function ReturnSheet({ doc }: { doc: GoodsIssueDoc }) {
                   onChange={setSweepZone}
                   invalid={tried && !sweepZone}
                 />
-                {tried && !sweepZone && <p className="text-sm text-danger-strong">เลือกโซน</p>}
+                {tried && !sweepZone && <p className="text-sm text-danger-strong">เลือกล็อค</p>}
               </div>
             </div>
           ) : (
@@ -326,7 +326,7 @@ function ZoneSelect({
         aria-invalid={invalid || undefined}
         className={cn("w-full bg-card", invalid && "border-danger-strong", className)}
       >
-        <SelectValue placeholder="เลือกโซน" />
+        <SelectValue placeholder="เลือกล็อค" />
       </SelectTrigger>
       <SelectContent>
         {GOODS_ZONES.map((z) => (
@@ -401,7 +401,7 @@ function ReturnTable({ rows, unit, byCount, withCount, tried, decimals, onChange
                   (ชิ้น)
                 </TableHead>
               )}
-              <TableHead className="w-44">โซน</TableHead>
+              <TableHead className="w-44">ล็อค</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -503,7 +503,7 @@ function ReturnCards({ rows, unit, byCount, withCount, tried, decimals, onChange
                 />
               </CardField>
             )}
-            <CardField id={`m-zone-${r.lot.id}`} label="โซน:">
+            <CardField id={`m-zone-${r.lot.id}`} label="ล็อค:">
               <div className="w-40">
                 <ZoneSelect
                   id={`m-zone-${r.lot.id}`}

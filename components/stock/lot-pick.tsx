@@ -41,7 +41,7 @@ import {
      สแกนจากรูปภาพ    หยิบรูปป้ายที่ถ่ายไว้ เลือกได้หลายรูป อ่านแล้วทิ้งรูป
      เลือก Lot        ดรอปดาวน์ค้นหาได้ ติ๊กได้หลาย Lot
 
-   กล้องกับรูปใช้ชิ้นส่วนชุดเดียวกับหน้าเลือกโซนรับเข้า (zone-assign)
+   กล้องกับรูปใช้ชิ้นส่วนชุดเดียวกับหน้าเลือกล็อครับเข้า (zone-assign)
    ผลบอกด้วย toast ด้านบน 3 วินาที ไม่ทับปุ่มบันทึก/ย้อนกลับ
 
    Lot ที่เพิ่มเข้ามาตั้งจำนวนจ่ายให้เลย เท่าที่ยังขาดจากยอดขอเบิก
@@ -358,7 +358,7 @@ function LotTable({ state }: { state: LotPick }) {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead className="w-24">โซน</TableHead>
+              <TableHead className="w-24">ล็อค</TableHead>
               <TableHead>Lot</TableHead>
               <TableHead className="text-right">
                 คงเหลือในคลัง

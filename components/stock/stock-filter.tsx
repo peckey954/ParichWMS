@@ -63,7 +63,7 @@ export const isStockDefault = (v: StockView) =>
  */
 export const STOCK_SORTS: SortOption<StockSort>[] = [
   { id: "product", label: "สินค้า", asc: "ก → ฮ", desc: "ฮ → ก" },
-  { id: "zone", label: "โซน", asc: "A → Z", desc: "Z → A" },
+  { id: "zone", label: "ล็อค", asc: "A → Z", desc: "Z → A" },
   { id: "fifo", label: "FIFO", asc: "เก่าสุดก่อน", desc: "ใหม่สุดก่อน" },
 ];
 

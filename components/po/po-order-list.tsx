@@ -210,7 +210,7 @@ function PoOrderPanel({
           </span>
         </div>
 
-        {/* กันคลิกลอยไม่ให้ทะลุไปนำทางทั้งใบ — โซนนี้แค่ดูสถานะ/สลับมุมมอง
+        {/* กันคลิกลอยไม่ให้ทะลุไปนำทางทั้งใบ — ล็อคนี้แค่ดูสถานะ/สลับมุมมอง
             จอแคบเหลือแค่ลูกศร — จำนวนรายการ/ชิปสถานะย้ายไปท้ายการ์ดแทน */}
         <div className="flex shrink-0 items-center gap-3" onClick={(e) => e.stopPropagation()}>
           <span className="hidden text-sm whitespace-nowrap text-foreground @3xl:inline">

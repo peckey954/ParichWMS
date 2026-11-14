@@ -225,15 +225,15 @@ export default function DesignSystemPage() {
                 <Input id="lot" placeholder="PO260116/01-04" />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="zone">โซนจัดเก็บ</Label>
+                <Label htmlFor="zone">ล็อคจัดเก็บ</Label>
                 <Select>
                   <SelectTrigger id="zone" className="w-full">
-                    <SelectValue placeholder="เลือกโซน" />
+                    <SelectValue placeholder="เลือกล็อค" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="a">โซน A — สินค้าหมุนเร็ว</SelectItem>
-                    <SelectItem value="b">โซน B — สินค้าทั่วไป</SelectItem>
-                    <SelectItem value="c">โซน C — ควบคุมอุณหภูมิ</SelectItem>
+                    <SelectItem value="a">ล็อค A — สินค้าหมุนเร็ว</SelectItem>
+                    <SelectItem value="b">ล็อค B — สินค้าทั่วไป</SelectItem>
+                    <SelectItem value="c">ล็อค C — ควบคุมอุณหภูมิ</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

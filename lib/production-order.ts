@@ -107,7 +107,7 @@ export const SEED_ORDER: ProductionOrder = {
 /** ล็อตหนึ่งก้อนของวัตถุดิบที่เลือกเพิ่มได้ — ใช้เลือกได้หลายล็อตพร้อมกันในกล่องเพิ่มสินค้า */
 export type LotOption = {
   code: string;
-  /** โซนที่เก็บในคลัง เช่น A-9M */
+  /** ล็อคที่เก็บในคลัง เช่น A-9M */
   zone: string;
   /** วันที่รับเข้า แบบ ISO — แสดงผลผ่าน formatDate */
   receivedAt: string;

@@ -299,7 +299,7 @@ function SlipTable({ rows, external }: { rows: HistoryLine[]; external: boolean 
               <TableRow>
                 <TableHead className={HEAD_FIRST}>เลขที่รับสินค้า</TableHead>
                 {external && <TableHead>เบอร์ตู้คอนเทนเนอร์</TableHead>}
-                <TableHead>โซน</TableHead>
+                <TableHead>ล็อค</TableHead>
                 {external && <TableHead>บรรจุภัณฑ์</TableHead>}
                 <TableHead className="text-right">ปริมาณรับเข้าต่อสลิง (ตัน)</TableHead>
                 <TableHead className="text-right">จำนวนรับเข้าต่อสลิง (ชิ้น)</TableHead>
@@ -520,7 +520,7 @@ type LotCol = { label: string; get: (l: HistoryLine) => string };
 
 /**
  * Lot ที่หยิบออก/คืนเข้า — จอกว้างเป็นตาราง จอแคบเป็นการ์ดต่อ Lot
- * จ่ายออกวางโซนไว้หน้าสุด (หยิบตามโซน) รับคืนวางโซนท้ายสุด (ของกลับไปที่ไหน)
+ * จ่ายออกวางล็อคไว้หน้าสุด (หยิบตามล็อค) รับคืนวางล็อคท้ายสุด (ของกลับไปที่ไหน)
  */
 function LotTable({
   lines,
@@ -570,14 +570,14 @@ function LotTable({
           <Table>
             <TableHeader>
               <TableRow>
-                {zoneFirst && <TableHead className="w-24">โซน</TableHead>}
+                {zoneFirst && <TableHead className="w-24">ล็อค</TableHead>}
                 <TableHead>Lot</TableHead>
                 {cols.map((c) => (
                   <TableHead key={c.label} className="text-right">
                     {c.label}
                   </TableHead>
                 ))}
-                {!zoneFirst && <TableHead>โซน</TableHead>}
+                {!zoneFirst && <TableHead>ล็อค</TableHead>}
               </TableRow>
             </TableHeader>
             <TableBody>

@@ -226,7 +226,7 @@ export function HistoryDocList({ scope, rows }: { scope: StockScope; rows: Histo
 /* ------------------------------------------------------------------
    หน้าดูย้าย / ปรับปรุง ที่ทำไปแล้ว (Figma: ดูข้อมูลประวัติ - ปรับปรุงสต็อก)
 
-   ใบเดียว Lot เดียว: การ์ดสินค้ามีเลข Lot กับโซนอยู่ขวา แล้วรายละเอียดเรียงแนวนอน
+   ใบเดียว Lot เดียว: การ์ดสินค้ามีเลข Lot กับล็อคอยู่ขวา แล้วรายละเอียดเรียงแนวนอน
    หลาย Lot: การ์ดสินค้าเป็นยอดรวม แล้วตาราง Lot เหมือนตอนบันทึก
    อ่านอย่างเดียว ปุ่มเดียวคือย้อนกลับ
 ------------------------------------------------------------------ */
@@ -288,7 +288,7 @@ function LotHistorySheet({ scope, rows }: { scope: StockScope; rows: HistoryRow[
           <StatusChip status={s.key} label={s.label} />
         </p>
 
-        {/* การ์ดสินค้า — ใบเดียวมีเลข Lot กับโซนอยู่ขวา หลาย Lot มีแค่ยอดรวม */}
+        {/* การ์ดสินค้า — ใบเดียวมีเลข Lot กับล็อคอยู่ขวา หลาย Lot มีแค่ยอดรวม */}
         <section className="mt-5 rounded-xl border border-border bg-card p-4">
           <div className="flex flex-col gap-3 @3xl:flex-row @3xl:items-center @3xl:justify-between @3xl:gap-6">
             <p className="flex flex-wrap items-center gap-x-2 gap-y-1">
@@ -327,7 +327,7 @@ function LotHistorySheet({ scope, rows }: { scope: StockScope; rows: HistoryRow[
                   <TableHeader>
                     <TableRow className="[&>th]:py-2 [&>th]:align-bottom [&>th]:whitespace-pre-line">
                       <TableHead>Lot</TableHead>
-                      <TableHead className="w-28">โซน</TableHead>
+                      <TableHead className="w-28">ล็อค</TableHead>
                       <TableHead className="w-28">บรรจุภัณฑ์</TableHead>
                       <TableHead className="w-32 text-right">{stockLabel.replace(" (", "\n(")}</TableHead>
                       <TableHead className="w-32 text-right">{amountLabel.replace(" (", "\n(")}</TableHead>
@@ -385,7 +385,7 @@ function LotHistorySheet({ scope, rows }: { scope: StockScope; rows: HistoryRow[
 
         {/* รายละเอียดเรียงแนวนอนบนจอกว้าง ซ้อนลงมาบนจอแคบ */}
         <dl className={cn("mt-5 grid gap-5 @3xl:gap-6", move ? "@3xl:grid-cols-4" : "@3xl:grid-cols-3")}>
-          {move && <Stat label="โซนที่ต้องการย้าย">{r0.zoneTo ?? "-"}</Stat>}
+          {move && <Stat label="ล็อคที่ต้องการย้าย">{r0.zoneTo ?? "-"}</Stat>}
           <Stat label={move ? `จำนวนที่ต้องการย้าย (${pieceUnit})` : `นับจำนวนจริง (${pieceUnit})`}>
             {formatQty(piecesTotal)}
           </Stat>
@@ -435,7 +435,7 @@ function Row({ label, children, className }: { label: string; children: React.Re
   );
 }
 
-/** ป้ายโซน — ย้ายแสดงต้นทาง → ปลายทางในป้ายเดียว */
+/** ป้ายล็อค — ย้ายแสดงต้นทาง → ปลายทางในป้ายเดียว */
 function ZoneMove({ from, to }: { from: string; to?: string }) {
   return (
     <Badge appearance="soft" className="shrink-0 gap-1.5 whitespace-nowrap">

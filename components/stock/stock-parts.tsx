@@ -133,7 +133,7 @@ function ChipScroller({ children }: { children: React.ReactNode }) {
 }
 
 /**
- * ป้ายโซน — รหัสตำแหน่งในคลัง ตัวอักษรสีแบรนด์บนพื้นเทาอ่อน
+ * ป้ายล็อค — รหัสตำแหน่งในคลัง ตัวอักษรสีแบรนด์บนพื้นเทาอ่อน
  * ไม่ระบุฟอนต์ จึงรับ font-sans (Sarabun) ต่อมาจากข้างบน
  */
 function ZoneTag({ zone }: { zone: string }) {
@@ -296,7 +296,7 @@ export function ProductCard({
 
           {/* บรรทัดนับ เป็นข้อความเฉย ๆ ไม่ใช่ปุ่ม ปุ่มหุบ/กางย้ายไปอยู่ท้ายการ์ด */}
           <p className="mt-2 text-sm text-muted-foreground">
-            {product.lots.length} รายการ · {zoneCount(product)} โซน
+            {product.lots.length} รายการ · {zoneCount(product)} ล็อค
           </p>
         </div>
 

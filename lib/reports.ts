@@ -138,7 +138,7 @@ export const REPORT_TYPES: ReportType[] = [
     prefix: "ADJ",
     code: "FM-ST-01-02",
     partyLabel: "ผู้ทำรายการ",
-    refLabel: "โซนที่ปรับ",
+    refLabel: "ล็อคที่ปรับ",
     hasAmount: true,
   },
 

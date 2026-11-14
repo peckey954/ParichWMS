@@ -81,17 +81,17 @@ import {
    ตารางข้างล่างคือ "หนึ่งแถว = หนึ่งชิ้นที่รับเข้า" แต่ละชิ้นมีเลขที่รับสินค้า
    ของตัวเองที่พิมพ์ติดไปกับของจริง
 
-   โซนไม่ได้กรอกตอนรับของ — คนละคนคนละเวลา คนรับของยืนอยู่หน้าโกดัง
-   ส่วนคนเก็บของเข้าโซนมาทีหลัง ชิ้นที่ยังไม่มีโซนจึงเป็นสถานะปกติที่รอได้
-   ปุ่ม "เลือกโซนรับเข้า" คือทางเข้าของงานนั้น และเป็นปุ่มเดียวของหน้านี้
-   (Flow เพิ่มโซน ใน Figma)
+   ล็อคไม่ได้กรอกตอนรับของ — คนละคนคนละเวลา คนรับของยืนอยู่หน้าโกดัง
+   ส่วนคนเก็บของเข้าล็อคมาทีหลัง ชิ้นที่ยังไม่มีล็อคจึงเป็นสถานะปกติที่รอได้
+   ปุ่ม "เลือกล็อครับเข้า" คือทางเข้าของงานนั้น และเป็นปุ่มเดียวของหน้านี้
+   (Flow เพิ่มล็อค ใน Figma)
 
-   บันทึกที่แถบล่าง — เลือกโซนครบทุกชิ้น = รับเข้าเสร็จ ใบออกจากแท็บรอรับเข้า
+   บันทึกที่แถบล่าง — เลือกล็อคครบทุกชิ้น = รับเข้าเสร็จ ใบออกจากแท็บรอรับเข้า
    ยังไม่ครบ = เตือนก่อน บันทึกได้ แต่ใบยังค้างอยู่ที่รอรับเข้า
 ------------------------------------------------------------------ */
 
 const STATUS_CHIP: Record<PieceStatus, string> = {
-  // รอระบุโซน = งานที่ยังไม่จบ ใช้เหลืองชุดเดียวกับสถานะรออื่น ๆ ทั้งแอป
+  // รอระบุล็อค = งานที่ยังไม่จบ ใช้เหลืองชุดเดียวกับสถานะรออื่น ๆ ทั้งแอป
   waitingZone:
     "[--bdg-surface:var(--chip-yellow)] [--bdg-text:var(--chip-yellow-foreground)]",
   stocked:
@@ -122,7 +122,7 @@ export default function InboundReceiptPage() {
   );
 
   if (!receipt) return <NotFound />;
-  // key กันสถานะโซนที่แก้ไว้ค้างข้ามใบ ตอนเปลี่ยน id ในแถบที่อยู่
+  // key กันสถานะล็อคที่แก้ไว้ค้างข้ามใบ ตอนเปลี่ยน id ในแถบที่อยู่
   return <ReceiptSheet key={receipt.doc.id} receipt={receipt} />;
 }
 
@@ -132,7 +132,7 @@ function ReceiptSheet({ receipt }: { receipt: InboundReceipt }) {
   const router = useRouter();
   const { doc, meta } = receipt;
 
-  // โซนที่หน้าเลือกโซนบันทึกไว้ ใบที่สร้างใหม่ตอนเปิดหน้านี้อ่านมาให้แล้ว
+  // ล็อคที่หน้าเลือกล็อคบันทึกไว้ ใบที่สร้างใหม่ตอนเปิดหน้านี้อ่านมาให้แล้ว
   const pieces: InboundPiece[] = receipt.pieces;
   const [tab, setTab] = React.useState<TabId>("live");
   const [confirmOpen, setConfirmOpen] = React.useState(false);
@@ -150,7 +150,7 @@ function ReceiptSheet({ receipt }: { receipt: InboundReceipt }) {
         description: `ใบสั่งซื้อ: ${doc.code}`,
       });
     } else {
-      toast.success("เลือกโซนรับเข้าสำเร็จ", {
+      toast.success("เลือกล็อครับเข้าสำเร็จ", {
         description: `${live.length - waiting} รายการ`,
       });
     }
@@ -268,13 +268,13 @@ function ReceiptSheet({ receipt }: { receipt: InboundReceipt }) {
         {/* ---------- รอบการรับเข้าสินค้า ---------- */}
         <div className="mt-8 flex flex-wrap items-center justify-between gap-3">
           <h2 className="text-lg font-semibold">รอบการรับเข้าสินค้า</h2>
-          {/* หน้าเลือกโซนเป็นหน้าเต็มทั้งจอคอมและมือถือ — รายการคือของที่ต้อง
+          {/* หน้าเลือกล็อคเป็นหน้าเต็มทั้งจอคอมและมือถือ — รายการคือของที่ต้อง
               กวาดตาหามากที่สุด ไม่ควรมองผ่านช่องกล่อง */}
           {live.length === 0 ? (
-            <Button disabled>เลือกโซนรับเข้า</Button>
+            <Button disabled>เลือกล็อครับเข้า</Button>
           ) : (
             <Button asChild>
-              <Link href={`/stock/inbound/${doc.id}/zone`}>เลือกโซนรับเข้า</Link>
+              <Link href={`/stock/inbound/${doc.id}/zone`}>เลือกล็อครับเข้า</Link>
             </Button>
           )}
         </div>
@@ -322,7 +322,7 @@ function ReceiptSheet({ receipt }: { receipt: InboundReceipt }) {
                       <TableHead className="min-w-40">
                         เบอร์ตู้คอนเทนเนอร์
                       </TableHead>
-                      <TableHead className="min-w-24">โซน</TableHead>
+                      <TableHead className="min-w-24">ล็อค</TableHead>
                       <TableHead className="min-w-28">บรรจุภัณฑ์</TableHead>
                       <TableHead className="min-w-36 text-right">
                         ปริมาณรับเข้าต่อชิ้น ({doc.orderUnit})
@@ -361,13 +361,13 @@ function ReceiptSheet({ receipt }: { receipt: InboundReceipt }) {
         </div>
       </div>
 
-      {/* บันทึกทั้งที่ยังมีชิ้นไม่มีโซน — ทำได้ แต่ต้องรู้ก่อนว่าใบยังค้างที่รอรับเข้า */}
+      {/* บันทึกทั้งที่ยังมีชิ้นไม่มีล็อค — ทำได้ แต่ต้องรู้ก่อนว่าใบยังค้างที่รอรับเข้า */}
       <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
         <AlertDialogContent size="sm" className="data-[size=sm]:max-w-[22rem]">
           <AlertDialogHeader>
-            <AlertDialogTitle>พบสินค้าที่ยังไม่ได้เลือกโซน</AlertDialogTitle>
+            <AlertDialogTitle>พบสินค้าที่ยังไม่ได้เลือกล็อค</AlertDialogTitle>
             <AlertDialogDescription>
-              สินค้าบางรายการยังไม่ได้เลือกโซน
+              สินค้าบางรายการยังไม่ได้เลือกล็อค
               หากบันทึกรายการจะยังคงอยู่ในสถานะรอรับเข้า
             </AlertDialogDescription>
           </AlertDialogHeader>
@@ -510,7 +510,7 @@ function PieceCard({ piece: p, unit }: { piece: InboundPiece; unit: string }) {
 
       <CardBox className="mt-3 flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
         <span className="text-sm">
-          โซน:{" "}
+          ล็อค:{" "}
           <span className="font-semibold">
             {p.zone ?? "ยังไม่ระบุ"}
           </span>

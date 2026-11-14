@@ -39,7 +39,7 @@ export const ACTOR = "อลิสา พรสุขสิริ";
 /* ------------------------------------------------------------------
    หน้าย้ายสต็อก / ปรับปรุงสต็อก ของล็อตหนึ่ง — เปิดจากเมนู ⋮ ของแถวล็อต
 
-   เป็นหน้าเต็ม ไม่ใช่กล่อง: บนมือถือฟอร์มมีช่องเลือกโซน ช่องจำนวน และหมายเหตุ
+   เป็นหน้าเต็ม ไม่ใช่กล่อง: บนมือถือฟอร์มมีช่องเลือกล็อค ช่องจำนวน และหมายเหตุ
    กล่องลอยแล้วคีย์บอร์ดบังครึ่งจอ หน้าเต็มเลื่อนได้ปกติ ปุ่มบันทึกติดล่างเสมอ
 
    ใช้หน้าเดียวกันทั้งสต็อกทั่วไปและสต็อกสินค้า — รู้ว่าเป็นของคลังไหนจากล็อตเอง
@@ -111,7 +111,7 @@ function LotSheet({
   const diff = countDiff(lot, counted);
 
   const errors = {
-    zone: move && submitted && !zone ? "กรุณาเลือกโซน" : undefined,
+    zone: move && submitted && !zone ? "กรุณาเลือกล็อค" : undefined,
     pieces: move
       ? pieces > max
         ? `กรุณาระบุจำนวนไม่เกินสต็อกที่มีอยู่ ${formatQty(max)} ${pieceUnit}`
@@ -182,7 +182,7 @@ function LotSheet({
 
         <h1 className="mt-4 text-2xl font-bold tracking-tight">{TITLE[action]}</h1>
 
-        {/* การ์ดล็อต — จอกว้าง: โซน+สินค้าซ้าย เลขล็อต+วันที่รับขวา / จอแคบ: เส้นคั่นแล้วเรียงลงมา */}
+        {/* การ์ดล็อต — จอกว้าง: ล็อค+สินค้าซ้าย เลขล็อต+วันที่รับขวา / จอแคบ: เส้นคั่นแล้วเรียงลงมา */}
         <section className="mt-5 rounded-xl border border-border bg-card p-4">
           <div className="flex flex-col @3xl:flex-row @3xl:items-center @3xl:justify-between @3xl:gap-6">
             <div className="flex min-w-0 items-center gap-2 border-b border-border pb-4 @3xl:border-0 @3xl:pb-0">
@@ -226,14 +226,14 @@ function LotSheet({
           <div className="grid gap-5 @3xl:grid-cols-2 @3xl:gap-4">
             {move ? (
               <>
-                <Field id="move-zone" label="โซนที่ต้องการย้าย" error={errors.zone}>
+                <Field id="move-zone" label="ล็อคที่ต้องการย้าย" error={errors.zone}>
                   <Select value={zone} onValueChange={setZone}>
                     <SelectTrigger
                       id="move-zone"
                       aria-invalid={Boolean(errors.zone)}
                       className={cn("w-full bg-card", errors.zone && "border-danger-strong")}
                     >
-                      <SelectValue placeholder="เลือกโซน" />
+                      <SelectValue placeholder="เลือกล็อค" />
                     </SelectTrigger>
                     <SelectContent>
                       {home.zones

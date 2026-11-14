@@ -42,11 +42,11 @@ import { toast } from "sonner";
 import { ZONES, formatQty, type InboundPiece } from "@/lib/general-stock";
 
 /* ------------------------------------------------------------------
-   เลือกโซนรับเข้า — ตาม Flow เพิ่มโซน ใน Figma (Tab 2.2 Stock-In Choose Zone)
+   เลือกล็อครับเข้า — ตาม Flow เพิ่มล็อค ใน Figma (Tab 2.2 Stock-In Choose Zone)
 
    คนที่ทำงานนี้ไม่ใช่คนเดียวกับคนที่รับของหน้าโกดัง และมาทำทีหลัง ลำดับที่ทำจริงคือ
 
-     1  ยืนอยู่หน้าโซนไหน เลือกโซนนั้นไว้ก่อน
+     1  ยืนอยู่หน้าล็อคไหน เลือกล็อคนั้นไว้ก่อน
      2  ไล่สแกนเลขที่ติดบนของที่กำลังจะวางลงตรงนั้น หรือค้นหาเลขแล้วติ๊กจากรายการ
      3  กดบันทึกครั้งเดียวให้ทุกชิ้นที่เลือกไว้
 
@@ -162,7 +162,7 @@ export function useZoneAssign(
   const visible = q
     ? pieces.filter((p) => p.receiptCode.toUpperCase().includes(q))
     : pieces;
-  /** ชิ้นที่ยังไม่มีโซนในรายการที่เห็นอยู่ตอนนี้ — ปุ่มเลือกรวดเดียวทำแค่เท่าที่เห็น */
+  /** ชิ้นที่ยังไม่มีล็อคในรายการที่เห็นอยู่ตอนนี้ — ปุ่มเลือกรวดเดียวทำแค่เท่าที่เห็น */
   const waiting = visible.filter((p) => !p.zone);
 
   const isAllPicked = (list: InboundPiece[]) =>
@@ -200,7 +200,7 @@ export function useZoneAssign(
     setQuery("");
   };
 
-  /** เปลี่ยนโซนหลังยืนยันแล้ว — ของที่ติ๊กไว้เป็นของโซนเดิม ล้างทิ้งทั้งหมด */
+  /** เปลี่ยนล็อคหลังยืนยันแล้ว — ของที่ติ๊กไว้เป็นของล็อคเดิม ล้างทิ้งทั้งหมด */
   const changeZone = (next: string) => {
     clearAll();
     setZone(next);
@@ -275,7 +275,7 @@ export function useZoneAssign(
   /**
    * เลขที่ที่ "กล้อง" จะอ่านได้ในรอบนี้
    *
-   * โหมดเจอ: หยิบชิ้นที่ยังไม่ได้เลือกและยังไม่มีโซนก่อน null คือไม่เหลือให้เลือกแล้ว
+   * โหมดเจอ: หยิบชิ้นที่ยังไม่ได้เลือกและยังไม่มีล็อคก่อน null คือไม่เหลือให้เลือกแล้ว
    * โหมดไม่พบ: เลขหน้าตาเหมือนของในใบ แต่ไม่ตรงกับชิ้นไหน
    */
   const mockRead = (): string | null => {
@@ -413,7 +413,7 @@ export function useZoneAssign(
 
 export type ZoneAssign = ReturnType<typeof useZoneAssign>;
 
-/** ตัวหน้าจอทั้งชุด ตั้งแต่โซนลงไปถึงรายการ */
+/** ตัวหน้าจอทั้งชุด ตั้งแต่ล็อคลงไปถึงรายการ */
 export function ZoneAssignFields({
   state,
   listClassName,
@@ -423,15 +423,15 @@ export function ZoneAssignFields({
   listClassName?: string;
 }) {
   const { pieces, picked, visible, waiting } = state;
-  /** โซนที่กำลังจะเปลี่ยนไป — รอคนยืนยันก่อนเพราะของที่ติ๊กไว้จะหายหมด */
+  /** ล็อคที่กำลังจะเปลี่ยนไป — รอคนยืนยันก่อนเพราะของที่ติ๊กไว้จะหายหมด */
   const [pendingZone, setPendingZone] = React.useState<string>();
 
   return (
     <div className="space-y-4">
-      {/* ---------- โซนปลายทาง ----------
-           อยู่บนสุด เพราะลำดับที่คนทำจริงคือยืนอยู่หน้าโซนก่อน แล้วค่อยไล่สแกน */}
+      {/* ---------- ล็อคปลายทาง ----------
+           อยู่บนสุด เพราะลำดับที่คนทำจริงคือยืนอยู่หน้าล็อคก่อน แล้วค่อยไล่สแกน */}
       <div className="space-y-2">
-        <Label htmlFor="zone-target">โซน</Label>
+        <Label htmlFor="zone-target">ล็อค</Label>
         <Select
           value={state.zone}
           onValueChange={(v) => {
@@ -441,7 +441,7 @@ export function ZoneAssignFields({
           }}
         >
           <SelectTrigger id="zone-target" className="w-full bg-card">
-            <SelectValue placeholder="เลือกโซนรับเข้า" />
+            <SelectValue placeholder="เลือกล็อครับเข้า" />
           </SelectTrigger>
           <SelectContent>
             {ZONES.map((z) => (
@@ -497,7 +497,7 @@ export function ZoneAssignFields({
             disabled={waiting.length === 0}
             onClick={() => state.toggleAll(waiting)}
           >
-            เลือกที่ยังไม่มีโซน ({waiting.length})
+            เลือกที่ยังไม่มีล็อค ({waiting.length})
           </ActionChip>
         </div>
 
@@ -555,7 +555,7 @@ export function ZoneAssignFields({
 
       <ScannerDialog state={state} />
 
-      {/* ---------- เปลี่ยนโซนทั้งที่ติ๊กของไว้แล้ว ---------- */}
+      {/* ---------- เปลี่ยนล็อคทั้งที่ติ๊กของไว้แล้ว ---------- */}
       <AlertDialog
         open={pendingZone !== undefined}
         onOpenChange={(o) => !o && setPendingZone(undefined)}
@@ -563,10 +563,10 @@ export function ZoneAssignFields({
         <AlertDialogContent size="sm" className="data-[size=sm]:max-w-[22rem]">
           <AlertDialogHeader>
             <AlertDialogTitle>
-              พบข้อมูลมีการเลือกโซนไว้ก่อนหน้าแล้ว
+              พบข้อมูลมีการเลือกล็อคไว้ก่อนหน้าแล้ว
             </AlertDialogTitle>
             <AlertDialogDescription>
-              หากเปลี่ยนโซน ข้อมูลที่เลือกไว้ก่อนหน้าจะถูกล้าง
+              หากเปลี่ยนล็อค ข้อมูลที่เลือกไว้ก่อนหน้าจะถูกล้าง
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -577,7 +577,7 @@ export function ZoneAssignFields({
                 setPendingZone(undefined);
               }}
             >
-              เปลี่ยนโซน
+              เปลี่ยนล็อค
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -623,7 +623,7 @@ function CaptureTiles({ state }: { state: ZoneAssign }) {
       )}
       <p className="font-medium">
         {!state.reading
-          ? "สแกนเลขที่เพื่อเลือกโซนรับสินค้าเข้าคลัง"
+          ? "สแกนเลขที่เพื่อเลือกล็อครับสินค้าเข้าคลัง"
           : state.reading.total > 1
             ? `กำลังอ่านรูปที่ ${state.reading.done + 1} จาก ${state.reading.total}...`
             : "กำลังอ่านบาร์โค้ดจากรูป..."}
@@ -729,7 +729,7 @@ export function SimulateToggle<S extends string = Simulate>({
    กล่องสแกน — ภาพจำลองของกล้อง
 
    จอคอมเป็นกล่องกลางจอ มือถือเต็มจอ ทั้งสองแบบมีแค่ "กำลังค้นหาบาร์โค้ด..."
-   อ่านติดแล้วปิดเอง ผลไปบอกที่หน้าเลือกโซน
+   อ่านติดแล้วปิดเอง ผลไปบอกที่หน้าเลือกล็อค
 ------------------------------------------------------------------ */
 
 type ScanPhase =
@@ -758,7 +758,7 @@ function ScannerDialog({ state }: { state: ZoneAssign }) {
     const t = setTimeout(() => {
       const { outcome, piece } = live.current.applyCode(code);
       setPhase({ kind: outcome, code, piece });
-      // ไม่ค้างหน้ากล้อง อ่านติดแล้วปิดเอง ผลไปบอกที่หน้าเลือกโซน
+      // ไม่ค้างหน้ากล้อง อ่านติดแล้วปิดเอง ผลไปบอกที่หน้าเลือกล็อค
       if (outcome === "empty") toast.info("เลือกครบทุกชิ้นในใบนี้แล้ว");
       live.current.setScannerOpen(false);
     }, AIM_MS);
@@ -822,7 +822,7 @@ export function ResultCard({
   tone: "ok" | "error";
   title: string;
   detail?: string;
-  /** undefined = ไม่โชว์ป้ายโซน, null = ชิ้นนั้นยังไม่มีโซน */
+  /** undefined = ไม่โชว์ป้ายล็อค, null = ชิ้นนั้นยังไม่มีล็อค */
   zone?: string | null;
   aside?: React.ReactNode;
   onManual?: () => void;
@@ -1010,7 +1010,7 @@ function ActionChip({
   );
 }
 
-/** โซนปัจจุบันของชิ้นหนึ่ง — ยังไม่มีโซนคือสถานะปกติ ไม่ใช่ข้อมูลขาด */
+/** ล็อคปัจจุบันของชิ้นหนึ่ง — ยังไม่มีล็อคคือสถานะปกติ ไม่ใช่ข้อมูลขาด */
 function ZoneTag({ zone }: { zone?: string }) {
   if (!zone)
     return (
@@ -1018,7 +1018,7 @@ function ZoneTag({ zone }: { zone?: string }) {
         appearance="outline"
         className="shrink-0 bg-card whitespace-nowrap"
       >
-        ยังไม่มีโซน
+        ยังไม่มีล็อค
       </Badge>
     );
   return (
@@ -1066,12 +1066,12 @@ function PieceRow({
             {!p.correct && " · ไม่ถูกต้อง"}
           </span>
         </span>
-        {/* ชิ้นที่มีโซนแล้วยังเลือกได้ แต่ต้องเห็นก่อนว่ากำลังย้ายของที่เก็บไปแล้ว */}
+        {/* ชิ้นที่มีล็อคแล้วยังเลือกได้ แต่ต้องเห็นก่อนว่ากำลังย้ายของที่เก็บไปแล้ว */}
         {p.zone ? (
           <ZoneTag zone={p.zone} />
         ) : (
           <span className="shrink-0 text-xs whitespace-nowrap text-muted-foreground">
-            ยังไม่มีโซน
+            ยังไม่มีล็อค
           </span>
         )}
       </label>

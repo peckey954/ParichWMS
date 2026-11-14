@@ -22,7 +22,7 @@ import {
 /* ------------------------------------------------------------------
    สต็อก CWIP — ของที่เบิกมาไว้ที่ไลน์แล้วยังไม่ได้ใช้หมด
 
-   จัดเป็นสินค้า > ล็อต เพราะของชิ้นเดียวกันมาจากหลายล็อตหลายโซน
+   จัดเป็นสินค้า > ล็อต เพราะของชิ้นเดียวกันมาจากหลายล็อตหลายล็อค
    และการคืนกลับคลังทำเป็นล็อต ไม่ใช่ทำรวมทั้งสินค้า
 
    ปุ่มจึงอยู่ที่แถวของแต่ละล็อต ไม่ใช่ปุ่มระดับหน้า
@@ -125,7 +125,7 @@ export function PackingCwip({
   );
 }
 
-/** ป้ายโซน — ข้อความสีแบรนด์บนพื้นเทาอ่อน ตามที่ตกลงกันไว้ในหน้าสต็อก */
+/** ป้ายล็อค — ข้อความสีแบรนด์บนพื้นเทาอ่อน ตามที่ตกลงกันไว้ในหน้าสต็อก */
 function ZoneTag({ zone }: { zone: string }) {
   return (
     <span className="shrink-0 rounded-md bg-secondary px-2.5 py-0.5 text-sm font-semibold text-primary">
@@ -135,7 +135,7 @@ function ZoneTag({ zone }: { zone: string }) {
 }
 
 /**
- * แถวล็อตของโหมดโซนกับ FIFO — หน่วยของรายการคือล็อต ไม่ใช่สินค้า
+ * แถวล็อตของโหมดล็อคกับ FIFO — หน่วยของรายการคือล็อต ไม่ใช่สินค้า
  * ชื่อสินค้าจึงย้ายเข้ามาอยู่ในแถว
  *
  * ป้ายอยู่บรรทัดของตัวเองใต้ชื่อ ไม่ต่อท้ายชื่อ
@@ -157,7 +157,7 @@ function FlatLotRow({
 }) {
   const act = (what: string) =>
     toast.success(`${what} — ${product.name}`, {
-      description: `ล็อต ${lot.code} · โซน ${lot.zone}`,
+      description: `ล็อต ${lot.code} · ล็อค ${lot.zone}`,
     });
 
   const qty = (
@@ -285,7 +285,7 @@ function ProductCard({
             )}
           </div>
           <p className="mt-1 text-sm text-muted-foreground">
-            {p.lots.length} รายการ · {cwipZones(p)} โซน
+            {p.lots.length} รายการ · {cwipZones(p)} ล็อค
           </p>
         </div>
 
@@ -326,7 +326,7 @@ function LotRow({
 }) {
   const act = (what: string) =>
     toast.success(`${what} — ${product}`, {
-      description: `ล็อต ${l.code} · โซน ${l.zone}`,
+      description: `ล็อต ${l.code} · ล็อค ${l.zone}`,
     });
 
   const qty = (
@@ -340,14 +340,14 @@ function LotRow({
     <div className="p-4">
       {/* วางแบบเดียวกับล็อตในหน้าสต็อกทั่วไป
           จอกว้าง: ข้อมูล | ปุ่ม | ยอด อยู่แถวเดียว
-          จอแคบ: ยอดขึ้นไปอยู่ขวาของบรรทัดโซน แล้วปุ่มลงมาเต็มความกว้างข้างล่าง
+          จอแคบ: ยอดขึ้นไปอยู่ขวาของบรรทัดล็อค แล้วปุ่มลงมาเต็มความกว้างข้างล่าง
           ยอดต้องอยู่มุมบนขวาเสมอ ไม่ใช่ไหลไปอยู่ใต้ปุ่ม
           เพราะคนกวาดตาหาตัวเลขที่ขอบขวาของหัวแถว ไม่ได้ไล่อ่านจากล่างขึ้นบน */}
       <div className="flex flex-col @2xl:flex-row @2xl:items-center @2xl:justify-between @2xl:gap-3">
         <div className="min-w-0 flex-1">
           <div className="flex items-start justify-between gap-3">
             <div className="flex min-w-0 flex-wrap items-center gap-2">
-              {/* โซนเป็นข้อความสีแบรนด์ ไม่ใช่ชิป ตามที่ตกลงกันไว้ในหน้าสต็อก */}
+              {/* ล็อคเป็นข้อความสีแบรนด์ ไม่ใช่ชิป ตามที่ตกลงกันไว้ในหน้าสต็อก */}
               <span className="rounded-md bg-secondary px-2.5 py-0.5 font-semibold text-primary">
                 {l.zone}
               </span>

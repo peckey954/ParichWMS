@@ -26,12 +26,12 @@ import {
 } from "@/lib/general-stock";
 
 /* ------------------------------------------------------------------
-   เลือกโซนรับเข้า — หน้าเต็ม ทั้งจอคอมและมือถือ (Flow เพิ่มโซน ใน Figma)
+   เลือกล็อครับเข้า — หน้าเต็ม ทั้งจอคอมและมือถือ (Flow เพิ่มล็อค ใน Figma)
 
    รายการคือสิ่งที่ต้องกวาดตาหามากที่สุดในงานนี้ จึงเป็นหน้าของตัวเอง
    ไม่ใช่กล่องบนหน้าใบรับเข้า กล้องสแกนเปิดเป็นกล่องบนหน้านี้ได้โดยไม่ซ้อนกล่องอื่น
 
-   เข้ามาได้จากปุ่ม "เลือกโซนรับเข้า" ในหน้าใบรับเข้า และเปิดตรงจากลิงก์ได้ด้วย
+   เข้ามาได้จากปุ่ม "เลือกล็อครับเข้า" ในหน้าใบรับเข้า และเปิดตรงจากลิงก์ได้ด้วย
    เพราะอ่านใบจาก id ในที่อยู่เอง ไม่ได้รอรับของจากหน้าก่อนหน้า
 ------------------------------------------------------------------ */
 
@@ -57,7 +57,7 @@ function ZoneSheet({ receipt }: { receipt: InboundReceipt }) {
     const ids = [...state.picked];
     // เก็บลงที่ที่หน้าใบรับเข้าอ่านเจอ ไม่ใช่ state ของหน้านี้ที่ตายตอนออกจากหน้า
     setPieceZones(ids, state.zone);
-    toast.success("เลือกโซนรับเข้าสำเร็จ", {
+    toast.success("เลือกล็อครับเข้าสำเร็จ", {
       description: `${ids.length} รายการ`,
     });
     router.push(`/stock/inbound/${doc.id}`);
@@ -69,16 +69,16 @@ function ZoneSheet({ receipt }: { receipt: InboundReceipt }) {
         <Crumbs docId={doc.id} />
 
         <h1 className="mt-4 text-2xl font-semibold tracking-tight">
-          เลือกโซนรับเข้า
+          เลือกล็อครับเข้า
         </h1>
         <p className="mt-1.5 text-sm text-muted-foreground">
-          เลือกโซนแล้วสแกนเลขที่ติดบนสินค้าหรือเลือกจากรายการ
+          เลือกล็อคแล้วสแกนเลขที่ติดบนสินค้าหรือเลือกจากรายการ
         </p>
 
         <div className="mt-5">
           {/* รายการยังเลื่อนอยู่ในกรอบของตัวเอง ไม่ปล่อยยาวไปตามหน้า
               ห้าสิบชิ้นเรียงลงไปทั้งหน้าแปลว่าต้องเลื่อนผ่านมันทุกครั้งที่จะกลับ
-              ไปแก้โซนข้างบน */}
+              ไปแก้ล็อคข้างบน */}
           <ZoneAssignFields state={state} listClassName="max-h-[55svh]" />
         </div>
       </main>
@@ -143,7 +143,7 @@ function Crumbs({ docId }: { docId?: string }) {
         <BreadcrumbSeparator />
         <BreadcrumbItem>
           <BreadcrumbPage className="text-primary">
-            เลือกโซนรับเข้า
+            เลือกล็อครับเข้า
           </BreadcrumbPage>
         </BreadcrumbItem>
       </BreadcrumbList>
