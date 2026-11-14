@@ -24,10 +24,13 @@ import {
    ย้าย/ปรับปรุงหลายรายการ (bulk-lot-action)
 
    สองทางเข้า ได้ผลเดียวกันคือ Lot ถูกเพิ่มเข้ารายการ
-     สแกนเลขที่สินค้า  เปิดกล้อง อ่านป้ายติดแล้วปิดเอง
-                       (continuous: กล้องค้างไว้ สแกนต่อได้เรื่อยๆ ผลขึ้นบนกล้อง กด "เสร็จ" ปิดเอง)
+     สแกนเลขที่สินค้า  เปิดกล้อง อ่านทีละป้าย ติดแล้วปิดเอง
      สแกนจากรูปภาพ    หยิบรูปป้ายที่ถ่ายไว้ เลือกได้หลายรูป อ่านแล้วทิ้งรูป
-   ผลบอกด้วย toast ทีเดียวต่อรอบ (ไม่ใช่ต่อป้าย) — สำเร็จกี่ Lot ไม่พบกี่ป้าย
+   ผลบอก (ตามแบบ Figma)
+     กล้อง   อ่านไม่ผ่าน (ไม่พบ/คนละสินค้า) ขึ้นการ์ดแดงบนกล้อง กล้องยังเปิดให้สแกนใหม่
+             อ่านผ่านแล้วปิดกล้อง กลับหน้าพร้อม toast "สแกนสำเร็จ"
+     รูป     ผ่านหมด = toast "สแกนสำเร็จ N รายการ" / ไม่ผ่านเลย = toast "สแกนไม่สำเร็จ"
+             ผ่านบางส่วน = modal สรุปเลข Lot ที่ผ่าน กับจำนวนที่ไม่ผ่าน
    หน้ากล้องมีปุ่มรูปภาพมุมขวาล่าง ปิดกล้องแล้วเปิดคลังรูปต่อได้เลย
 
    reject (ถ้าส่งมา) ปัดตก Lot ที่เจอแต่ใช้ในใบนี้ไม่ได้ เช่นคนละสินค้า
@@ -39,10 +42,12 @@ import {
 ------------------------------------------------------------------ */
 
 type Via = "scan" | "photo";
-type Simulate = "found" | "notfound" | "rejected";
+type Simulate = "found" | "notfound" | "rejected" | "partial";
 type Outcome = "found" | "already" | "notfound" | "rejected" | "empty";
 
 const READ_MS = 900;
+/** การ์ดแดงค้างบนกล้องก่อนเล็งใหม่ */
+const RETRY_MS = 2200;
 const AIM_MS = 1800;
 
 export type ScanLot = { id: string; code: string; zone: string };
@@ -56,7 +61,6 @@ export function useLotScanner<L extends ScanLot>({
   describe,
   inputId,
   selectId,
-  continuous = false,
 }: {
   /** Lot ที่สแกนเจอได้ — ป้ายที่ไม่อยู่ในนี้นับเป็นไม่พบ */
   lots: L[];
@@ -71,14 +75,14 @@ export function useLotScanner<L extends ScanLot>({
   inputId: string;
   /** ช่องเลือก Lot — ปุ่ม "เลือก Lot" บน toast ไม่พบ เลื่อนไปเปิดช่องนี้ ไม่ส่ง = สแกนอย่างเดียว */
   selectId?: string;
-  /** กล้องไม่ปิดเองหลังอ่านติด — ผลบอกบนกล้องแทน toast */
-  continuous?: boolean;
 }) {
   const isPhone = useIsPhone();
   const [simulate, setSimulateState] = React.useState<Simulate>("found");
   const [scannerOpen, setScannerOpenState] = React.useState(false);
   const [reading, setReading] = React.useState<{ done: number; total: number } | null>(null);
   const [flashId, setFlashId] = React.useState<string>();
+  /** รูปผ่านบางส่วน — modal สรุป */
+  const [partial, setPartial] = React.useState<{ found: string[]; failed: number } | null>(null);
 
   // สแกนหลายรูปต่อกันในรอบเดียว ต้องเห็น Lot ที่เพิ่งเพิ่มก่อน React วาดใหม่
   const live = React.useRef({ lots, picked, onAdd, reject, describe });
@@ -120,33 +124,16 @@ export function useLotScanner<L extends ScanLot>({
     }, 80);
   };
 
-  const endSession = () => {
-    const rep = sessionRef.current;
-    sessionRef.current = null;
-    // สแกนต่อเนื่องเห็นผลบนกล้องทีละป้ายแล้ว ไม่ต้องสรุปซ้ำ
-    if (rep?.via === "scan" && continuous) return;
-    if (!rep || (rep.found.length === 0 && rep.missing.length === 0 && rep.rejected.length === 0)) return;
-    if (rep.found.length > 0) {
-      const one = rep.found.length === 1 ? rep.found[0] : undefined;
-      toast.custom(() => (
-        <ResultCard
-          tone="ok"
-          className="w-[min(32rem,calc(100vw-2rem))] shadow-lg"
-          title="สแกนสำเร็จ"
-          detail={one ? live.current.describe(one) : `${rep.found.length} Lot`}
-          zone={one ? one.zone : undefined}
-        />
-      ));
-    }
-    if (rep.missing.length > 0) {
-      toast.custom((id) => (
-        <ResultCard
-          tone="error"
-          className="w-[min(32rem,calc(100vw-2rem))] shadow-lg"
-          title="ไม่พบ Lot ที่ตรงกับบาร์โค้ด"
-          detail={rep.missing.length === 1 ? rep.missing[0] : `${rep.missing.length} รายการ`}
-          aside={
-            selectId && (
+  const toastCard = (tone: "ok" | "error", title: string, detail: string, withSelect = false) =>
+    toast.custom((id) => (
+      <ResultCard
+        tone={tone}
+        className="w-[min(32rem,calc(100vw-2rem))] shadow-lg"
+        title={title}
+        detail={detail}
+        aside={
+          withSelect &&
+          selectId && (
             <Button
               size="sm"
               variant="outline"
@@ -158,22 +145,21 @@ export function useLotScanner<L extends ScanLot>({
             >
               เลือก Lot
             </Button>
-            )
-          }
-        />
-      ));
-    }
-    if (rep.rejected.length > 0) {
-      const one = rep.rejected.length === 1 ? rep.rejected[0] : undefined;
-      toast.custom(() => (
-        <ResultCard
-          tone="error"
-          className="w-[min(32rem,calc(100vw-2rem))] shadow-lg"
-          title={rejectLabel}
-          detail={one ? `${one.lot.code} · ${one.reason}` : `${rep.rejected.length} Lot · ${rep.rejected[0].reason}`}
-        />
-      ));
-    }
+          )
+        }
+      />
+    ));
+
+  const endSession = () => {
+    const rep = sessionRef.current;
+    sessionRef.current = null;
+    if (!rep) return;
+    const found = rep.found.length;
+    // กล้องบอกผลไม่ผ่านบนกล้องไปแล้วทีละป้าย สรุปแค่ที่ผ่าน
+    const failed = rep.via === "scan" ? 0 : rep.missing.length + rep.rejected.length;
+    if (found > 0 && failed === 0) toastCard("ok", "สแกนสำเร็จ", `${found} รายการ`);
+    else if (found > 0) setPartial({ found: rep.found.map((l) => l.code), failed });
+    else if (failed > 0) toastCard("error", "สแกนไม่สำเร็จ", "กรุณาตรวจสอบ", true);
   };
 
   function setScannerOpen(open: boolean) {
@@ -191,7 +177,8 @@ export function useLotScanner<L extends ScanLot>({
     const { lots: pool, picked: chosen, reject: rejects } = live.current;
     if (pool.length === 0) return null;
     if (simulateRef.current === "notfound") return pool[0].code.replace(/\d+$/, "99");
-    if (simulateRef.current === "rejected") return pool.find((l) => rejects?.(l))?.code ?? null;
+    if (simulateRef.current === "rejected")
+      return (pool.find((l) => rejects?.(l)) ?? pool.find((l) => !chosen.includes(l.id)))?.code ?? null;
     return pool.find((l) => !chosen.includes(l.id) && !rejects?.(l))?.code ?? null;
   };
 
@@ -221,7 +208,10 @@ export function useLotScanner<L extends ScanLot>({
   const readPhoto = (total: number, index: number) => {
     timersRef.current = [
       setTimeout(() => {
-        const { outcome } = applyCode(mockRead());
+        // ผลจำลองบางส่วน: รูปคู่ผ่าน รูปคี่ไม่พบ
+        const failThis = simulateRef.current === "partial" && index % 2 === 1;
+        const code = failThis ? (live.current.lots[0]?.code.replace(/\d+$/, "99") ?? null) : mockRead();
+        const { outcome } = applyCode(code);
         if (index + 1 < total && outcome !== "empty") {
           setReading({ done: index + 1, total });
           readPhoto(total, index + 1);
@@ -248,17 +238,20 @@ export function useLotScanner<L extends ScanLot>({
   };
 
   const simulateOptions: { value: Simulate; label: string }[] = [
-    { value: "found", label: "พบสินค้า" },
-    { value: "notfound", label: "ไม่พบสินค้า" },
-    ...(reject ? [{ value: "rejected" as const, label: rejectLabel }] : []),
+    // ป้ายสั้นให้พอดีจอมือถือแถวเดียว
+    { value: "found", label: "พบ" },
+    { value: "notfound", label: "ไม่พบ" },
+    ...(reject ? [{ value: "rejected" as const, label: "คนละสินค้า" }] : []),
+    { value: "partial", label: "รูปบางส่วน" },
   ];
 
   return {
     isPhone,
-    continuous,
     rejectLabel,
-    /** ใช้กับ lot ที่ applyCode คืนมาเท่านั้น จึงเป็น L เสมอ */
-    describe: (lot: ScanLot) => live.current.describe(lot as L),
+    hasSelect: Boolean(selectId),
+    openLotSelect,
+    partial,
+    closePartial: () => setPartial(null),
     simulate,
     simulateOptions,
     setSimulate,
@@ -338,30 +331,33 @@ export function CaptureTile({ scan, prompt, error }: { scan: LotScanner; prompt:
 
 type Phase = { kind: "aiming" | Outcome; code: string | null };
 
-type Last = { tone: "ok" | "error"; title: string; detail?: string; zone?: string };
-
-/** ผลค้างบนกล้องก่อนเล็งป้ายถัดไป (สแกนต่อเนื่อง) */
-const RESULT_MS = 1400;
-
 /**
- * กล้องจำลอง — เปิดแล้ว "อ่าน" ป้ายเองหลังเล็งครู่หนึ่ง
- * ปกติอ่านติดแล้วปิดเอง / continuous ค้างไว้ บอกผลบนกล้อง แล้วเล็งป้ายถัดไป
+ * กล้องจำลอง — เปิดแล้ว "อ่าน" ป้ายเองหลังเล็งครู่หนึ่ง ทีละป้าย
+ * ผ่านแล้วปิดเอง / ไม่ผ่านขึ้นการ์ดแดงบนกล้องค้างไว้ครู่หนึ่งแล้วเล็งใหม่
+ * modal "สแกนสำเร็จบางส่วน" ของการเลือกรูปก็อยู่ที่นี่
  * input เลือกรูปอยู่ที่นี่ (นอก Dialog) เพราะคอมโพเนนต์นี้อยู่บนหน้าตลอด
  */
 export function ScannerDialog({ scan }: { scan: LotScanner }) {
-  const { isPhone, continuous } = scan;
+  const { isPhone } = scan;
   const open = scan.scannerOpen;
   const [phase, setPhase] = React.useState<Phase>({ kind: "aiming", code: null });
-  const [added, setAdded] = React.useState(0);
-  const [last, setLast] = React.useState<Last | null>(null);
-  /** เพิ่มทีละหนึ่งเพื่อเริ่มเล็งป้ายถัดไป */
+  /** ผลไม่ผ่านของป้ายล่าสุด — โชว์บนกล้อง */
+  const [error, setError] = React.useState<{ title: string; detail: string } | null>(null);
+  /** เพิ่มทีละหนึ่งเพื่อเล็งใหม่หลังอ่านไม่ผ่าน */
   const [round, setRound] = React.useState(0);
 
-  const { mockRead, applyCode, setScannerOpen, setSimulate, describe, rejectLabel } = scan;
-  const live = React.useRef({ mockRead, applyCode, setScannerOpen, setSimulate, describe, rejectLabel });
+  const { mockRead, applyCode, setScannerOpen, setSimulate, rejectLabel } = scan;
+  const live = React.useRef({ mockRead, applyCode, setScannerOpen, setSimulate, rejectLabel });
   React.useEffect(() => {
-    live.current = { mockRead, applyCode, setScannerOpen, setSimulate, describe, rejectLabel };
+    live.current = { mockRead, applyCode, setScannerOpen, setSimulate, rejectLabel };
   });
+
+  // เปิดกล้องรอบใหม่ ล้างการ์ดแดงของรอบก่อน (ปรับ state ระหว่าง render แทน effect)
+  const [wasOpen, setWasOpen] = React.useState(open);
+  if (open !== wasOpen) {
+    setWasOpen(open);
+    if (open) setError(null);
+  }
 
   // ระหว่างเปิดกล้องไม่ให้ toast ใดๆ ทับภาพ (ดู globals.css) — รวมแจ้งเตือนใหม่ของแอปที่เด้งหลังโหลดหน้า
   React.useEffect(() => {
@@ -372,117 +368,116 @@ export function ScannerDialog({ scan }: { scan: LotScanner }) {
     };
   }, [open]);
 
-  // เปิดกล้องรอบใหม่ เริ่มนับใหม่ (ปรับ state ระหว่าง render แทน effect)
-  const [wasOpen, setWasOpen] = React.useState(open);
-  if (open !== wasOpen) {
-    setWasOpen(open);
-    if (open) {
-      setAdded(0);
-      setLast(null);
-    }
-  }
-
   React.useEffect(() => {
     if (!open) return;
     const code = live.current.mockRead();
     setPhase({ kind: "aiming", code });
-    let next: ReturnType<typeof setTimeout> | undefined;
+    let retry: ReturnType<typeof setTimeout> | undefined;
     const t = setTimeout(() => {
-      const { outcome, lot, reason } = live.current.applyCode(code);
+      const { outcome, reason } = live.current.applyCode(code);
       setPhase({ kind: outcome, code });
-      if (!continuous) {
-        if (outcome === "empty") toast.info("เลือกครบทุก Lot ของสินค้านี้แล้ว");
-        live.current.setScannerOpen(false);
+      if (outcome === "notfound" || outcome === "rejected") {
+        setError(
+          outcome === "rejected"
+            ? { title: live.current.rejectLabel, detail: reason ?? "" }
+            : { title: "ไม่พบสินค้าที่ตรงกับบาร์โค้ด", detail: "กรุณาตรวจสอบอีกครั้ง" }
+        );
+        retry = setTimeout(() => {
+          // ผลจำลองแบบไม่ผ่านใช้ครั้งเดียว ป้ายถัดไปกลับเป็นพบสินค้า
+          live.current.setSimulate("found");
+          setError(null);
+          setRound((r) => r + 1);
+        }, RETRY_MS);
         return;
       }
-      if (outcome === "empty") {
-        // ไม่มีป้ายให้อ่านแล้ว หยุดเล็ง รอกดเสร็จ
-        setLast({ tone: "ok", title: "สแกนครบทุก Lot ของสินค้านี้แล้ว" });
-        return;
-      }
-      if (outcome === "found") setAdded((n) => n + 1);
-      setLast(
-        outcome === "found"
-          ? { tone: "ok", title: "เพิ่มแล้ว", detail: lot && live.current.describe(lot), zone: lot?.zone }
-          : outcome === "already"
-            ? { tone: "ok", title: "Lot นี้อยู่ในรายการแล้ว", detail: lot?.code }
-            : outcome === "rejected"
-              ? { tone: "error", title: live.current.rejectLabel, detail: lot && `${lot.code} · ${reason}` }
-              : { tone: "error", title: "ไม่พบ Lot ที่ตรงกับบาร์โค้ด", detail: code ?? undefined }
-      );
-      next = setTimeout(() => {
-        // ผลจำลองแบบผิดพลาดใช้ครั้งเดียว ป้ายถัดไปกลับเป็นพบสินค้า
-        if (outcome === "notfound" || outcome === "rejected") live.current.setSimulate("found");
-        setRound((r) => r + 1);
-      }, RESULT_MS);
+      if (outcome === "empty") toast.info("เลือกครบทุก Lot ของสินค้านี้แล้ว");
+      live.current.setScannerOpen(false);
     }, AIM_MS);
     return () => {
       clearTimeout(t);
-      clearTimeout(next);
+      clearTimeout(retry);
     };
-  }, [open, scan.simulate, round, continuous]);
+  }, [open, scan.simulate, round]);
 
   return (
     <>
-    <Dialog open={open} onOpenChange={scan.setScannerOpen}>
-      <DialogContent
-        showCloseButton={false}
-        className={cn(
-          "flex flex-col gap-0 overflow-hidden p-0",
-          isPhone
-            ? "inset-0 h-dvh max-w-none translate-x-0 translate-y-0 rounded-none border-0"
-            : "h-[min(92dvh,900px)] sm:max-w-3xl"
-        )}
-      >
-        <div className="flex items-start justify-between gap-2 px-6 pt-5 pb-4 max-sm:px-4">
-          <div>
-            <DialogTitle className="text-lg">สแกนบาร์โค้ด</DialogTitle>
-            <DialogDescription className="mt-1">วางบาร์โค้ดให้อยู่ในตำแหน่งสแกน</DialogDescription>
-          </div>
-          <Button variant="ghost" size="icon" aria-label="ปิด" onClick={() => scan.setScannerOpen(false)}>
-            <XIcon />
-          </Button>
-        </div>
-        {/* ภาพกล้องเต็มที่เหลือ — ทับดำ 40% ให้เห็นภาพกล้องอยู่ข้างใต้ มีแค่ปุ่มรูปภาพมุมขวาล่าง
-            ผลจำลองสลับได้ที่กล่องสแกนบนหน้า ไม่โชว์บนกล้อง */}
-        <div className="relative min-h-0 flex-1">
-          <Viewfinder
-            phase={{ kind: phase.kind === "rejected" ? "found" : phase.kind, code: phase.code }}
-            className="h-full bg-black/40"
-          />
-          {continuous && last && (
-            <div className="absolute inset-x-4 top-4 flex justify-center" aria-live="polite">
-              <ResultCard
-                tone={last.tone}
-                title={last.title}
-                detail={last.detail}
-                zone={last.zone}
-                className="w-full max-w-md shadow-lg"
-              />
-            </div>
+      <Dialog open={open} onOpenChange={scan.setScannerOpen}>
+        <DialogContent
+          showCloseButton={false}
+          className={cn(
+            "flex flex-col gap-0 overflow-hidden p-0",
+            isPhone
+              ? "inset-0 h-dvh max-w-none translate-x-0 translate-y-0 rounded-none border-0"
+              : "h-[min(92dvh,900px)] sm:max-w-3xl"
           )}
-          <div className="absolute inset-x-6 bottom-[max(1.5rem,env(safe-area-inset-bottom))] flex items-center justify-between gap-3 max-sm:inset-x-4">
-            {continuous && added > 0 ? (
-              <Button className="h-11 px-5" onClick={() => scan.setScannerOpen(false)}>
-                เสร็จ · {added} Lot
-              </Button>
-            ) : (
-              <span />
-            )}
-            <Button
-              variant="outline"
-              size="icon"
-              className="size-11 rounded-lg border-0 bg-black/60 text-white hover:bg-black/70 hover:text-white"
-              aria-label="เลือกรูปจากเครื่อง"
-              title="เลือกรูปจากเครื่อง"
-              onClick={scan.pickPhotosFromScanner}
-            >
-              <ImageIcon />
+        >
+          <div className="flex items-start justify-between gap-2 px-6 pt-5 pb-4 max-sm:px-4">
+            <div>
+              <DialogTitle className="text-lg">สแกนบาร์โค้ด</DialogTitle>
+              <DialogDescription className="mt-1">วางบาร์โค้ดให้อยู่ในตำแหน่งสแกน</DialogDescription>
+            </div>
+            <Button variant="ghost" size="icon" aria-label="ปิด" onClick={() => scan.setScannerOpen(false)}>
+              <XIcon />
             </Button>
           </div>
-        </div>
-      </DialogContent>
-    </Dialog>
+          {/* ภาพกล้องเต็มที่เหลือ — ทับดำ 40% ให้เห็นภาพกล้องอยู่ข้างใต้ มีแค่ปุ่มรูปภาพมุมขวาล่าง
+              ผลจำลองสลับได้ที่กล่องสแกนบนหน้า ไม่โชว์บนกล้อง */}
+          <div className="relative min-h-0 flex-1">
+            <Viewfinder
+              phase={{ kind: phase.kind === "rejected" ? "found" : phase.kind, code: phase.code }}
+              className="h-full bg-black/40"
+            />
+            <div className="absolute inset-x-6 bottom-[max(1.5rem,env(safe-area-inset-bottom))] flex justify-end max-sm:inset-x-4">
+              {error ? (
+                <ResultCard
+                  tone="error"
+                  title={error.title}
+                  detail={error.detail}
+                  className="w-full shadow-lg"
+                  aside={
+                    scan.hasSelect && (
+                      <Button size="sm" variant="outline" className="shrink-0 bg-card" onClick={scan.openLotSelect}>
+                        เลือก Lot
+                      </Button>
+                    )
+                  }
+                />
+              ) : (
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="size-11 rounded-lg border-0 bg-black/60 text-white hover:bg-black/70 hover:text-white"
+                  aria-label="เลือกรูปจากเครื่อง"
+                  title="เลือกรูปจากเครื่อง"
+                  onClick={scan.pickPhotosFromScanner}
+                >
+                  <ImageIcon />
+                </Button>
+              )}
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+      <Dialog open={Boolean(scan.partial)} onOpenChange={(o) => !o && scan.closePartial()}>
+        <DialogContent className="max-w-[calc(100vw-2rem)] gap-0 p-6 text-center sm:max-w-md">
+          <DialogTitle className="text-lg">สแกนสำเร็จบางส่วน</DialogTitle>
+          <DialogDescription asChild>
+            <div className="mt-2 space-y-1 text-muted-foreground">
+              <p>สแกนสำเร็จ: {scan.partial?.found.length} รายการ</p>
+              {scan.partial?.found.map((code) => (
+                <p key={code} className="tabular-nums">
+                  {code}
+                </p>
+              ))}
+              <p>สแกนไม่สำเร็จ: {scan.partial?.failed} รายการ</p>
+              <p>กรุณาตรวจสอบ</p>
+            </div>
+          </DialogDescription>
+          <Button className="mt-6 w-full" onClick={scan.closePartial}>
+            ตกลง
+          </Button>
+        </DialogContent>
+      </Dialog>
       <input
         id={scan.inputId}
         type="file"
