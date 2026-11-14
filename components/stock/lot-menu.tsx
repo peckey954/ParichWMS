@@ -54,28 +54,28 @@ export function LotMenu({ lot }: { lot: Lot }) {
 }
 
 /**
- * ปุ่ม ⋮ บนหัวหน้าสต็อก — ย้าย/ปรับปรุงหลายรายการในใบเดียว
+ * ปุ่ม ⋮ บนหัวหน้าสต็อก — ย้าย / ปรับปรุง กดแล้วเข้าหน้าสแกนเลย (หนึ่งใบ สินค้าเดียว หลาย Lot)
  * เป็นงานระดับทั้งหน้า ไม่ผูกกับแท็บ จึงอยู่ข้างชื่อหน้าได้โดยหัวเรื่องไม่กระตุก
  */
 export function BulkMenu({ base }: { base: "/stock" | "/stock/goods" }) {
   return (
     <DropdownMenu modal={false}>
       <DropdownMenuTrigger asChild>
-        <Button variant="outline" size="icon" className="shrink-0" aria-label="ย้าย/ปรับปรุงหลายรายการ">
+        <Button variant="outline" size="icon" className="shrink-0" aria-label="ย้าย/ปรับปรุงสต็อก">
           <EllipsisVerticalIcon />
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="min-w-52">
+      <DropdownMenuContent align="end" className="min-w-36">
         <DropdownMenuItem asChild>
           <Link href={`${base}/bulk/move`}>
             <ReplaceIcon />
-            ย้ายหลายรายการ
+            ย้าย
           </Link>
         </DropdownMenuItem>
         <DropdownMenuItem asChild>
           <Link href={`${base}/bulk/adjust`}>
             <ArrowUpDownIcon />
-            ปรับปรุงหลายรายการ
+            ปรับปรุง
           </Link>
         </DropdownMenuItem>
       </DropdownMenuContent>

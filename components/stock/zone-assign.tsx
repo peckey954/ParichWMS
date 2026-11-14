@@ -671,17 +671,21 @@ function CaptureTiles({ state }: { state: ZoneAssign }) {
  * ชิปสลับผลจำลอง — มีไว้ให้เดินดู flow ไม่พบสินค้าได้
  * ตัวถอดบาร์โค้ดจริงมาเมื่อไรชิปนี้ถอดทิ้ง
  */
-export function SimulateToggle({
+const SIMULATE_OPTIONS: { value: Simulate; label: string }[] = [
+  { value: "found", label: "พบสินค้า" },
+  { value: "notfound", label: "ไม่พบสินค้า" },
+];
+
+export function SimulateToggle<S extends string = Simulate>({
   state,
   dark,
+  options = SIMULATE_OPTIONS as { value: S; label: string }[],
 }: {
-  state: Pick<ZoneAssign, "simulate" | "setSimulate">;
+  state: { simulate: S; setSimulate: (v: S) => void };
   dark?: boolean;
+  /** ผลจำลองเพิ่มเติม เช่น "คนละสินค้า" ของหน้าย้าย/ปรับปรุง */
+  options?: { value: S; label: string }[];
 }) {
-  const options: { value: Simulate; label: string }[] = [
-    { value: "found", label: "พบสินค้า" },
-    { value: "notfound", label: "ไม่พบสินค้า" },
-  ];
   return (
     <div
       className={cn(

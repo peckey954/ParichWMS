@@ -25,7 +25,6 @@ import {
 import { Textarea } from "@peckey954/ui/components/ui/textarea";
 import { cn } from "@peckey954/ui/lib/utils";
 import { toast } from "sonner";
-import { MultiSelectChips } from "@/components/multi-select-chips";
 import { Crumbs } from "@/components/receiving/parts";
 import { TableFrame } from "@/components/stock/doc-parts";
 import { ACTOR, DECIMAL_UNITS, Field, SCOPES, type LotAction } from "./lot-action";
@@ -44,20 +43,19 @@ import {
 import { GOODS_CATEGORIES } from "@/lib/goods-stock";
 
 /* ------------------------------------------------------------------
-   ย้าย / ปรับปรุงหลายรายการ — เปิดจากปุ่ม ⋮ บนหัวหน้าสต็อก
+   ย้าย / ปรับปรุง — เปิดจากปุ่ม ⋮ บนหัวหน้าสต็อก
    (Figma: Flow ปรับปรุงสต็อกแบบหลายรายการ)
 
-   หนึ่งใบ = สินค้าเดียว หลาย Lot
-     1. เลือกสินค้า (ย้าย: เลือกโซนปลายทางด้วย)
-     2. เพิ่ม Lot — สแกนป้าย / สแกนจากรูป / เลือกจากรายการ ได้ผลเดียวกัน
-        ยังไม่ได้เลือกสินค้าแล้วสแกน ระบบเลือกสินค้าของป้ายนั้นให้เลย
-     3. กรอกจำนวนต่อ Lot แล้วบันทึกทีเดียว — ประวัติได้หนึ่งแถวต่อ Lot
+   หนึ่งใบ = สินค้าเดียว หลาย Lot — เพิ่ม Lot ได้ทางสแกนอย่างเดียว ไม่มีช่องพิมพ์/เลือก Lot
+     1. เข้าหน้าแล้วกล้องเปิดเลย (ในกล้องมีปุ่มเลือกรูปจากเครื่อง)
+     2. ป้ายแรกกำหนดสินค้าของใบ ป้ายต่อไปต้องเป็นสินค้าเดียวกัน
+        คนละสินค้าขึ้น error ไม่เพิ่มเข้าใบ — ลบ Lot ออกหมดแล้วสแกนสินค้าอื่นได้ใหม่
+     3. กรอกจำนวนต่อ Lot (ย้าย: เลือกโซนปลายทาง) แล้วบันทึกทีเดียว — ประวัติได้หนึ่งแถวต่อ Lot
 
    ปรับปรุง: กรอกยอดที่นับได้จริง ส่วนต่างขึ้นเขียว (เกิน) / แดง (ขาด)
    ย้าย: ตั้งต้นย้ายทั้ง Lot แก้ลดได้ เกินคงเหลือเตือนทันที
 ------------------------------------------------------------------ */
 
-const LOT_SELECT_ID = "bulk-lot";
 const PHOTO_INPUT_ID = "bulk-photo";
 
 const TITLE: Record<LotAction, string> = { move: "ย้ายสต็อก", adjust: "ปรับปรุงสต็อก" };
@@ -107,10 +105,10 @@ function BulkSheet({ scope, action }: { scope: StockScope; action: LotAction }) 
   const pieceUnit = decimal ? "ชิ้น" : unit;
   const fmt = decimal ? formatAmount : formatQty;
 
-  // ยังไม่เลือกสินค้า สแกนได้ทุก Lot ของคลัง เจอแล้วเลือกสินค้าของป้ายนั้นให้
+  // สแกนเจอได้ทุก Lot ของคลัง — Lot ของสินค้าอื่นนับเป็นคนละสินค้า ไม่ใช่ไม่พบ
   const ownerOf = (lotId: string): Product | undefined =>
     home.products.find((p) => p.lots.some((l) => l.id === lotId));
-  const scanPool = product ? product.lots : home.products.flatMap((p) => p.lots);
+  const scanPool = React.useMemo(() => home.products.flatMap((p) => p.lots), [home]);
 
   /** Lot ใหม่ย้ายทั้ง Lot เป็นค่าตั้งต้น — ปรับปรุงเว้นว่างไว้ให้นับเอง */
   const addLots = (lots: Lot[]) => {
@@ -123,42 +121,48 @@ function BulkSheet({ scope, action }: { scope: StockScope; action: LotAction }) 
       });
   };
 
-  const changeProduct = (id: string) => {
-    if (id === productId) return;
-    setProductId(id);
-    setPicked([]);
-    setCounts({});
-  };
-
   const scan = useLotScanner({
     lots: scanPool,
     picked,
     onAdd: (lot) => {
-      const owner = ownerOf(lot.id);
-      if (owner && owner.id !== productId) {
-        setProductId(owner.id);
+      if (!productId) {
+        // ป้ายแรกของใบ — กำหนดสินค้า
+        setProductId(ownerOf(lot.id)?.id ?? "");
         setPicked([lot.id]);
         setCounts(move ? { [lot.id]: String(lotPieces(lot)) } : {});
         return;
       }
       addLots([lot]);
     },
-    describe: (l) => `${l.code} · ${fmt(l.qty)} ${unit}`,
+    reject: (lot) => {
+      const owner = ownerOf(lot.id);
+      return product && owner && owner.id !== product.id
+        ? `เป็น ${owner.name} ไม่ใช่ ${product.name}`
+        : undefined;
+    },
+    rejectLabel: "คนละสินค้า",
+    describe: (l) => `${l.code} · ${fmt(l.qty)} ${ownerOf(l.id)?.unit ?? unit}`,
     inputId: PHOTO_INPUT_ID,
-    selectId: LOT_SELECT_ID,
   });
 
-  const setPickedFromSelect = (ids: string[]) => {
-    setPicked((prev) => [...prev.filter((id) => ids.includes(id)), ...ids.filter((id) => !prev.includes(id))]);
-    if (move)
-      setCounts((prev) => {
-        const next = { ...prev };
-        for (const l of product?.lots ?? [])
-          if (ids.includes(l.id) && next[l.id] === undefined) next[l.id] = String(lotPieces(l));
-        return next;
-      });
+  // สแกนได้เลย — เข้าหน้าแล้วเปิดกล้องทันที
+  const { setScannerOpen } = scan;
+  const autoOpened = React.useRef(false);
+  React.useEffect(() => {
+    if (autoOpened.current) return;
+    autoOpened.current = true;
+    setScannerOpen(true);
+  }, [setScannerOpen]);
+
+  /** เอา Lot สุดท้ายออกแล้ว ใบว่าง — ปลดสินค้าให้สแกนสินค้าอื่นได้ */
+  const remove = (id: string) => {
+    const next = picked.filter((x) => x !== id);
+    setPicked(next);
+    if (next.length === 0) {
+      setProductId("");
+      setCounts({});
+    }
   };
-  const remove = (id: string) => setPicked((prev) => prev.filter((x) => x !== id));
   const setCount = (id: string, v: string) => setCounts((prev) => ({ ...prev, [id]: v.replace(/\D/g, "") }));
 
   // ---------- แถวและยอดรวม ----------
@@ -189,9 +193,8 @@ function BulkSheet({ scope, action }: { scope: StockScope; action: LotAction }) 
   const total = rows.reduce((s, r) => s + r.amount, 0);
 
   const errors = {
-    product: submitted && !product ? "กรุณาเลือกสินค้า" : undefined,
     zone: move && submitted && !zone ? "กรุณาเลือกโซน" : undefined,
-    lots: submitted && product && rows.length === 0 ? "กรุณาเพิ่ม Lot อย่างน้อย 1 รายการ" : undefined,
+    lots: submitted && rows.length === 0 ? "กรุณาสแกน Lot อย่างน้อย 1 รายการ" : undefined,
     note: submitted && !note.trim() ? (move ? "กรุณาระบุหมายเหตุการย้าย" : "กรุณาระบุหมายเหตุการปรับปรุง") : undefined,
   };
 
@@ -228,45 +231,11 @@ function BulkSheet({ scope, action }: { scope: StockScope; action: LotAction }) 
     leave();
   };
 
-  const lotOptions = (product?.lots ?? []).map((l) => ({
-    value: l.id,
-    label: l.code,
-    badge: <span className="text-primary">{l.zone}</span>,
-    description: lotLine(l),
-    keywords: [l.zone],
-    meta: (
-      <span className="font-semibold tabular-nums">
-        {fmt(l.qty)} <span className="font-normal text-foreground">{unit}</span>
-      </span>
-    ),
-  }));
-
   const stockLabel = `${decimal ? "ปริมาณ" : "จำนวน"}ในคลัง (${unit})`;
   const amountLabel = move ? `${decimal ? "ปริมาณ" : "จำนวน"}ย้าย (${unit})` : `ส่วนต่าง (${unit})`;
   const inputLabel = move ? `จำนวนย้าย (${pieceUnit})` : `นับจำนวนจริง (${pieceUnit})`;
   const signed = (v: number) => `${v > 0 ? "+" : ""}${fmt(v)}`;
   const diffTone = (v: number) => cn(v > 0 && "text-success-strong", v < 0 && "text-danger-strong");
-
-  const productSelect = (
-    <Field id="bulk-product" label="สินค้า" error={errors.product}>
-      <Select value={productId} onValueChange={changeProduct}>
-        <SelectTrigger
-          id="bulk-product"
-          aria-invalid={Boolean(errors.product)}
-          className={cn("w-full bg-card", errors.product && "border-danger-strong")}
-        >
-          <SelectValue placeholder="เลือกสินค้า" />
-        </SelectTrigger>
-        <SelectContent>
-          {home.products.map((p) => (
-            <SelectItem key={p.id} value={p.id}>
-              {p.name}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-    </Field>
-  );
 
   return (
     <div className="flex min-h-[calc(100vh-3.5rem)] flex-col">
@@ -281,8 +250,8 @@ function BulkSheet({ scope, action }: { scope: StockScope; action: LotAction }) 
         </p>
 
         <div className="mt-5 space-y-5">
-          {move ? (
-            <div className="grid gap-5 @3xl:grid-cols-2 @3xl:gap-4">
+          {move && (
+            <div className="@3xl:max-w-md">
               <Field id="bulk-zone" label="โซนที่ต้องการย้าย" error={errors.zone}>
                 <Select value={zone} onValueChange={setZone}>
                   <SelectTrigger
@@ -301,10 +270,7 @@ function BulkSheet({ scope, action }: { scope: StockScope; action: LotAction }) 
                   </SelectContent>
                 </Select>
               </Field>
-              {productSelect}
             </div>
-          ) : (
-            productSelect
           )}
 
           {/* การ์ดสินค้า — ยอดรวมทั้งสินค้า กับยอดที่ใบนี้จะเปลี่ยน */}
@@ -328,28 +294,14 @@ function BulkSheet({ scope, action }: { scope: StockScope; action: LotAction }) 
             </section>
           )}
 
-          <CaptureTile scan={scan} prompt="สแกนเลขที่ติดบนสินค้าเพื่อเพิ่ม Lot" />
-
-          <div className="flex items-center gap-3 text-sm text-muted-foreground">
-            <span className="h-px flex-1 bg-border" />
-            หรือ
-            <span className="h-px flex-1 bg-border" />
-          </div>
-
-          <div className="scroll-mt-24 space-y-2">
-            <Label htmlFor={LOT_SELECT_ID}>Lot</Label>
-            <MultiSelectChips
-              id={LOT_SELECT_ID}
-              className="bg-card"
-              options={lotOptions}
-              value={picked}
-              onValueChange={setPickedFromSelect}
-              placeholder={product ? "เลือก Lot" : "เลือกสินค้าก่อน หรือสแกนป้าย"}
-              searchPlaceholder="ค้นหา"
-              emptyText={product ? "ไม่พบ Lot ที่ค้นหา" : "เลือกสินค้าก่อน"}
-              hideSelectAll
-            />
-          </div>
+          <CaptureTile
+            scan={scan}
+            prompt={
+              product
+                ? `สแกนเลขที่ติดบนสินค้าเพื่อเพิ่ม Lot ของ ${product.name}`
+                : "สแกนเลขที่ติดบนสินค้าเพื่อเพิ่ม Lot"
+            }
+          />
 
           {rows.length === 0 ? (
             <div
@@ -360,7 +312,7 @@ function BulkSheet({ scope, action }: { scope: StockScope; action: LotAction }) 
             >
               <p className="text-lg font-bold">ไม่มีข้อมูล</p>
               <p className={errors.lots ? "text-danger-strong" : "text-muted-foreground"}>
-                {errors.lots ?? "กรุณาเพิ่ม Lot"}
+                {errors.lots ?? "สแกน Lot แรกเพื่อเริ่ม — Lot ต่อไปต้องเป็นสินค้าเดียวกัน"}
               </p>
             </div>
           ) : (

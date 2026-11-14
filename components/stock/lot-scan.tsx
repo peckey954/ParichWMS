@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { ScanBarcodeIcon, XIcon } from "lucide-react";
+import { ImageIcon, ScanBarcodeIcon, XIcon } from "lucide-react";
 import { Button } from "@peckey954/ui/components/ui/button";
 import {
   Dialog,
@@ -27,6 +27,10 @@ import {
      สแกนเลขที่สินค้า  เปิดกล้อง อ่านป้ายติดแล้วปิดเอง
      สแกนจากรูปภาพ    หยิบรูปป้ายที่ถ่ายไว้ เลือกได้หลายรูป อ่านแล้วทิ้งรูป
    ผลบอกด้วย toast ทีเดียวต่อรอบ (ไม่ใช่ต่อป้าย) — สำเร็จกี่ Lot ไม่พบกี่ป้าย
+   หน้ากล้องมีปุ่ม "เลือกรูปจากเครื่อง" ปิดกล้องแล้วเปิดคลังรูปต่อได้เลย
+
+   reject (ถ้าส่งมา) ปัดตก Lot ที่เจอแต่ใช้ในใบนี้ไม่ได้ เช่นคนละสินค้า
+   ขึ้นเป็น toast สีแดงแยกจากไม่พบ
 
    ---------- ยังเป็นของจำลอง ----------
    กล้องกับการถอดบาร์โค้ดยังไม่ได้ต่อของจริง "กล้อง" อ่านได้ Lot แรกในรายการ
@@ -34,8 +38,8 @@ import {
 ------------------------------------------------------------------ */
 
 type Via = "scan" | "photo";
-type Simulate = "found" | "notfound";
-type Outcome = "found" | "already" | "notfound" | "empty";
+type Simulate = "found" | "notfound" | "rejected";
+type Outcome = "found" | "already" | "notfound" | "rejected" | "empty";
 
 const READ_MS = 900;
 const AIM_MS = 1800;
@@ -46,6 +50,8 @@ export function useLotScanner<L extends ScanLot>({
   lots,
   picked,
   onAdd,
+  reject,
+  rejectLabel = "ใช้ Lot นี้ไม่ได้",
   describe,
   inputId,
   selectId,
@@ -54,11 +60,15 @@ export function useLotScanner<L extends ScanLot>({
   lots: L[];
   picked: string[];
   onAdd: (lot: L) => void;
+  /** เหตุผลที่ใช้ Lot นี้ไม่ได้ — undefined = ใช้ได้ */
+  reject?: (lot: L) => string | undefined;
+  /** ชื่อผลจำลอง/หัว toast ของ reject เช่น "คนละสินค้า" */
+  rejectLabel?: string;
   /** บรรทัดรองบน toast ตอนเจอ Lot เดียว เช่น "PD…/01 · 80 ตัน" */
   describe: (lot: L) => string;
   inputId: string;
-  /** ช่องเลือก Lot — ปุ่ม "เลือก Lot" บน toast ไม่พบ เลื่อนไปเปิดช่องนี้ */
-  selectId: string;
+  /** ช่องเลือก Lot — ปุ่ม "เลือก Lot" บน toast ไม่พบ เลื่อนไปเปิดช่องนี้ ไม่ส่ง = สแกนอย่างเดียว */
+  selectId?: string;
 }) {
   const isPhone = useIsPhone();
   const [simulate, setSimulateState] = React.useState<Simulate>("found");
@@ -67,12 +77,17 @@ export function useLotScanner<L extends ScanLot>({
   const [flashId, setFlashId] = React.useState<string>();
 
   // สแกนหลายรูปต่อกันในรอบเดียว ต้องเห็น Lot ที่เพิ่งเพิ่มก่อน React วาดใหม่
-  const live = React.useRef({ lots, picked, onAdd, describe });
+  const live = React.useRef({ lots, picked, onAdd, reject, describe });
   React.useEffect(() => {
-    live.current = { lots, picked, onAdd, describe };
+    live.current = { lots, picked, onAdd, reject, describe };
   });
   const simulateRef = React.useRef(simulate);
-  const sessionRef = React.useRef<{ via: Via; found: L[]; missing: string[] } | null>(null);
+  const sessionRef = React.useRef<{
+    via: Via;
+    found: L[];
+    missing: string[];
+    rejected: { lot: L; reason: string }[];
+  } | null>(null);
   const timersRef = React.useRef<ReturnType<typeof setTimeout>[]>([]);
   const flashTimer = React.useRef<ReturnType<typeof setTimeout>>(undefined);
 
@@ -90,6 +105,7 @@ export function useLotScanner<L extends ScanLot>({
   };
 
   const openLotSelect = () => {
+    if (!selectId) return;
     setScannerOpen(false);
     setTimeout(() => {
       const el = document.getElementById(selectId);
@@ -103,7 +119,7 @@ export function useLotScanner<L extends ScanLot>({
   const endSession = () => {
     const rep = sessionRef.current;
     sessionRef.current = null;
-    if (!rep || (rep.found.length === 0 && rep.missing.length === 0)) return;
+    if (!rep || (rep.found.length === 0 && rep.missing.length === 0 && rep.rejected.length === 0)) return;
     if (rep.found.length > 0) {
       const one = rep.found.length === 1 ? rep.found[0] : undefined;
       toast.custom(() => (
@@ -124,6 +140,7 @@ export function useLotScanner<L extends ScanLot>({
           title="ไม่พบ Lot ที่ตรงกับบาร์โค้ด"
           detail={rep.missing.length === 1 ? rep.missing[0] : `${rep.missing.length} รายการ`}
           aside={
+            selectId && (
             <Button
               size="sm"
               variant="outline"
@@ -135,24 +152,37 @@ export function useLotScanner<L extends ScanLot>({
             >
               เลือก Lot
             </Button>
+            )
           }
+        />
+      ));
+    }
+    if (rep.rejected.length > 0) {
+      const one = rep.rejected.length === 1 ? rep.rejected[0] : undefined;
+      toast.custom(() => (
+        <ResultCard
+          tone="error"
+          className="w-[min(32rem,calc(100vw-2rem))] shadow-lg"
+          title={rejectLabel}
+          detail={one ? `${one.lot.code} · ${one.reason}` : `${rep.rejected.length} Lot · ${rep.rejected[0].reason}`}
         />
       ));
     }
   };
 
   function setScannerOpen(open: boolean) {
-    if (open) sessionRef.current = { via: "scan", found: [], missing: [] };
+    if (open) sessionRef.current = { via: "scan", found: [], missing: [], rejected: [] };
     else if (sessionRef.current?.via === "scan") endSession();
     setScannerOpenState(open);
   }
 
-  /** ป้ายที่ "กล้อง" จะอ่านได้ — Lot แรกที่ยังไม่ได้เลือก */
+  /** ป้ายที่ "กล้อง" จะอ่านได้ — Lot แรกที่ยังไม่ได้เลือกและใช้ได้ (ผลจำลองคนละสินค้า = Lot แรกที่ใช้ไม่ได้) */
   const mockRead = (): string | null => {
-    const { lots: pool, picked: chosen } = live.current;
+    const { lots: pool, picked: chosen, reject: rejects } = live.current;
     if (pool.length === 0) return null;
     if (simulateRef.current === "notfound") return pool[0].code.replace(/\d+$/, "99");
-    return pool.find((l) => !chosen.includes(l.id))?.code ?? null;
+    if (simulateRef.current === "rejected") return pool.find((l) => rejects?.(l))?.code ?? null;
+    return pool.find((l) => !chosen.includes(l.id) && !rejects?.(l))?.code ?? null;
   };
 
   const applyCode = (code: string | null): { outcome: Outcome } => {
@@ -162,6 +192,11 @@ export function useLotScanner<L extends ScanLot>({
     if (!hit) {
       session?.missing.push(code);
       return { outcome: "notfound" };
+    }
+    const reason = live.current.reject?.(hit);
+    if (reason) {
+      session?.rejected.push({ lot: hit, reason });
+      return { outcome: "rejected" };
     }
     clearTimeout(flashTimer.current);
     setFlashId(hit.id);
@@ -197,14 +232,21 @@ export function useLotScanner<L extends ScanLot>({
       toast.error("ไฟล์นี้ไม่ใช่รูป อ่านบาร์โค้ดไม่ได้");
       return;
     }
-    sessionRef.current = { via: "photo", found: [], missing: [] };
+    sessionRef.current = { via: "photo", found: [], missing: [], rejected: [] };
     setReading({ done: 0, total: photos.length });
     readPhoto(photos.length, 0);
   };
 
+  const simulateOptions: { value: Simulate; label: string }[] = [
+    { value: "found", label: "พบสินค้า" },
+    { value: "notfound", label: "ไม่พบสินค้า" },
+    ...(reject ? [{ value: "rejected" as const, label: rejectLabel }] : []),
+  ];
+
   return {
     isPhone,
     simulate,
+    simulateOptions,
     setSimulate,
     scannerOpen,
     setScannerOpen,
@@ -215,6 +257,11 @@ export function useLotScanner<L extends ScanLot>({
     scanPhotos,
     inputId,
     pickPhotos: () => document.getElementById(inputId)?.click(),
+    /** จากหน้ากล้อง — ปิดกล้องแล้วเปิดคลังรูป (ยังอยู่ในจังหวะกดของผู้ใช้ เบราว์เซอร์จึงยอมเปิด) */
+    pickPhotosFromScanner: () => {
+      setScannerOpen(false);
+      document.getElementById(inputId)?.click();
+    },
   };
 }
 
@@ -268,7 +315,7 @@ export function CaptureTile({ scan, prompt }: { scan: LotScanner; prompt: string
           สแกนจากรูปภาพ
         </Button>
       </div>
-      <SimulateToggle state={scan} />
+      <SimulateToggle state={scan} options={scan.simulateOptions} />
       <input
         id={scan.inputId}
         type="file"
@@ -332,12 +379,21 @@ export function ScannerDialog({ scan }: { scan: LotScanner }) {
             <XIcon />
           </Button>
         </div>
-        <Viewfinder phase={phase} className={isPhone ? "min-h-0 flex-1" : "h-[min(58dvh,580px)]"}>
-          {phase.kind === "aiming" && <SimulateToggle state={scan} dark />}
+        <Viewfinder
+          phase={{ kind: phase.kind === "rejected" ? "found" : phase.kind, code: phase.code }}
+          className={isPhone ? "min-h-0 flex-1" : "h-[min(58dvh,580px)]"}
+        >
+          {phase.kind === "aiming" && <SimulateToggle state={scan} options={scan.simulateOptions} dark />}
         </Viewfinder>
-        <div className="flex min-h-14 items-center justify-center gap-2 p-4 pb-[max(1rem,env(safe-area-inset-bottom))] text-sm text-muted-foreground">
-          <Spinner className="size-4" />
-          กำลังค้นหาบาร์โค้ด...
+        <div className="flex flex-col items-center gap-3 p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
+          <p className="flex items-center gap-2 text-sm text-muted-foreground">
+            <Spinner className="size-4" />
+            กำลังค้นหาบาร์โค้ด...
+          </p>
+          <Button variant="outline-primary" className="bg-card" onClick={scan.pickPhotosFromScanner}>
+            <ImageIcon />
+            เลือกรูปจากเครื่อง
+          </Button>
         </div>
       </DialogContent>
     </Dialog>
