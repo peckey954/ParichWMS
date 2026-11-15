@@ -551,6 +551,7 @@ export type SetupAction =
   | "delete"
   | "assign"
   | "route"
+  | "reorder"
   | "reset";
 
 export const SETUP_ACTION_LABEL: Record<SetupAction, string> = {
@@ -561,6 +562,8 @@ export const SETUP_ACTION_LABEL: Record<SetupAction, string> = {
   assign: "จัดเข้า",
   /** สับสวิตช์คลังปลายทางของประเภท — บรรทัดที่สำคัญที่สุดในประวัติ */
   route: "เปลี่ยนคลังปลายทาง",
+  /** ลากสลับลำดับล็อค */
+  reorder: "เรียงลำดับใหม่",
   reset: "คืนค่าเริ่มต้น",
 };
 

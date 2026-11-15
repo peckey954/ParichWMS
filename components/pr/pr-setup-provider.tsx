@@ -94,6 +94,10 @@ type PrSetupCtx = {
   addLocks: (warehouseId: string, labels: string[], after?: string) => void;
   renameLock: (id: string, label: string) => void;
   deleteLock: (id: string) => void;
+  /** ย้ายล็อคหลายตัวไปอีกคลังทีเดียว — แถวเดียวก็ส่งมาเป็นรายการเดียว */
+  moveLocksToWarehouse: (ids: string[], warehouseId: string) => void;
+  /** วางล็อคชุดหนึ่ง (ตามลำดับเดิม) ไว้หน้า/หลังล็อค target — ลากทีละกลุ่มได้ */
+  moveLocksNear: (ids: string[], targetId: string, place: "before" | "after") => void;
   /** ไม่ระบุส่วน = คืนค่าเริ่มต้นทั้งหมด */
   reset: (slice?: SetupSlice) => void;
   dirty: Record<SetupSlice, boolean>;
@@ -495,6 +499,35 @@ export function PrSetupProvider({ children }: { children: React.ReactNode }) {
         // แถวว่างที่เพิ่งกดเพิ่มแล้วไม่ได้ใช้ ไม่ต้องรกประวัติ
         if (l?.label.trim()) log("locks", "delete", l.label);
         setSetup((s) => ({ ...s, locks: s.locks.filter((x) => x.id !== id) }));
+      },
+      moveLocksToWarehouse: (ids, warehouseId) => {
+        const move = new Set(ids);
+        const changed = setup.locks.filter((l) => move.has(l.id) && l.warehouseId !== warehouseId);
+        if (changed.length === 0) return;
+        setSetup((s) => ({
+          ...s,
+          locks: s.locks.map((l) => (move.has(l.id) ? { ...l, warehouseId } : l)),
+        }));
+        const name = (id: string) => setup.warehouses.find((w) => w.id === id)?.label ?? "";
+        log(
+          "locks",
+          "route",
+          changed.length === 1 ? changed[0].label : `${changed.length} ล็อค`,
+          { from: changed.length === 1 ? name(changed[0].warehouseId) : undefined, to: name(warehouseId) },
+        );
+      },
+      moveLocksNear: (ids, targetId, place) => {
+        if (ids.includes(targetId)) return;
+        const move = new Set(ids);
+        setSetup((s) => {
+          const moving = s.locks.filter((l) => move.has(l.id));
+          const rest = s.locks.filter((l) => !move.has(l.id));
+          const at = rest.findIndex((l) => l.id === targetId);
+          if (at < 0) return s;
+          const i = place === "before" ? at : at + 1;
+          return { ...s, locks: [...rest.slice(0, i), ...moving, ...rest.slice(i)] };
+        });
+        log("locks", "reorder", ids.length === 1 ? setup.locks.find((l) => l.id === ids[0])?.label ?? "" : `${ids.length} ล็อค`);
       },
       reset: (slice) => {
         log(slice ?? "categories", "reset", slice ? SETUP_SLICE_LABEL[slice] : "ทุกส่วน");

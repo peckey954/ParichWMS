@@ -233,6 +233,15 @@ export const MODULES: ModuleItem[] = [
     href: "/pr/setup",
   },
   {
+    id: "lock-setup",
+    group: "settings",
+    label: "ตั้งค่าล็อคสินค้า",
+    description: "ล็อคของทุกคลังในตารางเดียว ย้ายล็อคข้ามคลังทีละหลายรายการ และลากเรียงลำดับ",
+    code: "FM-ST-01-05",
+    icon: "grid",
+    href: "/settings/locks",
+  },
+  {
     id: "approve-setup",
     group: "settings",
     label: "ตั้งค่าการอนุมัติ",
