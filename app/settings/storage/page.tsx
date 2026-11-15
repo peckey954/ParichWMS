@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { GripVerticalIcon, PencilIcon, PlusIcon, Trash2Icon } from "lucide-react";
+import { ChevronsUpDownIcon, PencilIcon, PlusIcon, Trash2Icon } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -38,6 +38,8 @@ import { ChipGroup } from "@/components/chip-group";
 import { SetupFooter } from "@/components/pr/setup-footer";
 import { usePrSetup } from "@/components/pr/pr-setup-provider";
 import { Crumbs } from "@/components/receiving/parts";
+import { PRODUCTS } from "@/lib/general-stock";
+import { GOODS_PRODUCTS } from "@/lib/goods-stock";
 import { duplicateLockIds, type StorageLock } from "@/lib/pr-setup";
 
 /* ------------------------------------------------------------------
@@ -48,13 +50,21 @@ import { duplicateLockIds, type StorageLock } from "@/lib/pr-setup";
    - ชิปคลัง (มี "ทั้งหมด") แทนแท็บ — ดูทุกคลังพร้อมกันได้
    - แต่ละแถวมีช่องเลือกคลังของตัวเอง ย้ายล็อคไปคลังอื่นได้ทีละแถว
    - ติ๊กหลายแถวแล้ว "แก้ไขคลังหลายรายการ" ย้ายทั้งชุดในครั้งเดียว
-   - ลากที่จับ ⋮⋮ เพื่อเรียงลำดับ ถ้าแถวที่ลากถูกติ๊กอยู่ แถวที่ติ๊กทั้งหมด
-     ย้ายไปด้วยกันเป็นกลุ่ม (เรียงตามลำดับเดิม)
+   - ลากปุ่มย้าย (⌃⌄ ข้างถังขยะ) เพื่อเรียงลำดับ ถ้าแถวที่ลากถูกติ๊กอยู่
+     แถวที่ติ๊กทั้งหมดย้ายไปด้วยกันเป็นกลุ่ม (เรียงตามลำดับเดิม)
+   - ปิดใช้งานล็อคที่ยังมีของอยู่ ต้องยืนยันก่อน — ของเดิมยังอยู่ แต่ย้าย/รับเข้าไม่ได้
 ------------------------------------------------------------------ */
 
 const ALL = "__all__";
 
 type Drop = { id: string; place: "before" | "after" };
+
+/** Lot ที่วางอยู่ในล็อคนี้ — ยังไม่มีข้อมูลสต็อกของคลังวัตถุดิบ เลยนับได้แค่สองคลัง */
+function lotsIn(lock: StorageLock, warehouseLabel: string) {
+  const products = /สินค้า/.test(warehouseLabel) ? GOODS_PRODUCTS : /ทั่วไป/.test(warehouseLabel) ? PRODUCTS : [];
+  const key = lock.label.trim().toUpperCase();
+  return products.flatMap((p) => p.lots.filter((l) => l.zone.toUpperCase() === key).map((l) => ({ product: p.name, lot: l })));
+}
 
 export default function LockSettingsPage() {
   const {
@@ -165,6 +175,13 @@ export default function LockSettingsPage() {
   };
 
   const [confirm, setConfirm] = React.useState<StorageLock | null>(null);
+  /** ล็อคที่กดปิดแต่ยังมีของ — รอยืนยัน */
+  const [confirmOff, setConfirmOff] = React.useState<{ lock: StorageLock; lots: ReturnType<typeof lotsIn> } | null>(null);
+  const setEnabled = (l: StorageLock, on: boolean) => {
+    const lots = on ? [] : lotsIn(l, whName(l.warehouseId));
+    if (lots.length > 0) setConfirmOff({ lock: l, lots });
+    else setEntityEnabled("locks", l.id, on);
+  };
 
   const save = () => {
     const first = setup.locks.find((l) => dupes.has(l.id));
@@ -190,7 +207,7 @@ export default function LockSettingsPage() {
       label: `${w.label.trim() || "(ยังไม่ได้ตั้งชื่อ)"} (${setup.locks.filter((l) => l.warehouseId === w.id).length})`,
     })),
   ];
-  const cols = "grid-cols-[1.25rem_1.25rem_2rem_minmax(0,16rem)_minmax(0,14rem)_1fr_auto]";
+  const cols = "grid-cols-[1.25rem_2rem_minmax(0,16rem)_minmax(0,14rem)_1fr_auto_2.25rem_2.25rem]";
 
   return (
     <>
@@ -201,7 +218,7 @@ export default function LockSettingsPage() {
           <h1 className="text-2xl font-semibold tracking-tight">ตั้งค่าล็อคสินค้า</h1>
           <p className="mt-1 text-sm text-muted-foreground">
             ล็อคของทุกคลังในที่เดียว — เปลี่ยนคลังได้ทีละแถวหรือติ๊กหลายแถวแล้วย้ายทีเดียว
-            ลาก ⋮⋮ เพื่อเรียงลำดับ แถวที่ติ๊กไว้จะย้ายไปด้วยกันเป็นกลุ่ม
+            ลากปุ่ม ⌃⌄ ข้างถังขยะเพื่อเรียงลำดับ แถวที่ติ๊กไว้จะย้ายไปด้วยกันเป็นกลุ่ม
           </p>
         </div>
 
@@ -236,13 +253,13 @@ export default function LockSettingsPage() {
             )}
           >
             <Checkbox checked={allState} onCheckedChange={toggleAll} aria-label="เลือกทั้งหมดที่เห็นอยู่" disabled={rows.length === 0} />
-            {/* ช่องว่างใต้คอลัมน์ที่จับลาก — sr-only หลุดจาก grid จึงใช้ span เปล่า */}
-            <span aria-hidden />
             <span>#</span>
             <span>ชื่อล็อค</span>
             <span>คลัง</span>
+            <span aria-hidden />
             <span>การใช้งาน</span>
-            <span className="w-9" />
+            <span aria-hidden />
+            <span aria-hidden />
           </div>
 
           {rows.length === 0 ? (
@@ -281,17 +298,6 @@ export default function LockSettingsPage() {
                       onCheckedChange={(v) => toggle(l.id, v === true)}
                       aria-label={`เลือกล็อค ${l.label || `แถวที่ ${i + 1}`}`}
                     />
-                    {/* ลากได้เฉพาะที่ ⋮⋮ — ทั้งแถวลากได้แล้วจะเลือกข้อความในช่องชื่อไม่ได้ */}
-                    <button
-                      type="button"
-                      draggable
-                      onDragStart={(e) => startDrag(l, e)}
-                      onDragEnd={endDrag}
-                      aria-label={`ลากเพื่อเรียงล็อค ${l.label || `แถวที่ ${i + 1}`}`}
-                      className="mt-2 grid size-5 cursor-grab place-content-center rounded-sm text-muted-foreground hover:bg-accent active:cursor-grabbing"
-                    >
-                      <GripVerticalIcon className="size-4" />
-                    </button>
                     <span className="pt-2 text-sm text-muted-foreground tabular-nums">{i + 1}</span>
 
                     <div className="min-w-0 flex-1 @3xl:flex-none">
@@ -326,20 +332,37 @@ export default function LockSettingsPage() {
                       </Select>
                     </div>
 
-                    <label className="flex w-fit cursor-pointer items-center gap-2 @3xl:pt-1.5">
+                    <span aria-hidden className="hidden @3xl:block" />
+
+                    {/* ชิดขวา: เปิด/ปิด → ย้าย → ลบ */}
+                    <label className="ml-auto flex w-fit cursor-pointer items-center gap-2 @3xl:ml-0 @3xl:pt-1.5">
                       <Switch
                         checked={l.enabled}
-                        onCheckedChange={(v) => setEntityEnabled("locks", l.id, v)}
+                        onCheckedChange={(v) => setEnabled(l, v)}
                         aria-label={`การใช้งานของล็อค ${l.label || `แถวที่ ${i + 1}`}`}
                       />
                       <span className="text-sm whitespace-nowrap">{l.enabled ? "เปิดใช้งาน" : "ปิดใช้งาน"}</span>
                     </label>
 
+                    {/* ลากได้เฉพาะที่ปุ่มนี้ — ทั้งแถวลากได้แล้วจะเลือกข้อความในช่องชื่อไม่ได้ */}
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      draggable
+                      onDragStart={(e) => startDrag(l, e)}
+                      onDragEnd={endDrag}
+                      aria-label={`ลากเพื่อเรียงล็อค ${l.label || `แถวที่ ${i + 1}`}`}
+                      title="ลากเพื่อเรียงลำดับ"
+                      className="cursor-grab text-foreground active:cursor-grabbing"
+                    >
+                      <ChevronsUpDownIcon />
+                    </Button>
+
                     <Button
                       variant="ghost"
                       size="icon"
                       aria-label={`ลบล็อค ${l.label || `แถวที่ ${i + 1}`}`}
-                      className="ml-auto text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                      className="text-foreground hover:bg-destructive/10 hover:text-destructive"
                       onClick={() => (l.builtIn ? setConfirm(l) : deleteLock(l.id))}
                     >
                       <Trash2Icon />
@@ -397,6 +420,34 @@ export default function LockSettingsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={confirmOff !== null} onOpenChange={(o) => !o && setConfirmOff(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>ปิดใช้งานล็อค {confirmOff?.lock.label}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              ล็อคนี้ยังมีของอยู่ {confirmOff?.lots.length} Lot (
+              {[...new Set(confirmOff?.lots.map((x) => x.product))].slice(0, 2).join(", ")}
+              {(new Set(confirmOff?.lots.map((x) => x.product)).size ?? 0) > 2 ? " และอื่น ๆ" : ""})
+              <br />
+              ถ้าปิดใช้งาน ของเดิมยังอยู่และดูได้ตามปกติ แต่จะย้ายหรือรับของเข้าล็อคนี้ไม่ได้ ควรย้ายของออกก่อน
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel variant="outline-primary">ยกเลิก</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (!confirmOff) return;
+                setEntityEnabled("locks", confirmOff.lock.id, false);
+                toast.success("ปิดใช้งานล็อคแล้ว", { description: confirmOff.lock.label });
+                setConfirmOff(null);
+              }}
+            >
+              ปิดใช้งาน
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <AlertDialog open={confirm !== null} onOpenChange={(o) => !o && setConfirm(null)}>
         <AlertDialogContent>

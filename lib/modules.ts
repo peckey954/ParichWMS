@@ -239,7 +239,7 @@ export const MODULES: ModuleItem[] = [
     description: "ล็อคของทุกคลังในตารางเดียว ย้ายล็อคข้ามคลังทีละหลายรายการ และลากเรียงลำดับ",
     code: "FM-ST-01-05",
     icon: "grid",
-    href: "/settings/locks",
+    href: "/settings/storage",
   },
   {
     id: "approve-setup",
