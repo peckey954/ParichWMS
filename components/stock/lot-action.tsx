@@ -53,7 +53,7 @@ export const SCOPES: Record<StockScope, { label: string; href: string; products:
   goods: { label: "สต็อกสินค้า", href: "/stock/goods", products: GOODS_PRODUCTS, zones: GOODS_ZONES },
 };
 
-function findLot(id: string) {
+export function findLot(id: string) {
   for (const scope of ["goods", "general"] as const) {
     for (const product of SCOPES[scope].products) {
       const lot = product.lots.find((l) => l.id === id);

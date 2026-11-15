@@ -9,19 +9,15 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@peckey954/ui/components/ui/dropdown-menu";
-import { toast } from "sonner";
 import type { Lot } from "@/lib/general-stock";
 
 /* ------------------------------------------------------------------
-   ปุ่ม ⋮ ท้ายแถวล็อต — ตามแบบ: พิมพ์บาร์โค้ด / ย้าย / ปรับปรุง
-   แทนปุ่มย้าย/ปรับปรุงสองปุ่มเดิม แถวจึงเตี้ยลง และไม่ต้องมีตัวเลือกซ่อนปุ่มในตัวกรอง
+   ปุ่ม ⋮ ท้ายแถวล็อต — ตามแบบเหลือแค่ "พิมพ์บาร์โค้ด"
+   ย้าย/ปรับปรุงย้ายไปอยู่ที่ ⋮ บนหัวหน้า (BulkMenu) ทำได้หลาย Lot ในใบเดียว
 
-   ย้าย/ปรับปรุงเปิดเป็นหน้าเต็ม (/stock/lot/<id>/…) เป็นลิงก์จริง
+   พิมพ์บาร์โค้ดเปิดเป็นหน้าเต็ม (/stock/lot/<id>/print) เป็นลิงก์จริง
    คลิกกลางเปิดแท็บใหม่ได้ ย้อนกลับแล้วกลับมาที่แท็บ/ชิปเดิม
 ------------------------------------------------------------------ */
-
-/** หน้าย้าย/ปรับปรุงของล็อต — หน้าเดียวใช้ทั้งสต็อกทั่วไปและสต็อกสินค้า */
-const lotActionHref = (lot: Lot, action: "move" | "adjust") => `/stock/lot/${lot.id}/${action}`;
 
 export function LotMenu({ lot }: { lot: Lot }) {
   return (
@@ -32,20 +28,10 @@ export function LotMenu({ lot }: { lot: Lot }) {
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="min-w-44">
-        <DropdownMenuItem onSelect={() => toast.success("ส่งพิมพ์บาร์โค้ดแล้ว", { description: lot.code })}>
-          <PrinterIcon />
-          พิมพ์บาร์โค้ด
-        </DropdownMenuItem>
         <DropdownMenuItem asChild>
-          <Link href={lotActionHref(lot, "move")}>
-            <ReplaceIcon />
-            ย้าย
-          </Link>
-        </DropdownMenuItem>
-        <DropdownMenuItem asChild>
-          <Link href={lotActionHref(lot, "adjust")}>
-            <ArrowUpDownIcon />
-            ปรับปรุง
+          <Link href={`/stock/lot/${lot.id}/print`}>
+            <PrinterIcon />
+            พิมพ์บาร์โค้ด
           </Link>
         </DropdownMenuItem>
       </DropdownMenuContent>

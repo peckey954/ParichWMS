@@ -86,7 +86,7 @@ function openStamp(action: LotAction) {
 }
 
 /** น้ำหนักต่อชิ้นต่อท้าย ถ้าบรรจุภัณฑ์ยังไม่ได้บอก (Bulk) */
-function productTags(p: Product) {
+export function productTags(p: Product) {
   const kg = p.lots.find((l) => l.kgPerPiece)?.kgPerPiece;
   const weight = kg && !p.packing.includes("กก.") ? `${kg} กก.` : undefined;
   return [CATEGORY_LABEL[p.category], p.packing, weight].filter((t): t is string => Boolean(t));
@@ -465,29 +465,11 @@ function BulkSheet({ scope, action }: { scope: StockScope; action: LotAction }) 
 
         <ScannerDialog scan={scan} />
 
-        <AlertDialog open={pendingRemove !== undefined} onOpenChange={(o) => !o && setPendingRemove(undefined)}>
-          <AlertDialogContent size="sm" className="data-[size=sm]:max-w-[22rem]">
-            <AlertDialogHeader className="text-center sm:text-center">
-              <AlertDialogTitle>คุณต้องการลบ Lot ใช่ไหม?</AlertDialogTitle>
-              <AlertDialogDescription>
-                Lot: {pendingRemove?.code}
-                <br />
-                หากลบแล้วจะไม่สามารถกู้คืนข้อมูลได้อีก
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel variant="outline-primary">ย้อนกลับ</AlertDialogCancel>
-              <AlertDialogAction
-                onClick={() => {
-                  if (pendingRemove) remove(pendingRemove.id);
-                  setPendingRemove(undefined);
-                }}
-              >
-                ลบ
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
+        <RemoveLotDialog
+          code={pendingRemove?.code}
+          onClose={() => setPendingRemove(undefined)}
+          onConfirm={() => pendingRemove && remove(pendingRemove.id)}
+        />
       </main>
 
       <div className="sticky bottom-0 z-30 border-t border-border bg-surface">
@@ -506,7 +488,44 @@ function BulkSheet({ scope, action }: { scope: StockScope; action: LotAction }) 
   );
 }
 
-function Summary({
+/** ยืนยันก่อนเอา Lot ออกจากใบ (ตามแบบ) — code ว่าง = ปิดอยู่ */
+export function RemoveLotDialog({
+  code,
+  onClose,
+  onConfirm,
+}: {
+  code?: string;
+  onClose: () => void;
+  onConfirm: () => void;
+}) {
+  return (
+    <AlertDialog open={code !== undefined} onOpenChange={(o) => !o && onClose()}>
+      <AlertDialogContent size="sm" className="data-[size=sm]:max-w-[22rem]">
+        <AlertDialogHeader className="text-center sm:text-center">
+          <AlertDialogTitle>คุณต้องการลบ Lot ใช่ไหม?</AlertDialogTitle>
+          <AlertDialogDescription>
+            Lot: {code}
+            <br />
+            หากลบแล้วจะไม่สามารถกู้คืนข้อมูลได้อีก
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel variant="outline-primary">ย้อนกลับ</AlertDialogCancel>
+          <AlertDialogAction
+            onClick={() => {
+              onConfirm();
+              onClose();
+            }}
+          >
+            ลบ
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  );
+}
+
+export function Summary({
   label,
   children,
   className,
@@ -523,7 +542,7 @@ function Summary({
   );
 }
 
-function ZoneBadge({ zone }: { zone: string }) {
+export function ZoneBadge({ zone }: { zone: string }) {
   return (
     <Badge appearance="soft" className="shrink-0 whitespace-nowrap">
       {zone}
