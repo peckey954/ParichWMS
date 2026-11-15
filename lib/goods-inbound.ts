@@ -15,9 +15,14 @@
 // ============================================================
 
 import type { InboundPiece } from "@/lib/general-stock";
+import { GOODS_ISSUE_DOCS, closeGoodsIssue, isGoodsIssueOpen, sampleTruckOf } from "@/lib/goods-issue";
 import { GOODS_HISTORY, type GoodsHistoryRow } from "@/lib/goods-stock";
 
-export type GoodsInboundSource = "production" | "external";
+/**
+ * return = ใบขอคืนภายนอก (Figma Stock-in Return) — ของคืนมากับรถเป็นสลิง
+ * หน้าตาและ Flow เลือกล็อคเหมือนรับเข้าภายนอกทุกอย่าง ต่างแค่หัวใบ
+ */
+export type GoodsInboundSource = "production" | "external" | "return";
 
 export type GoodsInboundDoc = {
   id: string;
@@ -41,11 +46,16 @@ export type GoodsInboundDoc = {
   round?: "ปกติ" | "แทรก";
   orderQty?: number;
   producedQty?: number;
+  // ---------- รับคืน ----------
+  requester?: string;
+  requestEditor?: string;
+  requesterNote?: string;
 };
 
 export const GOODS_INBOUND_SOURCE_LABEL: Record<GoodsInboundSource, string> = {
   production: "รอรับเข้าจากการผลิต",
   external: "รอรับเข้าภายนอก",
+  return: "รอรับคืน (ภายนอก)",
 };
 
 const pad = (n: number) => String(n).padStart(2, "0");
@@ -81,6 +91,26 @@ const SEED: GoodsInboundDoc[] = [
 ];
 
 export const GOODS_INBOUND_DOCS = SEED;
+
+/** ใบขอคืนภายนอก ในรูปใบรับเข้า — id เดียวกับใบขอคืน ปิดใบไหนก็ปิดอีกใบด้วย */
+const RETURN_DOCS: GoodsInboundDoc[] = GOODS_ISSUE_DOCS.filter((d) => d.status === "returnExternal").map((d) => ({
+  id: d.id,
+  code: d.code,
+  createdAt: d.createdAt,
+  source: "return",
+  productName: d.productName,
+  productType: d.productType,
+  group: d.group,
+  packing: d.packing ?? d.unit,
+  qty: Math.abs(d.qty),
+  unit: d.unit,
+  supplier: d.customer ?? "บริษัท เอชซี อินเตอร์เนชั่นแนล เทรดดิ้ง จำกัด",
+  truck: d.truck && d.truck !== "-" ? d.truck : sampleTruckOf(d.id),
+  arriveDate: d.arriveDate && d.arriveDate !== "-" ? d.arriveDate : d.createdAt.split("|")[0].trim(),
+  requester: d.requester,
+  requestEditor: d.lastEditor ?? d.editedBy,
+  requesterNote: d.requesterNote ?? d.note,
+}));
 
 export const isCountUnit = (unit: string) => unit === "ชิ้น" || unit === "ขวด";
 
@@ -168,14 +198,21 @@ function buildReceipt(doc: GoodsInboundDoc): GoodsInboundReceipt {
   const f = 10 ** digits;
   const per = Math.floor((doc.qty / count) * f) / f;
   const kg = kgOf(doc.packing);
-  const container = doc.source === "external" ? `AB-${1000 + Math.floor(rnd() * 9000)}` : undefined;
+  const container = doc.source !== "production" ? `AB-${1000 + Math.floor(rnd() * 9000)}` : undefined;
+  // ใบคืนเลขสลิงต่อจากเลขใบ …/01A-01-06 ตามแบบ
+  const slipCode = (k: number) =>
+    doc.source === "production"
+      ? `${doc.code}-${pad(k + 1)}`
+      : doc.source === "return"
+        ? `${doc.code}-01-${pad(k)}`
+        : `${doc.code}-06-${pad(k)}`;
   const slips: GoodsSlip[] = [];
   for (let i = 0; i < count; i++) {
     const qty = i === 0 ? Math.round((doc.qty - per * (count - 1)) * f) / f : per;
     slips.push({
       id: `${doc.id}-s${i}`,
       // เลขไล่จากมากไปน้อย สลิงล่าสุดอยู่บนสุดเหมือนตารางในแบบ
-      receiptCode: doc.source === "production" ? `${doc.code}-${pad(count - i + 1)}` : `${doc.code}-06-${pad(count - i)}`,
+      receiptCode: slipCode(count - i),
       createdAt: doc.createdAt,
       containerNo: i === 0 ? undefined : container,
       packing: doc.packing,
@@ -190,7 +227,7 @@ function buildReceipt(doc: GoodsInboundDoc): GoodsInboundReceipt {
   for (let i = 0; i < 2; i++) {
     slips.push({
       id: `${doc.id}-c${i}`,
-      receiptCode: doc.source === "production" ? `${doc.code}-${pad(count + i + 2)}` : `${doc.code}-06-${pad(count + i + 1)}`,
+      receiptCode: slipCode(count + i + 1),
       createdAt: doc.createdAt,
       packing: doc.packing,
       qty: per,
@@ -204,8 +241,15 @@ function buildReceipt(doc: GoodsInboundDoc): GoodsInboundReceipt {
 }
 
 export function getGoodsInboundReceipt(id: string): GoodsInboundReceipt | undefined {
-  const doc = GOODS_INBOUND_DOCS.find((d) => d.id === id);
+  const doc = GOODS_INBOUND_DOCS.find((d) => d.id === id) ?? RETURN_DOCS.find((d) => d.id === id);
   return doc ? buildReceipt(doc) : undefined;
+}
+
+/** ใบอื่นที่เป็นคนละสินค้า — สลิงของใบนั้นสแกนแล้วต้องขึ้น "สินค้าไม่ตรงกัน" */
+export function otherProductReceipt(doc: GoodsInboundDoc) {
+  const pool = doc.source === "return" ? RETURN_DOCS : GOODS_INBOUND_DOCS;
+  const other = pool.find((d) => d.productName !== doc.productName);
+  return other ? buildReceipt(other) : undefined;
 }
 
 export const liveSlips = (s: GoodsSlip[]) => s.filter((x) => !x.cancelled);
@@ -218,12 +262,17 @@ export const waitingSlips = (s: GoodsSlip[]) => liveSlips(s).filter((x) => !x.zo
 // ---------------------------------------------------------------
 
 const CLOSED = new Set<string>();
-export const isGoodsInboundOpen = (d: GoodsInboundDoc) => !CLOSED.has(d.id);
+export const isGoodsInboundOpen = (d: GoodsInboundDoc) => {
+  if (CLOSED.has(d.id)) return false;
+  const issue = d.source === "return" ? GOODS_ISSUE_DOCS.find((x) => x.id === d.id) : undefined;
+  return !issue || isGoodsIssueOpen(issue);
+};
 
 export function closeGoodsInbound(r: GoodsInboundReceipt) {
   const { doc } = r;
   if (CLOSED.has(doc.id)) return;
   CLOSED.add(doc.id);
+  if (doc.source === "return") closeGoodsIssue(doc.id);
   const live = liveSlips(r.slips);
   const row: GoodsHistoryRow = {
     id: `gh-in-${doc.id}`,
@@ -238,9 +287,9 @@ export function closeGoodsInbound(r: GoodsInboundReceipt) {
     doneQty: slipQty(r.slips),
     unit: doc.unit,
     zone: live[0]?.zone,
-    requester: ACTOR,
+    requester: doc.requester ?? ACTOR,
     actor: ACTOR,
-    status: "inbound",
+    status: doc.source === "return" ? "returnExternal" : "inbound",
     source: doc.source === "production" ? "production" : undefined,
   };
   GOODS_HISTORY.unshift(row);

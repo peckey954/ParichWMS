@@ -268,6 +268,12 @@ const SEED: GoodsIssueDoc[] = [
 
 export const GOODS_ISSUE_DOCS = SEED;
 
+/** ทะเบียนรถตัวอย่างสำหรับใบที่ไม่ได้ใส่รถไว้ — คงที่ตามเลขใบ ไม่สุ่มใหม่ทุกครั้ง */
+export function sampleTruckOf(id: string) {
+  const hash = [...id].reduce((a, c) => (a * 31 + c.charCodeAt(0)) % 100000, 7);
+  return `กค - ${String(1000 + (hash % 9000)).padStart(4, "0")}`;
+}
+
 /** ใบที่จ่ายไปแล้วในรอบนี้ — หลุดจากแท็บรอจ่าย/คืน */
 const CLOSED = new Set<string>();
 
@@ -376,9 +382,27 @@ export type ReturnLot = {
   ageDays: number;
   /** ปริมาณขอคืน (หน่วยของใบ) */
   qty: number;
-  /** จำนวนขอคืน (ชิ้น/ขวด) — ใบที่ไม่มีจำนวนเป็น undefined */
-  count?: number;
+  /** จำนวนขอคืน (ชิ้น/ขวด) — ใบตันที่ไม่ได้ระบุ คิดจากน้ำหนักต่อชิ้น */
+  count: number;
+  packing?: string;
+  /** จำนวนชิ้นของ Lot ตอนรับเข้า — บรรทัดรองใต้เลข Lot */
+  lotPieces: number;
+  /** ล็อคที่เลือกจากหน้าสแกนเลือกล็อค */
+  zone?: string;
 };
+
+/** ล็อคที่เลือกให้ Lot ที่ขอคืนในเซสชันนี้ — หน้ารับคืนอ่านกลับได้หลังกลับจากหน้าเลือกล็อค */
+const RETURN_ZONE = new Map<string, string>();
+export function setReturnLotZones(ids: string[], zone: string) {
+  for (const id of ids) RETURN_ZONE.set(id, zone);
+}
+
+/** จำนวนคืนที่พิมพ์ไว้ — ไม่หายตอนไปสแกนเลือกล็อคแล้วกลับมา */
+const RETURN_INPUT = new Map<string, string>();
+export const returnInputOf = (id: string) => RETURN_INPUT.get(id);
+export function setReturnInput(id: string, v: string) {
+  RETURN_INPUT.set(id, v);
+}
 
 /** แบ่งยอดเป็นส่วน ๆ ให้รวมกลับได้ยอดเดิมพอดี */
 function splitTotal(total: number, parts: number, digits: number) {
@@ -394,16 +418,30 @@ export function returnLotsFor(doc: GoodsIssueDoc): ReturnLot[] {
   if (doc.status === "returnSweep") return [];
   const n = Number(doc.id.replace(/\D/g, ""));
   const parts = Math.abs(doc.qty) >= 2 ? 2 : 1;
-  const qtys = splitTotal(Math.abs(doc.qty), parts, isCountUnit(doc.unit) ? 0 : 2);
+  const byCount = isCountUnit(doc.unit);
+  const qtys = splitTotal(Math.abs(doc.qty), parts, byCount ? 0 : 2);
   const counts = doc.count !== undefined ? splitTotal(Math.abs(doc.count), parts, 0) : undefined;
-  return qtys.map((q, i) => ({
-    id: `${doc.id}-r${i + 1}`,
-    code: `PD2605${pad(12 - i * 3)}/${pad(n + i)}`,
-    receivedAt: `5/${pad(14 - i * 3)}/2026`,
-    ageDays: 44 + i * 3,
-    qty: q,
-    count: counts?.[i],
-  }));
+  const kg = kgOf(doc.packing);
+  return qtys.map((q, i) => {
+    const id = `${doc.id}-r${i + 1}`;
+    const count = counts?.[i] ?? (byCount ? q : Math.round((q * 1000) / kg));
+    return {
+      id,
+      code: `PD2605${pad(12 - i * 3)}/${pad(n + i)}`,
+      receivedAt: `5/${pad(14 - i * 3)}/2026`,
+      ageDays: 44 + i * 3,
+      qty: q,
+      count,
+      packing: doc.packing,
+      lotPieces: Math.ceil((count + 200) / 100) * 100,
+      zone: RETURN_ZONE.get(id),
+    };
+  });
+}
+
+/** ใบขอคืนอื่นที่เป็นคนละสินค้า ชนิดเดียวกัน — Lot ของใบนั้นสแกนแล้วขึ้น "สินค้าไม่ตรงกัน" */
+export function otherReturnDoc(doc: GoodsIssueDoc) {
+  return GOODS_ISSUE_DOCS.find((d) => d.status === doc.status && d.productName !== doc.productName);
 }
 
 export const formatTons = (v: number) =>

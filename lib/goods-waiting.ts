@@ -13,6 +13,7 @@ import {
   isGoodsIssueOpen,
   isGoodsReturn,
   matchesGoodsIssue,
+  sampleTruckOf,
   type GoodsIssueDoc,
 } from "./goods-issue";
 
@@ -105,7 +106,7 @@ export const truckOf = (first: string, i: number) =>
   i === 0 ? first : first.replace(/\d+$/, (n) => String(Number(n) + i * 111).padStart(n.length, "0"));
 
 /** ทะเบียนรถตัวอย่างสำหรับใบที่ไม่ได้ใส่รถไว้ — คงที่ตามเลขใบ ไม่สุ่มใหม่ทุกครั้ง */
-export const sampleTruck = (id: string) => `กค - ${String(1000 + (hash(id) % 9000)).padStart(4, "0")}`;
+export const sampleTruck = sampleTruckOf;
 
 /**
  * ใบจริงมีได้หลายสินค้า แต่ข้อมูลตัวอย่างหนึ่งใบมีสินค้าเดียว
