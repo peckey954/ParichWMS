@@ -689,14 +689,15 @@ export function SimulateToggle<S extends string = Simulate>({
   return (
     <div
       className={cn(
-        "flex items-center gap-1.5 text-xs",
+        // ตัวเลือกเยอะ (หน้าเลือกล็อคสินค้ามีห้าแบบ) ขึ้นบรรทัดใหม่แทนการบีบตัวหนังสือ
+        "flex flex-wrap items-center justify-center gap-1.5 text-xs",
         dark ? "text-white/70" : "text-muted-foreground"
       )}
     >
       ผลจำลอง
       <div
         className={cn(
-          "flex rounded-full border border-dashed p-0.5",
+          "flex flex-wrap justify-center rounded-2xl border border-dashed p-0.5",
           dark ? "border-white/40" : "border-border"
         )}
       >
@@ -707,7 +708,7 @@ export function SimulateToggle<S extends string = Simulate>({
             aria-pressed={state.simulate === o.value}
             onClick={() => state.setSimulate(o.value)}
             className={cn(
-              "rounded-full px-2.5 py-1 transition-colors",
+              "rounded-full px-2.5 py-1 whitespace-nowrap transition-colors",
               state.simulate === o.value
                 ? dark
                   ? "bg-white font-medium text-neutral-900"

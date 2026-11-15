@@ -36,14 +36,17 @@ import {
    reject (ถ้าส่งมา) ปัดตก Lot ที่เจอแต่ใช้ในใบนี้ไม่ได้ เช่นคนละสินค้า
    ขึ้นเป็น toast สีแดงแยกจากไม่พบ
 
+   hold (ถ้าส่งมา) พัก Lot ที่ต้องถามก่อนเพิ่ม เช่นสลิงที่เลือกล็อคไว้แล้ว
+   กล้องปิดเหมือนอ่านผ่าน แต่ไม่เพิ่มเข้ารายการ — ส่งให้ onHold ไปถามเอง
+
    ---------- ยังเป็นของจำลอง ----------
    กล้องกับการถอดบาร์โค้ดยังไม่ได้ต่อของจริง "กล้อง" อ่านได้ Lot แรกในรายการ
    ที่ยังไม่ได้เลือก (เรียงเก่าสุดก่อน = FIFO) ชิป "ผลจำลอง" สลับไปดูทางไม่พบสินค้าได้
 ------------------------------------------------------------------ */
 
 type Via = "scan" | "photo";
-type Simulate = "found" | "notfound" | "rejected" | "partial";
-type Outcome = "found" | "already" | "notfound" | "rejected" | "empty";
+type Simulate = "found" | "notfound" | "rejected" | "held" | "partial";
+type Outcome = "found" | "already" | "notfound" | "rejected" | "held" | "empty";
 
 const READ_MS = 900;
 /** การ์ดแดงค้างบนกล้องก่อนเล็งใหม่ */
@@ -58,6 +61,9 @@ export function useLotScanner<L extends ScanLot>({
   onAdd,
   reject,
   rejectLabel = "ใช้ Lot นี้ไม่ได้",
+  hold,
+  onHold,
+  holdLabel = "ต้องยืนยันก่อน",
   describe,
   inputId,
   selectId,
@@ -70,6 +76,11 @@ export function useLotScanner<L extends ScanLot>({
   reject?: (lot: L) => string | undefined;
   /** ชื่อผลจำลอง/หัว toast ของ reject เช่น "คนละสินค้า" */
   rejectLabel?: string;
+  /** Lot ที่ต้องถามก่อนเพิ่ม — true = ไม่เพิ่มเอง ส่งให้ onHold */
+  hold?: (lot: L) => boolean;
+  onHold?: (lot: L) => void;
+  /** ชื่อผลจำลองของ hold เช่น "มีล็อคแล้ว" */
+  holdLabel?: string;
   /** บรรทัดรองบน toast ตอนเจอ Lot เดียว เช่น "PD…/01 · 80 ตัน" */
   describe: (lot: L) => string;
   inputId: string;
@@ -85,9 +96,9 @@ export function useLotScanner<L extends ScanLot>({
   const [partial, setPartial] = React.useState<{ found: string[]; failed: number } | null>(null);
 
   // สแกนหลายรูปต่อกันในรอบเดียว ต้องเห็น Lot ที่เพิ่งเพิ่มก่อน React วาดใหม่
-  const live = React.useRef({ lots, picked, onAdd, reject, describe });
+  const live = React.useRef({ lots, picked, onAdd, reject, hold, onHold, describe });
   React.useEffect(() => {
-    live.current = { lots, picked, onAdd, reject, describe };
+    live.current = { lots, picked, onAdd, reject, hold, onHold, describe };
   });
   const simulateRef = React.useRef(simulate);
   const sessionRef = React.useRef<{
@@ -174,12 +185,15 @@ export function useLotScanner<L extends ScanLot>({
 
   /** ป้ายที่ "กล้อง" จะอ่านได้ — Lot แรกที่ยังไม่ได้เลือกและใช้ได้ (ผลจำลองคนละสินค้า = Lot แรกที่ใช้ไม่ได้) */
   const mockRead = (): string | null => {
-    const { lots: pool, picked: chosen, reject: rejects } = live.current;
+    const { lots: pool, picked: chosen, reject: rejects, hold: holds } = live.current;
     if (pool.length === 0) return null;
     if (simulateRef.current === "notfound") return pool[0].code.replace(/\d+$/, "99");
     if (simulateRef.current === "rejected")
       return (pool.find((l) => rejects?.(l)) ?? pool.find((l) => !chosen.includes(l.id)))?.code ?? null;
-    return pool.find((l) => !chosen.includes(l.id) && !rejects?.(l))?.code ?? null;
+    const open = pool.filter((l) => !chosen.includes(l.id) && !rejects?.(l));
+    if (simulateRef.current === "held") return (open.find((l) => holds?.(l)) ?? open[0])?.code ?? null;
+    // ป้ายที่ต้องถามก่อนมาทีหลัง — สแกนไล่ไปเรื่อยๆ จะไม่เจอคำถามจนกว่าจะหมดป้ายปกติ
+    return (open.find((l) => !holds?.(l)) ?? open[0])?.code ?? null;
   };
 
   const applyCode = (code: string | null): { outcome: Outcome; lot?: L; reason?: string } => {
@@ -194,6 +208,10 @@ export function useLotScanner<L extends ScanLot>({
     if (reason) {
       session?.rejected.push({ lot: hit, reason });
       return { outcome: "rejected", lot: hit, reason };
+    }
+    if (!live.current.picked.includes(hit.id) && live.current.hold?.(hit)) {
+      live.current.onHold?.(hit);
+      return { outcome: "held", lot: hit };
     }
     clearTimeout(flashTimer.current);
     setFlashId(hit.id);
@@ -242,6 +260,7 @@ export function useLotScanner<L extends ScanLot>({
     { value: "found", label: "พบ" },
     { value: "notfound", label: "ไม่พบ" },
     ...(reject ? [{ value: "rejected" as const, label: "คนละสินค้า" }] : []),
+    ...(hold ? [{ value: "held" as const, label: holdLabel }] : []),
     { value: "partial", label: "รูปบางส่วน" },
   ];
 
@@ -424,7 +443,7 @@ export function ScannerDialog({ scan }: { scan: LotScanner }) {
               ผลจำลองสลับได้ที่กล่องสแกนบนหน้า ไม่โชว์บนกล้อง */}
           <div className="relative min-h-0 flex-1">
             <Viewfinder
-              phase={{ kind: phase.kind === "rejected" ? "found" : phase.kind, code: phase.code }}
+              phase={{ kind: phase.kind === "rejected" || phase.kind === "held" ? "found" : phase.kind, code: phase.code }}
               className="h-full bg-black/40"
             />
             <div className="absolute inset-x-6 bottom-[max(1.5rem,env(safe-area-inset-bottom))] flex justify-end max-sm:inset-x-4">

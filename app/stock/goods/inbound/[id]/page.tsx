@@ -20,7 +20,6 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@peckey954/ui/components/ui/collapsible";
-import { Separator } from "@peckey954/ui/components/ui/separator";
 import {
   Table,
   TableBody,
@@ -61,7 +60,7 @@ import {
    ใบรับเข้าสินค้า — ภายนอก (PO) หรือ ผลิต (PD) ตาม Figma Tab 2.1 / 2.2
 
    หัวใบต่างกันตามแหล่ง ส่วนล่างเหมือนกัน: สลิงที่รับมาแล้ว รอเลือกล็อค
-   ปุ่ม "เลือกล็อครับเข้า" ไปหน้าเลือกล็อค (สแกน/เลือกจากรายการ)
+   ปุ่ม "สแกนเลือกล็อค" ไปหน้าเลือกล็อค เปิดกล้องให้สแกนป้ายสลิงทันที
 
    บันทึก — เลือกล็อคครบทุกสลิง = รับเข้าเสร็จ ใบออกจากแท็บรอรับเข้า ไปอยู่ในประวัติ
             ยังไม่ครบ = เตือนก่อน บันทึกได้ แต่ใบยังค้างที่รอรับเข้า
@@ -145,15 +144,18 @@ function ReceiptSheet({ receipt }: { receipt: GoodsInboundReceipt }) {
         <Collapsible defaultOpen className="mt-5 rounded-xl border border-border bg-card px-4 py-5">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0 space-y-1">
-              <p className="flex flex-wrap items-center gap-x-2 gap-y-1">
+              {/* มือถือ: ชื่อสินค้าบรรทัดเดียว แท็กลงบรรทัดถัดไป / จอกว้าง: ต่อกันแถวเดียว */}
+              <div className="flex flex-col gap-1 @3xl:flex-row @3xl:flex-wrap @3xl:items-center @3xl:gap-x-2">
                 <span className="font-semibold">{doc.productName}</span>
-                {(production ? [doc.group, doc.packing] : [doc.productType, doc.group, doc.packing]).map((v) => (
-                  <React.Fragment key={v}>
-                    <span className="h-4 w-px bg-border" aria-hidden />
-                    <span className="text-sm">{v}</span>
-                  </React.Fragment>
-                ))}
-              </p>
+                <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
+                  {(production ? [doc.group, doc.packing] : [doc.productType, doc.group, doc.packing]).map((v, i) => (
+                    <React.Fragment key={v}>
+                      <span className={cn("h-4 w-px bg-border", i === 0 && "hidden @3xl:block")} aria-hidden />
+                      <span>{v}</span>
+                    </React.Fragment>
+                  ))}
+                </p>
+              </div>
               <p className="text-sm font-semibold @3xl:hidden">{right}</p>
             </div>
             <div className="flex shrink-0 items-center gap-2">
@@ -237,10 +239,10 @@ function ReceiptSheet({ receipt }: { receipt: GoodsInboundReceipt }) {
             <div className="mt-5 flex flex-wrap items-center justify-between gap-3">
               <h2 className="font-semibold">{tab === "in" ? "รับเข้าสินค้าต่อสลิง" : "สลิงที่ยกเลิก"}</h2>
               {live.length === 0 ? (
-                <Button disabled>เลือกล็อครับเข้า</Button>
+                <Button disabled>สแกนเลือกล็อค</Button>
               ) : (
                 <Button asChild>
-                  <Link href={`/stock/goods/inbound/${doc.id}/zone`}>เลือกล็อครับเข้า</Link>
+                  <Link href={`/stock/goods/inbound/${doc.id}/zone`}>สแกนเลือกล็อค</Link>
                 </Button>
               )}
             </div>
@@ -312,18 +314,20 @@ function SlipList({ rows, external, unit }: { rows: GoodsSlip[]; external: boole
       <div className="space-y-3 @3xl:hidden">
         {slice.map((s) => (
           <div key={s.id} className="rounded-xl border border-border bg-card p-4">
-            <div className="flex items-center justify-between gap-2">
+            {/* ตามแบบ: เลขสลิง + วันที่แถวเดียว แล้วรายการหัวข้อ:ค่า ล็อคอยู่แถวสุดท้าย */}
+            <div className="flex items-baseline justify-between gap-2">
               <span className="font-semibold">{s.receiptCode}</span>
-              {s.zone ? <ZoneCell zone={s.zone} /> : <span className="text-sm text-muted-foreground">ยังไม่มีล็อค</span>}
+              <span className="shrink-0 text-sm text-muted-foreground">{s.createdAt}</span>
             </div>
-            <p className="mt-1 text-sm text-muted-foreground">{s.createdAt}</p>
-            <Separator className="my-3" />
-            <dl className="space-y-1.5 text-sm">
+            <dl className="mt-3 space-y-1.5 text-sm">
               {external && <CardRow label="เบอร์ตู้คอนเทนเนอร์">{s.containerNo ?? "-"}</CardRow>}
-              {external && <CardRow label="บรรจุภัณฑ์">{s.packing}</CardRow>}
-              <CardRow label={`ปริมาณรับเข้า (${unit})`}>{fmt(s.qty)}</CardRow>
-              {!byCount && <CardRow label="จำนวนรับเข้า (ชิ้น)">{s.count.toLocaleString("en-US")}</CardRow>}
-              {s.note && <CardRow label="หมายเหตุ">{s.note}</CardRow>}
+              <CardRow label="บรรจุภัณฑ์">{s.packing}</CardRow>
+              <CardRow label={`ปริมาณรับเข้าต่อสลิง (${unit})`}>{fmt(s.qty)}</CardRow>
+              {!byCount && <CardRow label="จำนวนรับเข้าต่อสลิง (ชิ้น)">{s.count.toLocaleString("en-US")}</CardRow>}
+              <CardRow label="หมายเหตุ">{s.note ?? "-"}</CardRow>
+              <CardRow label="ล็อค">
+                <ZoneCell zone={s.zone} />
+              </CardRow>
             </dl>
           </div>
         ))}
