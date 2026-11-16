@@ -38,7 +38,7 @@ import { Textarea } from "@peckey954/ui/components/ui/textarea";
 import { cn } from "@peckey954/ui/lib/utils";
 import { DateRangeSelect, type DateRange } from "@/components/date-select";
 import { useNumberField } from "@/components/number-field";
-import { PR_PRODUCTS, type PrCategoryId, type PrDoc } from "@/lib/pr";
+import { PR_PRODUCTS, PR_REASONS, type PrCategoryId, type PrDoc, type PrReason } from "@/lib/pr";
 import { COMPANY_POOL, formatPoBaht, formatPoQty } from "@/lib/po";
 
 /* ------------------------------------------------------------------
@@ -73,13 +73,40 @@ export type DraftLine = {
   prRef?: {
     code: string;
     requestedQty: number;
+    /** จำนวนตั้งต้นที่ใช้เทียบว่าเปลี่ยนไปหรือยัง — หน้าแก้ไขใช้ยอดที่สั่งไว้
+     *  ในใบปัจจุบัน ไม่มีค่า = เทียบกับ requestedQty (ตอนสร้างใบ) */
+    baseQty?: number;
     /** บรรจุภัณฑ์ตอนเริ่มต้น (ตามที่ขอไว้) — เก็บแยกจาก line.packing ที่แก้ได้
      *  เพื่อเทียบว่าค่าปัจจุบันเปลี่ยนไปจากที่ขอไว้หรือยัง */
     originalPacking?: string;
     requester: string;
     editedBy?: string;
+    reason: PrReason;
   };
 };
+
+/** การ์ดที่ได้ key เดียวกันจะถูกรวมเป็นรายการเดียวในใบสั่งซื้อตอนบันทึก —
+ *  สินค้าเดียวกัน บรรจุภัณฑ์เดียวกัน */
+export function lineMergeKey(l: Pick<DraftLine, "categoryId" | "productName" | "productSub" | "packing">) {
+  return [l.categoryId, l.productName, l.productSub ?? "", l.packing ?? ""].join("|");
+}
+
+/** ราคาสั่ง/ค่าจัดการของการ์ดที่รวมกันได้ต้องเท่ากันเสมอ — ให้ทุกการ์ดในกลุ่ม
+ *  ใช้ราคาของการ์ดแรกในกลุ่ม (ตามลำดับที่เห็นในหน้า) */
+export function alignGroupPrices(lines: DraftLine[]): DraftLine[] {
+  const first = new Map<string, DraftLine>();
+  return lines.map((l) => {
+    const k = lineMergeKey(l);
+    const lead = first.get(k);
+    if (!lead) {
+      first.set(k, l);
+      return l;
+    }
+    return lead.pricePerUnit === l.pricePerUnit && lead.handlingPerUnit === l.handlingPerUnit
+      ? l
+      : { ...l, pricePerUnit: lead.pricePerUnit, handlingPerUnit: lead.handlingPerUnit };
+  });
+}
 
 export function toDraftLine(pr: PrDoc): DraftLine {
   const product = PR_PRODUCTS.find(
@@ -109,6 +136,7 @@ export function toDraftLine(pr: PrDoc): DraftLine {
       originalPacking: packing,
       requester: pr.requester,
       editedBy: pr.editedBy,
+      reason: pr.reasons[0] ?? PR_REASONS[0],
     },
   };
 }
@@ -185,9 +213,42 @@ export function PoForm({
     [lines]
   );
 
+  // ราคาผูกกันตามกลุ่มสินค้า+บรรจุภัณฑ์ — แก้ราคาการ์ดไหน การ์ดอื่นในกลุ่ม
+  // เปลี่ยนตาม เปลี่ยนบรรจุภัณฑ์จนไปตรงกลุ่มอื่น ก็รับราคาของกลุ่มนั้นมา
   function updateLine(key: string, patch: Partial<DraftLine>) {
-    set({ lines: lines.map((l) => (l.key === key ? { ...l, ...patch } : l)) });
+    const target = lines.find((l) => l.key === key);
+    if (!target) return;
+    const next = { ...target, ...patch };
+    const priceChanged = "pricePerUnit" in patch || "handlingPerUnit" in patch;
+    const groupKey = lineMergeKey(next);
+    const updated = lines.map((l) => {
+      if (l.key === key) return next;
+      if (priceChanged && lineMergeKey(l) === groupKey) {
+        return { ...l, pricePerUnit: next.pricePerUnit, handlingPerUnit: next.handlingPerUnit };
+      }
+      return l;
+    });
+    if (!priceChanged && "packing" in patch) {
+      const peer = updated.find((l) => l.key !== key && lineMergeKey(l) === groupKey);
+      if (peer) {
+        set({
+          lines: updated.map((l) =>
+            l.key === key
+              ? { ...l, pricePerUnit: peer.pricePerUnit, handlingPerUnit: peer.handlingPerUnit }
+              : l
+          ),
+        });
+        return;
+      }
+    }
+    set({ lines: updated });
   }
+
+  const groupSizes = React.useMemo(() => {
+    const m = new Map<string, number>();
+    for (const l of lines) m.set(lineMergeKey(l), (m.get(lineMergeKey(l)) ?? 0) + 1);
+    return m;
+  }, [lines]);
 
   function removeLine(key: string) {
     set({ lines: lines.filter((l) => l.key !== key) });
@@ -287,6 +348,7 @@ export function PoForm({
               <ProductCard
                 key={line.key}
                 line={line}
+                peers={(groupSizes.get(lineMergeKey(line)) ?? 1) - 1}
                 onChange={(patch) => updateLine(line.key, patch)}
                 onRemove={() => removeLine(line.key)}
               />
@@ -371,10 +433,13 @@ function RadioBox({
 
 function ProductCard({
   line,
+  peers,
   onChange,
   onRemove,
 }: {
   line: DraftLine;
+  /** จำนวนการ์ดอื่นที่เป็นสินค้า+บรรจุภัณฑ์เดียวกัน (ใช้ราคาเดียวกัน) */
+  peers: number;
   onChange: (patch: Partial<DraftLine>) => void;
   onRemove: () => void;
 }) {
@@ -383,7 +448,8 @@ function ProductCard({
   // ในหน้านี้) ไม่มีของเดิมให้เทียบ เลยไม่มีทางเข้าเงื่อนไขนี้ได้เลย
   const changedFromRequest =
     !!line.prRef &&
-    (line.orderedQty !== line.prRef.requestedQty || line.packing !== line.prRef.originalPacking);
+    (line.orderedQty !== (line.prRef.baseQty ?? line.prRef.requestedQty) ||
+      line.packing !== line.prRef.originalPacking);
 
   return (
     // ไม่ defaultOpen — การ์ดสินค้าเริ่มต้นหุบไว้เสมอ กางเมื่อกดดูข้อมูลอ้างอิง
@@ -511,6 +577,13 @@ function ProductCard({
             step={10}
           />
         </div>
+        {/* บอกให้รู้ว่าทำไมแก้ราคาที่นี่แล้วการ์ดอื่นเปลี่ยนตาม — บันทึกแล้วการ์ด
+            กลุ่มนี้รวมเป็นแถวเดียวในใบสั่งซื้อ */}
+        {peers > 0 && (
+          <p className="text-sm text-muted-foreground @lg:col-span-2 @lg:col-start-3">
+            ใช้ราคาเดียวกับสินค้านี้อีก {peers} ใบขอซื้อ
+          </p>
+        )}
       </div>
 
       {/* ---------- เหตุผลเปลี่ยนข้อมูล ----------

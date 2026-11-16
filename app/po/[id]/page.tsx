@@ -93,6 +93,7 @@ import {
   PO_REOPEN_DAYS,
   PO_ROUND_STATUS_LABEL,
   type PoWholesale,
+  poCanEdit,
   poProgress,
   poTotalPrice,
   type PoDoc,
@@ -263,9 +264,10 @@ export default function PoOrderDetailPage() {
   const progress = poProgress(po);
   // สถานะเปิด/ปิดใบ + ส่งออกรายงาน — ตั้งแต่เริ่มทยอยรับสินค้าเป็นต้นไป
   const canCloseEarly = !cancelled && (closed || progress !== "notStarted");
-  // เมนู ⋮ — แก้ไขได้ตอนรออนุมัติ/ไม่อนุมัติ (ส่งกลับแก้ไข) อนุมัติแล้วแก้ไม่ได้
-  // ยกเลิกได้จนถึง "รอรับสินค้า" เริ่มรับสินค้าแล้วไม่มีเมนู
-  const canEdit = !cancelled && po.approval !== "approved";
+  // เมนู ⋮ — แก้ไขได้จนกว่าจะเริ่มรับสินค้า (ดู poCanEdit) เริ่มรับแล้วยังเห็น
+  // "แก้ไข" แต่กดไม่ได้ พร้อมบอกเหตุผล ยกเลิกได้จนถึง "รอรับสินค้า"
+  const canEdit = poCanEdit(po);
+  const showEdit = !cancelled;
   const canCancel = !cancelled && !closed && (po.approval !== "approved" || progress === "notStarted");
   const editHref = `/po/${po.id}/edit`;
 
@@ -311,7 +313,7 @@ export default function PoOrderDetailPage() {
               </Button>
             )}
 
-          {(canEdit || canCancel) && (
+          {(showEdit || canCancel) && (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button
@@ -324,14 +326,23 @@ export default function PoOrderDetailPage() {
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="min-w-40">
-                {canEdit && (
-                  <DropdownMenuItem asChild>
-                    <Link href={editHref}>
-                      <PencilIcon />
-                      แก้ไข
-                    </Link>
-                  </DropdownMenuItem>
-                )}
+                {showEdit &&
+                  (canEdit ? (
+                    <DropdownMenuItem asChild>
+                      <Link href={editHref}>
+                        <PencilIcon />
+                        แก้ไข
+                      </Link>
+                    </DropdownMenuItem>
+                  ) : (
+                    <DropdownMenuItem disabled className="flex-col items-start gap-0.5">
+                      <span className="flex items-center gap-2">
+                        <PencilIcon />
+                        แก้ไข
+                      </span>
+                      <span className="pl-6 text-xs">เริ่มรับสินค้าแล้ว แก้ไขไม่ได้</span>
+                    </DropdownMenuItem>
+                  ))}
                 {canCancel && (
                   <DropdownMenuItem onSelect={() => setCancelOpen(true)}>
                     <Trash2Icon />

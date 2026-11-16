@@ -6,15 +6,32 @@ import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { Button } from "@peckey954/ui/components/ui/button";
 import { formatDateSlash, parseDateSlash } from "@/components/date-select";
-import { PoForm, toDraftLine, type DraftLine, type PoFormState } from "@/components/po/po-form";
-import { PO_QUEUE_DOCS, type PoDoc, type PoLineItem } from "@/lib/po";
+import {
+  alignGroupPrices,
+  lineMergeKey,
+  PoForm,
+  toDraftLine,
+  type DraftLine,
+  type PoFormState,
+} from "@/components/po/po-form";
+import {
+  mergePrSources,
+  PO_QUEUE_DOCS,
+  poCanEdit,
+  type PoDoc,
+  type PoLineItem,
+  type PoPrSource,
+} from "@/lib/po";
 import { clearPoDraft, getPoDraft, savePoEdit, stashPoDraft, usePoOrder } from "@/lib/po-edits";
 import { PR_PRODUCTS, PR_REASONS } from "@/lib/pr";
 
 /* ------------------------------------------------------------------
-   แก้ไขใบสั่งซื้อ — เข้าจากหน้าใบสั่งซื้อที่ "รออนุมัติ" หรือ "ไม่อนุมัติ"
-   (ส่งกลับแก้ไข) ได้สองทาง: เมนู ⋮ > แก้ไข และลิงก์ "แก้ไขใบสั่งซื้อ" ในกล่อง
-   แจ้งเตือนสีแดง ฟอร์มเดียวกับหน้าสร้างใบสั่งซื้อ (PoForm)
+   แก้ไขใบสั่งซื้อ — แก้ได้จนกว่าจะเริ่มรับสินค้า (poCanEdit) เข้าได้สองทาง:
+   เมนู ⋮ > แก้ไข และลิงก์ "แก้ไขใบสั่งซื้อ" ในกล่องแจ้งเตือนสีแดง (ไม่อนุมัติ)
+   ฟอร์มเดียวกับหน้าสร้างใบสั่งซื้อ (PoForm)
+
+   รายการในใบ (สินค้า+บรรจุภัณฑ์ละแถว) แยกกลับเป็นการ์ดตามใบขอซื้อที่รวมมา
+   บันทึกแล้วรวมกลับเป็นแถวเดียวตามสินค้า+บรรจุภัณฑ์อีกครั้ง
 
    บันทึกแล้วใบกลับไป "รออนุมัติ" ใหม่ ขึ้น toast "แก้ไขใบสั่งซื้อสำเร็จ" แล้ว
    พากลับหน้าใบสั่งซื้อ (ไม่มี backend — เก็บไว้ใน lib/po-edits ระหว่างเซสชัน)
@@ -23,12 +40,13 @@ import { PR_PRODUCTS, PR_REASONS } from "@/lib/pr";
    ออกเก็บร่างที่กรอกค้างไว้ กลับมาพร้อม ?add=<ids ใบขอซื้อที่เพิ่งเลือก>
 ------------------------------------------------------------------ */
 
-function toEditLine(item: PoLineItem): DraftLine {
+/** รายการในใบแยกกลับเป็นการ์ดตามใบขอซื้อที่รวมมา — การ์ดละใบขอซื้อ */
+function toEditLines(item: PoLineItem): DraftLine[] {
   const product = PR_PRODUCTS.find(
     (p) => p.category === item.categoryId && p.name === item.productName && p.sub === item.productSub
   );
-  return {
-    key: item.id,
+  return item.prs.map((src) => ({
+    key: `${item.id}~${src.prCode}`,
     productId: product?.id,
     categoryId: item.categoryId,
     categoryLabel: item.categoryLabel,
@@ -38,21 +56,23 @@ function toEditLine(item: PoLineItem): DraftLine {
     packing: item.packing,
     packingOptions: product?.packingOptions ?? (item.packing ? [item.packing] : []),
     unit: item.unit,
-    neededDate: item.neededDate,
-    urgent: !!item.urgent,
-    orderedQty: item.orderedQty,
+    neededDate: src.neededDate,
+    urgent: !!src.urgent,
+    orderedQty: src.orderedQty,
     pricePerUnit: item.pricePerUnit,
     handlingPerUnit: item.handlingPerUnit,
-    changeReason: "",
+    changeReason: src.changeReason ?? "",
     // เทียบกับค่าในใบสั่งซื้อปัจจุบัน — แก้จำนวน/บรรจุภัณฑ์แล้วต้องใส่เหตุผล
     prRef: {
-      code: item.prCode,
-      requestedQty: item.orderedQty,
+      code: src.prCode,
+      requestedQty: src.requestedQty,
+      baseQty: src.orderedQty,
       originalPacking: item.packing,
-      requester: item.requester,
-      editedBy: item.editedBy,
+      requester: src.requester,
+      editedBy: src.editedBy,
+      reason: src.reason,
     },
-  };
+  }));
 }
 
 function toFormState(po: PoDoc): PoFormState {
@@ -60,51 +80,49 @@ function toFormState(po: PoDoc): PoFormState {
     poType: po.poType,
     company: po.company,
     expectedRange: { from: parseDateSlash(po.expectedFrom), to: parseDateSlash(po.expectedTo) },
-    lines: po.lineItems.map(toEditLine),
+    lines: po.lineItems.flatMap(toEditLines),
     note: po.note ?? "",
   };
 }
 
-/** แปลงการ์ดในฟอร์มกลับเป็นรายการในใบ — รายการเดิมเก็บรอบ/ข้อมูลอื่นไว้ตามเดิม
- *  รายการที่เพิ่มจากใบขอซื้อใหม่สร้างจากใบขอซื้อนั้น */
-function toLineItem(po: PoDoc, line: DraftLine): PoLineItem {
-  const changeReason = line.changeReason.trim() || undefined;
-  const values = {
-    packing: line.packing,
-    orderedQty: line.orderedQty,
-    pricePerUnit: line.pricePerUnit,
-    handlingPerUnit: line.handlingPerUnit,
-  };
-  const orig = po.lineItems.find((i) => i.id === line.key);
-  if (orig) {
-    const changed = (Object.keys(values) as (keyof typeof values)[]).some((k) => values[k] !== orig[k]);
-    return {
-      ...orig,
-      ...values,
-      changeReason: changeReason ?? orig.changeReason,
-      editedBy: changed ? po.requester : orig.editedBy,
-    };
+/** รวมการ์ดกลับเป็นรายการในใบ — การ์ดสินค้า+บรรจุภัณฑ์เดียวกันเป็นรายการเดียว
+ *  รายการที่ตรงกับของเดิมในใบเก็บไอดี/รอบ/ข้อมูลชั่งไว้ตามเดิม */
+function toLineItems(po: PoDoc, lines: DraftLine[]): PoLineItem[] {
+  const groups = new Map<string, DraftLine[]>();
+  for (const l of lines) {
+    const k = lineMergeKey(l);
+    groups.set(k, [...(groups.get(k) ?? []), l]);
   }
-  const pr = PO_QUEUE_DOCS.find((d) => d.id === line.key);
-  return {
-    id: line.key,
-    poId: po.id,
-    categoryId: line.categoryId,
-    categoryLabel: line.categoryLabel,
-    group: line.group,
-    productName: line.productName,
-    productSub: line.productSub,
-    unit: line.unit,
-    neededDate: line.neededDate,
-    urgent: line.urgent,
-    prCode: line.prRef?.code ?? "-",
-    requester: line.prRef?.requester ?? po.requester,
-    editedBy: line.prRef?.editedBy,
-    reason: pr?.reasons[0] ?? PR_REASONS[0],
-    changeReason,
-    rounds: [],
-    ...values,
-  };
+  return [...groups.entries()].map(([k, group], i) => {
+    const lead = group[0];
+    const prs: PoPrSource[] = group.map((l) => ({
+      prCode: l.prRef?.code ?? "-",
+      requestedQty: l.prRef?.requestedQty ?? l.orderedQty,
+      orderedQty: l.orderedQty,
+      neededDate: l.neededDate,
+      urgent: l.urgent,
+      requester: l.prRef?.requester ?? po.requester,
+      editedBy: l.prRef?.editedBy,
+      reason: l.prRef?.reason ?? PR_REASONS[0],
+      changeReason: l.changeReason.trim() || undefined,
+    }));
+    const orig = po.lineItems.find((it) => lineMergeKey(it) === k);
+    const base = {
+      categoryId: lead.categoryId,
+      categoryLabel: lead.categoryLabel,
+      group: lead.group,
+      productName: lead.productName,
+      productSub: lead.productSub,
+      packing: lead.packing,
+      unit: lead.unit,
+      pricePerUnit: lead.pricePerUnit,
+      handlingPerUnit: lead.handlingPerUnit,
+      prs,
+      ...mergePrSources(prs),
+    };
+    if (orig) return { ...orig, ...base };
+    return { id: `${po.id}-li-new${i + 1}-${lead.key}`, poId: po.id, rounds: [], ...base };
+  });
 }
 
 export default function EditPoPage() {
@@ -119,7 +137,7 @@ function EditPoContent() {
   const params = useParams<{ id: string }>();
   const po = usePoOrder(params.id);
 
-  if (!po || po.status === "cancelled" || po.approval === "approved") {
+  if (!po || !poCanEdit(po)) {
     return (
       <main className="mx-auto w-full max-w-6xl px-4 pt-6 pb-24 sm:px-6">
         <div className="mt-10 rounded-xl border border-dashed border-border px-6 py-14 text-center">
@@ -127,7 +145,7 @@ function EditPoContent() {
             {po ? "ใบสั่งซื้อนี้แก้ไขไม่ได้แล้ว" : "ไม่พบใบสั่งซื้อนี้"}
           </p>
           <p className="mt-1 text-sm text-muted-foreground">
-            แก้ไขได้เฉพาะใบที่รออนุมัติหรือไม่อนุมัติ (ส่งกลับแก้ไข) เท่านั้น
+            แก้ไขได้จนกว่าจะเริ่มรับสินค้า — ใบที่ยกเลิกหรือมีของเข้ามาแล้วแก้ไม่ได้
           </p>
           <Button asChild variant="outline-primary" className="mt-4">
             <Link href={po ? `/po/${po.id}` : "/po"}>
@@ -152,7 +170,7 @@ function EditPoForm({ po }: { po: PoDoc }) {
     const base = (addIds.length > 0 && getPoDraft(po.id)) || toFormState(po);
     const have = new Set(base.lines.map((l) => l.key));
     const added = PO_QUEUE_DOCS.filter((d) => addIds.includes(d.id) && !have.has(d.id)).map(toDraftLine);
-    return { ...base, lines: [...base.lines, ...added] };
+    return { ...base, lines: alignGroupPrices([...base.lines, ...added]) };
   });
 
   const addItemsHref = React.useMemo(() => {
@@ -185,7 +203,7 @@ function EditPoForm({ po }: { po: PoDoc }) {
           ? formatDateSlash(expectedRange.from)
           : po.expectedTo,
       note: form.note.trim() || undefined,
-      lineItems: lines.map((l) => toLineItem(po, l)),
+      lineItems: toLineItems(po, lines),
       editedBy: po.requester,
     });
     clearPoDraft(po.id);

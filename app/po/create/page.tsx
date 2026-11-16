@@ -3,7 +3,14 @@
 import * as React from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
-import { lineTotalPrice, PoForm, toDraftLine, type PoFormState } from "@/components/po/po-form";
+import {
+  alignGroupPrices,
+  lineMergeKey,
+  lineTotalPrice,
+  PoForm,
+  toDraftLine,
+  type PoFormState,
+} from "@/components/po/po-form";
 import { formatPoBaht, PO_QUEUE_DOCS } from "@/lib/po";
 
 /* ------------------------------------------------------------------
@@ -41,7 +48,7 @@ function CreatePoForm() {
       poType: searchParams.get("poType") === "poi" ? "poi" : "po",
       company: searchParams.get("company") ?? undefined,
       expectedRange: from ? { from: new Date(from), to: to ? new Date(to) : undefined } : undefined,
-      lines: PO_QUEUE_DOCS.filter((d) => ids.has(d.id)).map(toDraftLine),
+      lines: alignGroupPrices(PO_QUEUE_DOCS.filter((d) => ids.has(d.id)).map(toDraftLine)),
       note: searchParams.get("note") ?? "",
     };
   });
@@ -74,7 +81,8 @@ function CreatePoForm() {
     }
     const totalPrice = lines.reduce((sum, l) => sum + lineTotalPrice(l), 0);
     toast.success("สร้างใบสั่งซื้อแล้ว", {
-      description: `${company} — ${lines.length} รายการ · ${formatPoBaht(totalPrice)} บาท`,
+      // การ์ดสินค้า+บรรจุภัณฑ์เดียวกันรวมเป็นรายการเดียวในใบ
+      description: `${company} — ${new Set(lines.map(lineMergeKey)).size} รายการ · ${formatPoBaht(totalPrice)} บาท`,
     });
     // กลับไปแท็บ "ขอซื้อ" (ที่มาของหน้านี้เสมอ) ไม่ใช่แท็บเริ่มต้น — เผื่อทำ
     // รายการสร้างใบสั่งซื้อถัดไปต่อได้เลย

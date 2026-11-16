@@ -29,8 +29,8 @@ import { PR_CATEGORY_LABEL, PR_REASON_LABEL } from "@/lib/pr";
 /* ------------------------------------------------------------------
    รายละเอียดสินค้าหนึ่งรายการในใบสั่งซื้อ — กดที่แถว/การ์ดในตาราง "รายการ
    สินค้า" ของหน้าใบสั่งซื้อ (app/po/[id]/page.tsx) แล้วเปิด modal นี้ขึ้นมา
-   รวมทุกตัวเลข (สั่งซื้อ/รับเข้า/ไม่ผ่าน/เข้าคลัง/ราคา) กับข้อมูลอ้างอิงจาก
-   ใบขอซื้อ (PR) ต้นทางของรายการนี้ไว้ในที่เดียว ไม่ต้องเลื่อนหาในตารางกว้างๆ
+   รวมทุกตัวเลข (สั่งซื้อ/รับเข้า/ไม่ผ่าน/เข้าคลัง/ราคา) ของรายการนี้ — ยอดรวม
+   จากทุกใบขอซื้อที่รวมมา — แล้วตามด้วยรายการใบขอซื้อ (PR) ต้นทางทีละใบ
 
    ใช้ state ควบคุมจากภายนอก (open/onOpenChange) ตามแบบ CostRowModal
    (components/production/cost-row-modal.tsx) — item เป็น null ได้ตอนปิดอยู่
@@ -91,7 +91,7 @@ export function PoLineItemDetailDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="flex max-h-[85vh] flex-col sm:max-w-lg">
+      <DialogContent className="flex max-h-[85vh] flex-col sm:max-w-2xl">
         <DialogHeader className="text-left">
           <DialogTitle>
             {item.productName}
@@ -111,7 +111,7 @@ export function PoLineItemDetailDialog({
         {/* ---------- ตัวเลขหลักของรายการนี้ — กล่องเน้นสีแบรนด์เหมือนกล่อง
             ราคารวม/วันที่ในหัวใบด้านนอก (Stat ใน app/po/[id]/page.tsx) ปักไว้
             นอกล็อคเลื่อนด้านล่าง เห็นตลอดไม่ว่าจะเลื่อนดูรายละเอียดแค่ไหน ---------- */}
-        <div className="grid grid-cols-2 gap-4 rounded-lg bg-brand p-4">
+        <div className="grid grid-cols-2 gap-4 rounded-lg bg-brand p-4 sm:grid-cols-4">
           <Stat label="สั่งซื้อ" value={`${formatPoQty(item.orderedQty)} ${item.unit}`} />
           <div>
             <Stat label="รับเข้า" value={`${formatPoQty(received)} ${item.unit}`} />
@@ -133,7 +133,7 @@ export function PoLineItemDetailDialog({
             (-mx-6 px-6 ชดเชย padding ของ DialogContent เอง กันแถบเลื่อนไปโผล่
             ทับขอบขวาของเนื้อหา เหมือนกับ CostRowModal) ---------- */}
         <div className="-mx-6 overflow-y-auto px-6">
-          <div className="grid grid-cols-2 gap-4 pb-1 text-sm">
+          <div className="grid grid-cols-2 gap-4 text-sm sm:grid-cols-4">
             {/* น้ำหนักชั่ง/ตามผู้ขาย/ส่วนต่าง — เหมือนคอลัมน์เดียวกันในตาราง
                 "รายการสินค้า" ของหน้าใบสั่งซื้อ (app/po/[id]/page.tsx) มีค่า
                 เฉพาะรายการที่เริ่มรับเข้าไปแล้ว ยังไม่เริ่มโชว์ "-" ทั้งคู่ */}
@@ -178,8 +178,6 @@ export function PoLineItemDetailDialog({
             <Field label="ค่าจัดการต่อหน่วย" value={`${formatPoBaht(item.handlingPerUnit)} บาท`} />
             <Field label="ราคารวมต่อหน่วย" value={`${formatPoBaht(lineItemUnitPrice(item))} บาท`} />
             <Field label="ราคารวมทั้งหมด" value={`${formatPoBaht(lineItemTotalPrice(item))} บาท`} />
-            <Field label="เลขที่ใบขอซื้อ" value={item.prCode} />
-            <Field label="ขอซื้อ" value={`${formatPoQty(item.orderedQty)} ${item.unit}`} />
             <div>
               <Field label="วันที่ต้องการสินค้า" value={item.neededDate} />
               {item.urgent && (
@@ -188,15 +186,39 @@ export function PoLineItemDetailDialog({
                 </div>
               )}
             </div>
-            <Field label="ผู้ขอซื้อ" value={item.requester} />
-            <Field label="ผู้แก้ไขขอซื้อล่าสุด" value={item.editedBy ?? "-"} />
-            <Field label="เหตุผลการซื้อ" value={PR_REASON_LABEL[item.reason]} />
-            <Field
-              className="col-span-2"
-              label="เหตุผลเปลี่ยนข้อมูลสั่งซื้อ"
-              value={item.changeReason ?? "-"}
-            />
           </div>
+
+          {/* ---------- ใบขอซื้อที่รวมมาในรายการนี้ — ใบละกล่อง ยอดด้านบนเป็นผล
+              รวมของทุกใบ (สั่งซื้อรวม, วันที่เร็วสุด, เร่งด่วนถ้ามีใบไหนเร่งด่วน)
+              ใบเดียวก็แสดงแบบเดียวกัน หน้าตาไม่สลับไปมา ---------- */}
+          <h3 className="mt-5 text-sm font-semibold">
+            ใบขอซื้อ <span className="font-normal">({item.prs.length} ใบ)</span>
+          </h3>
+          <ul className="mt-2 space-y-2 pb-1">
+            {item.prs.map((pr) => (
+              <li key={pr.prCode} className="rounded-lg border border-border p-3 text-sm">
+                <p className="flex flex-wrap items-center gap-2 font-semibold">
+                  {pr.prCode}
+                  {pr.urgent && <UrgentChip />}
+                </p>
+                <div className="mt-2 grid grid-cols-2 gap-3 sm:grid-cols-3">
+                  <Field label="วันที่ต้องการสินค้า" value={pr.neededDate} />
+                  <Field label="ขอซื้อ" value={`${formatPoQty(pr.requestedQty)} ${item.unit}`} />
+                  <Field label="สั่งซื้อ" value={`${formatPoQty(pr.orderedQty)} ${item.unit}`} />
+                  <Field label="เหตุผลการซื้อ" value={PR_REASON_LABEL[pr.reason]} />
+                  <Field label="ผู้ขอซื้อ" value={pr.requester} />
+                  <Field label="ผู้แก้ไขขอซื้อล่าสุด" value={pr.editedBy ?? "-"} />
+                  {pr.changeReason && (
+                    <Field
+                      className="col-span-full"
+                      label="เหตุผลเปลี่ยนข้อมูลสั่งซื้อ"
+                      value={pr.changeReason}
+                    />
+                  )}
+                </div>
+              </li>
+            ))}
+          </ul>
         </div>
 
         <DialogFooter>

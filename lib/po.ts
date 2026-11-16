@@ -150,19 +150,15 @@ export type PoLineItem = {
   pricePerUnit: number;
   /** ค่าจัดการต่อหน่วย — บวกกับราคาสั่งต่อหน่วยแล้วได้ราคารวมต่อหน่วยที่แท้จริง */
   handlingPerUnit: number;
+  /** วันที่เร็วที่สุดในบรรดาใบขอซื้อที่รวมมา (ดู mergePrSources) */
   neededDate: string;
+  /** เร่งด่วนถ้ามีใบขอซื้อใบใดใบหนึ่งที่รวมมาเร่งด่วน */
   urgent?: boolean;
-  /** เลขที่ใบขอซื้อ (PR) ต้นทางของรายการนี้ — หนึ่งใบสั่งซื้ออาจรวมมาจาก
-      หลายใบขอซื้อคนละคนกัน จึงเก็บที่ระดับรายการ ไม่ใช่ระดับทั้งใบสั่งซื้อ */
-  prCode: string;
-  /** ผู้ขอซื้อของรายการนี้โดยเฉพาะ — อาจคนละคนกับ PoDoc.requester (คนที่กด
-      สร้างใบสั่งซื้อ) เพราะรวมมาจากคำขอของหลายคนได้ */
-  requester: string;
-  /** มีค่าเฉพาะรายการที่เคยถูกแก้ไขคำขอซื้อหลังส่งคำขอ ไม่ใช่ทุกรายการจะมี */
-  editedBy?: string;
-  reason: PrReason;
-  /** เหตุผลตอนแก้ไขข้อมูลสั่งซื้อภายหลัง — มีค่าเฉพาะรายการที่เคยถูกแก้ไข */
-  changeReason?: string;
+  /** ใบขอซื้อ (PR) ต้นทาง — รายการหนึ่งคือสินค้า+บรรจุภัณฑ์หนึ่งตัวในใบสั่งซื้อ
+      รวมมาจากหลายใบขอซื้อได้ (ราคาต้องเท่ากันอยู่แล้ว ฟอร์มผูกราคาไว้ให้) ตอน
+      แก้ไขแยกกลับเป็นการ์ดตามใบขอซื้อเหล่านี้ ยอดรับเข้า/ค้างรับนับระดับรายการ
+      ไม่แบ่งลงไปต่อใบขอซื้อ */
+  prs: PoPrSource[];
   rounds: PoRound[];
   /** ตัดขายส่ง — ขายต่อให้ลูกค้าก่อนเข้าโรงงาน (ดึงจาก ERP) นับรวมกับยอดรับเข้า
    *  ตอนคิดค้างรับ มีเฉพาะบางรายการ */
@@ -174,6 +170,41 @@ export type PoLineItem = {
   weighedKg?: number;
   sellerWeightKg?: number;
 };
+
+/** ใบขอซื้อหนึ่งใบที่รวมเข้ามาในรายการสินค้าของใบสั่งซื้อ */
+export type PoPrSource = {
+  prCode: string;
+  /** จำนวนที่ใบขอซื้อขอไว้ */
+  requestedQty: number;
+  /** จำนวนที่สั่งจริงสำหรับใบขอซื้อนี้ — แก้ได้ในการ์ดของใบนี้ตอนสร้าง/แก้ไข
+   *  ผลรวมทุกใบคือ PoLineItem.orderedQty */
+  orderedQty: number;
+  neededDate: string;
+  urgent?: boolean;
+  /** ผู้ขอซื้อของใบนี้ — อาจคนละคนกับ PoDoc.requester (คนที่กดสร้างใบสั่งซื้อ) */
+  requester: string;
+  /** มีค่าเฉพาะใบที่เคยถูกแก้ไขคำขอซื้อหลังส่งคำขอ */
+  editedBy?: string;
+  reason: PrReason;
+  /** เหตุผลตอนสั่งต่างจากที่ขอ (จำนวน/บรรจุภัณฑ์) — มีเฉพาะใบที่เปลี่ยน */
+  changeReason?: string;
+};
+
+/** "dd/mm/yyyy" → ตัวเลขเทียบลำดับได้ */
+function dateKey(d: string): number {
+  const [dd, mm, yyyy] = d.split("/").map(Number);
+  return (yyyy || 0) * 10000 + (mm || 0) * 100 + (dd || 0);
+}
+
+/** ค่าระดับรายการที่ได้จากใบขอซื้อที่รวมมา — สั่งซื้อรวม, วันที่ต้องการเร็วสุด,
+ *  เร่งด่วนถ้ามีใบไหนเร่งด่วน */
+export function mergePrSources(prs: PoPrSource[]) {
+  return {
+    orderedQty: prs.reduce((sum, p) => sum + p.orderedQty, 0),
+    neededDate: prs.reduce((a, p) => (dateKey(p.neededDate) < dateKey(a) ? p.neededDate : a), prs[0]?.neededDate ?? ""),
+    urgent: prs.some((p) => p.urgent),
+  };
+}
 
 export type PoDoc = {
   id: string;
@@ -305,6 +336,14 @@ export function poDisplayStatus(doc: PoDoc, closed = doc.closedDaysAgo != null):
 /** เพิ่ม/แก้รอบรับสินค้าได้เฉพาะใบที่อนุมัติแล้ว ยังไม่ยกเลิก และยังไม่ปิดใบ */
 export function poCanAddRound(doc: PoDoc): boolean {
   return doc.status !== "cancelled" && doc.approval === "approved" && doc.closedDaysAgo == null;
+}
+
+/** แก้ไขใบได้จนกว่าจะเริ่มรับสินค้า (มีรอบที่ไม่ใช่แค่ "รอรถขนส่ง") หรือปิดใบ — แก้แล้ว
+ *  แยกรายการกลับเป็นการ์ดตามใบขอซื้อ ถ้ามีของเข้ามาแล้วจะแบ่งยอดย้อนหลังไม่ได้ */
+export function poCanEdit(doc: PoDoc): boolean {
+  return (
+    doc.status !== "cancelled" && doc.closedDaysAgo == null && !doc.lineItems.some(lineItemStarted)
+  );
 }
 
 /** แท็บ "เข้าคลัง" — ใบที่รับสินค้าครบแล้ว หรือปิดใบไปแล้ว */
@@ -566,11 +605,36 @@ function buildPoDoc(
   const company = pick(COMPANY_POOL, rnd);
   const lineCount = 1 + Math.floor(rnd() * 3); // 1-3 รายการต่อใบ
 
+  let prSeq = 0;
+  // สินค้าไม่ซ้ำกันในใบ — สินค้าเดียวกันจากหลายใบขอซื้อรวมอยู่ในรายการเดียวแล้ว
+  const usedProducts = new Set<string>();
   const lineItems: PoLineItem[] = Array.from({ length: lineCount }, (_, i) => {
-    const product = pick(PR_PRODUCTS, rnd);
-    const orderedQty = Math.round((150 + rnd() * 700) / 10) * 10;
+    let product = pick(PR_PRODUCTS, rnd);
+    while (usedProducts.has(product.id)) product = pick(PR_PRODUCTS, rnd);
+    usedProducts.add(product.id);
+    // รายการหนึ่งรวมมาจาก 1-3 ใบขอซื้อ (ส่วนใหญ่ใบเดียว)
+    const prRoll = rnd();
+    const prCount = prRoll < 0.6 ? 1 : prRoll < 0.85 ? 2 : 3;
+    const prs: PoPrSource[] = Array.from({ length: prCount }, () => {
+      prSeq += 1;
+      const requestedQty = Math.round((80 + rnd() * 400) / 10) * 10;
+      const editedBy = rnd() < 0.3 ? pick(PR_REQUESTERS, rnd) : undefined;
+      // ใบที่ถูกแก้จำนวนตอนสั่ง มีเหตุผลเปลี่ยนข้อมูลติดมาด้วย
+      const orderedQty = editedBy ? requestedQty + 50 : requestedQty;
+      return {
+        prCode: `PR2601${pad(day)}/${pad(prSeq)}`,
+        requestedQty,
+        orderedQty,
+        neededDate: `${pad(1 + Math.floor(rnd() * 28))}/${pad(1 + Math.floor(rnd() * 12))}/2026`,
+        urgent: rnd() < 0.25,
+        requester: pick(PR_REQUESTERS, rnd),
+        editedBy,
+        reason: pick<PrReason>(PR_REASONS, rnd),
+        changeReason: editedBy ? pick(CHANGE_REASON_POOL, rnd) : undefined,
+      };
+    });
+    const { orderedQty, neededDate, urgent } = mergePrSources(prs);
     const lineCode = `${code}/${pad(i + 1)}`;
-    const editedBy = rnd() < 0.4 ? pick(PR_REQUESTERS, rnd) : undefined;
     // ยังไม่อนุมัติ (หรือยกเลิก) ก็ยังไม่มีรถมาส่ง — ไม่มีรอบรับเข้าเลย
     // ตัดขายส่งเฉพาะรายการสุดท้ายของใบ (ใบรายการเดียวก็มีได้)
     const wholesaleQty =
@@ -600,14 +664,9 @@ function buildPoDoc(
       orderedQty,
       pricePerUnit: Math.round((1200 + rnd() * 1800) / 10) * 10,
       handlingPerUnit: Math.round((30 + rnd() * 70) / 10) * 10,
-      neededDate: `${pad(1 + Math.floor(rnd() * 28))}/${pad(1 + Math.floor(rnd() * 12))}/2026`,
-      urgent: rnd() < 0.3,
-      // เลขที่ใบขอซื้อ (PR) ต้นทาง — คนละเลขกับใบสั่งซื้อ (PO) ที่รวมมา
-      prCode: `PR2601${pad(day)}/${pad(i + 1)}`,
-      requester: pick(PR_REQUESTERS, rnd),
-      editedBy,
-      reason: pick<PrReason>(PR_REASONS, rnd),
-      changeReason: editedBy ? pick(CHANGE_REASON_POOL, rnd) : undefined,
+      neededDate,
+      urgent,
+      prs,
       rounds,
       wholesaleQty,
       weighedKg,
