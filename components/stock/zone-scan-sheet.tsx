@@ -86,6 +86,7 @@ export function ZoneScanSheet({
     hold: (s) => Boolean(s.zone),
     onHold: setHeld,
     holdLabel: "มีล็อคแล้ว",
+    mockZone: GOODS_ZONES[0],
     describe: (s) => s.code,
     inputId: photoInputId,
   });

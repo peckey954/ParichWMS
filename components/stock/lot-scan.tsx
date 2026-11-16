@@ -55,6 +55,10 @@ const AIM_MS = 1800;
 
 export type ScanLot = { id: string; code: string; zone: string };
 
+/** ผลที่ "กล้อง" จะอ่านได้ — force บังคับผลจำลองเมื่อข้อมูลในใบไม่มีของที่ทำให้เกิดผลนั้นจริง
+ *  เช่น เลือก "มีล็อคแล้ว" แต่ไม่มี Lot ไหนมีล็อค ถ้าไม่บังคับ ชิปจะกลายเป็น "พบ" เงียบๆ */
+type MockRead = { code: string | null; force?: "rejected" | "held" };
+
 export function useLotScanner<L extends ScanLot>({
   lots,
   picked,
@@ -64,6 +68,7 @@ export function useLotScanner<L extends ScanLot>({
   hold,
   onHold,
   holdLabel = "ต้องยืนยันก่อน",
+  mockZone = "",
   describe,
   inputId,
   selectId,
@@ -81,6 +86,8 @@ export function useLotScanner<L extends ScanLot>({
   onHold?: (lot: L) => void;
   /** ชื่อผลจำลองของ hold เช่น "มีล็อคแล้ว" */
   holdLabel?: string;
+  /** ล็อคที่ใช้แสดงตอนบังคับผลจำลอง hold กับ Lot ที่ยังไม่มีล็อค */
+  mockZone?: string;
   /** บรรทัดรองบน toast ตอนเจอ Lot เดียว เช่น "PD…/01 · 80 ตัน" */
   describe: (lot: L) => string;
   inputId: string;
@@ -183,20 +190,30 @@ export function useLotScanner<L extends ScanLot>({
     setScannerOpenState(open);
   }
 
-  /** ป้ายที่ "กล้อง" จะอ่านได้ — Lot แรกที่ยังไม่ได้เลือกและใช้ได้ (ผลจำลองคนละสินค้า = Lot แรกที่ใช้ไม่ได้) */
-  const mockRead = (): string | null => {
+  /** ป้ายที่ "กล้อง" จะอ่านได้ — Lot แรกที่ยังไม่ได้เลือกและใช้ได้
+   *  ผลจำลองคนละสินค้า/มีล็อคแล้ว ใช้ Lot ที่เป็นแบบนั้นจริงก่อน ไม่มีก็บังคับผลกับ Lot แรก */
+  const mockRead = (): MockRead => {
     const { lots: pool, picked: chosen, reject: rejects, hold: holds } = live.current;
-    if (pool.length === 0) return null;
-    if (simulateRef.current === "notfound") return pool[0].code.replace(/\d+$/, "99");
-    if (simulateRef.current === "rejected")
-      return (pool.find((l) => rejects?.(l)) ?? pool.find((l) => !chosen.includes(l.id)))?.code ?? null;
+    if (pool.length === 0) return { code: null };
+    if (simulateRef.current === "notfound") return { code: pool[0].code.replace(/\d+$/, "99") };
     const open = pool.filter((l) => !chosen.includes(l.id) && !rejects?.(l));
-    if (simulateRef.current === "held") return (open.find((l) => holds?.(l)) ?? open[0])?.code ?? null;
+    const first = open[0] ?? pool.find((l) => !chosen.includes(l.id)) ?? pool[0];
+    if (simulateRef.current === "rejected") {
+      const real = pool.find((l) => rejects?.(l));
+      return real ? { code: real.code } : { code: first.code, force: "rejected" };
+    }
+    if (simulateRef.current === "held") {
+      const real = open.find((l) => holds?.(l));
+      return real ? { code: real.code } : { code: first.code, force: "held" };
+    }
     // ป้ายที่ต้องถามก่อนมาทีหลัง — สแกนไล่ไปเรื่อยๆ จะไม่เจอคำถามจนกว่าจะหมดป้ายปกติ
-    return (open.find((l) => !holds?.(l)) ?? open[0])?.code ?? null;
+    return { code: (open.find((l) => !holds?.(l)) ?? open[0])?.code ?? null };
   };
 
-  const applyCode = (code: string | null): { outcome: Outcome; lot?: L; reason?: string } => {
+  const applyCode = (
+    code: string | null,
+    force?: MockRead["force"]
+  ): { outcome: Outcome; lot?: L; reason?: string } => {
     const session = sessionRef.current;
     if (code === null) return { outcome: "empty" };
     const hit = live.current.lots.find((l) => l.code.toUpperCase() === code.trim().toUpperCase());
@@ -204,13 +221,15 @@ export function useLotScanner<L extends ScanLot>({
       session?.missing.push(code);
       return { outcome: "notfound" };
     }
-    const reason = live.current.reject?.(hit);
+    const reason =
+      live.current.reject?.(hit) ?? (force === "rejected" ? "กรุณาสแกน Lot ของสินค้าเดียวกัน" : undefined);
     if (reason) {
       session?.rejected.push({ lot: hit, reason });
       return { outcome: "rejected", lot: hit, reason };
     }
-    if (!live.current.picked.includes(hit.id) && live.current.hold?.(hit)) {
-      live.current.onHold?.(hit);
+    const forceHold = force === "held" && Boolean(live.current.onHold);
+    if (!live.current.picked.includes(hit.id) && (forceHold || live.current.hold?.(hit))) {
+      live.current.onHold?.(forceHold && !hit.zone ? { ...hit, zone: mockZone } : hit);
       return { outcome: "held", lot: hit };
     }
     clearTimeout(flashTimer.current);
@@ -228,8 +247,8 @@ export function useLotScanner<L extends ScanLot>({
       setTimeout(() => {
         // ผลจำลองบางส่วน: รูปคู่ผ่าน รูปคี่ไม่พบ
         const failThis = simulateRef.current === "partial" && index % 2 === 1;
-        const code = failThis ? (live.current.lots[0]?.code.replace(/\d+$/, "99") ?? null) : mockRead();
-        const { outcome } = applyCode(code);
+        const read = failThis ? { code: live.current.lots[0]?.code.replace(/\d+$/, "99") ?? null } : mockRead();
+        const { outcome } = applyCode(read.code, read.force);
         if (index + 1 < total && outcome !== "empty") {
           setReading({ done: index + 1, total });
           readPhoto(total, index + 1);
@@ -251,8 +270,10 @@ export function useLotScanner<L extends ScanLot>({
       return;
     }
     sessionRef.current = { via: "photo", found: [], missing: [], rejected: [] };
-    setReading({ done: 0, total: photos.length });
-    readPhoto(photos.length, 0);
+    // ผลจำลองบางส่วนต้องมีอย่างน้อยสองป้าย — รูปเดียวนับเป็นรูปที่มีสองป้าย (ป้ายหลังอ่านไม่ได้)
+    const total = simulateRef.current === "partial" ? Math.max(2, photos.length) : photos.length;
+    setReading({ done: 0, total });
+    readPhoto(total, 0);
   };
 
   const simulateOptions: { value: Simulate; label: string }[] = [
@@ -371,6 +392,13 @@ export function ScannerDialog({ scan }: { scan: LotScanner }) {
     live.current = { mockRead, applyCode, setScannerOpen, setSimulate, rejectLabel };
   });
 
+  // ชิปผลจำลองบนกล้อง — หน้าสแกนเปิดกล้องทันทีที่เข้า ชิปบนหน้าจึงโดนกล้องบัง
+  // "รูปบางส่วน" เป็นผลของการเลือกรูปเท่านั้น กดบนกล้องแล้วเปิดคลังรูปต่อเลย
+  const pickSimulate = (v: (typeof scan.simulateOptions)[number]["value"]) => {
+    scan.setSimulate(v);
+    if (v === "partial") scan.pickPhotosFromScanner();
+  };
+
   // เปิดกล้องรอบใหม่ ล้างการ์ดแดงของรอบก่อน (ปรับ state ระหว่าง render แทน effect)
   const [wasOpen, setWasOpen] = React.useState(open);
   if (open !== wasOpen) {
@@ -389,11 +417,11 @@ export function ScannerDialog({ scan }: { scan: LotScanner }) {
 
   React.useEffect(() => {
     if (!open) return;
-    const code = live.current.mockRead();
+    const { code, force } = live.current.mockRead();
     setPhase({ kind: "aiming", code });
     let retry: ReturnType<typeof setTimeout> | undefined;
     const t = setTimeout(() => {
-      const { outcome, reason } = live.current.applyCode(code);
+      const { outcome, reason } = live.current.applyCode(code, force);
       setPhase({ kind: outcome, code });
       if (outcome === "notfound" || outcome === "rejected") {
         setError(
@@ -439,13 +467,18 @@ export function ScannerDialog({ scan }: { scan: LotScanner }) {
               <XIcon />
             </Button>
           </div>
-          {/* ภาพกล้องเต็มที่เหลือ — ทับดำ 40% ให้เห็นภาพกล้องอยู่ข้างใต้ มีแค่ปุ่มรูปภาพมุมขวาล่าง
-              ผลจำลองสลับได้ที่กล่องสแกนบนหน้า ไม่โชว์บนกล้อง */}
+          {/* ภาพกล้องเต็มที่เหลือ — ทับดำ 40% ให้เห็นภาพกล้องอยู่ข้างใต้ มีแค่ปุ่มรูปภาพมุมขวาล่าง */}
           <div className="relative min-h-0 flex-1">
             <Viewfinder
               phase={{ kind: phase.kind === "rejected" || phase.kind === "held" ? "found" : phase.kind, code: phase.code }}
               className="h-full bg-black/40"
             />
+            {/* ของจำลอง — ถอดทิ้งพร้อม SimulateToggle เมื่อต่อกล้องจริง */}
+            {phase.kind === "aiming" && !error && (
+              <div className="absolute inset-x-4 top-4">
+                <SimulateToggle dark state={{ simulate: scan.simulate, setSimulate: pickSimulate }} options={scan.simulateOptions} />
+              </div>
+            )}
             <div className="absolute inset-x-6 bottom-[max(1.5rem,env(safe-area-inset-bottom))] flex justify-end max-sm:inset-x-4">
               {error ? (
                 <ResultCard
