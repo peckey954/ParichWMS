@@ -11,6 +11,15 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@peckey954/ui/components/ui/dialog";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableFooter,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@peckey954/ui/components/ui/table";
 import { cn } from "@peckey954/ui/lib/utils";
 import {
   formatPoBaht,
@@ -30,7 +39,9 @@ import { PR_CATEGORY_LABEL, PR_REASON_LABEL } from "@/lib/pr";
    รายละเอียดสินค้าหนึ่งรายการในใบสั่งซื้อ — กดที่แถว/การ์ดในตาราง "รายการ
    สินค้า" ของหน้าใบสั่งซื้อ (app/po/[id]/page.tsx) แล้วเปิด modal นี้ขึ้นมา
    รวมทุกตัวเลข (สั่งซื้อ/รับเข้า/ไม่ผ่าน/เข้าคลัง/ราคา) ของรายการนี้ — ยอดรวม
-   จากทุกใบขอซื้อที่รวมมา — แล้วตามด้วยรายการใบขอซื้อ (PR) ต้นทางทีละใบ
+   จากทุกใบขอซื้อที่รวมมา — แล้วตามด้วยใบขอซื้อ (PR) ต้นทาง
+     ใบเดียว   ช่องข้อมูลใบขอซื้อต่อท้ายราคา ตาม Figma
+     หลายใบ    หัว modal บอกเลขทุกใบ แล้วตารางใบละแถวพร้อมยอดรวมท้าย modal
 
    ใช้ state ควบคุมจากภายนอก (open/onOpenChange) ตามแบบ CostRowModal
    (components/production/cost-row-modal.tsx) — item เป็น null ได้ตอนปิดอยู่
@@ -84,6 +95,8 @@ export function PoLineItemDetailDialog({
     item.weighedKg != null && item.sellerWeightKg != null
       ? item.weighedKg - item.sellerWeightKg
       : undefined;
+  const multi = item.prs.length > 1;
+  const single = multi ? undefined : item.prs[0];
   const weighDiffPercent =
     weighDiff != null && item.sellerWeightKg
       ? (weighDiff / item.sellerWeightKg) * 100
@@ -106,6 +119,13 @@ export function PoLineItemDetailDialog({
               </>
             )}
           </DialogDescription>
+          {/* รวมหลายใบขอซื้อ — บอกตั้งแต่หัว modal ว่ามาจากใบไหนบ้าง รายละเอียดแต่ละใบอยู่ท้าย */}
+          {multi && (
+            <p className="text-sm">
+              <span className="text-muted-foreground">รวมจาก {item.prs.length} ใบขอซื้อ:</span>{" "}
+              <span className="font-medium">{item.prs.map((p) => p.prCode).join(", ")}</span>
+            </p>
+          )}
         </DialogHeader>
 
         {/* ---------- ตัวเลขหลักของรายการนี้ — กล่องเน้นสีแบรนด์เหมือนกล่อง
@@ -178,47 +198,135 @@ export function PoLineItemDetailDialog({
             <Field label="ค่าจัดการต่อหน่วย" value={`${formatPoBaht(item.handlingPerUnit)} บาท`} />
             <Field label="ราคารวมต่อหน่วย" value={`${formatPoBaht(lineItemUnitPrice(item))} บาท`} />
             <Field label="ราคารวมทั้งหมด" value={`${formatPoBaht(lineItemTotalPrice(item))} บาท`} />
+            {/* ใบขอซื้อใบเดียว — ช่องข้อมูลต่อท้ายราคาแบบเดียวกับ Figma */}
+            {single && (
+              <>
+                <Field label="เลขที่ใบขอซื้อ" value={single.prCode} />
+                <Field label="ขอซื้อ" value={`${formatPoQty(single.requestedQty)} ${item.unit}`} />
+              </>
+            )}
             <div>
-              <Field label="วันที่ต้องการสินค้า" value={item.neededDate} />
+              <Field
+                label={multi ? "วันที่ต้องการ (เร็วสุด)" : "วันที่ต้องการสินค้า"}
+                value={item.neededDate}
+              />
               {item.urgent && (
                 <div className="mt-1">
                   <UrgentChip />
                 </div>
               )}
             </div>
+            {single && (
+              <>
+                <Field label="ผู้ขอซื้อ" value={single.requester} />
+                <Field label="ผู้แก้ไขขอซื้อล่าสุด" value={single.editedBy ?? "-"} />
+                <Field label="เหตุผลการซื้อ" value={PR_REASON_LABEL[single.reason]} />
+                <Field
+                  className="col-span-full"
+                  label="เหตุผลเปลี่ยนข้อมูลสั่งซื้อ"
+                  value={single.changeReason ?? "-"}
+                />
+              </>
+            )}
           </div>
 
-          {/* ---------- ใบขอซื้อที่รวมมาในรายการนี้ — ใบละกล่อง ยอดด้านบนเป็นผล
-              รวมของทุกใบ (สั่งซื้อรวม, วันที่เร็วสุด, เร่งด่วนถ้ามีใบไหนเร่งด่วน)
-              ใบเดียวก็แสดงแบบเดียวกัน หน้าตาไม่สลับไปมา ---------- */}
-          <h3 className="mt-5 text-sm font-semibold">
-            ใบขอซื้อ <span className="font-normal">({item.prs.length} ใบ)</span>
-          </h3>
-          <ul className="mt-2 space-y-2 pb-1">
-            {item.prs.map((pr) => (
-              <li key={pr.prCode} className="rounded-lg border border-border p-3 text-sm">
-                <p className="flex flex-wrap items-center gap-2 font-semibold">
-                  {pr.prCode}
-                  {pr.urgent && <UrgentChip />}
-                </p>
-                <div className="mt-2 grid grid-cols-2 gap-3 sm:grid-cols-3">
-                  <Field label="วันที่ต้องการสินค้า" value={pr.neededDate} />
-                  <Field label="ขอซื้อ" value={`${formatPoQty(pr.requestedQty)} ${item.unit}`} />
-                  <Field label="สั่งซื้อ" value={`${formatPoQty(pr.orderedQty)} ${item.unit}`} />
-                  <Field label="เหตุผลการซื้อ" value={PR_REASON_LABEL[pr.reason]} />
-                  <Field label="ผู้ขอซื้อ" value={pr.requester} />
-                  <Field label="ผู้แก้ไขขอซื้อล่าสุด" value={pr.editedBy ?? "-"} />
-                  {pr.changeReason && (
-                    <Field
-                      className="col-span-full"
-                      label="เหตุผลเปลี่ยนข้อมูลสั่งซื้อ"
-                      value={pr.changeReason}
-                    />
-                  )}
-                </div>
-              </li>
-            ))}
-          </ul>
+          {/* ---------- หลายใบขอซื้อ — ใบละแถว ยอดสั่งซื้อรวมทุกใบ = สั่งซื้อในกล่องด้านบน
+              จอกว้างเป็นตาราง จอแคบเป็นการ์ดใบละใบ ---------- */}
+          {multi && (
+            <section className="mt-5 pb-1">
+              <h3 className="text-sm font-semibold">
+                ใบขอซื้อที่รวมมา <span className="font-normal">({item.prs.length} ใบ)</span>
+              </h3>
+
+              <div className="mt-2 hidden overflow-hidden rounded-lg border border-border sm:block">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>เลขที่ใบขอซื้อ</TableHead>
+                      <TableHead className="text-right">ขอซื้อ</TableHead>
+                      <TableHead className="text-right">สั่งซื้อ</TableHead>
+                      <TableHead>วันที่ต้องการ</TableHead>
+                      <TableHead>ผู้ขอซื้อ</TableHead>
+                      <TableHead>เหตุผลการซื้อ</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {item.prs.map((pr) => (
+                      <TableRow key={pr.prCode} className="align-top">
+                        <TableCell className="whitespace-nowrap">
+                          <span className="font-medium">{pr.prCode}</span>
+                          {pr.urgent && (
+                            <span className="ml-1.5">
+                              <UrgentChip />
+                            </span>
+                          )}
+                          {/* แก้ไขหลังส่งคำขอ — ใครแก้ และทำไมสั่งต่างจากที่ขอ */}
+                          {pr.editedBy && (
+                            <span className="mt-1 block max-w-56 text-xs whitespace-normal text-muted-foreground">
+                              แก้ไขโดย {pr.editedBy}
+                              {pr.changeReason && ` · ${pr.changeReason}`}
+                            </span>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-right whitespace-nowrap tabular-nums">
+                          {formatPoQty(pr.requestedQty)}
+                        </TableCell>
+                        <TableCell
+                          className={cn(
+                            "text-right whitespace-nowrap tabular-nums",
+                            pr.orderedQty !== pr.requestedQty && "font-semibold"
+                          )}
+                        >
+                          {formatPoQty(pr.orderedQty)}
+                        </TableCell>
+                        <TableCell className="whitespace-nowrap">{pr.neededDate}</TableCell>
+                        <TableCell className="whitespace-nowrap">{pr.requester}</TableCell>
+                        <TableCell className="whitespace-nowrap">{PR_REASON_LABEL[pr.reason]}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                  <TableFooter>
+                    <TableRow>
+                      <TableCell className="font-semibold">รวม ({item.unit})</TableCell>
+                      <TableCell className="text-right font-semibold tabular-nums">
+                        {formatPoQty(item.prs.reduce((sum, p) => sum + p.requestedQty, 0))}
+                      </TableCell>
+                      <TableCell className="text-right font-semibold tabular-nums">
+                        {formatPoQty(item.orderedQty)}
+                      </TableCell>
+                      <TableCell colSpan={3} />
+                    </TableRow>
+                  </TableFooter>
+                </Table>
+              </div>
+
+              <ul className="mt-2 space-y-2 sm:hidden">
+                {item.prs.map((pr) => (
+                  <li key={pr.prCode} className="rounded-lg border border-border p-3 text-sm">
+                    <p className="flex flex-wrap items-center gap-2 font-semibold">
+                      {pr.prCode}
+                      {pr.urgent && <UrgentChip />}
+                    </p>
+                    <div className="mt-2 grid grid-cols-2 gap-3">
+                      <Field label="ขอซื้อ" value={`${formatPoQty(pr.requestedQty)} ${item.unit}`} />
+                      <Field label="สั่งซื้อ" value={`${formatPoQty(pr.orderedQty)} ${item.unit}`} />
+                      <Field label="วันที่ต้องการสินค้า" value={pr.neededDate} />
+                      <Field label="ผู้ขอซื้อ" value={pr.requester} />
+                      <Field label="เหตุผลการซื้อ" value={PR_REASON_LABEL[pr.reason]} />
+                      <Field label="ผู้แก้ไขขอซื้อล่าสุด" value={pr.editedBy ?? "-"} />
+                      {pr.changeReason && (
+                        <Field
+                          className="col-span-full"
+                          label="เหตุผลเปลี่ยนข้อมูลสั่งซื้อ"
+                          value={pr.changeReason}
+                        />
+                      )}
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
         </div>
 
         <DialogFooter>

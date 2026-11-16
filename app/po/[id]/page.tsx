@@ -678,6 +678,21 @@ function lineItemCode(po: PoDoc, index: number): string {
   return `${po.code}${String.fromCharCode(65 + index)}`;
 }
 
+/** เลขที่ใบขอซื้อของแถว — ใบแรก ตามด้วย "+N ใบ" ถ้ารวมมาหลายใบ
+ *  เลขเต็มทุกใบดูได้ใน modal ที่กดจากแถว (ตารางกว้างอยู่แล้ว ไม่ยัดทุกเลขลงช่อง) */
+function PrCodes({ item }: { item: PoLineItem }) {
+  const [first, ...rest] = item.prs;
+  if (!first) return <span className="text-muted-foreground">-</span>;
+  return (
+    <>
+      <span className="font-medium">{first.prCode}</span>
+      {rest.length > 0 && (
+        <span className="ml-1.5 text-sm text-muted-foreground">+{rest.length} ใบ</span>
+      )}
+    </>
+  );
+}
+
 function LineItemsTable({ po, canAddRound }: { po: PoDoc; canAddRound: boolean }) {
   const cancelled = po.status === "cancelled";
   // กดที่แถว/การ์ดรายการไหนก็ได้เพื่อดูรายละเอียดเต็มของสินค้านั้น — ยกเว้น
@@ -719,6 +734,9 @@ function LineItemsTable({ po, canAddRound }: { po: PoDoc; canAddRound: boolean }
                 {lineItemCode(po, index)}
                 {item.urgent && <UrgentChip />}
               </p>
+              <p className="mt-1 text-muted-foreground">
+                ใบขอซื้อ <PrCodes item={item} />
+              </p>
             </div>
             {canAddRound && (
               <div onClick={(e) => e.stopPropagation()} className="shrink-0">
@@ -739,6 +757,7 @@ function LineItemsTable({ po, canAddRound }: { po: PoDoc; canAddRound: boolean }
               <TableRow>
                 <TableHead className={HEAD_FIRST}>สินค้า</TableHead>
                 <TableHead>เลขที่ใบสั่งซื้อ</TableHead>
+                <TableHead>ใบขอซื้อ</TableHead>
                 <TableHead className="text-right">สั่งซื้อ</TableHead>
                 <TableHead className="text-right">ตัดขายส่ง</TableHead>
                 <TableHead className="text-right">รับเข้า</TableHead>
@@ -789,6 +808,9 @@ function LineItemsTable({ po, canAddRound }: { po: PoDoc; canAddRound: boolean }
                     </TableCell>
                     <TableCell className="whitespace-nowrap">
                       <span className="font-medium">{lineItemCode(po, index)}</span>
+                    </TableCell>
+                    <TableCell className="whitespace-nowrap">
+                      <PrCodes item={item} />
                     </TableCell>
                     <TableCell className="text-right whitespace-nowrap tabular-nums">
                       {formatPoQty(item.orderedQty)} {item.unit}
