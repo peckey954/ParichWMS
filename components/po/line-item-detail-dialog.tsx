@@ -26,7 +26,6 @@ import {
   formatPoQty,
   lineItemFailedQty,
   lineItemPendingQty,
-  lineItemReceivedQty,
   lineItemStockedQty,
   lineItemTotalPrice,
   lineItemUnitPrice,
@@ -38,7 +37,7 @@ import { PR_CATEGORY_LABEL, PR_REASON_LABEL } from "@/lib/pr";
 /* ------------------------------------------------------------------
    รายละเอียดสินค้าหนึ่งรายการในใบสั่งซื้อ — กดที่แถว/การ์ดในตาราง "รายการ
    สินค้า" ของหน้าใบสั่งซื้อ (app/po/[id]/page.tsx) แล้วเปิด modal นี้ขึ้นมา
-   รวมทุกตัวเลข (สั่งซื้อ/รับเข้า/ไม่ผ่าน/เข้าคลัง/ราคา) ของรายการนี้ — ยอดรวม
+   รวมทุกตัวเลข (สั่งซื้อ/ตัดขายส่ง/ไม่ผ่าน/เข้าคลัง/ราคา) ของรายการนี้ — ยอดรวม
    จากทุกใบขอซื้อที่รวมมา — แล้วตามด้วยใบขอซื้อ (PR) ต้นทาง
      ใบเดียว   ช่องข้อมูลใบขอซื้อต่อท้ายราคา ตาม Figma
      หลายใบ    หัว modal บอกเลขทุกใบ แล้วตารางใบละแถวพร้อมยอดรวมท้าย modal
@@ -50,8 +49,8 @@ import { PR_CATEGORY_LABEL, PR_REASON_LABEL } from "@/lib/pr";
    ท้าย modal ปักอยู่กับที่ตลอด มีแค่ล็อคกลาง (ราคา+ข้อมูลอ้างอิง) ที่เลื่อนเอง
    ถ้าเนื้อหายาวเกินจอ (เดิมปล่อยให้ทั้งกล่อง modal เป็นก้อนเดียวแล้วให้ CSS
    จำลองอุปกรณ์ (globals.css, data-device-frame) บีบขนาด+เลื่อนทั้งกล่องแทน —
-   หัว/ท้ายเลื่อนหายไปด้วยเวลาเนื้อหายาว ดูลอยแปลกๆ) กล่องตัวเลขหลัก (สั่งซื้อ/
-   รับเข้า/ไม่ผ่าน/เข้าคลัง) ปักไว้นอกล็อคเลื่อนเช่นกัน เห็นตลอดเวลาเลื่อนดู
+   หัว/ท้ายเลื่อนหายไปด้วยเวลาเนื้อหายาว ดูลอยแปลกๆ) กล่องตัวเลขหลัก (สั่งซื้อ/ตัดขายส่ง/
+   ไม่ผ่าน/เข้าคลัง) ปักไว้นอกล็อคเลื่อนเช่นกัน เห็นตลอดเวลาเลื่อนดู
    รายละเอียดด้านล่าง เหมือนกล่องราคารวมของหน้าใบอนุมัติ (app/approve/[id]/page.tsx)
 ------------------------------------------------------------------ */
 
@@ -85,7 +84,6 @@ export function PoLineItemDetailDialog({
   if (!item) return null;
 
   const cancelled = po.status === "cancelled";
-  const received = lineItemReceivedQty(item);
   const pending = lineItemPendingQty(item);
   const failed = lineItemFailedQty(item);
   const stocked = lineItemStockedQty(item);
@@ -104,7 +102,7 @@ export function PoLineItemDetailDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="flex max-h-[85vh] flex-col sm:max-w-2xl">
+      <DialogContent className="flex max-h-[85vh] flex-col sm:max-w-2xl lg:max-w-5xl">
         <DialogHeader className="text-left">
           <DialogTitle>
             {item.productName}
@@ -131,21 +129,31 @@ export function PoLineItemDetailDialog({
         {/* ---------- ตัวเลขหลักของรายการนี้ — กล่องเน้นสีแบรนด์เหมือนกล่อง
             ราคารวม/วันที่ในหัวใบด้านนอก (Stat ใน app/po/[id]/page.tsx) ปักไว้
             นอกล็อคเลื่อนด้านล่าง เห็นตลอดไม่ว่าจะเลื่อนดูรายละเอียดแค่ไหน ---------- */}
+        {/* ตาม Figma: สั่งซื้อ / ตัดขายส่ง / ไม่ผ่าน / เข้าคลัง — ค้างรับต่อท้ายเข้าคลัง
+            (จอกว้างบรรทัดเดียวกัน จอแคบขึ้นบรรทัดใหม่) ยอดรับเข้าดิบดูได้ที่ตารางรอบการรับสินค้า */}
         <div className="grid grid-cols-2 gap-4 rounded-lg bg-brand p-4 sm:grid-cols-4">
           <Stat label="สั่งซื้อ" value={`${formatPoQty(item.orderedQty)} ${item.unit}`} />
-          <div>
-            <Stat label="รับเข้า" value={`${formatPoQty(received)} ${item.unit}`} />
-            {!cancelled && pending > 0 && (
-              <p className="mt-1 text-sm font-medium text-danger-strong">
-                ค้างรับ {formatPoQty(pending)} {item.unit}
-              </p>
-            )}
-          </div>
+          <Stat
+            label="ตัดขายส่ง"
+            value={item.wholesaleQty ? `${formatPoQty(item.wholesaleQty)} ${item.unit}` : "-"}
+          />
           <Stat
             label="ไม่ผ่าน"
             value={failed > 0 ? `- ${formatPoQty(failed)} ${item.unit}` : "-"}
           />
-          <Stat label="เข้าคลัง" value={`${formatPoQty(stocked)} ${item.unit}`} />
+          <div>
+            <p className="text-sm text-muted-foreground">เข้าคลัง</p>
+            <p className="mt-1 flex flex-wrap items-baseline gap-x-2">
+              <span className="font-semibold tabular-nums">
+                {formatPoQty(stocked)} {item.unit}
+              </span>
+              {!cancelled && pending > 0 && (
+                <span className="basis-full text-sm font-medium text-danger-strong tabular-nums sm:basis-auto">
+                  ค้างรับ {formatPoQty(pending)}
+                </span>
+              )}
+            </p>
+          </div>
         </div>
 
         {/* ---------- ราคา + ข้อมูลอ้างอิงจากใบขอซื้อต้นทาง — ล็อคเดียวที่เลื่อน
@@ -154,18 +162,13 @@ export function PoLineItemDetailDialog({
             ทับขอบขวาของเนื้อหา เหมือนกับ CostRowModal) ---------- */}
         <div className="-mx-6 overflow-y-auto px-6">
           <div className="grid grid-cols-2 gap-4 text-sm sm:grid-cols-4">
-            {/* น้ำหนักชั่ง/ตามผู้ขาย/ส่วนต่าง — เหมือนคอลัมน์เดียวกันในตาราง
-                "รายการสินค้า" ของหน้าใบสั่งซื้อ (app/po/[id]/page.tsx) มีค่า
-                เฉพาะรายการที่เริ่มรับเข้าไปแล้ว ยังไม่เริ่มโชว์ "-" ทั้งคู่ */}
-            <Field
-              label="น้ำหนักชั่ง"
-              value={item.weighedKg != null ? `${formatPoQty(item.weighedKg)} กก.` : "-"}
-            />
+            {/* น้ำหนักตามผู้ขาย/ส่วนต่าง (เทียบน้ำหนักชั่ง) ตาม Figma — น้ำหนักชั่งเองดูที่
+                ตาราง "รายการสินค้า" มีค่าเฉพาะรายการที่เริ่มรับเข้าไปแล้ว ยังไม่เริ่มโชว์ "-" */}
             <Field
               label="น้ำหนักตามผู้ขาย"
               value={item.sellerWeightKg != null ? `${formatPoQty(item.sellerWeightKg)} กก.` : "-"}
             />
-            <div className="col-span-2">
+            <div>
               <p className="text-muted-foreground">ส่วนต่าง</p>
               {weighDiff != null ? (
                 <p className="mt-0.5 flex flex-wrap items-center gap-2">
