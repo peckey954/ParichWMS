@@ -43,7 +43,7 @@ export function LotMenu({ lot }: { lot: Lot }) {
  * ปุ่ม ⋮ บนหัวหน้าสต็อก — ย้าย / ปรับปรุง กดแล้วเข้าหน้าสแกนเลย (หนึ่งใบ สินค้าเดียว หลาย Lot)
  * เป็นงานระดับทั้งหน้า ไม่ผูกกับแท็บ จึงอยู่ข้างชื่อหน้าได้โดยหัวเรื่องไม่กระตุก
  */
-export function BulkMenu({ base }: { base: "/stock" | "/stock/goods" }) {
+export function BulkMenu({ base }: { base: "/stock" | "/stock/goods" | "/stock/raw" }) {
   return (
     <DropdownMenu modal={false}>
       <DropdownMenuTrigger asChild>

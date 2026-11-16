@@ -40,6 +40,7 @@ import {
   type GoodsHistoryRow,
 } from "@/lib/goods-stock";
 import { pad, sampleTruck, truckOf, withCompanion, type WaitDoc, type WaitKind } from "@/lib/goods-waiting";
+import { RAW_HISTORY, rawGroupOf } from "@/lib/raw-stock";
 
 /* ------------------------------------------------------------------
    แท็บประวัติ — หนึ่งการ์ดต่อใบ แบบเดียวกับแท็บรอรับเข้า/จ่าย/คืน
@@ -52,8 +53,12 @@ import { pad, sampleTruck, truckOf, withCompanion, type WaitDoc, type WaitKind }
    ใบอื่นของสต็อกสินค้าเปิดหน้าใบเดิม ส่วนสต็อกทั่วไปยังไม่มีหน้าใบรับเข้า/จ่าย/คืน
 ------------------------------------------------------------------ */
 
-const BASE: Record<StockScope, string> = { general: "/stock", goods: "/stock/goods" };
-const INITIAL: Record<StockScope, HistoryRow[]> = { general: HISTORY_ROWS, goods: GOODS_HISTORY };
+const BASE: Record<StockScope, string> = { general: "/stock", goods: "/stock/goods", raw: "/stock/raw" };
+const INITIAL: Record<StockScope, HistoryRow[]> = {
+  general: HISTORY_ROWS,
+  goods: GOODS_HISTORY,
+  raw: RAW_HISTORY,
+};
 
 const CATEGORY_LABEL = Object.fromEntries(
   [...CATEGORIES, ...GOODS_CATEGORIES].map((c) => [c.id, c.label])
@@ -89,7 +94,8 @@ function groupRows(rows: HistoryRow[]) {
 }
 
 function statusOf(scope: StockScope, r: HistoryRow) {
-  if (scope === "goods") return goodsHistoryStatus(r as GoodsHistoryRow);
+  // สต็อกวัตถุดิบใช้แถวชนิดเดียวกับสต็อกสินค้า (มีประเภท/หมวด)
+  if (scope !== "general") return goodsHistoryStatus(r as GoodsHistoryRow);
   return { key: r.status, label: HISTORY_STATUS_LABEL[r.status] };
 }
 
@@ -99,7 +105,15 @@ function productOf(scope: StockScope, name: string) {
 
 /** แท็กต่อท้ายชื่อสินค้า — ประเภท | หมวด | บรรจุ */
 function tagsOf(scope: StockScope, r: HistoryRow) {
-  if (scope === "goods") {
+  if (scope === "raw") {
+    // แถวที่เพิ่งบันทึกจากหน้าย้าย/ปรับปรุงไม่มีประเภท/หมวดติดมา หาจากสินค้า
+    const g = r as GoodsHistoryRow;
+    const p = productOf(scope, r.productName);
+    const group = g.group ?? rawGroupOf(r.productName);
+    const packing = r.packing ?? (p && p.packing !== group ? p.packing : undefined);
+    return [g.productType ?? (p && CATEGORY_LABEL[p.category]), group, packing].filter(Boolean) as string[];
+  }
+  if (scope !== "general") {
     const t = goodsRowType(r as GoodsHistoryRow);
     return [t.productType, t.group, r.packing].filter(Boolean) as string[];
   }

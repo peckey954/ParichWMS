@@ -32,6 +32,7 @@ import {
   type Product,
 } from "@/lib/general-stock";
 import { GOODS_PRODUCTS, GOODS_ZONES } from "@/lib/goods-stock";
+import { RAW_PRODUCTS, RAW_ZONES } from "@/lib/raw-stock";
 
 /** ผู้ทำรายการ — ยังไม่มีระบบผู้ใช้ ใช้ชื่อเดียวกับข้อมูลตัวอย่างไปก่อน */
 export const ACTOR = "อลิสา พรสุขสิริ";
@@ -51,10 +52,11 @@ export type LotAction = "move" | "adjust";
 export const SCOPES: Record<StockScope, { label: string; href: string; products: Product[]; zones: string[] }> = {
   general: { label: "สต็อกทั่วไป", href: "/stock", products: PRODUCTS, zones: ZONES },
   goods: { label: "สต็อกสินค้า", href: "/stock/goods", products: GOODS_PRODUCTS, zones: GOODS_ZONES },
+  raw: { label: "สต็อกวัตถุดิบ", href: "/stock/raw", products: RAW_PRODUCTS, zones: RAW_ZONES },
 };
 
 export function findLot(id: string) {
-  for (const scope of ["goods", "general"] as const) {
+  for (const scope of ["goods", "general", "raw"] as const) {
     for (const product of SCOPES[scope].products) {
       const lot = product.lots.find((l) => l.id === id);
       if (lot) return { scope, product, lot };

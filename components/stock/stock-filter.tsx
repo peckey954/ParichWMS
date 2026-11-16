@@ -7,11 +7,18 @@ import { Label } from "@peckey954/ui/components/ui/label";
 import { Switch } from "@peckey954/ui/components/ui/switch";
 import { CheckChip } from "@/components/check-chip";
 import { MultiSelectChips } from "@/components/multi-select-chips";
+import { DateRangeSelect, type DateRange } from "@/components/date-select";
+import { Input } from "@peckey954/ui/components/ui/input";
 import { SortControl, type SortOption } from "@/components/sort-control";
+import { cn } from "@peckey954/ui/lib/utils";
 import {
   CATEGORIES,
+  CONDITION_LABEL,
   STOCK_PRODUCT_NAMES,
   type CategoryId,
+  type Lot,
+  type LotCondition,
+  type Product,
   type SortDir,
   type StockSort,
 } from "@/lib/general-stock";
@@ -33,6 +40,16 @@ export type StockView = {
   products: string[];
   sort: StockSort;
   dir: SortDir;
+  /* ---------- ตัวกรองเพิ่มของสต็อกวัตถุดิบ (StockFilter extended) ---------- */
+  /** วันที่รับเข้าของ Lot */
+  received?: DateRange;
+  /** ค้นเลข Lot บางส่วน */
+  lot: string;
+  /** หมวด (Bulk / PNR) */
+  groups: string[];
+  packings: string[];
+  /** สถานะของ Lot — Repack / รับสภาพ / กวาดพื้น */
+  conditions: LotCondition[];
 };
 
 export const STOCK_VIEW_DEFAULT: StockView = {
@@ -43,6 +60,11 @@ export const STOCK_VIEW_DEFAULT: StockView = {
   products: [],
   sort: "product",
   dir: "asc",
+  received: undefined,
+  lot: "",
+  groups: [],
+  packings: [],
+  conditions: [],
 };
 
 export const isStockDefault = (v: StockView) =>
@@ -52,7 +74,40 @@ export const isStockDefault = (v: StockView) =>
   v.sort === STOCK_VIEW_DEFAULT.sort &&
   v.dir === STOCK_VIEW_DEFAULT.dir &&
   v.kinds.length === 0 &&
-  v.products.length === 0;
+  v.products.length === 0 &&
+  !v.received?.from &&
+  !v.lot.trim() &&
+  v.groups.length === 0 &&
+  v.packings.length === 0 &&
+  v.conditions.length === 0;
+
+/** "5/14/2026" → เวลาเริ่มวัน */
+const lotDay = (d: string) => {
+  const [m, day, y] = d.split("/").map(Number);
+  return new Date(y, m - 1, day).getTime();
+};
+
+/** Lot ผ่านตัวกรองระดับ Lot (วันที่รับ / เลข Lot / สถานะ) ไหม */
+export function lotMatches(l: Lot, v: StockView): boolean {
+  if (v.received?.from) {
+    const from = new Date(v.received.from).setHours(0, 0, 0, 0);
+    const to = new Date(v.received.to ?? v.received.from).setHours(23, 59, 59, 999);
+    const t = lotDay(l.receivedAt);
+    if (t < from || t > to) return false;
+  }
+  if (v.lot.trim() && !l.code.toLowerCase().includes(v.lot.trim().toLowerCase())) return false;
+  if (v.conditions.length > 0 && !(l.condition && v.conditions.includes(l.condition))) return false;
+  return true;
+}
+
+/** ตัด Lot ที่ไม่ผ่านตัวกรองระดับ Lot ออก — สินค้าที่ไม่เหลือ Lot เลยหายไปทั้งการ์ด */
+export function applyLotFilters(products: Product[], v: StockView): Product[] {
+  const active = Boolean(v.received?.from) || Boolean(v.lot.trim()) || v.conditions.length > 0;
+  if (!active) return products;
+  return products
+    .map((p) => ({ ...p, lots: p.lots.filter((l) => lotMatches(l, v)) }))
+    .filter((p) => p.lots.length > 0);
+}
 
 
 /**
@@ -75,6 +130,7 @@ export function StockFilter({
   onApply,
   categories = CATEGORIES,
   productNames = STOCK_PRODUCT_NAMES,
+  extended,
 }: {
   view: StockView;
   /** เอาค่าที่แก้ไว้ไปใช้แล้วปิดกล่อง — ยกเลิกใช้กากบาทหรือ Esc */
@@ -82,6 +138,8 @@ export function StockFilter({
   /** ประเภทที่เลือกได้ — สต็อกสินค้ามีแค่สามประเภท ไม่ใช่ทั้งสิบเอ็ดของสต็อกทั่วไป */
   categories?: { id: CategoryId; label: string }[];
   productNames?: string[];
+  /** สต็อกวัตถุดิบ — เพิ่มวันที่ / Lot / หมวด / บรรจุภัณฑ์ / สถานะ จัดสองคอลัมน์ตามแบบ */
+  extended?: { groups: string[]; packings: string[] };
 }) {
   // ค่าที่กำลังแก้อยู่ในกล่อง ยังไม่มีผลกับรายการจนกว่าจะกดตกลง
   const [draft, setDraft] = React.useState(view);
@@ -136,6 +194,30 @@ export function StockFilter({
           </div>
         </Section>
 
+        <div className={cn("space-y-4", extended && "grid gap-x-4 gap-y-4 space-y-0 sm:grid-cols-2")}>
+        {extended && (
+          <>
+            <Section title="วันที่" htmlFor="stock-received">
+              <DateRangeSelect
+                id="stock-received"
+                value={draft.received}
+                onValueChange={(received) => set({ received })}
+                placeholder="เลือกวันที่"
+                className="bg-card"
+              />
+            </Section>
+            <Section title="Lot" htmlFor="stock-lot">
+              <Input
+                id="stock-lot"
+                value={draft.lot}
+                onChange={(e) => set({ lot: e.target.value })}
+                placeholder="ระบุ Lot"
+                className="bg-card"
+              />
+            </Section>
+          </>
+        )}
+
         <Section title="ประเภทสินค้า" htmlFor="stock-kinds">
           <MultiSelectChips
             id="stock-kinds"
@@ -161,6 +243,51 @@ export function StockFilter({
             className="min-h-10 bg-card"
           />
         </Section>
+
+        {extended && (
+          <>
+            <Section title="หมวด" htmlFor="stock-groups">
+              <MultiSelectChips
+                id="stock-groups"
+                options={asOptions(extended.groups)}
+                value={draft.groups}
+                onValueChange={(groups) => set({ groups })}
+                placeholder="เลือกหมวด"
+                searchPlaceholder="ค้นหาหมวด"
+                maxChips={2}
+                className="min-h-10 bg-card"
+              />
+            </Section>
+            <Section title="บรรจุภัณฑ์" htmlFor="stock-packings">
+              <MultiSelectChips
+                id="stock-packings"
+                options={asOptions(extended.packings)}
+                value={draft.packings}
+                onValueChange={(packings) => set({ packings })}
+                placeholder="เลือกบรรจุภัณฑ์"
+                searchPlaceholder="ค้นหาบรรจุภัณฑ์"
+                maxChips={2}
+                className="min-h-10 bg-card"
+              />
+            </Section>
+            <Section title="สถานะ" htmlFor="stock-conditions">
+              <MultiSelectChips
+                id="stock-conditions"
+                options={(Object.keys(CONDITION_LABEL) as LotCondition[]).map((c) => ({
+                  value: c,
+                  label: CONDITION_LABEL[c],
+                }))}
+                value={draft.conditions}
+                onValueChange={(v) => set({ conditions: v as LotCondition[] })}
+                placeholder="เลือกสถานะ"
+                searchPlaceholder="ค้นหาสถานะ"
+                maxChips={2}
+                className="min-h-10 bg-card"
+              />
+            </Section>
+          </>
+        )}
+        </div>
       </div>
 
       {/* สองปุ่มแยกคนละมุม ล้างค่าคือรื้อของที่เพิ่งเลือกทิ้ง ตกลงคือเอาไปใช้

@@ -144,7 +144,14 @@ export const MODULES: ModuleItem[] = [
   },
 
   // ---------- การคลังสินค้า ----------
-  { id: "stock-raw", group: "warehouse", label: "สต็อกวัตถุดิบ", code: "FM-PD-01-03", icon: "warehouse" },
+  {
+    id: "stock-raw",
+    group: "warehouse",
+    label: "สต็อกวัตถุดิบ",
+    code: "FM-PD-01-03",
+    icon: "warehouse",
+    href: "/stock/raw",
+  },
   {
     id: "stock-fg",
     group: "warehouse",

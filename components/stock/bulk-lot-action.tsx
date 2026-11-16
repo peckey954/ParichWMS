@@ -65,6 +65,10 @@ import { GOODS_CATEGORIES } from "@/lib/goods-stock";
    ปรับปรุง: กรอกแค่จำนวนชิ้นที่นับได้จริง (ไม่ชั่งใหม่) ส่วนต่างแปลงเป็นหน่วยสินค้าจากน้ำหนักต่อชิ้น
              ขึ้นเขียว (เกิน) / แดง (ขาด)
    ย้าย: ตั้งต้นย้ายทั้ง Lot แก้ลดได้ เกินคงเหลือเตือนทันที
+
+   สต็อกวัตถุดิบ (byWeight) — หนึ่ง Lot คือจัมโบ้หนึ่งชิ้น แบ่งไม่ได้ (Figma RM Stock)
+     ปรับปรุง: กรอกปริมาณจริงเป็นตัน ทศนิยม .00 ส่วนต่าง = ปริมาณจริง − ปริมาณในคลัง
+     ย้าย: ย้ายทั้ง Lot เสมอ ไม่มีช่องกรอกจำนวน แถวโชว์แค่ปริมาณย้าย
 ------------------------------------------------------------------ */
 
 const PHOTO_INPUT_ID = "bulk-photo";
@@ -103,6 +107,8 @@ function BulkSheet({ scope, action }: { scope: StockScope; action: LotAction }) 
   const router = useRouter();
   const home = SCOPES[scope];
   const move = action === "move";
+  /** วัตถุดิบคีเป็นปริมาณ (ตัน) อย่างเดียว ย้ายทั้ง Lot */
+  const byWeight = scope === "raw";
   const [opened] = React.useState(() => openStamp(action));
 
   const [productId, setProductId] = React.useState("");
@@ -179,7 +185,8 @@ function BulkSheet({ scope, action }: { scope: StockScope; action: LotAction }) 
       setCounts({});
     }
   };
-  const setCount = (id: string, v: string) => setCounts((prev) => ({ ...prev, [id]: v.replace(/\D/g, "") }));
+  const setCount = (id: string, v: string) =>
+    setCounts((prev) => ({ ...prev, [id]: byWeight ? toTons(v) : v.replace(/\D/g, "") }));
 
   // ---------- แถวและยอดรวม ----------
 
@@ -187,12 +194,27 @@ function BulkSheet({ scope, action }: { scope: StockScope; action: LotAction }) 
     const lot = product?.lots.find((l) => l.id === id);
     if (!lot) return [];
     const raw = counts[id] ?? "";
-    const n = Number(raw) || 0;
     const max = lotPieces(lot);
+    // วัตถุดิบย้ายทั้ง Lot เสมอ ไม่มีช่องกรอก
+    const n = byWeight && move ? max : Number(raw) || 0;
     const filled = raw !== "";
     // ส่วนต่าง (ปรับปรุง) หรือ ปริมาณที่ย้ายออก (ย้าย) ในหน่วยของสินค้า
-    const amount = move ? piecesToQty(lot, Math.min(n, max)) : filled ? piecesToQty(lot, n) - lot.qty : 0;
-    const error = move
+    const amount = byWeight
+      ? move
+        ? lot.qty
+        : filled
+          ? Math.round((n - lot.qty) * 100) / 100
+          : 0
+      : move
+        ? piecesToQty(lot, Math.min(n, max))
+        : filled
+          ? piecesToQty(lot, n) - lot.qty
+          : 0;
+    const error = byWeight && move
+      ? submitted && zone && lot.zone === zone
+        ? "อยู่ล็อคนี้แล้ว"
+        : undefined
+      : move
       ? n > max
         ? `เกินคงเหลือ ${formatQty(max)} ${pieceUnit}`
         : submitted && n <= 0
@@ -232,7 +254,8 @@ function BulkSheet({ scope, action }: { scope: StockScope; action: LotAction }) 
         ...(move
           ? { askedCount: r.n, doneCount: r.n, doneQty: r.amount, zoneTo: zone }
           : // ประวัติบันทึก "ส่วนต่าง" ไม่ใช่ยอดที่นับได้ เพราะสิ่งที่เปลี่ยนคือส่วนต่าง
-            { doneCount: r.n - lotPieces(r.lot), doneQty: r.amount }),
+            // วัตถุดิบนับเป็นตัน จำนวนชิ้นไม่เปลี่ยน
+            { doneCount: byWeight ? 0 : r.n - lotPieces(r.lot), doneQty: r.amount }),
         unit,
         zone: r.lot.zone,
         note: note.trim(),
@@ -249,9 +272,16 @@ function BulkSheet({ scope, action }: { scope: StockScope; action: LotAction }) 
 
   const stockLabel = `${decimal ? "ปริมาณ" : "จำนวน"}ในคลัง (${unit})`;
   const amountLabel = move ? `${decimal ? "ปริมาณ" : "จำนวน"}ย้าย (${unit})` : `ส่วนต่าง (${unit})`;
-  const inputLabel = move ? `จำนวนย้าย (${pieceUnit})` : `นับจำนวนจริง (${pieceUnit})`;
+  const inputLabel = byWeight
+    ? `ปริมาณจริง (${unit})`
+    : move
+      ? `จำนวนย้าย (${pieceUnit})`
+      : `นับจำนวนจริง (${pieceUnit})`;
   /** ย้ายสินค้าหน่วยนับเป็นชิ้น/ขวด: ยอดย้ายเท่ากับช่องกรอก จึงไม่โชว์ซ้ำในแถว Lot */
   const showRowAmount = !move || decimal;
+  /** วัตถุดิบย้ายทั้ง Lot — ไม่มีช่องกรอก และไม่โชว์ปริมาณในคลังซ้ำกับปริมาณย้าย */
+  const showInput = !(byWeight && move);
+  const showStock = !(byWeight && move);
   const signed = (v: number) => `${v > 0 ? "+" : ""}${fmt(v)}`;
   const diffTone = (v: number) => cn(v > 0 && "text-success-strong", v < 0 && "text-danger-strong");
 
@@ -278,8 +308,13 @@ function BulkSheet({ scope, action }: { scope: StockScope; action: LotAction }) 
                   </React.Fragment>
                 ))}
               </p>
-              <dl className="mt-4 grid grid-cols-2 gap-6 rounded-xl border border-brand-hover bg-brand px-4 py-5">
-                <Summary label={stockLabel}>{fmt(productTotal(product))}</Summary>
+              <dl
+                className={cn(
+                  "mt-4 grid gap-6 rounded-xl border border-brand-hover bg-brand px-4 py-5",
+                  showStock ? "grid-cols-2" : "grid-cols-1"
+                )}
+              >
+                {showStock && <Summary label={stockLabel}>{fmt(productTotal(product))}</Summary>}
                 <Summary label={amountLabel} className={move ? undefined : diffTone(total)}>
                   {rows.length === 0 || (!move && !anyFilled) ? "-" : move ? fmt(total) : signed(total)}
                 </Summary>
@@ -338,13 +373,17 @@ function BulkSheet({ scope, action }: { scope: StockScope; action: LotAction }) 
                         <TableHead>Lot</TableHead>
                         <TableHead className="w-24">ล็อค</TableHead>
                         <TableHead className="w-28">บรรจุภัณฑ์</TableHead>
-                        <TableHead className="w-32 text-right">
-                          {stockLabel.replace(/ \(/, "\n(")}
-                        </TableHead>
+                        {showStock && (
+                          <TableHead className="w-32 text-right">
+                            {stockLabel.replace(/ \(/, "\n(")}
+                          </TableHead>
+                        )}
                         {showRowAmount && (
                           <TableHead className="w-32 text-right">{amountLabel.replace(/ \(/, "\n(")}</TableHead>
                         )}
-                        <TableHead className="w-36 text-right">{inputLabel.replace(/ \(/, "\n(")}</TableHead>
+                        {showInput && (
+                          <TableHead className="w-36 text-right">{inputLabel.replace(/ \(/, "\n(")}</TableHead>
+                        )}
                         <TableHead className="w-12">
                           <span className="sr-only">ลบ</span>
                         </TableHead>
@@ -356,12 +395,17 @@ function BulkSheet({ scope, action }: { scope: StockScope; action: LotAction }) 
                           <TableCell className="align-top">
                             <span className="block font-medium">{r.lot.code}</span>
                             <span className="block text-sm text-muted-foreground">{lotLine(r.lot)}</span>
+                            {!showInput && r.error && (
+                              <span className="mt-1 block text-xs text-danger-strong">{r.error}</span>
+                            )}
                           </TableCell>
                           <TableCell className="align-top">
                             <ZoneBadge zone={r.lot.zone} />
                           </TableCell>
                           <TableCell className="align-top">{product?.packing || "-"}</TableCell>
-                          <TableCell className="text-right align-top tabular-nums">{fmt(r.lot.qty)}</TableCell>
+                          {showStock && (
+                            <TableCell className="text-right align-top tabular-nums">{fmt(r.lot.qty)}</TableCell>
+                          )}
                           {showRowAmount && (
                             <TableCell
                               className={cn("text-right align-top tabular-nums", !move && r.filled && diffTone(r.amount))}
@@ -369,15 +413,18 @@ function BulkSheet({ scope, action }: { scope: StockScope; action: LotAction }) 
                               {move ? fmt(r.amount) : r.filled ? signed(r.amount) : "-"}
                             </TableCell>
                           )}
-                          <TableCell className="align-top">
-                            <CountInput
-                              id={`bulk-count-${r.lot.id}`}
-                              label={`${inputLabel} ${r.lot.code}`}
-                              value={r.raw}
-                              error={r.error}
-                              onChange={(v) => setCount(r.lot.id, v)}
-                            />
-                          </TableCell>
+                          {showInput ? (
+                            <TableCell className="align-top">
+                              <CountInput
+                                id={`bulk-count-${r.lot.id}`}
+                                label={`${inputLabel} ${r.lot.code}`}
+                                value={r.raw}
+                                error={r.error}
+                                decimal={byWeight}
+                                onChange={(v) => setCount(r.lot.id, v)}
+                              />
+                            </TableCell>
+                          ) : null}
                           <TableCell className="align-top">
                             <Button
                               variant="ghost"
@@ -419,10 +466,12 @@ function BulkSheet({ scope, action }: { scope: StockScope; action: LotAction }) 
                     </div>
                     <p className="mt-1 text-sm text-muted-foreground">{lotLine(r.lot)}</p>
                     <dl className="mt-3 space-y-1.5 border-t border-border pt-3 text-sm">
-                      <div className="flex justify-between gap-3">
-                        <dt className="text-muted-foreground">{stockLabel}:</dt>
-                        <dd className="font-semibold tabular-nums">{fmt(r.lot.qty)}</dd>
-                      </div>
+                      {showStock && (
+                        <div className="flex justify-between gap-3">
+                          <dt className="text-muted-foreground">{stockLabel}:</dt>
+                          <dd className="font-semibold tabular-nums">{fmt(r.lot.qty)}</dd>
+                        </div>
+                      )}
                       {showRowAmount && (
                         <div className="flex justify-between gap-3">
                           <dt className="text-muted-foreground">{amountLabel}:</dt>
@@ -432,18 +481,22 @@ function BulkSheet({ scope, action }: { scope: StockScope; action: LotAction }) 
                         </div>
                       )}
                     </dl>
-                    <div className="mt-3 flex items-start justify-between gap-3">
-                      <Label htmlFor={`m-bulk-count-${r.lot.id}`} className="mt-2.5 font-normal text-muted-foreground">
-                        {inputLabel}:
-                      </Label>
-                      <CountInput
-                        id={`m-bulk-count-${r.lot.id}`}
-                        className="w-40"
-                        value={r.raw}
-                        error={r.error}
-                        onChange={(v) => setCount(r.lot.id, v)}
-                      />
-                    </div>
+                    {showInput && (
+                      <div className="mt-3 flex items-start justify-between gap-3">
+                        <Label htmlFor={`m-bulk-count-${r.lot.id}`} className="mt-2.5 font-normal text-muted-foreground">
+                          {inputLabel}:
+                        </Label>
+                        <CountInput
+                          id={`m-bulk-count-${r.lot.id}`}
+                          className="w-40"
+                          value={r.raw}
+                          error={r.error}
+                          decimal={byWeight}
+                          onChange={(v) => setCount(r.lot.id, v)}
+                        />
+                      </div>
+                    )}
+                    {!showInput && r.error && <p className="mt-2 text-xs text-danger-strong">{r.error}</p>}
                   </div>
                 ))}
               </div>
@@ -550,6 +603,12 @@ export function ZoneBadge({ zone }: { zone: string }) {
   );
 }
 
+/** ปริมาณเป็นตัน — ตัวเลขกับจุดเดียว ทศนิยมไม่เกินสองตำแหน่ง */
+function toTons(v: string) {
+  const [whole, ...rest] = v.replace(/[^\d.]/g, "").split(".");
+  return rest.length === 0 ? whole : `${whole}.${rest.join("").slice(0, 2)}`;
+}
+
 function CountInput({
   id,
   label,
@@ -557,6 +616,7 @@ function CountInput({
   error,
   onChange,
   className,
+  decimal,
 }: {
   id: string;
   label?: string;
@@ -564,14 +624,16 @@ function CountInput({
   error?: string;
   onChange: (v: string) => void;
   className?: string;
+  /** กรอกเป็นตัน มีทศนิยม */
+  decimal?: boolean;
 }) {
   return (
     <div className={className}>
       <Input
         id={id}
         aria-label={label}
-        inputMode="numeric"
-        placeholder="0"
+        inputMode={decimal ? "decimal" : "numeric"}
+        placeholder={decimal ? "0.00" : "0"}
         aria-invalid={Boolean(error) || undefined}
         className={cn("bg-card text-right tabular-nums", error && "border-danger-strong")}
         value={value}

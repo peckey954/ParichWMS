@@ -10,6 +10,7 @@ import { toast } from "sonner";
 import { Crumbs } from "@/components/receiving/parts";
 import { TreeMultiSelect, type TreeGroup } from "@/components/tree-multi-select";
 import { DECIMAL_UNITS, SCOPES, findLot } from "./lot-action";
+import type { StockScope } from "./stock-log";
 import { RemoveLotDialog, Summary, ZoneBadge, productTags } from "./bulk-lot-action";
 import { SimulateToggle } from "./zone-assign";
 import {
@@ -78,7 +79,7 @@ export function LotPrintPage({ lotId }: { lotId: string }) {
   return <PrintSheet key={lotId} scope={found.scope} product={found.product} lot={found.lot} />;
 }
 
-function PrintSheet({ scope, product, lot }: { scope: "goods" | "general"; product: Product; lot: Lot }) {
+function PrintSheet({ scope, product, lot }: { scope: StockScope; product: Product; lot: Lot }) {
   const router = useRouter();
   const home = SCOPES[scope];
   const [code] = React.useState(openCode);

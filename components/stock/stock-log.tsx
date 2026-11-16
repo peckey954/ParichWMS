@@ -15,10 +15,10 @@ import { HISTORY_ROWS, type HistoryRow } from "@/lib/general-stock";
    ประวัติยังมีอยู่ (รีเฟรชแล้วหาย เหมือนข้อมูลเดโมอื่น ๆ)
 ------------------------------------------------------------------ */
 
-/** สต็อกทั่วไปกับสต็อกสินค้ามีประวัติแยกกัน */
-export type StockScope = "general" | "goods";
+/** สต็อกทั่วไป สต็อกสินค้า และสต็อกวัตถุดิบ มีประวัติแยกกัน */
+export type StockScope = "general" | "goods" | "raw";
 
-const ADDED: Record<StockScope, HistoryRow[]> = { general: [], goods: [] };
+const ADDED: Record<StockScope, HistoryRow[]> = { general: [], goods: [], raw: [] };
 let seq = 0;
 
 /** เพิ่มรายการเข้าประวัติของคลังนั้น — เรียกจากหน้าย้าย/ปรับปรุง */
