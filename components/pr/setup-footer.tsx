@@ -30,7 +30,8 @@ export function SetupFooter({
   onSave,
 }: {
   dirty: boolean;
-  onReset: () => void;
+  /** ไม่ส่งมา = หน้านั้นไม่มีปุ่มคืนค่าเริ่มต้น (เช่น ตั้งค่าล็อคสินค้าตามแบบ) */
+  onReset?: () => void;
   onSave: () => void;
 }) {
   const router = useRouter();
@@ -39,7 +40,7 @@ export function SetupFooter({
     <div className="sticky bottom-0 z-30 border-t border-border bg-surface">
       <div className="mx-auto w-full max-w-7xl px-4 py-3 sm:px-8">
         <div className="flex flex-col gap-3 @lg:hidden">
-          {dirty && (
+          {dirty && onReset && (
             <Button variant="outline-primary" className="w-full" onClick={onReset}>
               <RotateCcwIcon />
               คืนค่าเริ่มต้น
@@ -64,10 +65,12 @@ export function SetupFooter({
             ย้อนกลับ
           </Button>
           <div className="flex items-center gap-3">
-            <Button variant="outline-primary" disabled={!dirty} onClick={onReset}>
-              <RotateCcwIcon />
-              คืนค่าเริ่มต้น
-            </Button>
+            {onReset && (
+              <Button variant="outline-primary" disabled={!dirty} onClick={onReset}>
+                <RotateCcwIcon />
+                คืนค่าเริ่มต้น
+              </Button>
+            )}
             <Button onClick={onSave}>บันทึก</Button>
           </div>
         </div>

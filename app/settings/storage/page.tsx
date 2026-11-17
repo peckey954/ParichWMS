@@ -112,7 +112,6 @@ export default function LockSettingsPage() {
     setEntityEnabled,
     moveLocksToWarehouse,
     moveLocksNear,
-    reset,
     dirty,
   } = usePrSetup();
   const warehouses = setup.warehouses;
@@ -595,7 +594,7 @@ export default function LockSettingsPage() {
         </div>
       </main>
 
-      <SetupFooter dirty={dirty.locks} onReset={() => reset("locks")} onSave={save} />
+      <SetupFooter dirty={dirty.locks} onSave={save} />
 
       {/* จอแคบ: ตัวกรองสถานะ */}
       <Dialog open={filterOpen} onOpenChange={setFilterOpen}>
